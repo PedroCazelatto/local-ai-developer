@@ -11,7 +11,7 @@ All of this while not spending a penny. Just using my RTX 3060 and electrical bi
 ## Requirements
 
 - Ollama
-- Dockers
+- Docker
 
 ## Commands
 
@@ -37,4 +37,5 @@ So, Docker developed `Docker Sandbox`, a microVM isolated by hardware to the mod
 
 Reference: https://www.docker.com/blog/docker-sandboxes-run-agents-in-yolo-mode-safely
 
+Instead, I'm using Docker Standard as an alternative
 
