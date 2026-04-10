@@ -1,0 +1,16 @@
+services:
+  developer:
+    image: node:20-slim # Imagem leve com Node.js
+    container_name: dev_sandbox
+    network_mode: none # Isolamento TOTAL de rede (segurança)
+    volumes:
+      - ./projeto-app:/workspace # Mapeia sua pasta local para dentro do container
+    working_dir: /workspace
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'       # Máximo de 2 núcleos
+          memory: 4gb       # Máximo de 4GB de RAM
+    stdin_open: true # Permite que você/IA interaja com o terminal
+    tty: true
+    command: /bin/bash # Mantém o container vivo esperando ordens
