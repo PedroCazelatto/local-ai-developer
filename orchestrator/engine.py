@@ -5,7 +5,6 @@ class Engine:
         self.model = model
 
     def chat(self, messages, tools=None):
-        # Aqui fazemos a chamada ao Ollama passando as ferramentas
         response = ollama.chat(
             model=self.model,
             messages=messages,

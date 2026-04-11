@@ -17,7 +17,7 @@ switch ($Action) {
     }
     "run" {
         if (-not $Project) {
-            Write-Host "Erro: informe o projeto. Ex: .\run.ps1 run HelloWorld"
+            Write-Host "Error: name the project. Ex: .\run.ps1 run hello-world"
         } else {
             & $VENV_PYTHON main.py $Project
         }
@@ -26,6 +26,6 @@ switch ($Action) {
         & $VENV_PYTHON -m pip install -r requirements.txt
     }
     default {
-        Write-Host "Comandos: up, stop, down, install, run [projeto]"
+        Write-Host "Commands: up, stop, down, install, run <project name>"
     }
 }
