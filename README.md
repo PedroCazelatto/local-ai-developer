@@ -39,3 +39,34 @@ Reference: https://www.docker.com/blog/docker-sandboxes-run-agents-in-yolo-mode-
 
 Instead, I'm using Docker Standard as an alternative
 
+## Folders structure
+
+```
+local-ai-developer/
+├── main.py                 # Entry point for the CLI
+├── orchestrator/           # The "Brains"
+│   ├── index.py
+│   ├── engine.py           # Main loop of chat and decisions
+│   ├── docker-client.py    # Docker management
+│   ├── ui.py               # Visual interface for the chat
+│   └── tools/              # All the tools for the model
+│       ├── list-files.py   # List all files of the project
+│       ├── read-file.py    # Read one file of the project
+│       ├── alter-file.py   # Apply changes to one file of the project
+│       ...                 # Other tools that the model might need
+├── rules/                  # Knowledge base for the model
+│   ├── personas/           # Identities that the model assumes
+│   ├── standards/          # Technical patterns to develop with
+│   └── workflows/          # Explanation on how to generate some technical files
+├── projects/               # Where all the projects resides. Each child is a git repo
+│   ├── my-app-1/
+│   ├── my-app-2/
+│   ...
+└── docker-compose.yml      # Base infrastructure
+```
+
+There is two reasons for the `projects` folder to exists:
+
+1. Isolate the logic of the project from all the extra files for the models, as the project can be shipped independently
+2. Single source of truth in one single repo for all the rules of development between all the projects, without the need to clone this repo for every new project or copy altered files if some rule changes.
+
