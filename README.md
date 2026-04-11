@@ -10,12 +10,14 @@ All of this while not spending a penny. Just using my RTX 3060 and electrical bi
 
 ## Requirements
 
-- Ollama
+- Ollama App
 - Docker
+- Python3
 
 ## Commands
 
-`docker compose up`
+- `pip install -r requirements.txt` - Install all the Python dependencies
+- `docker compose up` - To start the docker container with the project
 
 ## Models used
 
