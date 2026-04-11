@@ -25,11 +25,11 @@ I've selected some models to run locally, but you can choose the one that fits y
 2. qwen3.5:27b
 3. qwen3-coder:30b
 
-## Inference
+## AI Inference
 
 To run the model, I'm using Ollama, as it manages the usage of VRAM and RAM seamlessly.
 
-## Interaction Isolation
+## AI Interaction Isolation
 
 As of today, the best solution to let any model run while doing code is to isolate it. It should never have access to your full machine, be it running locally or on cloud.
 
@@ -37,7 +37,15 @@ So, Docker developed `Docker Sandbox`, a microVM isolated by hardware to the mod
 
 Reference: https://www.docker.com/blog/docker-sandboxes-run-agents-in-yolo-mode-safely
 
-Instead, I'm using Docker Standard as an alternative
+Instead, I'm using Docker Standard as an alternative.
+
+## AI Orchestrator
+
+To control all the power of the model and guide it through the thinking process, I'm building this Python Orchestrator, some code to interface the project files and the model, as well as keeping the rest of the system secure.
+
+### Human Interface
+
+To interact with the AI I'm using Rich, a Python lib that can create elegant terminal interfaces.
 
 ## Folders structure
 
