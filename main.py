@@ -1,29 +1,32 @@
 import sys
+import os
 from orchestrator.ui import UI
-from orchestrator.engine import Engine
-from orchestrator.docker_client import DockerClient
-from orchestrator.tool_box import ToolBox
+from orchestrator.index import Orchestrator
 
 def main():
     if len(sys.argv) < 2:
-        print("Uso: python main.py <project-name>")
+        print("Usage: .\run.ps1 run <project-name>")
         return
 
     project_name = sys.argv[1]
     project_path = f"./projects/{project_name}"
 
     ui = UI()
-    docker = DockerClient()
-    tools = ToolBox(project_path)
-    engine = Engine()
+    orc = Orchestrator()
 
-    ui.display_message("system", f"Starting orchestrator for project: {project_name}")
+    ui.display_message("system", f"Active project: {project_name}")
+    ui.log_action("Dynamic tools", orc.get_tools_definition())
 
     while True:
-        user_input = input("> ")
-        if user_input.lower() in ['quit', 'exit']: break
+        user_input = input("\n> ")
+        if user_input.lower() in ['exit', 'quit']: break
 
-        ui.display_message("AI", "Awaiting tool loop implementation...")
+        if user_input == "ls":
+            if 'list_files' in orc.tools:
+                res = orc.tools['list_files'](project_path)
+                ui.display_message("AI", f"Files:\n{res}")
+            else:
+                ui.error("Tool 'list_files' not loaded.")
 
 if __name__ == "__main__":
     main()
