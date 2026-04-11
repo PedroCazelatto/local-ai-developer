@@ -4,7 +4,7 @@ services:
     container_name: dev_sandbox
     network_mode: none # Isolamento TOTAL de rede (segurança)
     volumes:
-      - ./projeto-app:/workspace # Mapeia sua pasta local para dentro do container
+      - ./projects:/workspace # Mapeia sua pasta local para dentro do container
     working_dir: /workspace
     deploy:
       resources:
