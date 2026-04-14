@@ -1,14 +1,16 @@
-# Ambientes virtuais
-.venv/
-__pycache__/
-*.py[cod]
-
-# Docker
 .env
 
-# Projetos (Ignora tudo dentro de projects, exceto a pasta e o HelloWorld)
+# Projects (except hello-world - example project)
 projects/*
 !projects/hello-world/
 
-# Logs e arquivos temporários
+# Logs
+logs
 *.log
+npm-debug.log*
+
+# Node
+node_modules
+dist
+dist-ssr
+*.local
