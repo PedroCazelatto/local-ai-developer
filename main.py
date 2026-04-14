@@ -1,47 +1,35 @@
 import sys
 import os
-from orchestrator.ui import UI
+from dotenv import load_dotenv
 from orchestrator.index import Orchestrator
+
+load_dotenv()
 
 def main():
     if len(sys.argv) < 2:
-        print("Usage: .\run.ps1 run <project-name>")
+        print("Usage: .\run.ps1 start <project-name>")
         return
 
     project_name = sys.argv[1]
-    project_path = f"./projects/{project_name}"
+    project_path = os.path.abspath(f"./projects/{project_name}")
 
-    ui = UI()
-    orc = Orchestrator()
+    if not os.path.exists(project_path):
+        os.makedirs(project_path, exist_ok=True)
 
-    ui.display_message("system", f"Active project: {project_name}")
-    ui.log_action("Dynamic tools", orc.get_tools_definition())
+    orc = Orchestrator(project_name, project_path)
+    orc.start()
 
     while True:
-        user_input = input("\n> ").strip()
-        if user_input.lower() in ['exit', 'quit']: break
+        user_input = input("\nYou > ").strip()
 
-        # Teste de Listagem
-        if user_input == "ls":
-            res = orc.tools['list_files'](project_path)
-            ui.display_message("AI", f"Files:\n{res}")
+        if user_input.lower() in ['exit', 'quit']:
+            orc.ui.display_message("system", "Shutting down...")
+            break
 
-        # Teste de Escrita: "write nome-do-arquivo conteudo"
-        elif user_input.startswith("write "):
-            try:
-                # Divide o comando: write [0] arquivo.txt [1] conteudo [2:]
-                parts = user_input.split(" ", 2)
-                file_name = parts[1]
-                content = parts[2] if len(parts) > 2 else "Test default content"
+        if not user_input:
+            continue
 
-                # Chama a tool que criamos anteriormente
-                res = orc.tools['write_file'](project_path, file_name, content)
-                ui.display_message("AI", res)
-            except Exception as e:
-                ui.error(f"Invalid format. Usage: write file.txt Your content here")
-
-        else:
-            ui.display_message("system", "Available commands: ls, write [file] [content], quit")
+        orc.process_command(user_input)
 
 if __name__ == "__main__":
     main()
