@@ -16,8 +16,20 @@ All of this while not spending a penny. Just using my RTX 3060 and electrical bi
 
 ## Commands
 
-- `pip install -r requirements.txt` - Install all the Python dependencies
-- `docker compose up` - To start the docker container with the project
+### To run the application
+
+Remember to copy `.env.example` to `.env` to start the application
+
+- `.\run.ps1 start <project-name>` - To start the application focused on _project-name_
+- `.\run.ps1 stop` - To shutdown docker
+
+### Application commands
+
+These commands only run on the Rich Terminal
+
+- `/switch [architect / dev]` - Change the model behavior
+- `/clear` - Clear the terminal and resets model context
+- `exit / quit` - To stop the application
 
 ## Models used
 
@@ -26,6 +38,8 @@ I've selected some models to run locally, but you can choose the one that fits y
 1. qwen2.5-coder:14b
 2. qwen3.5:27b
 3. qwen3-coder:30b
+
+Just change the model on `.env`
 
 ## AI Inference
 
