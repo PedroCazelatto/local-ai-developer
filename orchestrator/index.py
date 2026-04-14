@@ -50,8 +50,11 @@ class Orchestrator:
         self.active_agent = agent_name
         self.ui.show_agent_status(agent_name)
 
-        new_system_prompt = self.context_builder.build_prompt(agent_name)
-        self.llm.clear_context(new_system_prompt)
+        system_prompt = self.context_builder.build_prompt(agent_name)
+
+        system_prompt += f"\n\nCURRENT_PROJECT: {self.project_name}"
+
+        self.llm.clear_context(system_prompt)
 
     def process_command(self, user_input):
         if user_input.startswith("/"):
@@ -60,7 +63,8 @@ class Orchestrator:
 
         self.ui.display_message("user", user_input)
 
-        response = self.llm.chat(user_input, tools=self.tool_manager.get_tools_definition())
+        with self.ui.console.status(f"[bold {self.active_agent}]The {self.active_agent} is thinking...", spinner="dots"):
+            response = self.llm.chat(user_input, tools=self.tool_manager.get_tools_definition())
 
         if response.get('tool_calls'):
             for tool_call in response['tool_calls']:
@@ -72,9 +76,19 @@ class Orchestrator:
                 result = self.tool_manager.execute_tool(tool_name, tool_args)
                 self.ui.log_action("Tool Result", result)
 
-                follow_up_response = self.llm.chat(
-                    user_message=f"System Notification: Tool '{tool_name}' executed. Result:\n{result}"
-                )
-                self.ui.display_message(self.active_agent, follow_up_response.get('content', 'Done.'))
+                with self.ui.console.status("[dim]Processando resultado da ferramenta..."):
+                    follow_up = self.llm.chat(
+                        user_message=f"System Notification: Tool '{tool_name}' executed. Result: {result}"
+                    )
+
+                # Só exibe a resposta final após a ferramenta
+                if follow_up.get('content'):
+                    self.ui.display_message(self.active_agent, follow_up.get('content'))
+
         elif response.get('content'):
-            self.ui.display_message(self.active_agent, response.get('content'))
+            content = response.get('content').strip()
+
+            if content.startswith("```json") or content.startswith("{"):
+                self.ui.log_action("System", "Model formatted tool as text. Ignoring...")
+            else:
+                self.ui.display_message(self.active_agent, content)

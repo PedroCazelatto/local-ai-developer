@@ -13,4 +13,13 @@ class ContextBuilder:
                     with open(os.path.join(root, file), 'r', encoding='utf-8') as f:
                         prompt += f"\n--- RULE: {file} ---\n"
                         prompt += f.read() + "\n"
+
+        prompt += """
+        ---
+        CRITICAL INSTRUCTION:
+        - Never write JSON blocks or tool calls in the chat.
+        - If you need to use a tool, trigger the function call silently.
+        - If you are calling a tool, do not provide any text explanation in the same message.
+        - Respond in plain text only after receiving the tool result.
+        """
         return prompt

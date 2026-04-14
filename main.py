@@ -20,7 +20,7 @@ def main():
     orc.start()
 
     while True:
-        user_input = input("\nYou > ").strip()
+        user_input = input("").strip()
 
         if user_input.lower() in ['exit', 'quit']:
             orc.ui.display_message("system", "Shutting down...")
