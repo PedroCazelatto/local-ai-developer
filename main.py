@@ -7,7 +7,7 @@ load_dotenv()
 
 def main():
     if len(sys.argv) < 2:
-        print("Usage: .\run.ps1 start <project-name>")
+        print("Usage: .\\run.ps1 start <project-name>")
         return
 
     project_name = sys.argv[1]
@@ -20,7 +20,7 @@ def main():
     orc.start()
 
     while True:
-        user_input = input("").strip()
+        user_input = orc.ui.get_input()
 
         if user_input.lower() in ['exit', 'quit']:
             orc.ui.display_message("system", "Shutting down...")
