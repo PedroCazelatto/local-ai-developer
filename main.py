@@ -23,7 +23,6 @@ def main():
         user_input = orc.ui.get_input()
 
         if user_input.lower() in ['exit', 'quit']:
-            orc.ui.display_message("system", "Shutting down...")
             break
 
         if not user_input:

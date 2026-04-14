@@ -3,6 +3,7 @@ from orchestrator.llm_client import LLMClient
 from orchestrator.context_builder import ContextBuilder
 from orchestrator.tool_manager import ToolManager
 from orchestrator.command_manager import CommandManager
+from rich.live import Live
 import ollama
 
 class Orchestrator:
@@ -18,40 +19,25 @@ class Orchestrator:
 
     def start(self):
         self.ui.clear_screen()
-        self.ui.display_message("system", f"Project Context: {self.project_name}")
         self._setup_initial_model()
         self.switch_agent(self.active_agent)
+        self.ui.console.print(self.ui.get_layout(self.llm.total_tokens, self.llm.context_limit))
 
     def _setup_initial_model(self):
         try:
             models_info = ollama.list()
-            available = []
-            for m in models_info.get('models', []):
-                if isinstance(m, dict):
-                    name = m.get('model') or m.get('name')
-                else:
-                    name = getattr(m, 'model', getattr(m, 'name', None))
-                if name:
-                    available.append(name)
-
+            available = [m.get('model') or m.get('name') for m in models_info.get('models', [])]
             default = "qwen2.5-coder:14b"
-            if default in available:
-                self.llm.set_model(default)
-                self.ui.log_action("System", f"Default model loaded: {default}")
-            elif available:
-                self.llm.set_model(available[0])
-                self.ui.log_action("System", f"Default not found. Using: {available[0]}")
-            else:
-                self.ui.error("No models found. Use /models pull <name>")
-        except Exception as e:
-            self.ui.error(f"Initialization error: {str(e)}")
+            model_to_use = default if default in available else (available[0] if available else None)
+            if model_to_use:
+                self.llm.set_model(model_to_use)
+        except:
+            pass
 
     def switch_agent(self, agent_name):
         self.active_agent = agent_name
-        self.ui.show_agent_status(agent_name)
         system_prompt = self.context_builder.build_prompt(agent_name)
         system_prompt += f"\n\nCURRENT_PROJECT: {self.project_name}"
-        system_prompt += "\nCRITICAL INSTRUCTION: Never write JSON blocks or tool calls in the chat. Trigger function calls silently. Respond in plain text only after receiving the tool result."
         self.llm.clear_context(system_prompt)
 
     def process_command(self, user_input):
@@ -59,63 +45,38 @@ class Orchestrator:
             self.cmd_manager.execute(user_input)
             return
 
+        self.ui.update_history("user", user_input)
         agent_color = "magenta" if self.active_agent == "architect" else "cyan"
-        self.ui.console.print(f"\n[{agent_color}][bold]{self.active_agent.upper()} >[/bold] ", end="")
 
-        tool_calls_to_execute = []
-        status = self.ui.console.status(f"[{agent_color}]The {self.active_agent} is thinking...", spinner="dots")
-        status.start()
-        first_chunk = False
+        with Live(self.ui.get_layout(self.llm.total_tokens, self.llm.context_limit, is_thinking=True, agent_name=self.active_agent), screen=True, auto_refresh=True) as live:
 
-        try:
+            tool_calls = []
+            first_chunk = False
+
             for response in self.llm.chat_stream(user_input, tools=self.tool_manager.get_tools_definition()):
-                if "error" in response:
-                    status.stop()
-                    self.ui.error(response["error"])
-                    return
-
-                if not first_chunk:
-                    status.stop()
+                if not first_chunk and "chunk" in response:
                     first_chunk = True
+                    self.ui.update_history(self.active_agent, "", agent_color)
 
                 if "chunk" in response:
-                    self.ui.console.print(f"[{agent_color}]{response['chunk']}[/{agent_color}]", end="")
+                    self.ui.chat_history.append(response["chunk"], style=agent_color)
+                    live.update(self.ui.get_layout(self.llm.total_tokens, self.llm.context_limit))
 
                 if "tool_calls" in response:
-                    tool_calls_to_execute = response["tool_calls"]
-        finally:
-            if not first_chunk:
-                status.stop()
+                    tool_calls = response["tool_calls"]
 
-        self.ui.console.print()
+            if tool_calls:
+                for tc in tool_calls:
+                    self.ui.update_history("system", f"Executing {tc['function']['name']}...", "yellow")
+                    res = self.tool_manager.execute_tool(tc['function']['name'], tc['function']['arguments'])
 
-        if tool_calls_to_execute:
-            for tool_call in tool_calls_to_execute:
-                tool_name = tool_call['function']['name']
-                tool_args = tool_call['function']['arguments']
+                    live.update(self.ui.get_layout(self.llm.total_tokens, self.llm.context_limit, is_thinking=True, agent_name=self.active_agent))
 
-                self.ui.log_action("Tool", f"Executing {tool_name}...")
-                result = self.tool_manager.execute_tool(tool_name, tool_args)
-
-                self.ui.console.print(f"\n[{agent_color}][bold]{self.active_agent.upper()} >[/bold] ", end="")
-
-                tool_status = self.ui.console.status(f"[{agent_color}]Processing tool result...", spinner="dots")
-                tool_status.start()
-                first_tool_chunk = False
-
-                follow_up_msg = f"System Notification: Tool '{tool_name}' executed. Result: {result}"
-                try:
-                    for response in self.llm.chat_stream(user_message=follow_up_msg):
-                        if not first_tool_chunk:
-                            tool_status.stop()
-                            first_tool_chunk = True
-
+                    self.ui.update_history(self.active_agent, "", agent_color)
+                    for response in self.llm.chat_stream(user_message=f"Result: {res}"):
                         if "chunk" in response:
-                            self.ui.console.print(f"[{agent_color}]{response['chunk']}[/{agent_color}]", end="")
-                finally:
-                    if not first_tool_chunk:
-                        tool_status.stop()
+                            self.ui.chat_history.append(response["chunk"], style=agent_color)
+                            live.update(self.ui.get_layout(self.llm.total_tokens, self.llm.context_limit))
 
-                self.ui.console.print()
-
-        self.ui.log_action("Context", f"{self.llm.total_tokens} tokens used in current memory")
+        self.ui.console.clear()
+        self.ui.console.print(self.ui.get_layout(self.llm.total_tokens, self.llm.context_limit))
