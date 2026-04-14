@@ -18,8 +18,7 @@ All of this while not spending a penny. Just using my RTX 3060 and electrical bi
 
 ### To run the application
 
-Remember to copy `.env.example` to `.env` to start the application
-
+- `.\run.ps1 install` - To install everything
 - `.\run.ps1 start <project-name>` - To start the application focused on _project-name_
 - `.\run.ps1 stop` - To shutdown docker
 
@@ -29,6 +28,8 @@ These commands only run on the Rich Terminal
 
 - `/switch [architect / dev]` - Change the model behavior
 - `/clear` - Clear the terminal and resets model context
+- `/models list` - To list all available Ollama models
+- `/models pull <model-name>` - To download _model-name_ locally
 - `exit / quit` - To stop the application
 
 ## Models used
