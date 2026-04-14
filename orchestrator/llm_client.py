@@ -57,7 +57,7 @@ class LLMClient:
                     tool_calls = msg['tool_calls']
 
                 if chunk.get('done'):
-                    self.total_tokens = chunk.get('prompt_eval_count', 0) + chunk.get('eval_count', 0)
+                    self.total_tokens += chunk.get('prompt_eval_count', 0) + chunk.get('eval_count', 0)
 
             final_msg = {'role': 'assistant', 'content': full_content}
             if tool_calls:
