@@ -62,33 +62,32 @@ To control all the power of the model and guide it through the thinking process,
 
 ### Human Interface
 
-To interact with the AI I've created the interface on a Vite Frontend. It calls Ollama local API directly, so there is no backend for the project.
+To interact with the AI I've created an interface using Python and Rich.
 
 ## Folders structure
 
 ```
 local-ai-developer/
-├── docker-compose.yml      # Instructions to containerize the frontend application.
-├── projects/               # Where all the projects resides. Each child is a git repo
-│   ├── my-app-1/
-│   ├── my-app-2/
-│   ...
+├── main.py                 # Entry point for the CLI
+├── orchestrator/           # The "Brains"
+│   ├── index.py
+│   ├── engine.py           # Main loop of chat and decisions
+│   ├── docker-client.py    # Docker management
+│   ├── ui.py               # Visual interface for the chat
+│   └── tools/              # All the tools for the model
+│       ├── list-files.py   # List all files of the project
+│       ├── read-file.py    # Read one file of the project
+│       ├── alter-file.py   # Apply changes to one file of the project
+│       ...                 # Other tools that the model might need
 ├── rules/                  # Knowledge base for the model
 │   ├── personas/           # Identities that the model assumes
 │   ├── standards/          # Technical patterns to develop with
 │   └── workflows/          # Explanation on how to generate some technical files
-└── src/
-    ├── types/              # Type definitions for Ollama API responses and internal contracts.
-    ├── domain/             # Business logic and domain entities (Stateless logic).
-    │   ├── entities/       # Core objects like Message, Session, and Agent.
-    │   └── services/       # Abstract service definitions for chat and file handling.
-    ├── infra/              # External implementations and API adapters.
-    │   └── ollama/         # Service to handle fetch/stream logic with the local Ollama API.
-    ├── ui/                 # React components, hooks, and global styling.
-    │   ├── components/     # UI elements (Chat, Bubbles, Inputs, Progress Bars).
-    │   ├── hooks/          # Custom hooks for managing chat streams and project state.
-    │   └── App.tsx         # Main application entry point.
-    └── main.tsx            # Vite entry point.
+├── projects/               # Where all the projects resides. Each child is a git repo
+│   ├── my-app-1/
+│   ├── my-app-2/
+│   ...
+└── docker-compose.yml      # Base infrastructure
 
 ```
 
