@@ -1,4 +1,5 @@
 .env
+.venv
 
 # Projects (except hello-world - example project)
 projects/*
@@ -7,10 +8,5 @@ projects/*
 # Logs
 logs
 *.log
-npm-debug.log*
 
-# Node
-node_modules
-dist
-dist-ssr
-*.local
+__pycache__/

@@ -5,13 +5,13 @@ $VENV_PYTHON = ".\.venv\Scripts\python.exe"
 switch ($Action) {
     "start" {
         if (-not $Project) {
-            Write-Host "❌ Error: Project name required. Example: .\run.ps1 start hello-world" -ForegroundColor Red
+            Write-Host "Error: Project name required. Example: .\run.ps1 start hello-world" -ForegroundColor Red
             return
         }
         try {
-            Write-Host "🚀 Starting infrastructure..." -ForegroundColor Cyan
+            Write-Host "Starting infrastructure..." -ForegroundColor Cyan
             docker compose up -d
-            Write-Host "🧠 Initializing Local AI Architect..." -ForegroundColor Green
+            Write-Host "Initializing Local AI Architect..." -ForegroundColor Green
             & $VENV_PYTHON main.py $Project
         }
         finally {
@@ -21,7 +21,7 @@ switch ($Action) {
     }
     "run" {
         if (-not $Project) {
-            Write-Host "❌ Error: Project name required. Example: .\run.ps1 run hello-world" -ForegroundColor Red
+            Write-Host "Error: Project name required. Example: .\run.ps1 run hello-world" -ForegroundColor Red
         } else {
             & $VENV_PYTHON main.py $Project
         }
@@ -29,7 +29,14 @@ switch ($Action) {
     "up" { docker compose up -d }
     "stop" { docker compose stop }
     "down" { docker compose down }
-    "install" { & $VENV_PYTHON -m pip install -r requirements.txt }
+    "install" {
+        if (-not (Test-Path ".\.venv")) {
+            Write-Host "Creating Virtual Environment..." -ForegroundColor Cyan
+            python -m venv .venv
+        }
+        Write-Host "Installing dependencies..." -ForegroundColor Green
+        & $VENV_PYTHON -m pip install -r requirements.txt
+    }
     default {
         Write-Host "Available Commands:" -ForegroundColor Cyan
         Write-Host "  start <project>   : Starts Docker and runs the AI (Recommended)"
