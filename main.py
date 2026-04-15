@@ -1,34 +1,19 @@
 import sys
-import os
-from dotenv import load_dotenv
-from orchestrator.index import Orchestrator
+from orchestrator.engine import OrchestratorEngine
 
-load_dotenv()
-
-def main():
+def main() -> None:
     if len(sys.argv) < 2:
-        print("Usage: .\\run.ps1 start <project-name>")
-        return
+        print("Usage: python main.py <project_name>")
+        sys.exit(1)
 
     project_name = sys.argv[1]
-    project_path = os.path.abspath(f"./projects/{project_name}")
+    engine = OrchestratorEngine(model_name="qwen2.5-coder:14b")
 
-    if not os.path.exists(project_path):
-        os.makedirs(project_path, exist_ok=True)
-
-    orc = Orchestrator(project_name, project_path)
-    orc.start()
-
-    while True:
-        user_input = orc.ui.get_input()
-
-        if user_input.lower() in ['exit', 'quit']:
-            break
-
-        if not user_input:
-            continue
-
-        orc.process_command(user_input)
+    try:
+        engine.start()
+    except Exception as e:
+        print(f"Fatal error: {e}")
+        sys.exit(1)
 
 if __name__ == "__main__":
     main()
