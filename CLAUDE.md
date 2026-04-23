@@ -28,12 +28,21 @@ A Python CLI that orchestrates a **locally-run** Ollama model to autonomously de
 ## How a session works
 
 1. `.\run.ps1 start <project-name>` boots the orchestrator locked to one project. Switching projects requires restarting `main.py`.
-2. Pedro interacts with the **architect** persona to produce a written plan. Plans are project-scoped artifacts stored **inside the project repo** (not in the orchestrator repo) — the project carries its own agent files.
-3. Architect hands off narrower tasks to the **tester** (writes failing tests first) and then the **developer** (implements against those tests). Tester also runs after implementation to check for unexpected regressions.
+2. Pedro drives a planning-oriented persona (Explorer → Architect → Product Owner → Prioritizer) to produce a written plan. Plans are project-scoped artifacts stored **inside the project repo** (not in the orchestrator repo) — the project carries its own agent files.
+3. The plan is sliced into narrower tasks picked up by the **Developer**; the **Reviewer** checks the result after each phase. Test-first discipline lives inside the Developer persona (failing tests before implementation).
 4. Pedro only interacts while planning and between phases. Within a phase the model runs autonomously with no per-tool confirmation.
 5. At the end of each phase, the in-memory context is cleared.
 
-Persona list is not fixed — new personas can be added. Current files: [rules/personas/architect_po.md](rules/personas/architect_po.md).
+### Planned personas (names provisional)
+
+- **Explorer** — runs discovery to extract product requirements from Pedro.
+- **Architect** — designs system architecture, boundaries, deployment.
+- **Product Owner** — transforms requirements into tasks.
+- **Prioritizer** — orders requirements/tasks by priority (name TBD).
+- **Developer** — transforms tasks into code, writing failing tests first.
+- **Reviewer** — reviews output (may split into logic-focused and standards-focused sub-personas).
+
+The list is open — new personas can be added.
 
 ## Memory model
 
@@ -47,13 +56,24 @@ Minimize persistent context to save tokens (local inference is VRAM-bound).
 
 Rules are all Markdown, under [rules/](rules/), and are **global** (projects are agnostic to the orchestrator and do not override rules).
 
-- **Personas** ([rules/personas/](rules/personas/)): injected automatically when the active persona is loaded.
-- **Standards** ([rules/standards/](rules/standards/)) and **Workflows** ([rules/workflows/](rules/workflows/)): the model receives a catalog (name + description) and pulls specific files on demand via a tool call. Exact tool shape is TBD — propose designs before implementing.
+Two folders only:
+- **Personas** ([rules/personas/](rules/personas/)): injected automatically when the active persona is loaded. A persona file contains the role definition *and* the workflows it owns — each workflow belongs to exactly one persona. There is no separate `workflows/` folder.
+- **Standards** ([rules/standards/](rules/standards/)): loaded on demand via tool call. Intended to grow freely.
+
+### Retrieval: LLM-delegated search
+
+To keep the main context lean, the standards catalog is **not** in the system prompt. Two tools:
+
+1. `search_rules(intent: str)` — the model describes what it needs. The orchestrator spawns a **fresh, throwaway LLM context** (not added to session memory) that receives the full `{name, description}` catalog plus the intent, and returns the matching rule name(s). The main context never sees the catalog.
+2. `load_rule(name: str)` — returns the full markdown content of the named rule. The model calls this after `search_rules` resolves.
+
+This splits the cost: search-time context holds the catalog once per call and is discarded; main context only holds the file the model actually chose to load.
 
 Existing files to be aware of:
+- [rules/personas/architect_po.md](rules/personas/architect_po.md) — legacy combined persona, slated to be split into Architect + Product Owner.
+- [rules/personas/explorer.md](rules/personas/explorer.md) — seeded from the former `workflows/discovery_process.md`; still needs the persona frame around it.
 - [rules/standards/clean_architecture.md](rules/standards/clean_architecture.md)
 - [rules/standards/hexagonal_ddd_manifesto.md](rules/standards/hexagonal_ddd_manifesto.md)
-- [rules/workflows/discovery_process.md](rules/workflows/discovery_process.md)
 
 ## Sandboxing & tools
 
@@ -85,7 +105,9 @@ local-ai-developer/
 ├── context/                # prompt/context builders, rules loader
 ├── interface/              # terminal loop, command processor
 ├── tools/                  # model-callable tools
-├── rules/                  # personas / standards / workflows (markdown)
+├── rules/
+│   ├── personas/           # personas + their workflows (markdown)
+│   └── standards/          # on-demand reference rules (markdown)
 ├── projects/               # each child is its own git repo, developed by the model
 ├── docker-compose.yml
 └── run.ps1                 # install / start / stop
@@ -113,7 +135,11 @@ In-app (Rich terminal):
 
 Track these here as they come up so future-you knows what's still fuzzy:
 
-- Exact shape of the on-demand rule-loading tool (search vs. load-by-name).
+- Splitting `architect_po.md` into separate Architect and Product Owner persona files (requires content rework — not done yet).
+- Filling out the Explorer persona frame around the existing discovery workflow content.
+- Whether Reviewer stays as one persona or splits into logic-focused and standards-focused variants.
+- Whether a standalone Tester persona is needed, or if test-first lives inside Developer and regression checks live inside Reviewer.
+- Naming for the Prioritizer persona.
 - Memory summarization trigger thresholds and who decides (orchestrator heuristic vs. model self-report).
 - Where project-scoped plan/memory files live inside each project repo (filename, folder).
-- Tester persona's handoff contract with developer.
+- Which LLM (and which context size) powers the `search_rules` throwaway context — same local model, or a smaller/faster one?
