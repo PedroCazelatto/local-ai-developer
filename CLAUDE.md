@@ -1,21 +1,21 @@
 # CLAUDE.md
 
-Guidance for Claude Code when working in this repo. The user is Pedro; this file is for you (Claude Code) as an advisor helping him build the orchestrator. It is **not** consumed by the local Ollama model — that model gets its instructions from [rules/](rules/).
+Guidance for Claude Code when working in this repo. This file is for you (Claude Code) as an advisor helping the user build the orchestrator. It is **not** consumed by the local Ollama model — that model gets its instructions from [rules/](rules/).
 
 ## Prime directive: do not assume, ask
 
-This project's requirements live mostly in Pedro's head. When a task is ambiguous, **ask clarifying questions instead of guessing**. Even small decisions (tool signatures, file layout, naming, what a phase means) should be confirmed if not already documented here or obvious from the code.
+This project's requirements live mostly in the user's head. When a task is ambiguous, **ask clarifying questions instead of guessing**. Even small decisions (tool signatures, file layout, naming, what a phase means) should be confirmed if not already documented here or obvious from the code.
 
 Corollary: if you learn a new product requirement during a conversation, propose adding it to this file.
 
 ## What this project is
 
-A Python CLI that orchestrates a **locally-run** Ollama model to autonomously develop code projects. Pedro's goals:
+A Python CLI that orchestrates a **locally-run** Ollama model to autonomously develop code projects. The user's goals:
 
-- Learn prompt engineering, AI interaction isolation, and planning by building the orchestrator himself.
+- Learn prompt engineering, AI interaction isolation, and planning by building the orchestrator themselves.
 - Practice planning skills by driving the architect persona and reviewing phases.
-- Run everything on his RTX 3060 — no cloud spend.
-- Ship this repo as a public learning artifact, used only by Pedro.
+- Run everything on a local RTX 3060 — no cloud spend.
+- Ship this repo as a public learning artifact, used only by the author.
 
 ### Non-goals
 
@@ -28,14 +28,15 @@ A Python CLI that orchestrates a **locally-run** Ollama model to autonomously de
 ## How a session works
 
 1. `.\run.ps1 start <project-name>` boots the orchestrator locked to one project. Switching projects requires restarting `main.py`.
-2. Pedro drives a planning-oriented persona (Explorer → Architect → Product Owner → Prioritizer) to produce a written plan. Plans are project-scoped artifacts stored **inside the project repo** (not in the orchestrator repo) — the project carries its own agent files.
+2. The user drives planning personas (Explorer, Architect, Product Owner, Prioritizer) to produce a written plan. Plans are project-scoped artifacts stored **inside the project repo** (not in the orchestrator repo) — the project carries its own agent files.
 3. The plan is sliced into narrower tasks picked up by the **Developer**; the **Reviewer** checks the result after each phase. Test-first discipline lives inside the Developer persona (failing tests before implementation).
-4. Pedro only interacts while planning and between phases. Within a phase the model runs autonomously with no per-tool confirmation.
-5. At the end of each phase, the in-memory context is cleared.
+4. The flow is **not linear** — after the Reviewer runs, the user can loop back to any planning persona to revise the plan, add new requirements, or reprioritize before the next Developer phase. Personas are switched manually via `/swap`.
+5. The user only interacts while planning and between phases. Within a phase the model runs autonomously with no per-tool confirmation.
+6. At the end of each phase, the in-memory context is cleared.
 
 ### Planned personas (names provisional)
 
-- **Explorer** — runs discovery to extract product requirements from Pedro.
+- **Explorer** — runs discovery to extract product requirements from the user.
 - **Architect** — designs system architecture, boundaries, deployment.
 - **Product Owner** — transforms requirements into tasks.
 - **Prioritizer** — orders requirements/tasks by priority (name TBD).
@@ -69,9 +70,15 @@ To keep the main context lean, the standards catalog is **not** in the system pr
 
 This splits the cost: search-time context holds the catalog once per call and is discarded; main context only holds the file the model actually chose to load.
 
-Existing files to be aware of:
-- [rules/personas/architect_po.md](rules/personas/architect_po.md) — legacy combined persona, slated to be split into Architect + Product Owner.
-- [rules/personas/explorer.md](rules/personas/explorer.md) — seeded from the former `workflows/discovery_process.md`; still needs the persona frame around it.
+Existing persona files (all marked DRAFT — review before relying on them):
+- [rules/personas/explorer.md](rules/personas/explorer.md)
+- [rules/personas/architect.md](rules/personas/architect.md)
+- [rules/personas/product_owner.md](rules/personas/product_owner.md)
+- [rules/personas/prioritizer.md](rules/personas/prioritizer.md)
+- [rules/personas/developer.md](rules/personas/developer.md)
+- [rules/personas/reviewer.md](rules/personas/reviewer.md)
+
+Standards:
 - [rules/standards/clean_architecture.md](rules/standards/clean_architecture.md)
 - [rules/standards/hexagonal_ddd_manifesto.md](rules/standards/hexagonal_ddd_manifesto.md)
 
@@ -89,7 +96,7 @@ Existing files to be aware of:
 - `snake_case`, type hints, Python best practices.
 - Prioritize **user experience** in the terminal interface (Rich).
 - **Test-first**: write failing tests before functional logic whenever feasible.
-- Do not assume — if a design choice isn't covered here or in the code, ask Pedro.
+- Do not assume — if a design choice isn't covered here or in the code, ask the user.
 
 ## Repo layout (current, in-progress restructure)
 
@@ -125,7 +132,7 @@ Host:
 In-app (Rich terminal):
 - `/swap <persona>` — switch active persona
 - `/exit` — quit
-- (README also lists `/switch`, `/clear`, `/models list`, `/models pull` — [main.py](main.py) currently only implements `/swap` and `/exit`. Confirm with Pedro before relying on the others.)
+- (README also lists `/switch`, `/clear`, `/models list`, `/models pull` — [main.py](main.py) currently only implements `/swap` and `/exit`. Confirm with the user before relying on the others.)
 
 ## Environment
 
@@ -135,9 +142,9 @@ In-app (Rich terminal):
 
 Track these here as they come up so future-you knows what's still fuzzy:
 
-- Splitting `architect_po.md` into separate Architect and Product Owner persona files (requires content rework — not done yet).
-- Filling out the Explorer persona frame around the existing discovery workflow content.
+- Reviewing and refining the six DRAFT persona files — content was seeded from `architect_po.md` + `discovery_process.md` plus skeletons for the rest.
 - Whether Reviewer stays as one persona or splits into logic-focused and standards-focused variants.
+- Whether Prioritizer is its own persona or a step inside Product Owner.
 - Whether a standalone Tester persona is needed, or if test-first lives inside Developer and regression checks live inside Reviewer.
 - Naming for the Prioritizer persona.
 - Memory summarization trigger thresholds and who decides (orchestrator heuristic vs. model self-report).
