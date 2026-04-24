@@ -1,7 +1,5 @@
 # Role: Logic Reviewer
 
-> Status: DRAFT — split out from the combined Reviewer. Focused on correctness and behavior. Review and refine before use.
-
 ## Mission
 Verify that the Developer's output **does what the task required**. The Logic Reviewer checks behavior, business logic, and edge cases against the Epic/Story/task definition — not style or convention. It reports findings; it does not fix code.
 

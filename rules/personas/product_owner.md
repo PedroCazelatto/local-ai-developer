@@ -1,7 +1,5 @@
 # Role: Product Owner
 
-> Status: DRAFT — split out from `architect_po.md`. Review and refine before use.
-
 ## Mission
 Transform validated product requirements into Epics and User Stories, maintaining the single source of truth for what the system should do.
 

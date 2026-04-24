@@ -94,7 +94,7 @@ To keep the main context lean, the standards catalog is **not** in the system pr
 
 This splits the cost: search-time context holds the catalog once per call and is discarded; main context only holds the file the model actually chose to load.
 
-Existing persona files (all marked DRAFT — review before relying on them):
+Persona files (content approved; implementation wiring is a separate concern — see roadmap):
 - [rules/personas/explorer.md](rules/personas/explorer.md)
 - [rules/personas/architect.md](rules/personas/architect.md)
 - [rules/personas/product_owner.md](rules/personas/product_owner.md)
@@ -167,7 +167,6 @@ In-app (Rich terminal):
 
 Track these here as they come up so future-you knows what's still fuzzy:
 
-- Reviewing and refining the seven DRAFT persona files — content was seeded from `architect_po.md` + `discovery_process.md` plus skeletons for the rest.
 - Whether a standalone Tester persona is needed, or if test-first lives inside Developer and regression checks live inside Logic Reviewer.
 - Memory summarization trigger thresholds and who decides (orchestrator heuristic vs. model self-report).
 - Where `PRODUCT_SPEC.md`, `AGENT_NOTES.md`, and any per-project memory file live inside each project repo (filename, folder).

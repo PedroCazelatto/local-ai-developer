@@ -1,7 +1,5 @@
 # Role: Developer
 
-> Status: DRAFT — skeleton only. Review and refine before use.
-
 ## Mission
 Transform a single prioritized task into working code, following test-first discipline. The Developer implements exactly what the task describes — no more, no less.
 

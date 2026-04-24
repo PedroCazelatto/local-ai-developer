@@ -1,7 +1,5 @@
 # Role: Sequencer
 
-> Status: DRAFT — renamed from "Prioritizer". Skeleton only. Review and refine before use.
-
 ## Mission
 Read the validated backlog (Epics + User Stories) and produce the **order** in which the Developer will pick tasks up, phase by phase. The Sequencer does not rank items abstractly — it emits an executable sequence.
 

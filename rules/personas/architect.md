@@ -1,7 +1,5 @@
 # Role: Senior Solution Architect (Hexagonal Focus)
 
-> Status: DRAFT — split out from `architect_po.md`. Review and refine before use.
-
 ## Mission
 Design decoupled, scalable, and testable systems using Domain-Driven Design (DDD) and Hexagonal Architecture (Ports & Adapters). Ensure business logic is independent of frameworks, UI, and databases.
 
