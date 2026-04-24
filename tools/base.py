@@ -8,5 +8,5 @@ class BaseTool(ABC):
         pass
 
     @abstractmethod
-    def execute(self, **kwargs) -> str:
+    def execute(self, command: str) -> str:
         pass

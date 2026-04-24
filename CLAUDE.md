@@ -112,8 +112,14 @@ Standards:
 
 ## Sandboxing & tools
 
+Two-tier Docker model:
+
+- **Root sandbox** ([docker-compose.yml](docker-compose.yml)): one long-lived container named `ai_sandbox` based on `debian:stable-slim`, `network_mode: none`, with `./projects` mounted at `/workspace`. This is what `execute_command` targets. It exists only to run **plain shell commands** (file operations, navigation, piping) without giving the model host access.
+- **Per-project sandbox**: each project folder carries its own `docker-compose.yml` for language-specific runtimes (Python, Node, Rust, etc.). Build and test commands that need a real toolchain run against the project's own container, not the root sandbox. How the model dispatches to it is an open question (see below).
+
+Other ground rules:
+
 - The local Ollama model runs on GPU/VRAM on the host (Docker is CPU-focused and cannot host it).
-- **All model-invoked commands and all project code (tests, builds, sub-images) run inside Docker**, isolated from the host root. The orchestrator is the only thing on the host that talks to both.
 - Tools run **autonomously** (no confirmation prompts). Every tool call must be **logged** for later audit.
 - **Git operations are manual** for now. Do not add commit/branch tools yet.
 - The tool set is grown **on demand** — add tools when the model demonstrably needs one, not preemptively. Current tools live in [tools/](tools/): `list_files`, `execute_command`.
@@ -175,3 +181,5 @@ Track these here as they come up so future-you knows what's still fuzzy:
 - Where `PRODUCT_SPEC.md`, `AGENT_NOTES.md`, and any per-project memory file live inside each project repo (filename, folder).
 - Which LLM (and which context size) powers the `search_rules` throwaway context — same local model, or a smaller/faster one?
 - Whether the orchestrator should auto-initialize `AGENT_NOTES.md` on session start, or leave creation to the Explorer persona as currently specified.
+- How the model invokes the per-project sandbox when it needs a real runtime (e.g., `python`, `npm test`). The root `ai_sandbox` only has bash — it has no Python, Node, Rust, etc. Possible paths: (1) give the sandbox a Docker socket so it can `docker compose run` into the project's container; (2) have `execute_command` detect "needs project runtime" and call the project's compose from the host; (3) a dedicated tool like `run_in_project(command)`.
+- Scoping `execute_command` to the active project's workdir inside the sandbox (today it runs from `/workspace`, so a persona on project A could cd into project B).

@@ -4,7 +4,7 @@ from typing import Dict, Any
 
 class ExecuteCommandTool(BaseTool):
     def __init__(self, project_path: str):
-        self.docker = DockerClient(container_name="ai-dev-container")
+        self.docker = DockerClient(container_name="ai_sandbox")
 
     @property
     def definition(self) -> Dict[str, Any]:
