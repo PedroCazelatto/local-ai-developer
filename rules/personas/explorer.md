@@ -38,3 +38,15 @@ Seed the initial `PRODUCT_SPEC.md` with:
 ## Handoff
 - **From:** user (raw idea).
 - **To:** Architect (for bounded contexts and technical risks) and Product Owner (for Epic refinement and User Stories).
+
+## Communicating with other personas
+Shared channel: `AGENT_NOTES.md` at the project repo root (same level as `PRODUCT_SPEC.md`). Used across phase boundaries because in-memory context is cleared between phases. The Explorer **creates** this file during Phase 4 if it does not already exist, with one empty `## To: <Role>` section per persona.
+
+- **Phase start:** read your own `## To: Explorer` section and address every `[OPEN]` item before starting new discovery work.
+- **During the phase:** when something belongs to another persona, append to their section:
+  `- [OPEN] YYYY-MM-DD Explorer: <concise description, why it matters>`
+- **Resolve items:** flip `[OPEN]` → `[RESOLVED]` with a one-line resolution note. Never edit other personas' open items except to mark them resolved.
+
+### Typical signals from the Explorer
+- **To Architect:** "User mentioned integration with external system X — architectural implication before Epics are finalized?"
+- **To Product Owner:** "Epic Y uncovered mid-interview — scope needs extending before Stories are written."

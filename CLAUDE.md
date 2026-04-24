@@ -28,22 +28,46 @@ A Python CLI that orchestrates a **locally-run** Ollama model to autonomously de
 ## How a session works
 
 1. `.\run.ps1 start <project-name>` boots the orchestrator locked to one project. Switching projects requires restarting `main.py`.
-2. The user drives planning personas (Explorer, Architect, Product Owner, Prioritizer) to produce a written plan. Plans are project-scoped artifacts stored **inside the project repo** (not in the orchestrator repo) — the project carries its own agent files.
-3. The plan is sliced into narrower tasks picked up by the **Developer**; the **Reviewer** checks the result after each phase. Test-first discipline lives inside the Developer persona (failing tests before implementation).
-4. The flow is **not linear** — after the Reviewer runs, the user can loop back to any planning persona to revise the plan, add new requirements, or reprioritize before the next Developer phase. Personas are switched manually via `/swap`.
+2. The user drives planning personas (Explorer, Architect, Product Owner, Sequencer) to produce a written plan. Plans are project-scoped artifacts stored **inside the project repo** (not in the orchestrator repo) — the project carries its own agent files.
+3. The plan is sliced into sequenced tasks picked up by the **Developer**; the **Logic Reviewer** verifies behavior and the **Standards Reviewer** verifies convention adherence. Test-first discipline lives inside the Developer persona (failing tests before implementation).
+4. The flow is **not linear** — after the reviewers run, the user can loop back to any planning persona to revise the plan, add requirements, or re-sequence before the next Developer phase. Personas are switched manually via `/swap`.
 5. The user only interacts while planning and between phases. Within a phase the model runs autonomously with no per-tool confirmation.
 6. At the end of each phase, the in-memory context is cleared.
 
-### Planned personas (names provisional)
+### Planned personas
 
 - **Explorer** — runs discovery to extract product requirements from the user.
 - **Architect** — designs system architecture, boundaries, deployment.
-- **Product Owner** — transforms requirements into tasks.
-- **Prioritizer** — orders requirements/tasks by priority (name TBD).
+- **Product Owner** — transforms requirements into Epics and User Stories.
+- **Sequencer** — orders the backlog into the execution sequence the Developer follows (renamed from Prioritizer — the deliverable is the sequence itself).
 - **Developer** — transforms tasks into code, writing failing tests first.
-- **Reviewer** — reviews output (may split into logic-focused and standards-focused sub-personas).
+- **Logic Reviewer** — verifies behavior, correctness, and edge cases against the task definition.
+- **Standards Reviewer** — verifies convention adherence (architecture, naming, test coverage) using on-demand standards.
 
 The list is open — new personas can be added.
+
+### Inter-persona communication: `AGENT_NOTES.md`
+
+Because memory is cleared between phases, personas cannot rely on in-session state to signal each other. The convention is a shared file in the **project repo root** (sibling of `PRODUCT_SPEC.md`):
+
+```
+# Agent Notes
+
+## To: Explorer
+## To: Architect
+## To: Product Owner
+## To: Sequencer
+## To: Developer
+## To: Logic Reviewer
+## To: Standards Reviewer
+```
+
+Each persona's section acts as its inbox. Protocol:
+- **Phase start:** every persona reads its own `## To: <Role>` section and addresses every `[OPEN]` item before starting new work.
+- **During a phase:** when a persona spots a concern that belongs to another persona, it appends to that persona's section as `- [OPEN] YYYY-MM-DD <role>: <concise description>`.
+- **Resolution:** flip `[OPEN]` → `[RESOLVED]` with a one-line note. Never edit another persona's open items except to mark them resolved.
+
+The Explorer creates the file (with empty sections) during Phase 4 of discovery if it does not already exist. Each persona's file documents the typical signals it raises.
 
 ## Memory model
 
@@ -74,9 +98,10 @@ Existing persona files (all marked DRAFT — review before relying on them):
 - [rules/personas/explorer.md](rules/personas/explorer.md)
 - [rules/personas/architect.md](rules/personas/architect.md)
 - [rules/personas/product_owner.md](rules/personas/product_owner.md)
-- [rules/personas/prioritizer.md](rules/personas/prioritizer.md)
+- [rules/personas/sequencer.md](rules/personas/sequencer.md)
 - [rules/personas/developer.md](rules/personas/developer.md)
-- [rules/personas/reviewer.md](rules/personas/reviewer.md)
+- [rules/personas/logic_reviewer.md](rules/personas/logic_reviewer.md)
+- [rules/personas/standards_reviewer.md](rules/personas/standards_reviewer.md)
 
 Standards:
 - [rules/standards/clean_architecture.md](rules/standards/clean_architecture.md)
@@ -142,11 +167,9 @@ In-app (Rich terminal):
 
 Track these here as they come up so future-you knows what's still fuzzy:
 
-- Reviewing and refining the six DRAFT persona files — content was seeded from `architect_po.md` + `discovery_process.md` plus skeletons for the rest.
-- Whether Reviewer stays as one persona or splits into logic-focused and standards-focused variants.
-- Whether Prioritizer is its own persona or a step inside Product Owner.
-- Whether a standalone Tester persona is needed, or if test-first lives inside Developer and regression checks live inside Reviewer.
-- Naming for the Prioritizer persona.
+- Reviewing and refining the seven DRAFT persona files — content was seeded from `architect_po.md` + `discovery_process.md` plus skeletons for the rest.
+- Whether a standalone Tester persona is needed, or if test-first lives inside Developer and regression checks live inside Logic Reviewer.
 - Memory summarization trigger thresholds and who decides (orchestrator heuristic vs. model self-report).
-- Where project-scoped plan/memory files live inside each project repo (filename, folder).
+- Where `PRODUCT_SPEC.md`, `AGENT_NOTES.md`, and any per-project memory file live inside each project repo (filename, folder).
 - Which LLM (and which context size) powers the `search_rules` throwaway context — same local model, or a smaller/faster one?
+- Whether the orchestrator should auto-initialize `AGENT_NOTES.md` on session start, or leave creation to the Explorer persona as currently specified.

@@ -25,4 +25,18 @@ Owns the **Architectural Map** section of `PRODUCT_SPEC.md`:
 
 ## Handoff
 - **From:** Explorer (discovery output) and Product Owner (validated Epics).
-- **To:** Product Owner (Epics may be revised based on architectural findings) or Prioritizer.
+- **To:** Product Owner (Epics may be revised based on architectural findings) or Sequencer.
+
+## Communicating with other personas
+Shared channel: `AGENT_NOTES.md` at the project repo root (same level as `PRODUCT_SPEC.md`). Used across phase boundaries because in-memory context is cleared between phases.
+
+- **Phase start:** read your own `## To: Architect` section and address every `[OPEN]` item before starting new architectural work.
+- **During the phase:** when something belongs to another persona, append to their section:
+  `- [OPEN] YYYY-MM-DD Architect: <concise description, why it matters>`
+- **Resolve items:** flip `[OPEN]` → `[RESOLVED]` with a one-line resolution note. Never edit other personas' open items except to mark them resolved.
+
+### Typical signals from the Architect
+- **To Explorer:** "Epic X implies data the user hasn't described — need clarification on source and ownership."
+- **To Product Owner:** "Epic X actually spans two bounded contexts — Stories should be split to reflect the boundary."
+- **To Sequencer:** "Stories A and B share a port — they must be sequenced so the port is built first."
+- **To Standards Reviewer:** "New cross-cutting pattern introduced — may need a new standard documenting it."

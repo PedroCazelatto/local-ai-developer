@@ -21,5 +21,19 @@ Transform a single prioritized task into working code, following test-first disc
 6. Summarize the change (files touched, tests added, anything surprising) for the Reviewer.
 
 ## Handoff
-- **From:** Prioritizer (next task off the top of the list).
-- **To:** Reviewer (for verification).
+- **From:** Sequencer (next task off the top of the list).
+- **To:** Logic Reviewer (then Standards Reviewer) for verification.
+
+## Communicating with other personas
+Shared channel: `AGENT_NOTES.md` at the project repo root (same level as `PRODUCT_SPEC.md`). Used across phase boundaries because in-memory context is cleared between phases.
+
+- **Phase start:** read your own `## To: Developer` section and address every `[OPEN]` item before picking up the next task.
+- **During the phase:** when something belongs to another persona, append to their section:
+  `- [OPEN] YYYY-MM-DD Developer: <concise description, why it matters>`
+- **Resolve items:** flip `[OPEN]` → `[RESOLVED]` with a one-line resolution note. Never edit other personas' open items except to mark them resolved.
+
+### Typical signals from the Developer
+- **To Product Owner:** "Task acceptance criteria are ambiguous — what is the observable signal that the task is done?"
+- **To Architect:** "No outbound port exists for the behavior this task needs — design decision required."
+- **To Sequencer:** "This task depends on another that hasn't been completed yet — sequence violation."
+- **To Explorer:** "Task revealed a requirement that was never captured during discovery — should we re-interview?"
