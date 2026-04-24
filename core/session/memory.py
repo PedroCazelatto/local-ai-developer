@@ -1,14 +1,29 @@
-from typing import List, Dict, Any, Optional
+from typing import Any, Dict, List, Optional
+
 
 class SessionMemory:
     def __init__(self) -> None:
-        self.history: List[Dict[str, Any]] = []
+        self._histories: Dict[str, List[Dict[str, Any]]] = {}
+        self._active: Optional[str] = None
+
+    def set_active_persona(self, persona: str) -> None:
+        self._active = persona
+        self._histories.setdefault(persona, [])
 
     def add(self, role: str, content: str, name: Optional[str] = None) -> None:
-        entry = {"role": role, "content": content}
+        if self._active is None:
+            raise RuntimeError("No active persona set")
+        entry: Dict[str, Any] = {"role": role, "content": content}
         if name:
             entry["name"] = name
-        self.history.append(entry)
+        self._histories[self._active].append(entry)
 
     def clear(self) -> None:
-        self.history = []
+        if self._active is not None:
+            self._histories[self._active] = []
+
+    @property
+    def history(self) -> List[Dict[str, Any]]:
+        if self._active is None:
+            return []
+        return self._histories[self._active]

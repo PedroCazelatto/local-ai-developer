@@ -1,14 +1,12 @@
-from typing import Optional, List
+from typing import List
+
 
 class CommandProcessor:
     def __init__(self) -> None:
-        self.commands = ["/swap", "/clear", "/exit", "/context"]
+        self.commands = ("/swap", "/clear", "/exit")
 
     def is_command(self, user_input: str) -> bool:
-        """Checks if the input starts with a slash."""
         return user_input.strip().startswith("/")
 
     def parse_command(self, user_input: str) -> List[str]:
-        """Splits the command and its arguments."""
-        parts = user_input.strip().split(" ")
-        return parts
+        return user_input.strip().split()

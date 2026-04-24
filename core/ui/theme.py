@@ -1,11 +1,19 @@
-from rich.style import Style
-
 class UITheme:
     def __init__(self) -> None:
         self.styles = {
-            "architect": Style(color="cyan", bold=True),
-            "developer": Style(color="green", bold=True),
-            "system": Style(color="yellow", italic=True),
-            "error": Style(color="red", bold=True),
-            "tool": Style(color="magenta")
+            "explorer":           "bright_blue bold",
+            "architect":          "cyan bold",
+            "product_owner":      "bright_magenta bold",
+            "sequencer":          "yellow bold",
+            "developer":          "green bold",
+            "logic_reviewer":     "bright_red bold",
+            "standards_reviewer": "bright_yellow bold",
+            "user":               "bright_white bold",
+            "assistant":          "white",
+            "system":             "grey74 italic",
+            "error":              "red bold",
+            "tool":               "magenta",
         }
+
+    def for_role(self, role: str) -> str:
+        return self.styles.get(role.lower(), "white")

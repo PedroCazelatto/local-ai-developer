@@ -1,13 +1,8 @@
-from abc import ABC, abstractmethod
-from typing import List
+from typing import List, Optional
 
-class BaseAgent(ABC):
-    @property
-    @abstractmethod
-    def persona(self) -> str:
-        pass
 
-    @property
-    @abstractmethod
-    def tools(self) -> List[str]:
-        pass
+class Agent:
+    def __init__(self, role: str, persona: str, tools: Optional[List[str]] = None) -> None:
+        self.role = role
+        self.persona = persona
+        self.tools = tools or []

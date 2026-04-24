@@ -32,7 +32,7 @@ A Python CLI that orchestrates a **locally-run** Ollama model to autonomously de
 3. The plan is sliced into sequenced tasks picked up by the **Developer**; the **Logic Reviewer** verifies behavior and the **Standards Reviewer** verifies convention adherence. Test-first discipline lives inside the Developer persona (failing tests before implementation).
 4. The flow is **not linear** — after the reviewers run, the user can loop back to any planning persona to revise the plan, add requirements, or re-sequence before the next Developer phase. Personas are switched manually via `/swap`.
 5. The user only interacts while planning and between phases. Within a phase the model runs autonomously with no per-tool confirmation.
-6. At the end of each phase, the in-memory context is cleared.
+6. Each persona keeps its own isolated memory (see Memory model). `/swap` does not clear memory — continuity within a persona is preserved across turns and across swaps.
 
 ### Planned personas
 
@@ -48,7 +48,7 @@ The list is open — new personas can be added.
 
 ### Inter-persona communication: `AGENT_NOTES.md`
 
-Because memory is cleared between phases, personas cannot rely on in-session state to signal each other. The convention is a shared file in the **project repo root** (sibling of `PRODUCT_SPEC.md`):
+Because each persona has its **own isolated memory** (see Memory model) and never sees another persona's turns, cross-persona signals need a file on disk. The convention is a shared file in the **project repo root** (sibling of `PRODUCT_SPEC.md`):
 
 ```
 # Agent Notes
@@ -71,11 +71,14 @@ The Explorer creates the file (with empty sections) during Phase 4 of discovery 
 
 ## Memory model
 
-- **In-session memory**: a living array of messages. Trimmed when a token threshold is crossed OR when the model's own output is large (summarize then replace). Cleared at phase boundaries.
-- **Per-project persistence**: each project keeps its own memory so the model always knows where it stopped. Persistence lives with the project (see §1 of session flow).
+Each persona has its **own isolated message history**. `/swap` saves the active persona's history and loads the target's — no cross-persona leakage, no auto-clear. The user owns the decision to wipe history.
+
+- **Manual clear:** `/clear` wipes only the active persona's history.
+- **Token-threshold failsafe:** when a persona's history crosses a configured token threshold, the orchestrator summarizes the oldest turns and replaces them with a single summary entry. This is a safety valve against VRAM exhaustion, not normal operation.
+- **Per-project persistence:** each project keeps its own per-persona memory so the model always knows where it stopped. Persistence lives with the project repo.
 - **Documentation files** (rules, plans, specs) exist for one-time reference or human reading — not loaded into every prompt.
 
-Minimize persistent context to save tokens (local inference is VRAM-bound).
+Minimize persistent context to save tokens (local inference is VRAM-bound). Cross-persona communication goes through `AGENT_NOTES.md`, not memory.
 
 ## Rules loading
 
