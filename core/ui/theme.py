@@ -9,7 +9,6 @@ class UITheme:
             "logic_reviewer":     "bright_red bold",
             "standards_reviewer": "bright_yellow bold",
             "user":               "bright_white bold",
-            "assistant":          "white",
             "system":             "grey74 italic",
             "error":              "red bold",
             "tool":               "magenta",

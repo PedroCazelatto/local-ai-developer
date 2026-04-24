@@ -1,6 +1,5 @@
 from typing import Any, Dict, List, Optional
 
-
 class SessionMemory:
     def __init__(self) -> None:
         self._histories: Dict[str, List[Dict[str, Any]]] = {}

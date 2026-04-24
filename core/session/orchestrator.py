@@ -5,7 +5,6 @@ from agents.factory import AgentFactory
 from context.builder import ContextBuilder
 from tools.manager import ToolManager
 
-
 class SessionOrchestrator:
     def __init__(self, project_name: str, model_name: str, initial_role: str = "architect") -> None:
         self.project_name = project_name

@@ -2,7 +2,6 @@ from pathlib import Path
 from typing import List
 from agents.base import Agent
 
-
 class AgentFactory:
     _personas_dir = Path(__file__).resolve().parent.parent / "rules" / "personas"
 

@@ -1,7 +1,6 @@
 import pytest
 from agents.factory import AgentFactory
 
-
 EXPECTED_PERSONAS = {
     "explorer",
     "architect",
@@ -11,7 +10,6 @@ EXPECTED_PERSONAS = {
     "logic_reviewer",
     "standards_reviewer",
 }
-
 
 class TestAvailableRoles:
     def test_lists_every_persona_file(self):
@@ -24,7 +22,7 @@ class TestAvailableRoles:
 
 class TestGetAgent:
     @pytest.mark.parametrize("role", sorted(EXPECTED_PERSONAS))
-    def test_loads_every_persona(self, role):
+    def test_loads_every_persona(self, role: str):
         agent = AgentFactory.get_agent(role)
         assert agent.role == role
         assert agent.persona.startswith("# Role:")
