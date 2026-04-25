@@ -1,6 +1,8 @@
 import sys
+
 from core.session.orchestrator import SessionOrchestrator
 from interface.terminal_loop import TerminalLoop
+from tools.factories import CommandFactory
 
 MODEL_NAME = "qwen2.5-coder:14b"
 
@@ -12,6 +14,7 @@ def main() -> None:
 
     project_name = sys.argv[1]
     orchestrator = SessionOrchestrator(project_name, MODEL_NAME)
+    commands = CommandFactory()
     ui = TerminalLoop()
 
     ui.display_welcome(project=project_name, model=MODEL_NAME, persona=orchestrator.agent.role)
@@ -26,30 +29,12 @@ def main() -> None:
             )
             user_input = ui.get_input(orchestrator.agent.role)
 
-            if ui.processor.is_command(user_input):
-                parts = ui.processor.parse_command(user_input)
-                cmd = parts[0]
-
-                if cmd == "/exit":
+            if user_input.strip().startswith("/"):
+                result = commands.dispatch(user_input, orchestrator)
+                if result.message:
+                    ui.display_system_info(result.message)
+                if result.exit:
                     break
-
-                if cmd == "/swap":
-                    if len(parts) < 2:
-                        ui.display_error("Usage: /swap <persona>")
-                        continue
-                    try:
-                        orchestrator.switch_agent(parts[1])
-                        ui.display_system_info(f"Switched to: {orchestrator.agent.role}")
-                    except ValueError as e:
-                        ui.display_error(str(e))
-                    continue
-
-                if cmd == "/clear":
-                    orchestrator.memory.clear()
-                    ui.display_system_info(f"Cleared memory for: {orchestrator.agent.role}")
-                    continue
-
-                ui.display_error(f"Unknown command: {cmd}")
                 continue
 
             ui.stream_response(orchestrator.stream_ask(user_input), orchestrator.agent.role)
@@ -60,8 +45,8 @@ def main() -> None:
                     name = call["function"]["name"]
                     args = call["function"]["arguments"]
                     ui.display_system_info(f"Executing tool: {name}")
-                    result = orchestrator.tools.call_tool(name, args)
-                    orchestrator.memory.add("tool", result, name=name)
+                    tool_output = orchestrator.call_tool(name, args)
+                    orchestrator.memory.add("tool", tool_output, name=name)
 
                 final_response = orchestrator.ask("Proceed with the tool results.")
                 ui.display_response(final_response["content"], orchestrator.agent.role)

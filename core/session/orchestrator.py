@@ -1,9 +1,17 @@
-from typing import Any, Dict, Generator
-from core.llm.provider import LLMProvider
-from core.session.memory import SessionMemory
+import os
+from collections.abc import Generator
+from typing import Any
+
 from agents.factory import AgentFactory
 from context.builder import ContextBuilder
-from tools.manager import ToolManager
+from core.container.client import DockerClient
+from core.llm.provider import LLMProvider
+from core.session.memory import SessionMemory
+from tools.base import ToolContext
+from tools.factories import ToolFactory
+
+SANDBOX_CONTAINER = "ai_sandbox"
+
 
 class SessionOrchestrator:
     def __init__(self, project_name: str, model_name: str, initial_role: str = "architect") -> None:
@@ -12,30 +20,41 @@ class SessionOrchestrator:
         self.llm = LLMProvider(model_name)
         self.memory = SessionMemory()
         self.context = ContextBuilder()
-        self.tools = ToolManager(project_name)
+        self.tools = ToolFactory()
+        self.tool_ctx = ToolContext(
+            project_path=os.path.abspath(f"./projects/{project_name}"),
+            docker=DockerClient(container_name=SANDBOX_CONTAINER),
+        )
         self.agent = AgentFactory.get_agent(initial_role)
         self.memory.set_active_persona(self.agent.role)
+        self._last_stream_message: dict[str, Any] = {}
 
     def switch_agent(self, role: str) -> None:
         self.agent = AgentFactory.get_agent(role)
         self.memory.set_active_persona(self.agent.role)
 
-    def stream_ask(self, user_input: str) -> Generator[str, None, None]:
-        """Yields text deltas as the model streams. After exhaustion, _last_stream_message holds the complete message."""
-        self.memory.add("user", user_input)
+    def call_tool(self, name: str, args: dict[str, object]) -> str:
+        return self.tools.call(name, self.tool_ctx, args)
 
+    def _build_messages(self) -> list[dict[str, Any]]:
         system_prompt = self.context.build_system_prompt(
             agent_persona=self.agent.persona,
             project_state=f"Project: {self.project_name}",
         )
-        messages = [{"role": "system", "content": system_prompt}] + self.memory.history
-        all_definitions = self.tools.get_all_definitions()
-        allowed_tools = [t for t in all_definitions if t["function"]["name"] in self.agent.tools]
+        return [{"role": "system", "content": system_prompt}] + self.memory.history
+
+    def _allowed_tools(self) -> list[dict[str, object]] | None:
+        allowed = [t for t in self.tools.definitions if t["function"]["name"] in self.agent.tools]
+        return allowed or None
+
+    def stream_ask(self, user_input: str) -> Generator[str, None, None]:
+        """Yields text deltas as the model streams. After exhaustion, `_last_stream_message` holds the complete message."""
+        self.memory.add("user", user_input)
 
         full_content = ""
-        last_message: Dict[str, Any] = {"role": "assistant", "content": "", "tool_calls": None}
+        last_message: dict[str, Any] = {"role": "assistant", "content": "", "tool_calls": None}
 
-        for chunk in self.llm.stream(messages=messages, tools=allowed_tools or None):
+        for chunk in self.llm.stream(messages=self._build_messages(), tools=self._allowed_tools()):
             msg = chunk.get("message", {})
             delta = msg.get("content", "")
             if delta:
@@ -47,18 +66,7 @@ class SessionOrchestrator:
         last_message["content"] = full_content
         self._last_stream_message = last_message
 
-    def ask(self, user_input: str) -> Dict[str, Any]:
+    def ask(self, user_input: str) -> dict[str, Any]:
         self.memory.add("user", user_input)
-
-        system_prompt = self.context.build_system_prompt(
-            agent_persona=self.agent.persona,
-            project_state=f"Project: {self.project_name}",
-        )
-
-        messages = [{"role": "system", "content": system_prompt}] + self.memory.history
-
-        all_definitions = self.tools.get_all_definitions()
-        allowed_tools = [t for t in all_definitions if t["function"]["name"] in self.agent.tools]
-
-        response = self.llm.chat(messages=messages, tools=allowed_tools)
+        response = self.llm.chat(messages=self._build_messages(), tools=self._allowed_tools())
         return response["message"]

@@ -1,11 +1,10 @@
-from typing import Iterator
-from interface.command_processor import CommandProcessor
+from collections.abc import Iterator
+
 from core.ui.renderer import UIRenderer
 
 
 class TerminalLoop:
     def __init__(self) -> None:
-        self.processor = CommandProcessor()
         self.renderer = UIRenderer()
 
     def get_input(self, persona: str) -> str:

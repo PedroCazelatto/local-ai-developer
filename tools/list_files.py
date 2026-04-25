@@ -1,27 +1,18 @@
 import os
-from tools.base import BaseTool
-from typing import Dict, Any
+
+from tools.base import BaseTool, ToolContext
+
+DESCRIPTION = "Lists all files in the current project directory."
+
 
 class ListFilesTool(BaseTool):
-    def __init__(self, project_path: str):
-        self.project_path = project_path
+    parameters = {"type": "object", "properties": {}, "required": []}
 
-    @property
-    def definition(self) -> Dict[str, Any]:
-        return {
-            "type": "function",
-            "function": {
-                "name": "list_files",
-                "description": "Lists all files in the current project directory.",
-                "parameters": {"type": "object", "properties": {}, "required": []}
-            }
-        }
-
-    def execute(self, **kwargs) -> str:
+    def execute(self, ctx: ToolContext, /, **kwargs: object) -> str:
         try:
-            if not os.path.exists(self.project_path):
-                os.makedirs(self.project_path)
-            files = os.listdir(self.project_path)
+            if not os.path.exists(ctx.project_path):
+                os.makedirs(ctx.project_path)
+            files = os.listdir(ctx.project_path)
             return "\n".join(files) if files else "The project is empty."
-        except Exception as e:
-            return f"Error listing files: {str(e)}"
+        except OSError as e:
+            return f"Error listing files: {e}"

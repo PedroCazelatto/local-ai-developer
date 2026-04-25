@@ -127,9 +127,9 @@ Other ground rules:
 ## Code conventions (for the orchestrator itself)
 
 - Python, latest LTS, `pip` with [requirements.txt](requirements.txt).
-- `snake_case`, type hints, Python best practices.
+- `snake_case`, type hints, Python best practices. Never use `typing.Any` — prefer concrete types, `Protocol`, `TypedDict`, or a localized `# type: ignore` when the real type is genuinely unknown.
 - Prioritize **user experience** in the terminal interface (Rich).
-- **Test-first**: write failing tests before functional logic whenever feasible.
+- **The orchestrator codebase does not require tests.** Test-first is a rule for the project-building personas (Developer in particular) — it lives in the persona prompts under [rules/personas/](rules/personas/), not in Claude Code's own workflow on this repo.
 - Do not assume — if a design choice isn't covered here or in the code, ask the user.
 
 ## Repo layout (current, in-progress restructure)
@@ -144,8 +144,8 @@ local-ai-developer/
 │   └── ui/                 # Rich renderer + theme
 ├── agents/                 # persona classes (architect, developer, base, factory)
 ├── context/                # prompt/context builders, rules loader
-├── interface/              # terminal loop, command processor
-├── tools/                  # model-callable tools
+├── interface/              # terminal loop
+├── tools/                  # actions — each file is a tool (model-callable), a command (user-callable via `/name`), or both
 ├── rules/
 │   ├── personas/           # personas + their workflows (markdown)
 │   └── standards/          # on-demand reference rules (markdown)
