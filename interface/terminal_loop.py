@@ -1,3 +1,4 @@
+from typing import Iterator
 from interface.command_processor import CommandProcessor
 from core.ui.renderer import UIRenderer
 
@@ -26,3 +27,6 @@ class TerminalLoop:
 
     def display_response(self, content: str, persona: str) -> None:
         self.renderer.display_chat("assistant", content, display_as=persona)
+
+    def stream_response(self, chunks: Iterator[str], persona: str) -> str:
+        return self.renderer.display_streaming_response(chunks, "assistant", display_as=persona)

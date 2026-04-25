@@ -1,5 +1,7 @@
-from typing import Optional
+import sys
+from typing import Iterator, Optional
 from rich.console import Console
+from rich.live import Live
 from rich.panel import Panel
 from rich.markdown import Markdown
 from core.ui.theme import UITheme
@@ -21,6 +23,27 @@ class UIRenderer:
             border_style=style,
         )
         self.console.print(panel)
+
+    def display_streaming_response(
+        self, chunks: Iterator[str], role: str, display_as: Optional[str] = None
+    ) -> str:
+        label_role = display_as or role
+        style = self.theme.for_role(label_role)
+        title = f"[{style}]{label_role.replace('_', ' ').upper()}[/]"
+
+        content = ""
+        with Live(
+            Panel("", title=title, border_style=style),
+            console=self.console,
+            refresh_per_second=15,
+        ) as live:
+            for delta in chunks:
+                content += delta
+                live.update(Panel(Markdown(content), title=title, border_style=style))
+
+        sys.stdout.write("\a")
+        sys.stdout.flush()
+        return content
 
     def display_status(self, *, persona: str, project: str, model: str, memory_size: int) -> None:
         persona_style = self.theme.for_role(persona)

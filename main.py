@@ -52,7 +52,8 @@ def main() -> None:
                 ui.display_error(f"Unknown command: {cmd}")
                 continue
 
-            response_msg = orchestrator.ask(user_input)
+            ui.stream_response(orchestrator.stream_ask(user_input), orchestrator.agent.role)
+            response_msg = orchestrator._last_stream_message
 
             if response_msg.get("tool_calls"):
                 for call in response_msg["tool_calls"]:
@@ -64,8 +65,8 @@ def main() -> None:
 
                 final_response = orchestrator.ask("Proceed with the tool results.")
                 ui.display_response(final_response["content"], orchestrator.agent.role)
+                orchestrator.memory.add("assistant", final_response["content"])
             else:
-                ui.display_response(response_msg["content"], orchestrator.agent.role)
                 orchestrator.memory.add("assistant", response_msg["content"])
 
         except KeyboardInterrupt:
