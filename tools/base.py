@@ -1,3 +1,4 @@
+import os
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
@@ -12,6 +13,14 @@ if TYPE_CHECKING:
 class ToolContext:
     project_path: str
     docker: DockerClient
+
+    def resolve(self, relative: str) -> str:
+        """Join `relative` onto the project root and reject any path that escapes it."""
+        root = os.path.abspath(self.project_path)
+        resolved = os.path.abspath(os.path.join(root, relative))
+        if resolved != root and not resolved.startswith(root + os.sep):
+            raise ValueError(f"Path '{relative}' escapes the project directory")
+        return resolved
 
 
 class BaseTool(ABC):
