@@ -16,3 +16,8 @@ class UITheme:
 
     def for_role(self, role: str) -> str:
         return self.styles.get(role.lower(), "white")
+
+    def shade_for_role(self, role: str) -> str:
+        """A softer variant of the role's color, used for assistant body text."""
+        base = self.styles.get(role.lower(), "white")
+        return base.replace(" bold", "")

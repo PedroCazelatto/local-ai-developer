@@ -24,43 +24,74 @@ def main() -> None:
     commands = CommandFactory()
     ui = TerminalLoop()
 
-    ui.display_welcome(project=project_name, model=MODEL_NAME, persona=orchestrator.agent.role)
+    ui.add_system_message(
+        f"Local AI Developer  ·  project: {project_name}  ·  model: {MODEL_NAME}\n"
+        f"Persona: {orchestrator.agent.role.replace('_', ' ').upper()}\n"
+        f"Commands: /swap <role>  ·  /clear  ·  /exit"
+    )
 
     while True:
         try:
-            ui.display_status(
-                persona=orchestrator.agent.role,
+            persona = orchestrator.agent.role
+            status = ui.build_status(
+                persona=persona,
                 project=project_name,
                 model=MODEL_NAME,
                 tokens_used=orchestrator.last_token_count,
                 num_ctx=num_ctx,
             )
-            user_input = ui.get_input(orchestrator.agent.role)
+            user_input = ui.get_input(persona, status)
 
-            if user_input.strip().startswith("/"):
+            stripped = user_input.strip()
+            if not stripped:
+                continue
+
+            if stripped.startswith("/"):
+                cmd_name = stripped.lstrip("/").split(maxsplit=1)[0] if stripped.lstrip("/") else ""
                 result = commands.dispatch(user_input, orchestrator)
+                if cmd_name == "clear":
+                    ui.clear_messages()
                 if result.message:
-                    ui.display_system_info(result.message)
+                    ui.add_system_message(result.message)
                 if result.exit:
                     break
                 continue
 
-            ui.stream_response(orchestrator.stream_ask(user_input), orchestrator.agent.role)
+            ui.add_user_message(user_input)
+            ui.stream_response(orchestrator.stream_ask(user_input), persona, status)
             response_msg = orchestrator._last_stream_message
+            streamed = response_msg.get("content", "") or ""
 
             if response_msg.get("tool_calls"):
+                if streamed:
+                    ui.add_assistant_message(streamed, persona)
                 for call in response_msg["tool_calls"]:
                     name = call["function"]["name"]
                     args = call["function"]["arguments"]
-                    ui.display_system_info(f"Executing tool: {name}")
+                    ui.add_system_message(f"→ tool: {name}")
                     tool_output = orchestrator.call_tool(name, args)
                     orchestrator.memory.add("tool", tool_output, name=name)
 
-                final_response = orchestrator.ask("Proceed with the tool results.")
-                ui.display_response(final_response["content"], orchestrator.agent.role)
-                orchestrator.memory.add("assistant", final_response["content"])
+                follow_up_status = ui.build_status(
+                    persona=persona,
+                    project=project_name,
+                    model=MODEL_NAME,
+                    tokens_used=orchestrator.last_token_count,
+                    num_ctx=num_ctx,
+                )
+                ui.stream_response(
+                    orchestrator.stream_ask("Proceed with the tool results."),
+                    persona,
+                    follow_up_status,
+                )
+                final_msg = orchestrator._last_stream_message
+                final_content = final_msg.get("content", "") or ""
+                if final_content:
+                    ui.add_assistant_message(final_content, persona)
+                orchestrator.memory.add("assistant", final_content)
             else:
-                orchestrator.memory.add("assistant", response_msg["content"])
+                ui.add_assistant_message(streamed, persona)
+                orchestrator.memory.add("assistant", streamed)
 
         except KeyboardInterrupt:
             break

@@ -1,5 +1,7 @@
 from collections.abc import Iterator
 
+from rich.text import Text
+
 from core.ui.renderer import UIRenderer
 
 
@@ -7,25 +9,40 @@ class TerminalLoop:
     def __init__(self) -> None:
         self.renderer = UIRenderer()
 
-    def get_input(self, persona: str) -> str:
-        style = self.renderer.theme.for_role(persona)
-        label = persona.replace("_", " ").upper()
-        return self.renderer.console.input(f"\n[{style}]{label}[/] [dim]›[/] ")
+    def add_user_message(self, content: str) -> None:
+        self.renderer.add_user(content)
 
-    def display_welcome(self, *, project: str, model: str, persona: str) -> None:
-        self.renderer.display_welcome(project=project, model=model, persona=persona)
+    def add_assistant_message(self, content: str, persona: str) -> None:
+        self.renderer.add_assistant(content, persona)
 
-    def display_status(self, *, persona: str, project: str, model: str, tokens_used: int, num_ctx: int) -> None:
-        self.renderer.display_status(persona=persona, project=project, model=model, tokens_used=tokens_used, num_ctx=num_ctx)
+    def add_system_message(self, content: str) -> None:
+        self.renderer.add_system(content)
 
-    def display_system_info(self, message: str) -> None:
-        self.renderer.display_chat("system", message)
+    def clear_messages(self) -> None:
+        self.renderer.clear_messages()
 
     def display_error(self, message: str) -> None:
         self.renderer.display_error(message)
 
-    def display_response(self, content: str, persona: str) -> None:
-        self.renderer.display_chat("assistant", content, display_as=persona)
+    def build_status(
+        self,
+        *,
+        persona: str,
+        project: str,
+        model: str,
+        tokens_used: int,
+        num_ctx: int,
+    ) -> Text:
+        return self.renderer.build_status(
+            persona=persona,
+            project=project,
+            model=model,
+            tokens_used=tokens_used,
+            num_ctx=num_ctx,
+        )
 
-    def stream_response(self, chunks: Iterator[str], persona: str) -> str:
-        return self.renderer.display_streaming_response(chunks, "assistant", display_as=persona)
+    def get_input(self, persona: str, status: Text) -> str:
+        return self.renderer.get_input(persona, status)
+
+    def stream_response(self, chunks: Iterator[str], persona: str, status: Text) -> str:
+        return self.renderer.stream_response(chunks, persona, status)
