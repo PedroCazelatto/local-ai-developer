@@ -2,6 +2,8 @@ import os
 from collections.abc import Generator
 from typing import Any
 
+import ollama
+
 from agents.factory import AgentFactory
 from context.builder import ContextBuilder
 from core.container.client import DockerClient
@@ -14,10 +16,11 @@ SANDBOX_CONTAINER = "ai_sandbox"
 
 
 class SessionOrchestrator:
-    def __init__(self, project_name: str, model_name: str, initial_role: str = "architect") -> None:
+    def __init__(self, project_name: str, model_name: str, num_ctx: int, initial_role: str = "architect") -> None:
         self.project_name = project_name
         self.model_name = model_name
-        self.llm = LLMProvider(model_name)
+        self.num_ctx = num_ctx
+        self.llm = LLMProvider(model_name, num_ctx)
         self.memory = SessionMemory()
         self.context = ContextBuilder()
         self.tools = ToolFactory()
@@ -28,6 +31,16 @@ class SessionOrchestrator:
         self.agent = AgentFactory.get_agent(initial_role)
         self.memory.set_active_persona(self.agent.role)
         self._last_stream_message: dict[str, Any] = {}
+        self.last_prompt_tokens: int = 0
+        self.last_eval_tokens: int = 0
+
+    @property
+    def last_token_count(self) -> int:
+        return self.last_prompt_tokens + self.last_eval_tokens
+
+    def _update_token_counts(self, response: ollama.ChatResponse) -> None:
+        self.last_prompt_tokens = response.prompt_eval_count or 0
+        self.last_eval_tokens = response.eval_count or 0
 
     def switch_agent(self, role: str) -> None:
         self.agent = AgentFactory.get_agent(role)
@@ -60,8 +73,10 @@ class SessionOrchestrator:
             if delta:
                 full_content += delta
                 yield delta
-            if chunk.get("done") and msg.get("tool_calls"):
-                last_message["tool_calls"] = msg["tool_calls"]
+            if chunk.get("done"):
+                if msg.get("tool_calls"):
+                    last_message["tool_calls"] = msg["tool_calls"]
+                self._update_token_counts(chunk)
 
         last_message["content"] = full_content
         self._last_stream_message = last_message
@@ -69,4 +84,5 @@ class SessionOrchestrator:
     def ask(self, user_input: str) -> dict[str, Any]:
         self.memory.add("user", user_input)
         response = self.llm.chat(messages=self._build_messages(), tools=self._allowed_tools())
+        self._update_token_counts(response)
         return response["message"]

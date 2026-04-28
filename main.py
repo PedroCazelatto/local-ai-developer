@@ -1,3 +1,4 @@
+import os
 import sys
 
 from dotenv import load_dotenv
@@ -18,7 +19,8 @@ def main() -> None:
         return
 
     project_name = sys.argv[1]
-    orchestrator = SessionOrchestrator(project_name, MODEL_NAME)
+    num_ctx = int(os.getenv("OLLAMA_NUM_CTX", str(DEFAULT_NUM_CTX)))
+    orchestrator = SessionOrchestrator(project_name, MODEL_NAME, num_ctx=num_ctx)
     commands = CommandFactory()
     ui = TerminalLoop()
 
@@ -30,7 +32,8 @@ def main() -> None:
                 persona=orchestrator.agent.role,
                 project=project_name,
                 model=MODEL_NAME,
-                memory_size=len(orchestrator.memory.history),
+                tokens_used=orchestrator.last_token_count,
+                num_ctx=num_ctx,
             )
             user_input = ui.get_input(orchestrator.agent.role)
 

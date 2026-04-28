@@ -45,12 +45,13 @@ class UIRenderer:
         sys.stdout.flush()
         return content
 
-    def display_status(self, *, persona: str, project: str, model: str, memory_size: int) -> None:
+    def display_status(self, *, persona: str, project: str, model: str, tokens_used: int, num_ctx: int) -> None:
         persona_style = self.theme.for_role(persona)
         persona_label = persona.replace("_", " ").upper()
+        pct = (tokens_used / num_ctx * 100) if num_ctx > 0 else 0.0
         line = (
             f"[{persona_style}]{persona_label}[/]  "
-            f"[dim]project: {project}  ·  model: {model}  ·  memory: {memory_size} msgs[/]"
+            f"[dim]project: {project}  ·  model: {model}  ·  ctx: {tokens_used}/{num_ctx} ({pct:.1f}%)[/]"
         )
         self.console.rule(line, style=persona_style, align="left")
 

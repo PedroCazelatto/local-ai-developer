@@ -15,8 +15,8 @@ class TerminalLoop:
     def display_welcome(self, *, project: str, model: str, persona: str) -> None:
         self.renderer.display_welcome(project=project, model=model, persona=persona)
 
-    def display_status(self, *, persona: str, project: str, model: str, memory_size: int) -> None:
-        self.renderer.display_status(persona=persona, project=project, model=model, memory_size=memory_size)
+    def display_status(self, *, persona: str, project: str, model: str, tokens_used: int, num_ctx: int) -> None:
+        self.renderer.display_status(persona=persona, project=project, model=model, tokens_used=tokens_used, num_ctx=num_ctx)
 
     def display_system_info(self, message: str) -> None:
         self.renderer.display_chat("system", message)
