@@ -19,7 +19,7 @@ def _process_message(orchestrator: SessionOrchestrator, ui: TerminalLoop, prompt
     for delta in orchestrator.stream_ask(prompt):
         ui.append_stream_delta(delta)
 
-    msg = orchestrator._last_stream_message
+    msg = orchestrator.last_stream_message
     streamed = msg.get("content", "") or ""
     ui.update_tokens(orchestrator.last_token_count)
 
@@ -39,7 +39,7 @@ def _process_message(orchestrator: SessionOrchestrator, ui: TerminalLoop, prompt
         ui.begin_stream()
         for delta in orchestrator.stream_ask("Proceed with the tool results."):
             ui.append_stream_delta(delta)
-        final_msg = orchestrator._last_stream_message
+        final_msg = orchestrator.last_stream_message
         final_content = final_msg.get("content", "") or ""
         ui.update_tokens(orchestrator.last_token_count)
 

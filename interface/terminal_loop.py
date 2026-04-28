@@ -208,6 +208,43 @@ class TerminalLoop:
             return None
         return msvcrt.getwch()
 
+    def _drain_pending_chars(self, max_wait: float = 0.005) -> str:
+        """Drain everything currently buffered in stdin, briefly waiting for trailing bytes."""
+        if msvcrt is None:
+            return ""
+        chars = ""
+        deadline = time.time() + max_wait
+        while True:
+            if msvcrt.kbhit():
+                chars += msvcrt.getwch()
+                deadline = time.time() + max_wait
+            elif time.time() >= deadline:
+                break
+            else:
+                time.sleep(0.0005)
+        return chars
+
+    def _handle_csi(self, seq: str) -> None:
+        """Handle a CSI sequence body (the part after ESC [). Mouse + arrow keys land here in alt-screen mode."""
+        if not seq:
+            return
+        # Mouse reports look like '<btn;col;rowM' or '<btn;col;rowm' — ignore them entirely.
+        if seq.startswith("<") and seq[-1:] in ("M", "m"):
+            return
+        final = seq[-1]
+        with self._lock:
+            if final == "C" and self._cursor < len(self._buffer):  # Right
+                self._cursor += 1
+            elif final == "D" and self._cursor > 0:  # Left
+                self._cursor -= 1
+            elif final == "H":  # Home
+                self._cursor = 0
+            elif final == "F":  # End
+                self._cursor = len(self._buffer)
+            elif seq == "3~" and self._cursor < len(self._buffer):  # Delete
+                self._buffer = self._buffer[: self._cursor] + self._buffer[self._cursor + 1 :]
+            # 'A' (Up) and 'B' (Down) — used by alt-screen mouse scroll and arrow keys; intentionally ignored.
+
     def _handle_key(self, key: str) -> None:
         if key in ("\r", "\n"):
             self._submit_buffer()
@@ -224,7 +261,7 @@ class TerminalLoop:
                     self._buffer = self._buffer[: self._cursor - 1] + self._buffer[self._cursor :]
                     self._cursor -= 1
             return
-        if key in ("\x00", "\xe0"):  # Windows extended-key prefix
+        if key in ("\x00", "\xe0"):  # Windows legacy extended-key prefix
             ext = msvcrt.getwch() if msvcrt and msvcrt.kbhit() else ""
             with self._lock:
                 if ext == "K" and self._cursor > 0:  # Left
@@ -237,6 +274,16 @@ class TerminalLoop:
                     self._cursor = len(self._buffer)
                 elif ext == "S" and self._cursor < len(self._buffer):  # Delete
                     self._buffer = self._buffer[: self._cursor] + self._buffer[self._cursor + 1 :]
+            return
+        if key == "\x1b":  # ESC — VT escape sequence (Windows Terminal in alt-screen mode)
+            tail = self._drain_pending_chars()
+            if not tail:
+                return  # lone ESC press
+            if tail.startswith("["):
+                self._handle_csi(tail[1:])
+            elif tail.startswith("O") and len(tail) >= 2:
+                # SS3 sequences (ESC O P/Q/R/S = F1-F4, etc.) — ignore.
+                pass
             return
         if key == "\x15":  # Ctrl+U: clear line
             with self._lock:

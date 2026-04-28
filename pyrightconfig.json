@@ -1,0 +1,24 @@
+{
+  "include": [
+    "main.py",
+    "agents",
+    "context",
+    "core",
+    "interface",
+    "tools"
+  ],
+  "exclude": [
+    "**/__pycache__",
+    "**/node_modules",
+    "**/.*",
+    ".venv",
+    "projects",
+    "rules"
+  ],
+  "venvPath": ".",
+  "venv": ".venv",
+  "pythonVersion": "3.12",
+  "typeCheckingMode": "basic",
+  "reportMissingTypeStubs": "none",
+  "reportPrivateUsage": "none"
+}

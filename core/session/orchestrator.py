@@ -30,7 +30,7 @@ class SessionOrchestrator:
         )
         self.agent = AgentFactory.get_agent(initial_role)
         self.memory.set_active_persona(self.agent.role)
-        self._last_stream_message: dict[str, Any] = {}
+        self.last_stream_message: dict[str, Any] = {}
         self.last_prompt_tokens: int = 0
         self.last_eval_tokens: int = 0
 
@@ -61,7 +61,7 @@ class SessionOrchestrator:
         return allowed or None
 
     def stream_ask(self, user_input: str) -> Generator[str, None, None]:
-        """Yields text deltas as the model streams. After exhaustion, `_last_stream_message` holds the complete message."""
+        """Yields text deltas as the model streams. After exhaustion, `last_stream_message` holds the complete message."""
         self.memory.add("user", user_input)
 
         full_content = ""
@@ -79,7 +79,7 @@ class SessionOrchestrator:
                 self._update_token_counts(chunk)
 
         last_message["content"] = full_content
-        self._last_stream_message = last_message
+        self.last_stream_message = last_message
 
     def ask(self, user_input: str) -> dict[str, Any]:
         self.memory.add("user", user_input)
