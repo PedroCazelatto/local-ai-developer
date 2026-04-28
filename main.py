@@ -1,10 +1,15 @@
 import sys
 
+from dotenv import load_dotenv
+
 from core.session.orchestrator import SessionOrchestrator
 from interface.terminal_loop import TerminalLoop
 from tools.factories import CommandFactory
 
+load_dotenv()
+
 MODEL_NAME = "qwen2.5-coder:14b"
+DEFAULT_NUM_CTX = 16384
 
 
 def main() -> None:

@@ -2,4 +2,5 @@ pydantic>=2.0.0
 docker
 ollama
 rich
+python-dotenv
 pytest
