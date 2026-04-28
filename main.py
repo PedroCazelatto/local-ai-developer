@@ -13,6 +13,83 @@ MODEL_NAME = "qwen2.5-coder:14b"
 DEFAULT_NUM_CTX = 16384
 
 
+def _process_message(orchestrator: SessionOrchestrator, ui: TerminalLoop, prompt: str) -> None:
+    persona = orchestrator.agent.role
+    ui.begin_stream()
+    for delta in orchestrator.stream_ask(prompt):
+        ui.append_stream_delta(delta)
+
+    msg = orchestrator._last_stream_message
+    streamed = msg.get("content", "") or ""
+    ui.update_tokens(orchestrator.last_token_count)
+
+    if streamed:
+        ui.finalize_stream_as_assistant(persona)
+    else:
+        ui.cancel_stream()
+
+    if msg.get("tool_calls"):
+        for call in msg["tool_calls"]:
+            name = call["function"]["name"]
+            args = call["function"]["arguments"]
+            ui.add_system_message(f"→ tool: {name}")
+            tool_output = orchestrator.call_tool(name, args)
+            orchestrator.memory.add("tool", tool_output, name=name)
+
+        ui.begin_stream()
+        for delta in orchestrator.stream_ask("Proceed with the tool results."):
+            ui.append_stream_delta(delta)
+        final_msg = orchestrator._last_stream_message
+        final_content = final_msg.get("content", "") or ""
+        ui.update_tokens(orchestrator.last_token_count)
+
+        if final_content:
+            ui.finalize_stream_as_assistant(persona)
+        else:
+            ui.cancel_stream()
+        orchestrator.memory.add("assistant", final_content)
+    else:
+        orchestrator.memory.add("assistant", streamed)
+
+
+def _process_command(
+    commands: CommandFactory,
+    orchestrator: SessionOrchestrator,
+    ui: TerminalLoop,
+    raw: str,
+) -> None:
+    stripped = raw.strip()
+    cmd_name = stripped.lstrip("/").split(maxsplit=1)[0] if stripped.lstrip("/") else ""
+    result = commands.dispatch(stripped, orchestrator)
+    if cmd_name == "clear":
+        ui.clear_messages()
+    if result.message:
+        ui.add_system_message(result.message)
+    ui.set_persona(orchestrator.agent.role)
+    if result.exit:
+        ui.request_exit()
+
+
+def _make_handler(
+    orchestrator: SessionOrchestrator,
+    commands: CommandFactory,
+    ui: TerminalLoop,
+):
+    def handler(batch: list[str]) -> None:
+        if not batch:
+            return
+        first = batch[0].strip()
+        if first.startswith("/"):
+            _process_command(commands, orchestrator, ui, batch[0])
+            return
+        combined = "\n\n".join(item.strip() for item in batch if item.strip())
+        if not combined:
+            return
+        _process_message(orchestrator, ui, combined)
+
+    return handler
+
+
 def main() -> None:
     if len(sys.argv) < 2:
         print("Usage: python main.py <project_name>")
@@ -22,79 +99,15 @@ def main() -> None:
     num_ctx = int(os.getenv("OLLAMA_NUM_CTX", str(DEFAULT_NUM_CTX)))
     orchestrator = SessionOrchestrator(project_name, MODEL_NAME, num_ctx=num_ctx)
     commands = CommandFactory()
-    ui = TerminalLoop()
 
-    ui.add_system_message(
-        f"Local AI Developer  ·  project: {project_name}  ·  model: {MODEL_NAME}\n"
-        f"Persona: {orchestrator.agent.role.replace('_', ' ').upper()}\n"
-        f"Commands: /swap <role>  ·  /clear  ·  /exit"
+    ui = TerminalLoop(
+        persona=orchestrator.agent.role,
+        project=project_name,
+        model=MODEL_NAME,
+        num_ctx=num_ctx,
     )
-
-    while True:
-        try:
-            persona = orchestrator.agent.role
-            status = ui.build_status(
-                persona=persona,
-                project=project_name,
-                model=MODEL_NAME,
-                tokens_used=orchestrator.last_token_count,
-                num_ctx=num_ctx,
-            )
-            user_input = ui.get_input(persona, status)
-
-            stripped = user_input.strip()
-            if not stripped:
-                continue
-
-            if stripped.startswith("/"):
-                cmd_name = stripped.lstrip("/").split(maxsplit=1)[0] if stripped.lstrip("/") else ""
-                result = commands.dispatch(user_input, orchestrator)
-                if cmd_name == "clear":
-                    ui.clear_messages()
-                if result.message:
-                    ui.add_system_message(result.message)
-                if result.exit:
-                    break
-                continue
-
-            ui.add_user_message(user_input)
-            ui.stream_response(orchestrator.stream_ask(user_input), persona, status)
-            response_msg = orchestrator._last_stream_message
-            streamed = response_msg.get("content", "") or ""
-
-            if response_msg.get("tool_calls"):
-                if streamed:
-                    ui.add_assistant_message(streamed, persona)
-                for call in response_msg["tool_calls"]:
-                    name = call["function"]["name"]
-                    args = call["function"]["arguments"]
-                    ui.add_system_message(f"→ tool: {name}")
-                    tool_output = orchestrator.call_tool(name, args)
-                    orchestrator.memory.add("tool", tool_output, name=name)
-
-                follow_up_status = ui.build_status(
-                    persona=persona,
-                    project=project_name,
-                    model=MODEL_NAME,
-                    tokens_used=orchestrator.last_token_count,
-                    num_ctx=num_ctx,
-                )
-                ui.stream_response(
-                    orchestrator.stream_ask("Proceed with the tool results."),
-                    persona,
-                    follow_up_status,
-                )
-                final_msg = orchestrator._last_stream_message
-                final_content = final_msg.get("content", "") or ""
-                if final_content:
-                    ui.add_assistant_message(final_content, persona)
-                orchestrator.memory.add("assistant", final_content)
-            else:
-                ui.add_assistant_message(streamed, persona)
-                orchestrator.memory.add("assistant", streamed)
-
-        except KeyboardInterrupt:
-            break
+    ui.add_system_message("Local AI Developer  ·  /swap <role>  ·  /clear  ·  /exit")
+    ui.run(_make_handler(orchestrator, commands, ui))
 
 
 if __name__ == "__main__":
