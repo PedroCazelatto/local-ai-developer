@@ -37,15 +37,11 @@ switch ($Action) {
         Write-Host "Installing dependencies..." -ForegroundColor Green
         & $VENV_PYTHON -m pip install -r requirements.txt
     }
-    "test" {
-        & $VENV_PYTHON -m pytest tests/ -v
-    }
     default {
         Write-Host "Available Commands:" -ForegroundColor Cyan
         Write-Host "  start <project>   : Starts Docker and runs the AI (Recommended)"
         Write-Host "  run <project>     : Runs the AI without starting Docker"
         Write-Host "  up | stop | down  : Manage Docker containers"
         Write-Host "  install           : Install Python dependencies"
-        Write-Host "  test              : Run the pytest test suite"
     }
 }

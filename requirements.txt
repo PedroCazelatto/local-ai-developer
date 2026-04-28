@@ -3,4 +3,3 @@ docker
 ollama
 rich
 python-dotenv
-pytest
