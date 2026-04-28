@@ -12,6 +12,7 @@ class ChatMessage(TypedDict, total=False):
     role: str
     content: str
     persona: str
+    queued: bool
 
 
 class UIRenderer:
@@ -62,8 +63,16 @@ class UIRenderer:
         streaming: Optional[str] = None,
         thinking: bool = False,
     ) -> Panel:
+        is_active = streaming is not None or thinking
+        if is_active:
+            non_queued = [m for m in messages if not m.get("queued")]
+            queued = [m for m in messages if m.get("queued")]
+        else:
+            non_queued = list(messages)
+            queued = []
+
         candidates: list[RenderableType] = []
-        for i, m in enumerate(messages):
+        for i, m in enumerate(non_queued):
             if i > 0:
                 candidates.append(Text(""))
             candidates.append(self.render_message(m))
@@ -76,6 +85,11 @@ class UIRenderer:
             if candidates:
                 candidates.append(Text(""))
             candidates.append(self.render_thinking(persona))
+
+        for m in queued:
+            if candidates:
+                candidates.append(Text(""))
+            candidates.append(self.render_message(m))
 
         kept: list[RenderableType] = []
         used = 0

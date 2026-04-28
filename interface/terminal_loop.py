@@ -44,6 +44,7 @@ class TerminalLoop:
         self._streaming_content = ""
         self._is_streaming = False
         self._thinking = False
+        self._is_processing = False
 
         self._buffer = ""
         self._cursor = 0
@@ -70,13 +71,22 @@ class TerminalLoop:
         with self._lock:
             self._tokens_used = tokens_used
 
+    def _insert_before_queued_locked(self, msg: ChatMessage) -> None:
+        """Insert a freshly-produced message before any pending queued user messages."""
+        insert_idx = len(self._messages)
+        for i, m in enumerate(self._messages):
+            if m.get("queued"):
+                insert_idx = i
+                break
+        self._messages.insert(insert_idx, msg)
+
     def add_user_message(self, content: str) -> None:
         with self._lock:
             self._messages.append({"role": "user", "content": content})
 
     def add_system_message(self, content: str) -> None:
         with self._lock:
-            self._messages.append({"role": "system", "content": content})
+            self._insert_before_queued_locked({"role": "system", "content": content})
 
     def clear_messages(self) -> None:
         with self._lock:
@@ -84,6 +94,8 @@ class TerminalLoop:
 
     def begin_stream(self) -> None:
         with self._lock:
+            for m in self._messages:
+                m.pop("queued", None)
             self._is_streaming = True
             self._thinking = True
             self._streaming_content = ""
@@ -99,7 +111,9 @@ class TerminalLoop:
         with self._lock:
             content = self._streaming_content
             if content:
-                self._messages.append({"role": "assistant", "content": content, "persona": persona})
+                self._insert_before_queued_locked(
+                    {"role": "assistant", "content": content, "persona": persona}
+                )
             self._is_streaming = False
             self._thinking = False
             self._streaming_content = ""
@@ -128,7 +142,10 @@ class TerminalLoop:
                 return
             self._work_items.append(text)
             if not stripped.startswith("/"):
-                self._messages.append({"role": "user", "content": text})
+                msg: ChatMessage = {"role": "user", "content": text}
+                if self._is_streaming or self._is_processing:
+                    msg["queued"] = True
+                self._messages.append(msg)
             self._work_cv.notify()
 
     def _take_next_batch(self) -> list[str]:
@@ -140,6 +157,7 @@ class TerminalLoop:
             first = self._work_items.pop(0)
             stripped = first.strip()
             if stripped.startswith("/"):
+                self._is_processing = True
                 return [first]
             batch = [first]
             while self._work_items:
@@ -147,6 +165,7 @@ class TerminalLoop:
                 if nxt.strip().startswith("/"):
                     break
                 batch.append(self._work_items.pop(0))
+            self._is_processing = True
             return batch
 
     # ------------------------------------------------------------------ rendering
@@ -339,6 +358,9 @@ class TerminalLoop:
                 handler(batch)
             except Exception as exc:  # noqa: BLE001 - surface to UI
                 self.add_system_message(f"error: {exc}")
+            finally:
+                with self._lock:
+                    self._is_processing = False
 
     # ------------------------------------------------------------------ accessors for handler
 
