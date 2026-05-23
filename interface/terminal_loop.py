@@ -18,6 +18,11 @@ else:  # pragma: no cover - Windows-first per CLAUDE.md
 
 REFRESH_PER_SECOND = 12
 INPUT_POLL_INTERVAL = 0.02
+SCROLL_STEP = 3
+
+# SGR mouse tracking: button events + SGR coordinate format.
+MOUSE_ENABLE = "\x1b[?1000h\x1b[?1006h"
+MOUSE_DISABLE = "\x1b[?1006l\x1b[?1000l"
 
 
 class TerminalLoop:
@@ -49,6 +54,12 @@ class TerminalLoop:
         self._buffer = ""
         self._cursor = 0
 
+        self._scroll_offset = 0
+
+        self._input_history: list[str] = []
+        self._input_history_pos = -1  # -1 = live buffer; 0+ = index from most recent
+        self._saved_buffer = ""
+
         self._lock = threading.Lock()
         self._work_cv = threading.Condition(self._lock)
         self._work_items: list[str] = []
@@ -57,8 +68,8 @@ class TerminalLoop:
         self._layout = Layout()
         self._layout.split_column(
             Layout(name="history", ratio=1),
-            Layout(name="input", size=1),
-            Layout(name="status", size=1),
+            Layout(name="input", size=3),
+            Layout(name="status", size=4),
         )
 
     # ------------------------------------------------------------------ state mutators
@@ -91,6 +102,7 @@ class TerminalLoop:
     def clear_messages(self) -> None:
         with self._lock:
             self._messages.clear()
+            self._scroll_offset = 0
 
     def begin_stream(self) -> None:
         with self._lock:
@@ -138,8 +150,12 @@ class TerminalLoop:
             self._buffer = ""
             self._cursor = 0
             stripped = text.strip()
+            self._input_history_pos = -1
+            self._saved_buffer = ""
+            self._scroll_offset = 0
             if not stripped:
                 return
+            self._input_history.append(text)
             self._work_items.append(text)
             if not stripped.startswith("/"):
                 msg: ChatMessage = {"role": "user", "content": text}
@@ -181,33 +197,39 @@ class TerminalLoop:
             cursor = self._cursor
             tokens_used = self._tokens_used
             queued = self._queued_count_locked()
+            scroll_offset = self._scroll_offset
 
         cols = self.console.size.width
         rows = self.console.size.height
-        history_height = max(rows - 2, 4)
-        avail_height = max(history_height - 2, 1)  # panel border (top + bottom)
-        avail_width = max(cols - 4, 10)  # panel border + padding
+        history_height = max(rows - 7, 4)  # 3 input panel rows + 4 status block rows
+        avail_height = max(history_height - 1, 1)  # rule header takes 1 line
+        avail_width = max(cols, 10)
 
-        history_panel = self.renderer.build_history_panel(
+        history_panel, _total, clamped = self.renderer.build_history_panel(
             persona,
             messages,
             avail_height=avail_height,
             avail_width=avail_width,
             streaming=streaming if is_streaming else None,
             thinking=thinking and is_streaming,
+            scroll_offset=scroll_offset,
         )
+        if clamped != scroll_offset:
+            with self._lock:
+                self._scroll_offset = clamped
+
         input_line = self.renderer.build_input_line(
             persona=persona,
             buffer=buffer,
             cursor_pos=cursor,
-            is_streaming=is_streaming,
-            queued=queued,
         )
         status_line = self.renderer.build_status_line(
             project=self._project,
             model=self._model,
             tokens_used=tokens_used,
             num_ctx=self._num_ctx,
+            is_streaming=is_streaming,
+            queued=queued,
         )
 
         self._layout["history"].update(history_panel)
@@ -215,10 +237,65 @@ class TerminalLoop:
         self._layout["status"].update(status_line)
 
     def _queued_count_locked(self) -> int:
-        # Count items still in the queue that look like user messages while a stream is active.
         if not self._is_streaming:
             return 0
         return sum(1 for x in self._work_items if not x.strip().startswith("/"))
+
+    # ------------------------------------------------------------------ scroll & history
+
+    def _scroll_history(self, delta_lines: int) -> None:
+        with self._lock:
+            self._scroll_offset = max(0, self._scroll_offset + delta_lines)
+            # Upper bound is enforced inside the renderer and reported back via _refresh_layout.
+
+    def _try_unqueue_locked(self) -> bool:
+        """Pop the most recent queued user message into the input buffer. Returns True if done."""
+        for i in range(len(self._messages) - 1, -1, -1):
+            m = self._messages[i]
+            if m.get("queued") and m.get("role") == "user":
+                content = m.get("content", "")
+                del self._messages[i]
+                # Remove the matching submission from the work queue.
+                for j in range(len(self._work_items) - 1, -1, -1):
+                    if self._work_items[j] == content:
+                        del self._work_items[j]
+                        break
+                self._buffer = content
+                self._cursor = len(content)
+                self._input_history_pos = -1
+                self._saved_buffer = ""
+                return True
+        return False
+
+    def _nav_history_up(self) -> None:
+        with self._work_cv:
+            if not self._buffer and self._try_unqueue_locked():
+                return
+            if not self._input_history:
+                return
+            if self._input_history_pos == -1:
+                self._saved_buffer = self._buffer
+                self._input_history_pos = 0
+            elif self._input_history_pos < len(self._input_history) - 1:
+                self._input_history_pos += 1
+            else:
+                return
+            idx = len(self._input_history) - 1 - self._input_history_pos
+            self._buffer = self._input_history[idx]
+            self._cursor = len(self._buffer)
+
+    def _nav_history_down(self) -> None:
+        with self._lock:
+            if self._input_history_pos == -1:
+                return
+            self._input_history_pos -= 1
+            if self._input_history_pos == -1:
+                self._buffer = self._saved_buffer
+                self._saved_buffer = ""
+            else:
+                idx = len(self._input_history) - 1 - self._input_history_pos
+                self._buffer = self._input_history[idx]
+            self._cursor = len(self._buffer)
 
     # ------------------------------------------------------------------ input handling
 
@@ -228,7 +305,6 @@ class TerminalLoop:
         return msvcrt.getwch()
 
     def _drain_pending_chars(self, max_wait: float = 0.005) -> str:
-        """Drain everything currently buffered in stdin, briefly waiting for trailing bytes."""
         if msvcrt is None:
             return ""
         chars = ""
@@ -244,13 +320,27 @@ class TerminalLoop:
         return chars
 
     def _handle_csi(self, seq: str) -> None:
-        """Handle a CSI sequence body (the part after ESC [). Mouse + arrow keys land here in alt-screen mode."""
+        """Handle a CSI sequence body (the part after ESC [)."""
         if not seq:
             return
-        # Mouse reports look like '<btn;col;rowM' or '<btn;col;rowm' — ignore them entirely.
+        # SGR mouse: '<btn;col;row[Mm]'.
         if seq.startswith("<") and seq[-1:] in ("M", "m"):
+            try:
+                button = int(seq[1:-1].split(";", 1)[0])
+            except (ValueError, IndexError):
+                return
+            if button == 64:  # scroll up
+                self._scroll_history(SCROLL_STEP)
+            elif button == 65:  # scroll down
+                self._scroll_history(-SCROLL_STEP)
             return
         final = seq[-1]
+        if final == "A":  # Up
+            self._nav_history_up()
+            return
+        if final == "B":  # Down
+            self._nav_history_down()
+            return
         with self._lock:
             if final == "C" and self._cursor < len(self._buffer):  # Right
                 self._cursor += 1
@@ -262,7 +352,6 @@ class TerminalLoop:
                 self._cursor = len(self._buffer)
             elif seq == "3~" and self._cursor < len(self._buffer):  # Delete
                 self._buffer = self._buffer[: self._cursor] + self._buffer[self._cursor + 1 :]
-            # 'A' (Up) and 'B' (Down) — used by alt-screen mouse scroll and arrow keys; intentionally ignored.
 
     def _handle_key(self, key: str) -> None:
         if key in ("\r", "\n"):
@@ -282,6 +371,12 @@ class TerminalLoop:
             return
         if key in ("\x00", "\xe0"):  # Windows legacy extended-key prefix
             ext = msvcrt.getwch() if msvcrt and msvcrt.kbhit() else ""
+            if ext == "H":  # Up
+                self._nav_history_up()
+                return
+            if ext == "P":  # Down
+                self._nav_history_down()
+                return
             with self._lock:
                 if ext == "K" and self._cursor > 0:  # Left
                     self._cursor -= 1
@@ -294,22 +389,21 @@ class TerminalLoop:
                 elif ext == "S" and self._cursor < len(self._buffer):  # Delete
                     self._buffer = self._buffer[: self._cursor] + self._buffer[self._cursor + 1 :]
             return
-        if key == "\x1b":  # ESC — VT escape sequence (Windows Terminal in alt-screen mode)
+        if key == "\x1b":  # ESC — VT escape sequence
             tail = self._drain_pending_chars()
             if not tail:
-                return  # lone ESC press
+                return
             if tail.startswith("["):
                 self._handle_csi(tail[1:])
             elif tail.startswith("O") and len(tail) >= 2:
-                # SS3 sequences (ESC O P/Q/R/S = F1-F4, etc.) — ignore.
-                pass
+                pass  # SS3 sequences (F1-F4) — ignored.
             return
-        if key == "\x15":  # Ctrl+U: clear line
+        if key == "\x15":  # Ctrl+U
             with self._lock:
                 self._buffer = ""
                 self._cursor = 0
             return
-        if key == "\x17":  # Ctrl+W: delete word backwards
+        if key == "\x17":  # Ctrl+W
             with self._lock:
                 left = self._buffer[: self._cursor].rstrip()
                 space = left.rfind(" ")
@@ -322,6 +416,8 @@ class TerminalLoop:
         with self._lock:
             self._buffer = self._buffer[: self._cursor] + key + self._buffer[self._cursor :]
             self._cursor += 1
+            self._input_history_pos = -1
+            self._saved_buffer = ""
 
     # ------------------------------------------------------------------ run
 
@@ -329,6 +425,8 @@ class TerminalLoop:
         worker = threading.Thread(target=self._worker, args=(handler,), daemon=True)
         worker.start()
 
+        sys.stdout.write(MOUSE_ENABLE)
+        sys.stdout.flush()
         try:
             with Live(
                 self._layout,
@@ -346,6 +444,8 @@ class TerminalLoop:
                     if key is None:
                         time.sleep(INPUT_POLL_INTERVAL)
         finally:
+            sys.stdout.write(MOUSE_DISABLE)
+            sys.stdout.flush()
             self.request_exit()
             worker.join(timeout=1.0)
 
