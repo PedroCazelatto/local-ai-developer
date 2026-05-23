@@ -80,6 +80,8 @@ Each persona has its **own isolated message history**. `/swap` saves the active 
 
 Minimize persistent context to save tokens (local inference is VRAM-bound). Cross-persona communication goes through `AGENT_NOTES.md`, not memory.
 
+**Token counts are always exact.** Read them from Ollama's response (`prompt_eval_count`, `eval_count`) and propagate that exact value through any code that needs it (status line, summarization trigger, audit log, /resume summaries). Never substitute a length-based estimate — estimates drift and they're the wrong basis for VRAM-safety decisions. If a metric isn't returned for a call, surface that explicitly; don't paper over it with a guess.
+
 ## Rules loading
 
 Rules are all Markdown, under [rules/](rules/), and are **global** (projects are agnostic to the orchestrator and do not override rules).
