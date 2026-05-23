@@ -17,4 +17,4 @@ class AgentFactory:
             available = ", ".join(cls.available_roles())
             raise ValueError(f"Unknown persona: '{role}'. Available: {available}")
         persona = path.read_text(encoding="utf-8")
-        return Agent(role=normalized, persona=persona, tools=[])
+        return Agent(role=normalized, persona=persona)

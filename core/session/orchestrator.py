@@ -56,10 +56,6 @@ class SessionOrchestrator:
         )
         return [{"role": "system", "content": system_prompt}] + self.memory.history
 
-    def _allowed_tools(self) -> list[dict[str, object]] | None:
-        allowed = [t for t in self.tools.definitions if t["function"]["name"] in self.agent.tools]
-        return allowed or None
-
     def stream_ask(self, user_input: str) -> Generator[str, None, None]:
         """Yields text deltas as the model streams. After exhaustion, `last_stream_message` holds the complete message."""
         self.memory.add("user", user_input)
@@ -67,7 +63,7 @@ class SessionOrchestrator:
         full_content = ""
         last_message: dict[str, Any] = {"role": "assistant", "content": "", "tool_calls": None}
 
-        for chunk in self.llm.stream(messages=self._build_messages(), tools=self._allowed_tools()):
+        for chunk in self.llm.stream(messages=self._build_messages(), tools=self.tools.definitions):
             msg = chunk.get("message", {})
             delta = msg.get("content", "")
             if delta:
@@ -83,6 +79,6 @@ class SessionOrchestrator:
 
     def ask(self, user_input: str) -> dict[str, Any]:
         self.memory.add("user", user_input)
-        response = self.llm.chat(messages=self._build_messages(), tools=self._allowed_tools())
+        response = self.llm.chat(messages=self._build_messages(), tools=self.tools.definitions)
         self._update_token_counts(response)
         return response["message"]
