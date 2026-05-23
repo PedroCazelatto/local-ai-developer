@@ -1,4 +1,5 @@
 import os
+import time
 from collections.abc import Generator
 from typing import Any
 
@@ -8,6 +9,7 @@ from agents.factory import AgentFactory
 from context.builder import ContextBuilder
 from core.container.client import DockerClient
 from core.llm.provider import LLMProvider
+from core.session.audit import ToolAuditLogger
 from core.session.memory import SessionMemory
 from tools.base import ToolContext
 from tools.factories import ToolFactory
@@ -28,6 +30,7 @@ class SessionOrchestrator:
             project_path=os.path.abspath(f"./projects/{project_name}"),
             docker=DockerClient(container_name=SANDBOX_CONTAINER),
         )
+        self.audit = ToolAuditLogger(self.tool_ctx.project_path)
         self.agent = AgentFactory.get_agent(initial_role)
         self.memory.set_active_persona(self.agent.role)
         self.last_stream_message: dict[str, Any] = {}
@@ -47,7 +50,27 @@ class SessionOrchestrator:
         self.memory.set_active_persona(self.agent.role)
 
     def call_tool(self, name: str, args: dict[str, object]) -> str:
-        return self.tools.call(name, self.tool_ctx, args)
+        started = time.perf_counter()
+        error: str | None = None
+        exit_status = 0
+        output = ""
+        try:
+            output = self.tools.call(name, self.tool_ctx, args)
+        except Exception as exc:
+            error = f"{type(exc).__name__}: {exc}"
+            exit_status = -1
+            output = f"Error: {error}"
+        finally:
+            self.audit.record(
+                persona=self.agent.role,
+                tool=name,
+                args=args,
+                output=output,
+                duration_ms=int((time.perf_counter() - started) * 1000),
+                exit_status=exit_status,
+                error=error,
+            )
+        return output
 
     def _build_messages(self) -> list[dict[str, Any]]:
         system_prompt = self.context.build_system_prompt(
