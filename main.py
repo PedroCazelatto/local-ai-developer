@@ -1,8 +1,10 @@
 import os
 import sys
+from collections.abc import Callable, Generator
 
 from dotenv import load_dotenv
 
+from core.llm.stream_filter import StreamFilter
 from core.session.orchestrator import SessionOrchestrator
 from interface.terminal_loop import TerminalLoop
 from tools.factories import CommandFactory
@@ -11,45 +13,64 @@ load_dotenv()
 
 MODEL_NAME = "qwen2.5-coder:14b"
 DEFAULT_NUM_CTX = 16384
+MAX_TOOL_ROUNDS = 8
 
 
-def _process_message(orchestrator: SessionOrchestrator, ui: TerminalLoop, prompt: str) -> None:
-    persona = orchestrator.agent.role
+def _run_turn(
+    orchestrator: SessionOrchestrator,
+    ui: TerminalLoop,
+    persona: str,
+    stream: Callable[[], Generator[str, None, None]],
+) -> bool:
+    """Stream one assistant turn and dispatch any tool calls.
+    Returns True if tools were dispatched (caller should run another turn).
+    """
     ui.begin_stream()
-    for delta in orchestrator.stream_ask(prompt):
-        ui.append_stream_delta(delta)
+    filt = StreamFilter()
+    for delta in stream():
+        visible = filt.push(delta)
+        if visible:
+            ui.append_stream_delta(visible)
+    tail = filt.flush()
+    if tail:
+        ui.append_stream_delta(tail)
 
     msg = orchestrator.last_stream_message
-    streamed = msg.get("content", "") or ""
+    cleaned = msg.get("content", "") or ""
     ui.update_tokens(orchestrator.last_token_count)
 
-    if streamed:
+    if cleaned.strip():
         ui.finalize_stream_as_assistant(persona)
     else:
         ui.cancel_stream()
 
-    if msg.get("tool_calls"):
-        for call in msg["tool_calls"]:
-            name = call["function"]["name"]
-            args = call["function"]["arguments"]
-            ui.add_system_message(f"→ tool: {name}")
-            tool_output = orchestrator.call_tool(name, args)
-            orchestrator.memory.add("tool", tool_output, name=name)
+    if not msg.get("tool_calls"):
+        orchestrator.memory.add("assistant", cleaned)
+        return False
 
-        ui.begin_stream()
-        for delta in orchestrator.stream_ask("Proceed with the tool results."):
-            ui.append_stream_delta(delta)
-        final_msg = orchestrator.last_stream_message
-        final_content = final_msg.get("content", "") or ""
-        ui.update_tokens(orchestrator.last_token_count)
+    # qwen2.5-coder's chat template renders assistant `content` OR `tool_calls`
+    # (if/else), so drop the prose to ensure the tool-call rendering survives.
+    orchestrator.memory.add("assistant", "", tool_calls=msg["tool_calls"])
+    for call in msg["tool_calls"]:
+        name = call["function"]["name"]
+        args = call["function"]["arguments"]
+        ui.add_system_message(f"→ tool: {name}")
+        tool_output = orchestrator.call_tool(name, args)
+        orchestrator.memory.add("tool", tool_output, name=name)
+    return True
 
-        if final_content:
-            ui.finalize_stream_as_assistant(persona)
-        else:
-            ui.cancel_stream()
-        orchestrator.memory.add("assistant", final_content)
-    else:
-        orchestrator.memory.add("assistant", streamed)
+
+def _process_message(orchestrator: SessionOrchestrator, ui: TerminalLoop, prompt: str) -> None:
+    persona = orchestrator.agent.role
+
+    if not _run_turn(orchestrator, ui, persona, lambda: orchestrator.stream_ask(prompt)):
+        return
+
+    for _ in range(MAX_TOOL_ROUNDS):
+        if not _run_turn(orchestrator, ui, persona, orchestrator.stream_continue):
+            return
+
+    ui.add_system_message(f"⚠ Reached tool-call limit ({MAX_TOOL_ROUNDS}). Stopping.")
 
 
 def _process_command(

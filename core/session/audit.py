@@ -27,6 +27,7 @@ class ToolAuditLogger:
         duration_ms: int,
         exit_status: int = 0,
         error: str | None = None,
+        metadata: Mapping[str, object] | None = None,
     ) -> None:
         preview = output[:OUTPUT_PREVIEW_LIMIT]
         row: dict[str, object] = {
@@ -39,6 +40,8 @@ class ToolAuditLogger:
             "output_truncated": len(output) > OUTPUT_PREVIEW_LIMIT,
             "output_preview": preview,
         }
+        if metadata:
+            row["metadata"] = dict(metadata)
         if error is not None:
             row["error"] = error
 

@@ -9,12 +9,20 @@ class SessionMemory:
         self._active = persona
         self._histories.setdefault(persona, [])
 
-    def add(self, role: str, content: str, name: Optional[str] = None) -> None:
+    def add(
+        self,
+        role: str,
+        content: str,
+        name: Optional[str] = None,
+        tool_calls: Optional[List[Dict[str, Any]]] = None,
+    ) -> None:
         if self._active is None:
             raise RuntimeError("No active persona set")
         entry: Dict[str, Any] = {"role": role, "content": content}
         if name:
             entry["name"] = name
+        if tool_calls:
+            entry["tool_calls"] = tool_calls
         self._histories[self._active].append(entry)
 
     def clear(self) -> None:

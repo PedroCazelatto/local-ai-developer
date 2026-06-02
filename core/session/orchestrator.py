@@ -9,6 +9,7 @@ from agents.factory import AgentFactory
 from context.builder import ContextBuilder
 from core.container.client import DockerClient
 from core.llm.provider import LLMProvider
+from core.llm.tool_call_recovery import recover_tool_calls
 from core.session.audit import ToolAuditLogger
 from core.session.memory import SessionMemory
 from tools.base import ToolContext
@@ -27,6 +28,7 @@ class SessionOrchestrator:
         self.context = ContextBuilder()
         self.tools = ToolFactory()
         self.tool_ctx = ToolContext(
+            project_name=project_name,
             project_path=os.path.abspath(f"./projects/{project_name}"),
             docker=DockerClient(container_name=SANDBOX_CONTAINER),
         )
@@ -54,6 +56,7 @@ class SessionOrchestrator:
         error: str | None = None
         exit_status = 0
         output = ""
+        metadata = self.tools.audit_metadata(name, self.tool_ctx, args)
         try:
             output = self.tools.call(name, self.tool_ctx, args)
         except Exception as exc:
@@ -69,6 +72,7 @@ class SessionOrchestrator:
                 duration_ms=int((time.perf_counter() - started) * 1000),
                 exit_status=exit_status,
                 error=error,
+                metadata=metadata,
             )
         return output
 
@@ -80,9 +84,17 @@ class SessionOrchestrator:
         return [{"role": "system", "content": system_prompt}] + self.memory.history
 
     def stream_ask(self, user_input: str) -> Generator[str, None, None]:
-        """Yields text deltas as the model streams. After exhaustion, `last_stream_message` holds the complete message."""
+        """Add `user_input` to memory and stream the model's reply. After
+        exhaustion, `last_stream_message` holds the complete message."""
         self.memory.add("user", user_input)
+        yield from self._stream()
 
+    def stream_continue(self) -> Generator[str, None, None]:
+        """Stream the next assistant turn from current memory without injecting
+        a user message. Use after a tool result so the model continues naturally."""
+        yield from self._stream()
+
+    def _stream(self) -> Generator[str, None, None]:
         full_content = ""
         last_message: dict[str, Any] = {"role": "assistant", "content": "", "tool_calls": None}
 
@@ -96,6 +108,12 @@ class SessionOrchestrator:
                 if msg.get("tool_calls"):
                     last_message["tool_calls"] = msg["tool_calls"]
                 self._update_token_counts(chunk)
+
+        if not last_message["tool_calls"]:
+            cleaned, recovered = recover_tool_calls(full_content)
+            if recovered:
+                last_message["tool_calls"] = recovered
+                full_content = cleaned
 
         last_message["content"] = full_content
         self.last_stream_message = last_message

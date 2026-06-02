@@ -6,11 +6,12 @@ class DockerClient:
         self.client = docker.from_env()
         self.container_name = container_name
 
-    def execute_command(self, command: str) -> Dict[str, Any]:
+    def execute_command(self, command: str, workdir: str | None = None) -> Dict[str, Any]:
         try:
             container = self.client.containers.get(self.container_name)
             exit_code, output = container.exec_run(
                 cmd=f'sh -c "{command}"',
+                workdir=workdir,
                 demux=True
             )
             stdout, stderr = output

@@ -71,6 +71,15 @@ class ToolFactory:
             return f"Error: Tool '{name}' not found."
         return tool.execute(ctx, **args)
 
+    def audit_metadata(self, name: str, ctx: ToolContext, args: dict[str, object]) -> dict[str, object]:
+        tool = self._tools.get(name)
+        if tool is None:
+            return {}
+        try:
+            return tool.audit_metadata(ctx, **args)
+        except Exception:
+            return {}
+
 
 class CommandFactory:
     """Loads every file in `tools/` that defines a `BaseCommand` subclass."""

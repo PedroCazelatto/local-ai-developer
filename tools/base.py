@@ -11,6 +11,7 @@ if TYPE_CHECKING:
 
 @dataclass
 class ToolContext:
+    project_name: str
     project_path: str
     docker: DockerClient
 
@@ -31,6 +32,10 @@ class BaseTool(ABC):
     @abstractmethod
     def execute(self, ctx: ToolContext, /, **kwargs: object) -> str:
         ...
+
+    def audit_metadata(self, ctx: ToolContext, /, **kwargs: object) -> dict[str, object]:
+        """Tool-specific fields to record on the audit row (e.g. resolved workdir)."""
+        return {}
 
 
 @dataclass
