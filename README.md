@@ -24,28 +24,42 @@ All of this while not spending a penny on inference. Just using my RTX 3060 and 
 - `.\run.ps1 start <project-name>` — start the orchestrator focused on _project-name_
 - `.\run.ps1 stop` — shut down Docker
 
-### In-app (Rich terminal)
+## What is the application?
 
-- `/swap <persona>` — switch active persona (see list below)
+The main application is a Python Rich Terminal with an input and some commands.
+
+Behind the terminal, a local model is used to create everything. As the Ollama API is stateless, each request contains it's own context window, and by playing with an array of contexts, we can create virtually infinite agents to work on the project.
+
+To develop a good application with AI, as we give more specification to the model, the better it performs. To reduce the workload, we can make another model ask us what we want to develop and let it write the specifications, raising questions and detailing everything that should and shouldn't be developed.
+
+So that is the principle behind the phases at this application:
+
+1. Discovery
+2. Design
+3. Breakdown
+4. Worker
+5. Reviewer
+
+## In-app commands (Rich terminal)
+
 - `/exit` — stop the application
 
 Model management and context-reset commands are planned but not yet implemented.
 
-## Personas
+## Phases
 
-The orchestrator exposes several personas the user drives manually via `/swap`. Plans flow through planning personas, then execution personas:
+The orchestrator exposes several phases:
 
-- **Explorer** — discovery; extracts requirements from the user.
-- **Architect** — system design (Hexagonal / DDD focus).
-- **Product Owner** — turns requirements into Epics and User Stories.
-- **Sequencer** — orders the backlog into an execution sequence.
-- **Developer** — writes failing tests, then code.
-- **Logic Reviewer** — verifies behavior and correctness.
-- **Standards Reviewer** — verifies convention adherence.
+- **Discovery** — extracts requirements from the user, defines versions and list all the features in Epics;
+- **Design** — make tech decisions, define boundaries and the architecture the Stories;
+- **Breakdown** — turns requirements into Tasks, prioritizing them;
+- **Worker** — writes failing tests, then code;
+- **Reviewer** — verifies behavior and correctness;
+- **Retro** — If some confusion gets caught by the Worker or Reviewer, the Retro finds the root cause and adjust the necessary file to avoid repeating the same error in the future;
 
-The flow is not linear — after the reviewers run, the user can loop back to any planning persona to revise the plan before the next Developer phase. Personas cross-signal each other through a shared `AGENT_NOTES.md` file inside each project.
+The flow is not linear — after the reviewers run, the user can loop back to any planning phase to revise the plan before the next Worker phase.
 
-Persona definitions live as Markdown in [rules/personas/](rules/personas/) (all currently marked DRAFT). Reusable standards live in [rules/standards/](rules/standards/) and are loaded on demand.
+Phase definitions live as Markdown in [rules/phases/](rules/phases/) (all currently marked DRAFT). Reusable standards live in [rules/standards/](rules/standards/) and are loaded on demand.
 
 ## Models used
 
@@ -73,9 +87,9 @@ The Ollama model itself runs on the host GPU (Docker is CPU-focused and cannot h
 
 A Python CLI that ties the model, the tools, and the rules together. It manages:
 
-- **Session context** — a living array of messages, cleared at the end of each phase to keep local inference VRAM-friendly.
-- **Persona switching** — the active persona's Markdown file is injected into the model prompt.
-- **Rules** — personas are auto-loaded; standards are fetched on demand (design in progress).
+- **Session context** — a living array of messages, with each phase inside.
+- **Phase switching** — the active phase's Markdown file is injected into the model prompt.
+- **Rules** — phases are auto-loaded; standards are fetched on demand (design in progress).
 - **Tool dispatch** — every tool call runs inside the project's Docker container.
 
 ### Human Interface
@@ -92,12 +106,12 @@ local-ai-developer/
 │   ├── container/          # Docker client
 │   ├── llm/                # Ollama provider
 │   └── ui/                 # Rich renderer + theme
-├── agents/                 # persona classes (architect, developer, base, factory)
+├── agents/                 # phases classes (architect, developer, base, factory)
 ├── context/                # prompt/context builders, rules loader
 ├── interface/              # terminal loop, command processor
 ├── tools/                  # model-callable tools (list_files, execute_command)
 ├── rules/
-│   ├── personas/           # persona definitions + their workflows
+│   ├── phases/             # phase definitions + their workflows
 │   └── standards/          # on-demand reference rules
 ├── projects/               # each child is its own git repo, developed by the model
 ├── docker-compose.yml

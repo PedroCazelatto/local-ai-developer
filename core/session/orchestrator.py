@@ -19,7 +19,7 @@ SANDBOX_CONTAINER = "ai_sandbox"
 
 
 class SessionOrchestrator:
-    def __init__(self, project_name: str, model_name: str, num_ctx: int, initial_role: str = "architect") -> None:
+    def __init__(self, project_name: str, model_name: str, num_ctx: int, initial_role: str = "discovery") -> None:
         self.project_name = project_name
         self.model_name = model_name
         self.num_ctx = num_ctx
