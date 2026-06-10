@@ -7,7 +7,12 @@ import json
 import re
 from typing import Any
 
+from core.llm.json_repair import repair_decode
+
 _TAGGED = re.compile(r"<tool_call>\s*(\{.*?\})\s*</tool_call>", re.DOTALL)
+# A markdown fence opener (``` + optional language) sitting at the end of the
+# text that precedes a recovered call — used to swallow the fence with the call.
+_FENCE_BEFORE = re.compile(r"```[A-Za-z0-9_+.-]*[ \t]*(?:\r?\n[ \t]*)?\Z")
 
 
 def recover_tool_calls(content: str) -> tuple[str, list[dict[str, Any]]]:
@@ -22,7 +27,7 @@ def recover_tool_calls(content: str) -> tuple[str, list[dict[str, Any]]]:
         call = _parse_call(match.group(1))
         if call is not None:
             calls.append(call)
-            spans.append((match.start(), match.end()))
+            spans.append(_expand_over_fence(content, match.start(), match.end()))
     if calls:
         return _strip_spans(content, spans).strip(), calls
 
@@ -35,12 +40,15 @@ def recover_tool_calls(content: str) -> tuple[str, list[dict[str, Any]]]:
         try:
             obj, end = decoder.raw_decode(content[i:])
         except json.JSONDecodeError:
-            i += 1
-            continue
+            repaired = repair_decode(content[i:])
+            if repaired is None:
+                i += 1
+                continue
+            obj, end = repaired
         call = _coerce_call(obj)
         if call is not None:
             calls.append(call)
-            spans.append((i, i + end))
+            spans.append(_expand_over_fence(content, i, i + end))
         i += end
 
     if calls:
@@ -50,10 +58,29 @@ def recover_tool_calls(content: str) -> tuple[str, list[dict[str, Any]]]:
 
 def _parse_call(payload: str) -> dict[str, Any] | None:
     try:
-        obj = json.loads(payload)
+        obj: object = json.loads(payload)
     except json.JSONDecodeError:
-        return None
+        repaired = repair_decode(payload.strip())
+        if repaired is None:
+            return None
+        obj = repaired[0]
     return _coerce_call(obj)
+
+
+def _expand_over_fence(content: str, start: int, end: int) -> tuple[int, int]:
+    """If the span is wrapped in a markdown fence (```json ... ```), widen it to
+    swallow the fence too, so stripping leaves no empty-fence debris."""
+    opener = _FENCE_BEFORE.search(content, 0, start)
+    if opener is None or opener.end() != start:
+        return start, end
+    j = end
+    while j < len(content) and content[j] in " \t\r\n":
+        j += 1
+    if content.startswith("```", j):
+        return opener.start(), j + 3
+    if j >= len(content):  # fence never closed (stream ended) — eat the opener anyway
+        return opener.start(), j
+    return start, end
 
 
 def _coerce_call(obj: object) -> dict[str, Any] | None:
@@ -74,11 +101,11 @@ def _coerce_call(obj: object) -> dict[str, Any] | None:
 
 
 def _strip_spans(text: str, spans: list[tuple[int, int]]) -> str:
-    """Remove non-overlapping, sorted (start, end) substrings from `text`."""
+    """Remove sorted (start, end) substrings from `text`, tolerating overlap."""
     parts: list[str] = []
     cursor = 0
     for start, end in spans:
-        parts.append(text[cursor:start])
-        cursor = end
+        parts.append(text[cursor:max(start, cursor)])
+        cursor = max(cursor, end)
     parts.append(text[cursor:])
     return "".join(parts)

@@ -96,6 +96,7 @@ class SessionOrchestrator:
 
     def _stream(self) -> Generator[str, None, None]:
         full_content = ""
+        tool_calls: list[ollama.Message.ToolCall] = []
         last_message: dict[str, Any] = {"role": "assistant", "content": "", "tool_calls": None}
 
         for chunk in self.llm.stream(messages=self._build_messages(), tools=self.tools.definitions):
@@ -104,10 +105,14 @@ class SessionOrchestrator:
             if delta:
                 full_content += delta
                 yield delta
+            # Ollama emits structured tool_calls on intermediate chunks
+            # (done=False), not just the final one — collect from every chunk.
+            if msg.get("tool_calls"):
+                tool_calls.extend(msg["tool_calls"])
             if chunk.get("done"):
-                if msg.get("tool_calls"):
-                    last_message["tool_calls"] = msg["tool_calls"]
                 self._update_token_counts(chunk)
+        if tool_calls:
+            last_message["tool_calls"] = tool_calls
 
         if not last_message["tool_calls"]:
             cleaned, recovered = recover_tool_calls(full_content)
