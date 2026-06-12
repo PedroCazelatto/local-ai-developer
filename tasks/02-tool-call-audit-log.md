@@ -1,3 +1,5 @@
+> **Status:** ✅ Completed (2026-06-12)
+
 # 02 — Tool-call audit log
 
 **Milestone:** M1 — Tools online

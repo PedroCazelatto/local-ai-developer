@@ -1,3 +1,5 @@
+> **Status:** ✅ Completed (2026-06-12)
+
 # 01 — Wire tools to agents
 
 **Milestone:** M1 — Tools online

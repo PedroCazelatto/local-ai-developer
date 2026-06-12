@@ -68,7 +68,8 @@ class ToolFactory:
     def call(self, name: str, ctx: ToolContext, args: dict[str, object]) -> str:
         tool = self._tools.get(name)
         if tool is None:
-            return f"Error: Tool '{name}' not found."
+            available = ", ".join(sorted(self._tools)) or "(none)"
+            raise ValueError(f"Tool '{name}' not found. Available tools: {available}.")
         return tool.execute(ctx, **args)
 
     def audit_metadata(self, name: str, ctx: ToolContext, args: dict[str, object]) -> dict[str, object]:
