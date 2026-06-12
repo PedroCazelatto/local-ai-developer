@@ -3,6 +3,19 @@
 **Milestone:** M1 — Tools online
 **Listed as an open question in CLAUDE.md** ("Scoping `execute_command` to the active project's workdir inside the sandbox").
 
+> **✅ Resolved — done via mount isolation instead of string-matching.**
+> The original plan below leaned on rejecting escapes by inspecting the command
+> string (`/workspace/<other>`, `..`). That's defeatable (`$(...)`, variables,
+> symlinks, interpreters), so it was replaced with a hard boundary: the sandbox
+> now mounts **only the active project** at `/workspace`
+> (`./projects/${ACTIVE_PROJECT}:/workspace`, set by `run.ps1`). Other projects
+> and the host are not mounted, so they're unreachable however the command is
+> written — verified live (a `cd ..` bypass lands in the empty container OS, not
+> in another project). `execute_command` runs at `/workspace` and still returns a
+> clean, recoverable error on `..` so the model self-corrects. The cross-project
+> regex was removed because, with one project as the root, `/workspace/<x>` is now
+> a legitimate in-project path.
+
 ## Why
 
 Today `execute_command` runs from `/workspace` inside `ai_sandbox`. A persona working on project A can `cd ../project-b` and trample anything there. The model isn't malicious, but its judgment about "which project am I in" is unreliable and the blast radius is wide.

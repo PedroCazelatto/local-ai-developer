@@ -44,7 +44,7 @@ Goal: a Developer-persona session can read, edit, search, write, and execute com
 
 - **Wire `ToolFactory.definitions` to every agent.** `Agent.tools=[]` is the root cause; the model receives no tool definitions today. No per-persona whitelist — every persona gets every tool, and persona markdown is the only place that steers usage.
 - **Audit log.** Append every tool call to `projects/<project>/.orchestrator/tool_audit.jsonl` with `{ts, persona, tool, args, exit_status, duration_ms, ...}`. CLAUDE.md explicitly requires this; today only the UI shows it.
-- **Workdir scoping.** `execute_command` runs with `workdir=/workspace/<active-project>` and rejects obvious cross-project escapes. The real sandbox is still Docker; this is mistake-prevention, not security.
+- **Workdir scoping.** The sandbox mounts **only the active project** at `/workspace` (`./projects/${ACTIVE_PROJECT}:/workspace`), so other projects and the host are physically unreachable regardless of the command. `execute_command` runs at `/workspace` and additionally returns a clean, recoverable error on `..` traversals so the model self-corrects instead of wandering into the throwaway container OS.
 - **Sanity demo.** Run the Developer persona once on `projects/hello-world` and have it create a real file, run a command, see the output.
 
 Exit criteria: model uses at least `read_file`, `write_file`, `execute_command` autonomously in one session.

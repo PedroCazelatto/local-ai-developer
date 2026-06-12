@@ -10,6 +10,8 @@ switch ($Action) {
         }
         try {
             Write-Host "Starting infrastructure..." -ForegroundColor Cyan
+            # Sandbox mounts only this project at /workspace (see docker-compose.yml).
+            $env:ACTIVE_PROJECT = $Project
             docker compose up -d
             Write-Host "Initializing Local AI Architect..." -ForegroundColor Green
             & $VENV_PYTHON main.py $Project
@@ -26,7 +28,14 @@ switch ($Action) {
             & $VENV_PYTHON main.py $Project
         }
     }
-    "up" { docker compose up -d }
+    "up" {
+        if (-not $Project) {
+            Write-Host "Error: Project name required. Example: .\run.ps1 up hello-world" -ForegroundColor Red
+        } else {
+            $env:ACTIVE_PROJECT = $Project
+            docker compose up -d
+        }
+    }
     "stop" { docker compose stop }
     "down" { docker compose down }
     "install" {
@@ -41,7 +50,8 @@ switch ($Action) {
         Write-Host "Available Commands:" -ForegroundColor Cyan
         Write-Host "  start <project>   : Starts Docker and runs the AI (Recommended)"
         Write-Host "  run <project>     : Runs the AI without starting Docker"
-        Write-Host "  up | stop | down  : Manage Docker containers"
+        Write-Host "  up <project>      : Start Docker for a project (no AI)"
+        Write-Host "  stop | down       : Manage Docker containers"
         Write-Host "  install           : Install Python dependencies"
     }
 }

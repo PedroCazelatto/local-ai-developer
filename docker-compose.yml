@@ -4,7 +4,11 @@ services:
     container_name: ai_sandbox
     network_mode: none
     volumes:
-      - ./projects:/workspace
+      # Mount ONLY the active project at /workspace, so the model literally
+      # cannot see (or escape into) other projects or the host. ACTIVE_PROJECT
+      # is set by run.ps1. Fail closed: if it is unset, mount a non-existent
+      # sentinel dir rather than ./projects (which would re-expose everything).
+      - ./projects/${ACTIVE_PROJECT:-__no_project__}:/workspace
     working_dir: /workspace
     deploy:
       resources:
