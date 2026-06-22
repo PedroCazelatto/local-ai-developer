@@ -1,181 +1,307 @@
 # Roadmap
 
-Forward-looking plan for the orchestrator. Pairs with [CLAUDE.md](CLAUDE.md), which describes intent — this file describes order of work toward v1.0.
+Forward-looking plan for the orchestrator. Pairs with [CLAUDE.md](CLAUDE.md), which
+describes *intent*; this file describes *goals, order of work, and the task backlog* toward v1.0
+and beyond.
 
-Detailed acceptance criteria for each item live in [tasks/](tasks/), numbered in the suggested execution order.
-
-## Where we are today
-
-Working end-to-end:
-
-- REPL loop (`main.py`) with Rich TUI, persona swapping, message queue, input history.
-- Per-persona in-memory history, isolated and switched on `/swap`.
-- Ollama streaming (`qwen2.5-coder:14b` hardcoded), `num_ctx` from `.env`.
-- Root sandbox container `ai_sandbox` reachable via `execute_command`.
-- All seven persona markdowns and two standards markdowns present and substantive.
-- `ToolFactory` / `CommandFactory` dynamically discover `tools/*.py`; `/swap`, `/clear`, `/exit` wired.
-
-Wired but dormant:
-
-- `Agent.tools` is always `[]` — **the model cannot call any tool yet**. Every other gap is downstream of this.
-
-Missing entirely:
-
-- Memory persistence; token-threshold summarization; `/resume`.
-- Inter-persona handoff mechanism (no code reads/writes anything).
-- `search_rules` / `load_rule`.
-- Per-project runtime (root sandbox has no Python/Node/Rust).
-- Tool-call audit log on disk.
-- Sub-agent spawning.
-- Model selection from the UI.
-
-## Guiding principles for ordering
-
-1. **Unblock the Developer persona first.** It's the only persona whose output is verifiable end-to-end (working code in a project). Until tools work, every other improvement is theoretical.
-2. **Each milestone should be demonstrable on `projects/hello-world`** — a real run, not a unit test.
-3. **Defer anything that doesn't change what the model can do this week.** Model picker, status-line polish, README rewrite all come after the loop is useful.
-4. **Never approximate token counts.** Every metric that touches tokens (status line, summarization trigger, archive summaries, audit log) reads exact values from Ollama's response. See CLAUDE.md.
+Detailed, executable acceptance criteria for each item live in [tasks/](tasks/), grouped by
+version. Each task file follows the template in [tasks/README.md](tasks/README.md).
 
 ---
 
-## M1 — Tools online (highest priority)
+## The pivot (2026-06-21)
 
-Goal: a Developer-persona session can read, edit, search, write, and execute commands against `projects/<project>`.
+Two load-bearing decisions reshape the whole plan. They override the older Python/air-gapped
+assumptions still lingering in some docs:
 
-- **Wire `ToolFactory.definitions` to every agent.** `Agent.tools=[]` is the root cause; the model receives no tool definitions today. No per-persona whitelist — every persona gets every tool, and persona markdown is the only place that steers usage.
-- **Audit log.** Append every tool call to `projects/<project>/.orchestrator/tool_audit.jsonl` with `{ts, persona, tool, args, exit_status, duration_ms, ...}`. CLAUDE.md explicitly requires this; today only the UI shows it.
-- **Workdir scoping.** The sandbox mounts **only the active project** at `/workspace` (`./projects/${ACTIVE_PROJECT}:/workspace`), so other projects and the host are physically unreachable regardless of the command. `execute_command` runs at `/workspace` and additionally returns a clean, recoverable error on `..` traversals so the model self-corrects instead of wandering into the throwaway container OS.
-- **Sanity demo.** Run the Developer persona once on `projects/hello-world` and have it create a real file, run a command, see the output.
+1. **Language: TypeScript / Node.** The Python implementation proved too heavy to keep building
+   on. The orchestrator is being rewritten in **TypeScript on Node**. The existing Python code is
+   **reference only** — it is read to recover behavior and acceptance criteria, never treated as
+   the source of truth, and is **deleted once the TS build reaches parity.**
+2. **Sandbox: controlled internet.** Every project needs live package installs (`npm i`,
+   `pip install`, `cargo fetch`). The sandbox therefore gets **network access**, hardened per the
+   dockerode model: rootless user, CPU/RAM caps, short-lived/disposable containers, and **only the
+   active project mounted**. This reverses the previous `network_mode: none` hard rule.
 
-Exit criteria: model uses at least `read_file`, `write_file`, `execute_command` autonomously in one session.
-
-Tasks: [01](tasks/01-wire-tools-to-agents.md), [02](tasks/02-tool-call-audit-log.md), [03](tasks/03-execute-command-workdir-scoping.md).
-
----
-
-## M2 — Knowledge retrieval (`search_rules` / `load_rule`)
-
-Goal: any persona can pull in a standard on demand without bloating its system prompt.
-
-- **`search_rules(intent: str) -> list[str]`** — same session model, same `num_ctx`, **fresh API call** (no session history). The catalog of `{name, description}` and the user's intent live and die inside that call.
-- **`load_rule(name: str) -> str`** — return the full markdown for the chosen rule.
-- **Catalog format.** Each standards file gets short YAML frontmatter (`name:`, `description:`). Loader fails loudly on missing or duplicate names.
-- **Six new standards** to give the Standards Reviewer something to work with: `testing_discipline`, `python_idioms`, `error_handling`, `naming_conventions`, `commit_hygiene`, `documentation`. Each one short — the strength of `search_rules` is that the model only loads what it needs.
-
-Exit criteria: Standards Reviewer answers a real review question by calling `search_rules`, then `load_rule`, then citing the rule.
-
-Tasks: [05](tasks/05-standards-catalog-frontmatter.md), [06](tasks/06-search-rules-and-load-rule-tools.md), [07](tasks/07-new-standards-files.md).
+What does **not** change: one local Ollama model on an RTX 3060, no cloud spend, **no
+parallelism** (phases run one at a time; scale by running a batch unattended), the model touches
+**only Docker — never the host**, Windows-first, single-user, shipped as a public learning
+artifact.
 
 ---
 
-## M3 — Cross-persona handoff (replaces `AGENT_NOTES.md`)
+## Goals
 
-CLAUDE.md specifies a single shared markdown file with `## To: <Role>` sections. This is fragile for an LLM client (read-modify-write race, formatting drift, no separation between active inbox and resolved history). The roadmap replaces it with a structured inbox driven by three tools.
+**Primary:** Learn prompt engineering, context-window isolation, and planning *by building the
+orchestrator myself* — **and actually use it** to develop real projects on local hardware. The
+older roadmap was almost entirely internal plumbing; this one is reorganized so the shortest path
+reaches a loop I would actually run.
 
-- **`inbox_post(to: str, body: str)`** — append to the recipient's JSONL.
-- **`inbox_read(status: "open" | "all" = "open")`** — returns only the active persona's items.
-- **`inbox_resolve(id: str, note: str)`** — append a `resolved` event referencing the original post.
+**Standing constraints**
 
-Storage: `projects/<project>/.orchestrator/inbox/<role>.jsonl`, append-only. State is reconstructed by replay.
+- One local Ollama model, RTX 3060, zero cloud spend.
+- Sequential phases only — no parallel windows (a 3060's VRAM can't hold parallel slots; the
+  intended way to scale is a batch left running overnight).
+- The model acts **only inside Docker**, with controlled internet, never on the host filesystem.
+- TypeScript / Node + a terminal UI (persistent REPL + clack-style prompts). Windows-first.
+- Single-user. Public learning artifact, used by the author.
 
-Exit criteria: Architect raises an item for Developer; Developer reads its open inbox, resolves the item; subsequent `inbox_read("open")` returns empty.
+**Non-goals (unchanged)**
 
-Task: [04](tasks/04-inbox-store-and-tools.md).
-
----
-
-## M4 — Persistence (`/clear` and `/resume`)
-
-Goal: closing and reopening `main.py` resumes every persona where it left off.
-
-- **Per-persona memory to disk.** Append-only JSONL at `projects/<project>/.orchestrator/memory/<role>.jsonl`. One record per turn, with exact token counts from Ollama.
-- **Token-threshold summarization.** When the **exact** `prompt_eval_count` from the previous call crosses `SUMMARIZATION_THRESHOLD_RATIO × num_ctx` (default 0.75), summarize the oldest 50% of turns into one `summary` record that lists every replaced turn id. Original turns stay in the JSONL; only the in-memory view collapses.
-- **`/clear`.** Active persona only. Moves the live JSONL into `archive/` under a timestamped+ULID name. No confirmation prompt.
-- **`/resume`.** Active persona only. Lists the last 3 archives with a quick summary (timestamp, turn count, total tokens, first and last user message). User picks 1–3 to restore, anything else cancels. Summaries are derived from the JSONL — no LLM call.
-
-Exit criteria: kill `main.py` mid-session, restart, run `/swap developer` and continue without context loss. `/clear` followed by `/resume` returns to the prior state.
-
-Tasks: [08](tasks/08-per-persona-memory-persistence.md), [09](tasks/09-token-threshold-summarization.md).
+- Not a VSCode/Cursor replacement. Not a "vibe coding" tool.
+- No backend/frontend deployment of the orchestrator itself.
+- No multi-user support. No cross-platform support yet.
 
 ---
 
-## M5 — Real runtimes (`run_in_project`)
+## Success criteria per version
 
-Goal: the model can execute language-specific commands (e.g., `pytest`, `npm test`, `cargo build`) against the active project's own container.
-
-Chosen direction: **host-dispatched `run_in_project` tool** (no docker socket inside `ai_sandbox`, no auto-routing magic).
-
-- **Tool.** `run_in_project(command: str, timeout_s: int = 120)`. Calls `docker compose -f projects/<active>/docker-compose.yml run --rm runner <command>` on the host. Auto-builds the image on first run, then caches.
-- **Project scaffold.** `/new-project <name> <stack>` drops `docker-compose.yml`, `Dockerfile` (when needed), `.orchestrator/` skeleton, empty `PRODUCT_SPEC.md`, and runs `git init` once.
-- **`execute_command` stays.** Still the right tool for plain shell ops (`ls`, `mv`, `cat`).
-- **Audit.** `run_in_project` calls (and the auto-build) go to the same `tool_audit.jsonl`.
-
-Exit criteria: Developer persona runs a failing test, edits a file, re-runs the test, sees it pass — all autonomously.
-
-Tasks: [10](tasks/10-run-in-project-tool.md), [11](tasks/11-project-scaffold-command.md).
+| Version | "Done" means… |
+|---|---|
+| **Foundation** | `run` boots a TS/Node REPL locked to one project, streams an Ollama turn with **exact** token counts, switches phases with isolated histories, and dispatches a model tool call into a hardened, networked Docker sandbox. |
+| **V1** | I can take an idea through the planning phases to an ordered Task list, trigger execution, and the local model (Worker) writes failing tests → implements → runs them with real `npm i` inside the project's container. Every tool call is logged. **I** review and git-commit the result. |
+| **V2** | After the Worker runs, an automated **Reviewer** judges the output against the task and surfaces a verdict + feedback. Approved work is auto-committed when I accept it. |
+| **V3** | The loop closes itself: implement→test→review→fix (max 5 rounds), `raise_blocker` escalation, **Retro** patches the right file, cross-phase inbox carries signals. I can start an all-tasks batch and walk away. |
+| **V4** | Any phase pulls a standard on demand (`search_rules`/`load_rule`) without bloating its prompt; every phase's memory persists across restarts with `/clear`/`/resume` and a token-threshold summarization failsafe. |
+| **V5** | Sub-agents, model picker in the UI, a polished status line + `/help`, an events log + cost visibility, and a rewritten README — shareable as a learning artifact. |
 
 ---
 
-## M6 — Sub-agents
+## Version ladder
 
-Goal: any persona can spawn a fresh-context worker for a side-task or a private back-and-forth that shouldn't pollute the main thread.
+### Foundation — the TypeScript rewrite skeleton
 
-- **`spawn_subagent(initial_context, task)`** — returns `{id, response}`. Master writes the brief; sub-agent runs in a fresh context with no inherited history.
-- **`ask_subagent(id, message)`** — follow-up, can be called many times.
-- **`dismiss_subagent(id)`** — drops state. Idempotent.
-- **Tool access.** Sub-agents get every tool the master has **except** the three sub-agent tools themselves. No nested sub-agents.
-- **Model.** Same session model, same `num_ctx`.
-- **Lifecycle.** In-memory only — sub-agents die with the session, not persisted to disk. Their tool calls *are* recorded in `tool_audit.jsonl` with a `subagent_id`.
-- **`/subagents`** — list active sub-agents (id, age, message count, exact token total).
+> Unavoidable prerequisite: nothing runs until the TS skeleton exists. This replaces `main.py`,
+> `run.ps1`, and the `core/`/`agents/`/`interface/` Python modules with their TS equivalents.
 
-Exit criteria: Developer spawns a typing-expert consultant, gets a critique, asks a follow-up, dismisses — all visible in the audit log, none of it in Developer's own memory.
+Scope:
 
-Task: [12](tasks/12-subagent-tools.md).
+- Node/TS project: `package.json`, strict `tsconfig`, source tree, build/run scripts replacing the
+  `run.ps1` verbs (`install` / `start <project>` / `stop`).
+- Ollama JS client: `chat` + `stream` + **tool-calling**, `num_ctx` option, and **exact** token
+  counts read from `prompt_eval_count` / `eval_count` (never estimated).
+- Docker sandbox layer via **dockerode**: a persistent root sandbox container, **networked +
+  hardened** (rootless `node` user, CPU/RAM caps), mounting **only the active project** at
+  `/workspace`.
+- Persistent-REPL UI: streaming output that preserves scrollback, a status line (project · phase ·
+  model · tokens · num_ctx), command input, with clack/chalk/ora for discrete prompts, styling, and
+  spinners.
+- Phase + orchestrator core: a **phase** abstraction (replaces "persona"/"role" entirely — no
+  legacy naming in the TS code), per-phase **isolated** message history, phase switching, and the
+  tool-dispatch turn loop (the port of `_run_turn` / `_process_message`'s bounded round loop).
 
----
+Exit criteria: `run start hello-world` opens the REPL, streams one Ollama turn with a real token
+count in the status line, `/swap` switches phases without leakage, and a model-issued `read_file`
+executes inside the sandbox.
 
-## M7 — Polish toward v1.0
-
-Lower priority, but needed for "this is shareable as a learning artifact":
-
-- **Model picker in the UI.** `/models list | pull <name> | use <name>`. Persist the choice across restarts.
-- **Status line.** Active persona persistent and color-coded, current tool with elapsed time, sub-agent count, time-since-last-tool-call. Token values from Ollama only — no estimates.
-- **`/help`.** Auto-generated from `CommandFactory`.
-- **Shift+Tab discoverability.** One-liner in the input panel footer.
-- **README rewrite.** Replace the stale `orchestrator/` layout, command list, and project tree. Link to this roadmap.
-
-Tasks: [13](tasks/13-model-picker-ui.md), [14](tasks/14-ux-polish-and-readme.md).
-
----
-
-## Cross-cutting backlog
-
-Themes that touch multiple milestones:
-
-- **Logging.** Beyond the tool audit log, route orchestrator-level events (persona swap, memory load, summarization fire, sub-agent spawn) to `projects/<project>/.orchestrator/events.jsonl`. Same format, different file.
-- **Configuration story.** `.env` only carries `OLLAMA_NUM_CTX`. Decide what stays in `.env` (machine-specific) vs. project config (per-project model overrides if/when needed).
-- **Error surfacing.** Today, a tool exception likely kills streaming. Each tool should return a structured error the model can read and recover from. Same for sub-agent failures.
-- **Cost visibility.** Total tokens (exact, from Ollama) per persona and per sub-agent per session, surfaced in the status line and in `tool_audit.jsonl`.
-
-## Open design questions
-
-Carried over from CLAUDE.md:
-
-- **Tester persona, or not?** Test-first lives in Developer; regression checks live in Logic Reviewer. Adding a dedicated Tester adds a swap step and another inbox. **Lean: don't add it until you hit a session where you wished you had it.**
-- **Per-project state location.** Proposal: everything orchestrator-owned under `projects/<name>/.orchestrator/` so it's easy to `.gitignore` from the project itself.
-- **Inbox guard against posting to your own role.** Edge case; blocking it is overhead. Leave open.
-- **Project switch UX.** Today, switching projects requires restarting `main.py`. Worth a `/project switch` command, or keep the one-process-per-project model?
+Tasks: [foundation/01](tasks/foundation/01-repo-skeleton-and-toolchain.md) ·
+[02](tasks/foundation/02-config-and-session-bootstrap.md) ·
+[03](tasks/foundation/03-ollama-client.md) ·
+[04](tasks/foundation/04-docker-sandbox-layer.md) ·
+[05](tasks/foundation/05-repl-ui-baseline.md) ·
+[06](tasks/foundation/06-phase-and-orchestrator-core.md).
 
 ---
 
-## Suggested sequencing
+### V1 — The usable loop *(you are the reviewer / git-gate)*
 
-| Order | Milestone | Why now |
-|------:|:----------|:--------|
-| 1 | M1 (tools online) | Nothing else is verifiable without it. |
-| 2 | M3 (inbox) | Lets you drive a multi-persona run on `hello-world`. |
-| 3 | M2 (retrieval) | Standards Reviewer becomes meaningful. |
-| 4 | M4 (persistence) | Sessions get long enough that losing them hurts. |
-| 5 | M5 (runtime) | Required before Developer can self-verify with real test suites. |
-| 6 | M6 (sub-agents) | Adds a power tool once the foundation is solid. |
-| 7 | M7 (polish) | Only after the loop is fun to use. |
+Goal: drive **idea → Epics → Stories → Tasks**, then run a Worker that writes and verifies code in
+a real, networked container. You review and commit; no automated Reviewer yet.
+
+Scope:
+
+- Phase-instruction loader: inject `rules/phases/<phase>.md` as the system prompt on phase load.
+- Tool registry + dispatch: discover tools, send their definitions to the model, dispatch calls,
+  feed results back, surface structured (recoverable) errors.
+- Core file tools: `list_files`, `read_file`, `write_file`, `edit_file`, `search_in_files`, scoped
+  to `/workspace` inside the sandbox.
+- `execute_command`: plain shell in the root sandbox at `/workspace`, workdir-scoped, recoverable
+  error on traversal attempts.
+- `run_in_project`: language-specific commands (`npm i`, `pytest`, `cargo build`) in the project's
+  **own networked container**, with timeout, captured stdout/stderr, and auto-build.
+- Tool-call audit log: append one JSON line per call to `.orchestrator/tool_audit.jsonl`.
+- `/new-project <name> <stack>`: scaffold a project with a **networked** hardened `runner` service,
+  the `.orchestrator/` skeleton, `PRODUCT_SPEC.md`, and `git init`.
+- Planning-phase content: write Discovery / Design / Breakdown so they decompose to the backlog.
+- Task-backlog format: settle where/how the Epic→Story→Task list and per-task status live in the
+  project repo, and the shape the Worker consumes.
+- Worker phase + execution trigger: pick **one / some / all** tasks, run them **sequentially**, a
+  fresh Worker window per task (test-first), output left for the user to review and commit.
+
+Exit criteria: from a fresh `/new-project`, the planning phases produce a Task list, you trigger
+one task, and the Worker writes failing tests → implements → runs them green via `run_in_project`
+with a real dependency install — all tool calls in the audit log.
+
+Tasks: [v1/01](tasks/v1/01-phase-instruction-loader.md) ·
+[02](tasks/v1/02-tool-registry-and-dispatch.md) ·
+[03](tasks/v1/03-core-file-tools.md) ·
+[04](tasks/v1/04-execute-command-tool.md) ·
+[05](tasks/v1/05-run-in-project-tool.md) ·
+[06](tasks/v1/06-tool-audit-log.md) ·
+[07](tasks/v1/07-project-scaffold-command.md) ·
+[08](tasks/v1/08-planning-phases-content.md) ·
+[09](tasks/v1/09-task-backlog-format.md) ·
+[10](tasks/v1/10-worker-phase-and-execution-trigger.md).
+
+---
+
+### V2 — Automated Reviewer
+
+Goal: a single automated review pass closes the gap between "Worker wrote something" and "I trust
+it enough to commit."
+
+Scope:
+
+- Reviewer phase: a fresh window that judges Worker output against the task definition; structured
+  verdict (`pass` / `fail` + concrete feedback).
+- Review integration: after the Worker finishes, spawn the Reviewer, surface the verdict; the user
+  still drives any fixes (the automatic fix loop is V3).
+- Auto-commit on accept: a commit tool + phase auto-commit policy — approved Worker output is
+  committed to the project repo when the user accepts. Global rule edits are **never** auto-committed.
+
+Exit criteria: run a task, see the Reviewer's verdict and feedback, accept, and find the work
+committed to the project's git history.
+
+Tasks: [v2/01](tasks/v2/01-reviewer-phase.md) ·
+[02](tasks/v2/02-review-integration.md) ·
+[03](tasks/v2/03-auto-commit-on-accept.md).
+
+---
+
+### V3 — Full autonomous loop *(the "run it overnight" milestone)*
+
+Goal: implement→test→review→fix runs without a human in the inner loop; humans are only pulled in
+on genuine blockers.
+
+Scope:
+
+- The fix loop: implement→test→review→fix, **max 5 rounds**; the **same Worker window** persists
+  across rounds (it remembers prior attempts + Reviewer feedback); escalate to the user after 5.
+- `raise_blocker(question)`: **Reviewer-only**; halts the loop immediately on a genuinely
+  ambiguous/under-specified/contradictory task and waits for the user's answer.
+- Retro phase: after the user resolves a blocker, spawn Retro with `{task, misunderstanding,
+  answer}`; patch the **global** rule (left uncommitted + warn the user) or the **project** doc
+  (task-specific) so the mistake can't recur.
+- Cross-phase inbox: `inbox_post` / `inbox_read` / `inbox_resolve` over append-only JSONL, replacing
+  the fragile `AGENT_NOTES.md` markdown mechanism.
+- Unattended batch execution: start an all-tasks batch, run sequentially, queue escalations for the
+  user without stopping the whole run where avoidable.
+
+Exit criteria: kick off a multi-task batch, leave; come back to committed passing tasks, a tidy
+escalation queue for the ambiguous ones, and Retro-applied patches awaiting review.
+
+Tasks: [v3/01](tasks/v3/01-implement-test-review-fix-loop.md) ·
+[02](tasks/v3/02-raise-blocker-tool.md) ·
+[03](tasks/v3/03-retro-phase.md) ·
+[04](tasks/v3/04-cross-phase-inbox.md) ·
+[05](tasks/v3/05-unattended-batch-execution.md).
+
+---
+
+### V4 — Knowledge + memory
+
+Goal: phases pull standards on demand, and no session is ever lost to a restart or VRAM ceiling.
+
+Scope:
+
+- Standards catalog: YAML frontmatter (`name`, `description`) on every standards file + a loader
+  that fails loudly on missing/duplicate names.
+- `search_rules(intent)` / `load_rule(name)`: a throwaway Ollama call resolves intent → standard
+  name(s) (catalog lives and dies in that call); `load_rule` returns the chosen body. Main context
+  never holds the catalog.
+- New standards files: `testing_discipline`, `python_idioms`, `error_handling`,
+  `naming_conventions`, `commit_hygiene`, `documentation` (keep each tight).
+- Per-phase memory persistence: append-only JSONL per phase, exact token counts, with `/clear`
+  (archive active history) and `/resume` (restore one of the last 3 archives, summaries derived from
+  JSONL — no LLM call).
+- Token-threshold summarization failsafe: when the **exact** `prompt_eval_count` crosses
+  `RATIO × num_ctx`, summarize the oldest turns into one `summary` record (originals stay on disk,
+  only the in-memory view collapses).
+
+Exit criteria: a Reviewer answers a layering question by `search_rules`→`load_rule`→citing it; kill
+and restart mid-session and continue without context loss; a long history compacts via the failsafe
+with the next `prompt_eval_count` dropping sharply.
+
+Tasks: [v4/01](tasks/v4/01-standards-catalog-frontmatter.md) ·
+[02](tasks/v4/02-search-rules-and-load-rule.md) ·
+[03](tasks/v4/03-new-standards-files.md) ·
+[04](tasks/v4/04-per-phase-memory-persistence.md) ·
+[05](tasks/v4/05-token-threshold-summarization.md).
+
+---
+
+### V5 — Power tools + polish
+
+Goal: the orchestrator is fun to use and shareable.
+
+Scope:
+
+- Sub-agents: `spawn_subagent` / `ask_subagent` / `dismiss_subagent` — fresh-context workers a phase
+  spawns for side-tasks; in-memory only; every sub-agent tool call audited with a `subagent_id`; no
+  nested sub-agents.
+- Model picker in the UI: `/models list | pull <name> | use <name>`, persisted across restarts;
+  remove the hardcoded model name.
+- Status line + `/help` + discoverability: persistent color-coded active phase, current tool +
+  elapsed, sub-agent count, time-since-last-tool-call; `/help` auto-generated from the command
+  registry; surface the Shift+Tab phase-cycle hint.
+- Events log + cost visibility + error surfacing: orchestrator-level events to
+  `.orchestrator/events.jsonl`; exact per-phase/per-sub-agent token totals; every tool returns a
+  structured, recoverable error rather than killing the stream.
+- README rewrite: replace the stale layout/commands, reflect the TS + networked-sandbox reality,
+  link here.
+
+Exit criteria: spawn → critique → follow-up → dismiss a sub-agent (visible only in the audit log);
+pull and switch models from the UI; `/help` lists every command; README matches reality.
+
+Tasks: [v5/01](tasks/v5/01-subagent-tools.md) ·
+[02](tasks/v5/02-model-picker-ui.md) ·
+[03](tasks/v5/03-status-line-and-help.md) ·
+[04](tasks/v5/04-events-log-and-cost.md) ·
+[05](tasks/v5/05-readme-rewrite.md).
+
+---
+
+## Mapping from the old M1–M7 plan
+
+Nothing was dropped — the old plumbing-first milestones were resequenced around reaching a usable
+loop, and re-homed onto the TS + networked-sandbox base.
+
+| Old milestone / task | New home |
+|---|---|
+| M1 — tools online (01 wire tools, 02 audit, 03 workdir scoping) | Foundation (06) + V1 (02, 04, 06) |
+| M5 — runtimes (10 `run_in_project`, 11 scaffold) | V1 (05, 07) — now **networked** |
+| M2 — retrieval (05 catalog, 06 search/load, 07 standards) | V4 (01, 02, 03) |
+| M3 — inbox (04) | V3 (04) |
+| M4 — persistence (08 memory, 09 summarization) | V4 (04, 05) |
+| M6 — sub-agents (12) | V5 (01) |
+| M7 — polish (13 model picker, 14 UX + README) | V5 (02, 03, 05) |
+| Reviewer / fix-loop / blocker / Retro (CLAUDE.md intent) | V2 (all) + V3 (01, 02, 03) |
+| Cross-cutting (events, cost, error surfacing) | V5 (04) |
+
+---
+
+## Sequencing principles
+
+1. **Foundation is a gate, not a milestone you skip.** The language switch means nothing works
+   until the skeleton exists. Resist starting V1 tasks against the dying Python code.
+2. **Each version is demonstrable on a real project**, not a unit test — a live `run start` session.
+3. **Shortest path to a usable loop first.** V1 deliberately stops at "Worker writes, you review."
+4. **Never approximate token counts.** Every metric that touches tokens reads exact values from
+   Ollama's response. See [CLAUDE.md](CLAUDE.md).
+5. **Just-in-time breakdown for far versions.** Foundation and V1 tasks are written to be executable
+   cold; V2–V5 tasks are solid but expect refinement when you actually reach them.
+
+---
+
+## Open questions (carried forward / newly opened by the pivot)
+
+- **Build/run tooling:** `tsc` vs `tsx`/`esbuild` for dev runs; does `run.ps1` survive as a thin
+  wrapper that calls `node`, or is it replaced by `npm` scripts? (Foundation/01 decides.)
+- **Sandbox container lifecycle:** persistent root sandbox (recommended — `node_modules` survives)
+  vs. the ephemeral `--rm`-per-command pattern from the dockerode note (re-installs every call).
+- **How hard to cap the network:** open egress vs. an allowlist/proxy for package registries only.
+- **Task-backlog format/location** inside the project repo (resolved in V1/09).
+- **Where `PRODUCT_SPEC.md` / inbox / per-phase memory live** under `projects/<name>/.orchestrator/`.
+- **Which model powers the `search_rules` / summarization throwaway context** — same local model
+  (current lean) or a smaller/faster one.
+- **Auto-init of project artifacts** on session start vs. leaving creation to the scaffold / Discovery.

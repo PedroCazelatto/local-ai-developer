@@ -1,0 +1,54 @@
+ARQUITETURA DE SANDBOX SEGURA COM NODE.JS E DOCKER PARA AGENTES DE IA
+=====================================================================
+
+Este documento resume a estratégia para criares uma aplicação de terminal (CLI) em Node.js que acede ao Ollama e executa comandos sugeridos pela IA dentro de um ambiente isolado (Sandbox) via Docker, permitindo acesso à internet (para comandos como 'npm install') sem colocar a tua máquina física em risco.
+
+1. O FLUXO DE FUNCIONAMENTO
+---------------------------
+* Seleção do Diretório: Escolhes uma pasta específica no teu computador real (ex: ~/ia-sandbox) para ser o espaço de trabalho.
+* Criação do Container: A aplicação Node.js usa a biblioteca 'dockerode' para levantar um container temporário em segundo plano.
+* Mapeamento de Volume: A pasta escolhida é espelhada para dentro do container (ex: no caminho /workspace). O resto do disco rígido da tua máquina real fica completamente invisível para o container.
+* Execução de Comandos: A IA sugere um comando (ex: 'npm install' ou 'mkdir src'). O Node.js pega nesse texto e envia-o para ser executado dentro do container ativo.
+* Retorno Isolado: O output do comando é capturado pelo Node.js, exibido no terminal e devolvido para a IA.
+
+2. COMPORTAMENTO DE COMANDOS COMUNS (SEGURANÇA)
+-----------------------------------------------
+* Uso do 'cd': Se a IA executar 'cd / && rm -rf *', ela sairá da pasta /workspace apenas dentro do container. Ela vai apagar o sistema de arquivos isolado do container, mas a tua máquina real continua 100% intacta. O container simplesmente não consegue "subir" além do topo do volume mapeado.
+* Downloads da Internet: Se a IA baixar um ficheiro ou script malicioso, o impacto depende de onde ele for guardado:
+  - Se for guardado FORA de /workspace (ex: em /tmp do container), ele desaparece para sempre assim que o container for destruído.
+  - Se for guardado DENTRO de /workspace, ele aparecerá na pasta real do teu computador, mas apenas como um ficheiro estático. O vírus não se vai executar sozinho na tua máquina host a menos que tu o abras.
+
+3. CONFIGURAÇÃO IDEAL EM NODE.JS (DOCKERODE)
+--------------------------------------------
+Para permitir que a IA use a internet livremente (instalar pacotes, atualizar dependências) e garantir total segurança, o container deve ser configurado com restrições de privilégios e recursos.
+
+Exemplo de Configuração no Código TypeScript:
+
+import Docker from 'dockerode';
+const docker = new Docker();
+
+const container = await docker.createContainer({
+  Image: 'node:20-alpine',        // Imagem leve que já inclui Node.js e npm
+  Cmd: ['npm', 'install'],       // Comando sugerido pela IA
+  User: 'node',                  // Crucial: Roda como utilizador comum, NÃO como root do container
+  WorkingDir: '/workspace',       // Garante que a execução começa na pasta certa
+  HostConfig: {
+    // Espelha apenas a pasta escolhida da máquina física para o container
+    Binds: ['/caminho/da/sua/pasta/real:/workspace'], 
+    
+    // Mantém a internet ativa para o npm i funcionar
+    NetworkMode: 'default', 
+    
+    // Limitações de hardware para evitar ataques de negação de serviço (DoS) ou mineração
+    Memory: 512 * 1024 * 1024,   // Limita o uso de RAM a 512MB
+    NanoCpus: 1000000000,        // Limita o uso a apenas 1 núcleo de CPU
+  }
+});
+
+4. PILARES DA BLINDAGEM DA MÁQUINA REAL
+---------------------------------------
+* Utilizador Rootless (User: 'node'): Por padrão, o Docker executa comandos como root. Usar o utilizador comum 'node' impede que processos maliciosos explorem falhas raras para tentar escapar do container para a tua máquina host.
+* Ciclo de Vida Curto (--rm): Configurar a aplicação para descartar ou reiniciar o container após execuções críticas garante que qualquer modificação destrutiva feita no sistema do container seja limpa imediatamente.
+* Controlo de CPU e Memória: Impede que um script em loop infinito gerado pela IA trave ou congele o teu computador físico.
+
+Com esta abordagem, a IA tem total liberdade para manipular os ficheiros do ecossistema do projeto dentro da pasta delimitada, enquanto o teu sistema operativo principal permanece completamente protegido.

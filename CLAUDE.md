@@ -10,7 +10,12 @@ Corollary: if you learn a new product requirement during a conversation, propose
 
 ## What this project is
 
-A Python CLI that orchestrates a **locally-run** Ollama model to autonomously develop code projects. The user's goals:
+> **Platform migration in progress (2026-06-21): Python → TypeScript/Node.** The Python code in
+> this repo is **reference only** and is deleted once the TS rewrite reaches parity. Do not build
+> new features on the Python code. The version plan lives in [ROADMAP.md](ROADMAP.md); `*.py`
+> file references below describe *behavior to port*, not the target implementation.
+
+A **TypeScript/Node CLI** that orchestrates a **locally-run** Ollama model to autonomously develop code projects. The user's goals:
 
 - Learn prompt engineering, AI interaction isolation, and planning by building the orchestrator themselves.
 - Practice planning skills by driving the interactive planning phases and reviewing execution output.
@@ -38,7 +43,7 @@ So the design is not "personas vs. skills." It is: **which phases the user drive
 
 ## How a session works
 
-`.\run.ps1 start <project-name>` boots the orchestrator locked to one project. Switching projects requires restarting `main.py`. All planning artifacts a project produces live **inside the project repo**, not in the orchestrator repo — each project carries its own agent files.
+`.\run.ps1 start <project-name>` boots the orchestrator locked to one project. Switching projects requires restarting the orchestrator process. All planning artifacts a project produces live **inside the project repo**, not in the orchestrator repo — each project carries its own agent files.
 
 Work is organized into **phases**. A phase is an instruction set loaded into a context window. The planning phases are interactive (the user drives them); the execution phases are spawned automatically once the user triggers them.
 
@@ -81,7 +86,11 @@ When the user answers a blocker, the orchestrator spawns a **Retro** window with
 - **Phases auto-commit their approved changes to the project repo.** Approval points: a planning phase's output when the user accepts it and moves on; a Worker's code when the Reviewer passes it. This requires a commit tool (the old "no commit tools yet" rule is superseded for project repos). Branch tooling is still not needed.
 - **Global instruction edits are the exception — never auto-committed.** When the Retro phase (or anything) edits a global phase file under [rules/](rules/), it leaves the change **uncommitted** and **warns the user that the change must be reviewed before continuing**, then the user commits it manually. The orchestrator's own instruction set must never mutate silently.
 
-### Inter-phase communication: `AGENT_NOTES.md`
+### Inter-phase communication: `AGENT_NOTES.md` *(superseded by the V3 inbox)*
+
+> **Superseded:** the structured cross-phase **inbox** (`inbox_post`/`inbox_read`/`inbox_resolve`,
+> append-only JSONL — see [ROADMAP.md](ROADMAP.md) V3) replaces this markdown-file mechanism. The
+> description below is retained as the conceptual model for *why* cross-phase signaling exists.
 
 Because each window has its **own isolated history** and never sees another phase's turns, cross-phase signals need a file on disk. The convention is a shared file in the **project repo root** (sibling of `PRODUCT_SPEC.md`):
 
@@ -111,7 +120,7 @@ Each phase has its **own isolated message history**. Switching phases saves the 
 - **Per-project persistence:** each project keeps its own per-phase memory so the model always knows where it stopped. Persistence lives with the project repo.
 - **Documentation files** (rules, plans, specs) exist for one-time reference or human reading — not loaded into every prompt.
 
-Minimize persistent context to save tokens (local inference is VRAM-bound). Cross-phase communication goes through `AGENT_NOTES.md`, not memory.
+Minimize persistent context to save tokens (local inference is VRAM-bound). Cross-phase communication goes through the cross-phase inbox (V3; supersedes `AGENT_NOTES.md`), not memory.
 
 **Token counts are always exact.** Read them from Ollama's response (`prompt_eval_count`, `eval_count`) and propagate that exact value through any code that needs it (status line, summarization trigger, audit log, /resume summaries). Never substitute a length-based estimate — estimates drift and they're the wrong basis for VRAM-safety decisions. If a metric isn't returned for a call, surface that explicitly; don't paper over it with a guess.
 
@@ -146,26 +155,32 @@ Standards:
 
 ## Sandboxing & tools
 
-Two-tier Docker model. **Hard rule: the model touches only Docker, never the host filesystem.** Every command it runs and every file it edits happens inside a container; the orchestrator is the only host-side process.
+Two-tier Docker model. **Hard rule: the model touches only Docker, never the host filesystem.** Every command it runs and every file it edits happens inside a container; the orchestrator is the only host-side process. **Containers have controlled internet** (so projects can `npm i`, `pip install`, etc.) — hardened per the dockerode model: rootless user, CPU/RAM caps, disposable lifecycle.
 
-- **Root sandbox** ([docker-compose.yml](docker-compose.yml)): one long-lived container named `ai_sandbox` based on `debian:stable-slim`, `network_mode: none`. It mounts **only the active project** at `/workspace` — `./projects/${ACTIVE_PROJECT}:/workspace`, where `run.ps1` sets `ACTIVE_PROJECT` from the session's project arg. Other projects and the host filesystem are therefore **not mounted at all**, so the model cannot reach them no matter how a command is written (`..`, `$(...)`, variables, symlinks). `/workspace` IS the project root; `execute_command` runs there. It runs **plain shell commands** (file operations, navigation, piping) without giving the model host access.
-- **Per-project sandbox**: each project folder carries its own `docker-compose.yml` for language-specific runtimes (Python, Node, Rust, etc.). The execution loop's **test/build steps need a real toolchain**, so they run against the project's own container, not the root sandbox (which only has bash). The tooling to dispatch commands into the project container is **not implemented yet** — that is the missing piece blocking the execution loop, *not* a host-access question. The exact mechanism is still open (see below), but the constraint is firm: it runs in Docker, never on the host.
+- **Root sandbox** ([docker-compose.yml](docker-compose.yml)): one long-lived container named `ai_sandbox`. It mounts **only the active project** at `/workspace` — `./projects/${ACTIVE_PROJECT}:/workspace`, where `run.ps1` sets `ACTIVE_PROJECT` from the session's project arg. Other projects and the host filesystem are therefore **not mounted at all**, so the model cannot reach them no matter how a command is written (`..`, `$(...)`, variables, symlinks). `/workspace` IS the project root; `execute_command` runs there. It runs **plain shell commands** (file operations, navigation, piping) without giving the model host access.
+- **Per-project sandbox**: each project folder carries its own `docker-compose.yml` declaring a `runner` service with the language toolchain (Python, Node, Rust, etc.) and network access. The execution loop's **test/build/install steps** run against this container via the **host-dispatched `run_in_project` tool** (decided — no docker socket inside `ai_sandbox`). It runs in Docker, never on the host.
 
 Other ground rules:
 
 - The local Ollama model runs on GPU/VRAM on the host (Docker is CPU-focused and cannot host it).
 - Tools run **autonomously** (no confirmation prompts). Every tool call must be **logged** for later audit.
-- The tool set is grown **on demand** — add tools when the model demonstrably needs one, not preemptively. Current tools live in [tools/](tools/): `list_files`, `execute_command`.
+- The tool set is grown **on demand** — add tools when the model demonstrably needs one, not preemptively. Current (Python reference) tools live in [tools/](tools/); the TS tool set is defined per [ROADMAP.md](ROADMAP.md) V1.
 
 ## Code conventions (for the orchestrator itself)
 
-- Python, latest LTS, `pip` with [requirements.txt](requirements.txt).
-- `snake_case`, type hints, Python best practices. Never use `typing.Any` — prefer concrete types, `Protocol`, `TypedDict`, or a localized `# type: ignore` when the real type is genuinely unknown.
-- Prioritize **user experience** in the terminal interface (Rich).
+- **TypeScript on Node** (latest LTS), `npm` with [package.json](package.json). The Python code is reference-only and is removed at parity; never add new Python.
+- `camelCase` for values/functions, `PascalCase` for types/classes, kebab-case file names. Strict `tsconfig` (`strict: true`). **Never use `any`** — prefer concrete types, `interface`/`type`, generics, or `unknown` with narrowing; reach for a localized `as`/`// @ts-expect-error` only when the type is genuinely unknowable.
+- Prioritize **user experience** in the terminal interface (persistent REPL + clack/chalk/ora).
 - **The orchestrator codebase does not require tests.** Test-first is a rule for the project-building phases (the Worker in particular) — it lives in the phase prompts under [rules/](rules/), not in Claude Code's own workflow on this repo.
 - Do not assume — if a design choice isn't covered here or in the code, ask the user.
 
-## Repo layout (current, in-progress restructure)
+## Repo layout
+
+> The tree below is the **Python reference layout** (deleted at parity). The **target TypeScript
+> layout** lives under `src/` and is finalized in
+> [tasks/foundation/01-repo-skeleton-and-toolchain.md](tasks/foundation/01-repo-skeleton-and-toolchain.md).
+> Mentally map: `main.py`→`src/index.ts`, `core/*`→`src/core/*`, `agents/`→`src/phases/`,
+> `interface/`→`src/interface/`, `tools/*.py`→`src/tools/*.ts`.
 
 ```
 local-ai-developer/
@@ -196,10 +211,10 @@ Host:
 - `.\run.ps1 start <project-name>` — start session for a project
 - `.\run.ps1 stop` — shut down Docker
 
-In-app (Rich terminal):
+In-app (terminal):
 - `/swap <phase>` — switch active phase
 - `/exit` — quit
-- (README also lists `/switch`, `/clear`, `/models list`, `/models pull` — [main.py](main.py) currently only implements `/swap` and `/exit`. Confirm with the user before relying on the others.)
+- (Other commands — `/clear`, `/resume`, `/models …`, `/new-project`, `/help` — are planned per [ROADMAP.md](ROADMAP.md); confirm with the user before relying on any not yet implemented.)
 
 ## Environment
 
@@ -207,13 +222,24 @@ In-app (Rich terminal):
 
 ## Open questions / not yet decided
 
-Track these here as they come up so future-you knows what's still fuzzy:
+Track these here as they come up so future-you knows what's still fuzzy. The current plan and
+ordering live in [ROADMAP.md](ROADMAP.md).
 
-- **Persona→phase code sweep:** the phase *files* are renamed and rewritten, but internal Python identifiers still say "persona"/"role" (`Agent.persona`, `SessionMemory` persona naming, `ToolAuditLogger` persona arg, `ui.set_persona`, the `persona` local in `main.py`, `initial_role`). A mechanical rename pass is still pending — it's cosmetic, the app runs as-is.
-- **Project-runtime dispatch mechanism:** *that* it runs in Docker is decided; *how* is not. Options: (1) give `ai_sandbox` a Docker socket so it can `docker compose run` into the project's container; (2) have `execute_command` detect "needs project runtime" and call the project's compose; (3) a dedicated `run_in_project(command)` tool.
-- **Phase-file rename + rewrite:** rename `rules/personas/` → `rules/phases/`, rewrite the 7 old persona drafts into the 6 phase files above (merging PO+Sequencer → Breakdown; folding/deciding Standards Reviewer into Reviewer; writing a new Retro), and remove "persona"/"role" naming across the Python code (`agents/`, `core/session/`, `tools/swap.py`, etc.) and `AgentFactory._personas_dir`.
-- **Task backlog format/location:** where the ordered Task list (with per-task status) and the Epic→Story→Task hierarchy live inside the project repo, and in what format.
+**Opened by the 2026-06-21 pivot:**
+
+- **TS build/run tooling:** `tsc` vs `tsx`/`esbuild` for dev runs; does `run.ps1` stay as a thin wrapper calling `node`, or do `npm` scripts replace it? (Foundation decides.)
+- **Sandbox network hardness:** open egress vs. an allowlist/registry proxy; persistent root sandbox vs. ephemeral `--rm`-per-command containers.
+- **Parity cutover:** which version reaches behavior parity and triggers deletion of the Python code.
+
+**Carried forward:**
+
+- **Task backlog format/location:** where the ordered Task list (with per-task status) and the Epic→Story→Task hierarchy live inside the project repo, and in what format. (V1 decides.)
+- Where `PRODUCT_SPEC.md`, the inbox, and per-phase memory live under `projects/<name>/.orchestrator/` (filename, folder).
 - Memory summarization trigger thresholds and who decides (orchestrator heuristic vs. model self-report).
-- Where `PRODUCT_SPEC.md`, `AGENT_NOTES.md`, and any per-project memory file live inside each project repo (filename, folder).
-- Which LLM (and which context size) powers the `search_rules` throwaway context — same local model, or a smaller/faster one?
-- Whether the orchestrator should auto-initialize `AGENT_NOTES.md` on session start, or leave creation to the Discovery phase.
+- Which LLM (and which context size) powers the `search_rules` / summarization throwaway context — same local model, or a smaller/faster one?
+- Whether the orchestrator should auto-initialize project artifacts on session start, or leave creation to the scaffold/Discovery phase.
+
+**Resolved by the pivot (kept for the record):**
+
+- *Project-runtime dispatch:* a dedicated **host-dispatched `run_in_project` tool** against the project's own networked container (no docker socket in the sandbox). See V1.
+- *Persona→phase code sweep:* moot — the TS rewrite uses **phase** terminology natively, with no legacy "persona"/"role" identifiers to rename.
