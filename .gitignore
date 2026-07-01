@@ -1,6 +1,10 @@
 .env
 .venv
 
+# Node / TypeScript
+node_modules/
+dist/
+
 # Projects (except hello-world - example project)
 projects/*
 !projects/hello-world/

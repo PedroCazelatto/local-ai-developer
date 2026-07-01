@@ -1,8 +1,18 @@
 param([string]$Action, [string]$Project)
 
-$VENV_PYTHON = ".\.venv\Scripts\python.exe"
+# Thin wrapper over npm / node / docker compose. It contains no orchestration logic of
+# its own — all real behavior lives in src/ (TypeScript). Verbs: install | start <project> | stop.
+# See tasks/foundation/01-repo-skeleton-and-toolchain.md.
 
 switch ($Action) {
+    "install" {
+        Write-Host "Installing Node dependencies..." -ForegroundColor Green
+        npm install
+        # The sandbox uses a stock image (debian:stable-slim, see docker-compose.yml),
+        # so pull it rather than building. Task 04 revisits the sandbox image.
+        Write-Host "Pulling sandbox image..." -ForegroundColor Cyan
+        docker compose pull
+    }
     "start" {
         if (-not $Project) {
             Write-Host "Error: Project name required. Example: .\run.ps1 start hello-world" -ForegroundColor Red
@@ -13,45 +23,20 @@ switch ($Action) {
             # Sandbox mounts only this project at /workspace (see docker-compose.yml).
             $env:ACTIVE_PROJECT = $Project
             docker compose up -d
-            Write-Host "Initializing Local AI Architect..." -ForegroundColor Green
-            & $VENV_PYTHON main.py $Project
+            Write-Host "Initializing Local AI Developer..." -ForegroundColor Green
+            # `--` forwards the project name to `tsx src/index.ts` as argv.
+            npm run dev -- $Project
         }
         finally {
-            Write-Host "🛑 Shutting down infrastructure..." -ForegroundColor Yellow
+            Write-Host "Shutting down infrastructure..." -ForegroundColor Yellow
             docker compose stop
         }
     }
-    "run" {
-        if (-not $Project) {
-            Write-Host "Error: Project name required. Example: .\run.ps1 run hello-world" -ForegroundColor Red
-        } else {
-            & $VENV_PYTHON main.py $Project
-        }
-    }
-    "up" {
-        if (-not $Project) {
-            Write-Host "Error: Project name required. Example: .\run.ps1 up hello-world" -ForegroundColor Red
-        } else {
-            $env:ACTIVE_PROJECT = $Project
-            docker compose up -d
-        }
-    }
     "stop" { docker compose stop }
-    "down" { docker compose down }
-    "install" {
-        if (-not (Test-Path ".\.venv")) {
-            Write-Host "Creating Virtual Environment..." -ForegroundColor Cyan
-            python -m venv .venv
-        }
-        Write-Host "Installing dependencies..." -ForegroundColor Green
-        & $VENV_PYTHON -m pip install -r requirements.txt
-    }
     default {
         Write-Host "Available Commands:" -ForegroundColor Cyan
-        Write-Host "  start <project>   : Starts Docker and runs the AI (Recommended)"
-        Write-Host "  run <project>     : Runs the AI without starting Docker"
-        Write-Host "  up <project>      : Start Docker for a project (no AI)"
-        Write-Host "  stop | down       : Manage Docker containers"
-        Write-Host "  install           : Install Python dependencies"
+        Write-Host "  install           : Install Node dependencies and pull the sandbox image"
+        Write-Host "  start <project>   : Start Docker and run the orchestrator for a project"
+        Write-Host "  stop              : Stop Docker containers"
     }
 }
