@@ -1,4 +1,4 @@
-> **Status:** ⬜ Not started
+> **Status:** ✅ Completed (2026-06-30)
 
 # 02 — Config and session bootstrap
 
