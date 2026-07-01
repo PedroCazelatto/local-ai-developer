@@ -1,4 +1,4 @@
-> **Status:** ⬜ Not started
+> **Status:** ✅ Completed (2026-06-30)
 
 # 03 — Ollama client (TS)
 
