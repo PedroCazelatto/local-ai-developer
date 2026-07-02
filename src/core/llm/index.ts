@@ -3,5 +3,7 @@
 export { OllamaClient } from './client.js';
 export type { StreamHandle } from './client.js';
 export { StreamFilter } from './stream-filter.js';
-export { loadsOrRepair } from './json-repair.js';
+export { loadsOrRepair, repairDecode } from './json-repair.js';
+export { recoverToolCalls } from './tool-call-recovery.js';
+export type { Recovery } from './tool-call-recovery.js';
 export type { ChatResult, Message, TokenCounts, Tool, ToolCall } from './types.js';

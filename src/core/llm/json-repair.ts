@@ -12,9 +12,10 @@ const CONTROL_ESCAPES: Readonly<Record<string, string>> = {
 /**
  * Decode a JSON object starting at `text[0] === '{'`, escaping literal control characters
  * found inside strings. Returns `{ value, consumed }` where `consumed` counts characters of
- * the original text, or `null` if no parseable object is found.
+ * the original text, or `null` if no parseable object is found. Exposed for tool-call recovery,
+ * which needs a raw-decode (parse one object, ignore trailing text) rather than a whole-string parse.
  */
-function repairDecode(text: string): { value: unknown; consumed: number } | null {
+export function repairDecode(text: string): { value: unknown; consumed: number } | null {
   if (!text.startsWith('{')) return null;
   const repaired: string[] = [];
   let depth = 0;

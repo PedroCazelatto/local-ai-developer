@@ -8,6 +8,7 @@ import { Ollama } from 'ollama';
 import type { ChatResponse, Message, Tool, ToolCall } from 'ollama';
 
 import { StreamFilter } from './stream-filter.js';
+import { recoverToolCalls } from './tool-call-recovery.js';
 import type { ChatResult, TokenCounts } from './types.js';
 
 const NO_TOKENS: TokenCounts = { promptTokens: null, evalTokens: null };
@@ -37,7 +38,7 @@ export class OllamaClient {
     return this.lastTokens;
   }
 
-  /** Non-streaming turn. Ports provider.chat(). */
+  /** Non-streaming turn. Ports provider.chat() + orchestrator's tool-call recovery. */
   async chat(messages: Message[], tools?: Tool[]): Promise<ChatResult> {
     const response = await this.ollama.chat({
       model: this.modelName,
@@ -46,7 +47,7 @@ export class OllamaClient {
       stream: false,
       options: { num_ctx: this.numCtx },
     });
-    return { message: response.message, tokens: this.captureTokens(response) };
+    return { message: recoverIfNeeded(response.message), tokens: this.captureTokens(response) };
   }
 
   /**
@@ -93,12 +94,13 @@ export class OllamaClient {
       if (tail) yield tail;
 
       // Raw content (for memory replay) + structured tool_calls (for dispatch). The filtered
-      // text was for display only; keep the two channels separate.
-      const message: Message = {
+      // text was for display only; keep the two channels separate. If Ollama didn't lift any
+      // structured calls, recover ones the model wrote as text (bare JSON / <tool_call> tags).
+      const message = recoverIfNeeded({
         role: 'assistant',
         content: rawContent,
         ...(toolCalls.length > 0 ? { tool_calls: toolCalls } : {}),
-      };
+      });
       finalResult = { message, tokens };
     };
 
@@ -132,4 +134,16 @@ export class OllamaClient {
 
 function exactCount(value: number | undefined | null): number | null {
   return typeof value === 'number' ? value : null;
+}
+
+/**
+ * When Ollama returned no structured tool_calls, recover any the model wrote as text and fold
+ * them into the message (with the call text stripped from `content`). A no-op when the message
+ * already has structured calls or the content holds none.
+ */
+function recoverIfNeeded(message: Message): Message {
+  if (message.tool_calls && message.tool_calls.length > 0) return message;
+  const { cleaned, calls } = recoverToolCalls(message.content);
+  if (calls.length === 0) return message;
+  return { ...message, content: cleaned, tool_calls: calls };
 }
