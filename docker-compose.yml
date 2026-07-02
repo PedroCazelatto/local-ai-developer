@@ -1,13 +1,22 @@
 services:
   sandbox:
-    image: debian:stable-slim
+    # node:<lts>-slim, NOT debian:stable-slim: V1's project work and `npm i` need node/npm
+    # present in the root sandbox, and a Debian base would force reinstalling a toolchain into
+    # an ephemeral layer on every command. node:slim ships node + npm and stays small. Language
+    # runtimes a *project* needs (Python, Rust) belong to that project's own per-project
+    # container — a separate, later concern. (Foundation task 04.)
+    image: node:22-slim
     container_name: ai_sandbox
-    network_mode: none
+    # Rootless: the node image ships a non-root `node` user. The model must never run as root.
+    user: node
+    # NETWORKED (the pivot reversal): the container has internet so projects can `npm i` /
+    # `pip install`. This replaces the old `network_mode: none`. How hard to cap egress (open vs.
+    # a registry allowlist/proxy) is an open ROADMAP question — default to open egress for now.
     volumes:
-      # Mount ONLY the active project at /workspace, so the model literally
-      # cannot see (or escape into) other projects or the host. ACTIVE_PROJECT
-      # is set by run.ps1. Fail closed: if it is unset, mount a non-existent
-      # sentinel dir rather than ./projects (which would re-expose everything).
+      # Mount ONLY the active project at /workspace, so the model literally cannot see (or
+      # escape into) other projects or the host. ACTIVE_PROJECT is set by run.ps1. Fail closed:
+      # if it is unset, mount a non-existent sentinel dir rather than ./projects (which would
+      # re-expose everything).
       - ./projects/${ACTIVE_PROJECT:-__no_project__}:/workspace
     working_dir: /workspace
     deploy:
@@ -17,4 +26,8 @@ services:
           memory: 4gb
     stdin_open: true
     tty: true
-    command: /bin/bash
+    # node:slim has no interactive bash by default — keep the container alive without relying on
+    # /bin/bash. Persistent (not --rm-per-command) so installed deps survive across commands
+    # within a session; re-`--rm`-ing per call would reinstall every time. This is the
+    # recommended resolution of the ROADMAP lifecycle open question, not a hard rule.
+    command: sleep infinity

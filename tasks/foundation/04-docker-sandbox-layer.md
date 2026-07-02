@@ -1,4 +1,4 @@
-> **Status:** ⬜ Not started
+> **Status:** ✅ Completed (2026-07-01)
 
 # 04 — Docker sandbox layer (dockerode)
 

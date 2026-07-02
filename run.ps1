@@ -8,8 +8,8 @@ switch ($Action) {
     "install" {
         Write-Host "Installing Node dependencies..." -ForegroundColor Green
         npm install
-        # The sandbox uses a stock image (debian:stable-slim, see docker-compose.yml),
-        # so pull it rather than building. Task 04 revisits the sandbox image.
+        # The sandbox uses a stock image (node:22-slim, see docker-compose.yml), so pull it
+        # rather than building — node/npm ship in the image for project work.
         Write-Host "Pulling sandbox image..." -ForegroundColor Cyan
         docker compose pull
     }
