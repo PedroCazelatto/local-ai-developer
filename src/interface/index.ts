@@ -1,3 +1,4 @@
-// interface/ — terminal input / REPL loop wiring (command input, phase switching).
-// Filled in by Foundation task 05 (REPL UI baseline).
-export {};
+// interface/ — the persistent REPL loop (command input, phase switching, status line).
+// Foundation task 05 (REPL UI baseline).
+export { runRepl } from './repl.js';
+export type { ReplOrchestrator } from './repl.js';

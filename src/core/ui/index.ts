@@ -1,3 +1,8 @@
-// core/ui/ — persistent-REPL renderer and theme (streaming output that preserves
-// scrollback, status line). Filled in by Foundation task 05 (REPL UI baseline).
-export {};
+// core/ui/ — persistent-REPL renderer, theme, spinner, and discrete prompts. Streaming output
+// that preserves scrollback (never clears / never grabs the alt-buffer). Foundation task 05.
+export { theme } from './theme.js';
+export * as renderer from './renderer.js';
+export type { StatusLineInfo } from './renderer.js';
+export { startThinking, stopThinking } from './spinner.js';
+export { confirm, select, textInput } from './prompts.js';
+export type { SelectChoice } from './prompts.js';
