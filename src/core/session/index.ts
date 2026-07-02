@@ -1,3 +1,7 @@
-// core/session/ — session orchestrator, per-phase isolated memory, and phase factory.
-// The orchestrator + memory land in Foundation task 06; config is here now (task 02).
+// core/session/ — session orchestrator, per-phase isolated memory, and config.
 export * from './config.js';
+export { SessionOrchestrator } from './orchestrator.js';
+export { SessionMemory } from './memory.js';
+export type { ChatRole } from './memory.js';
+export { MAX_TOOL_ROUNDS } from './turn-loop.js';
+export type { TurnContext } from './turn-loop.js';
