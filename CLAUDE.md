@@ -2,9 +2,18 @@
 
 Guidance for Claude Code when working in this repo. This file is for you (Claude Code) as an advisor helping the user build the orchestrator. It is **not** consumed by the local Ollama model — that model gets its instructions from [rules/](rules/).
 
+> [!IMPORTANT]
+> **Read [constitution.md](constitution.md) before writing or changing any code, every session.**
+> It holds the binding engineering constraints (TypeScript conventions, `never any`, exact token
+> counts, tool logging, instruction integrity). The docs divide as: **CLAUDE.md = the objective**
+> (what we're building and why), **[constitution.md](constitution.md) = the how** (the quality bar
+> every change must clear), **[tasks/](tasks/) = the what** (the specific work in flight).
+
 ## Prime directive: do not assume, ask
 
 This project's requirements live mostly in the user's head. When a task is ambiguous, **ask clarifying questions instead of guessing**. Even small decisions (tool signatures, file layout, naming, what a phase means) should be confirmed if not already documented here or obvious from the code.
+
+**The rule is absolute: if you have any doubt, ask. If a decision is not already specified in documentation — CLAUDE.md, [constitution.md](constitution.md), the task files, or the code — you must ask the user before acting. Never fill a gap with an assumption.** A missing decision is a question for the user, not a default for you to pick.
 
 Corollary: if you learn a new product requirement during a conversation, propose adding it to this file.
 
@@ -122,7 +131,7 @@ Each phase has its **own isolated message history**. Switching phases saves the 
 
 Minimize persistent context to save tokens (local inference is VRAM-bound). Cross-phase communication goes through the cross-phase inbox (V3; supersedes `AGENT_NOTES.md`), not memory.
 
-**Token counts are always exact.** Read them from Ollama's response (`prompt_eval_count`, `eval_count`) and propagate that exact value through any code that needs it (status line, summarization trigger, audit log, /resume summaries). Never substitute a length-based estimate — estimates drift and they're the wrong basis for VRAM-safety decisions. If a metric isn't returned for a call, surface that explicitly; don't paper over it with a guess.
+The summarization trigger keys off exact token counts from Ollama, never estimates — this is a VRAM-safety invariant; see [constitution.md](constitution.md).
 
 ## Rules loading
 
@@ -163,16 +172,13 @@ Two-tier Docker model. **Hard rule: the model touches only Docker, never the hos
 Other ground rules:
 
 - The local Ollama model runs on GPU/VRAM on the host (Docker is CPU-focused and cannot host it).
-- Tools run **autonomously** (no confirmation prompts). Every tool call must be **logged** for later audit.
-- The tool set is grown **on demand** — add tools when the model demonstrably needs one, not preemptively. Current (Python reference) tools live in [tools/](tools/); the TS tool set is defined per [ROADMAP.md](ROADMAP.md) V1.
+- Tools run **autonomously** and **every call is logged**, and the tool set is grown **on demand** — see [constitution.md](constitution.md). Current (Python reference) tools live in [tools/](tools/); the TS tool set is defined per [ROADMAP.md](ROADMAP.md) V1.
 
 ## Code conventions (for the orchestrator itself)
 
-- **TypeScript on Node** (latest LTS), `npm` with [package.json](package.json). The Python code is reference-only and is removed at parity; never add new Python.
-- `camelCase` for values/functions, `PascalCase` for types/classes, kebab-case file names. Strict `tsconfig` (`strict: true`). **Never use `any`** — prefer concrete types, `interface`/`type`, generics, or `unknown` with narrowing; reach for a localized `as`/`// @ts-expect-error` only when the type is genuinely unknowable.
-- Prioritize **user experience** in the terminal interface (persistent REPL + clack/chalk/ora).
-- **The orchestrator codebase does not require tests.** Test-first is a rule for the project-building phases (the Worker in particular) — it lives in the phase prompts under [rules/](rules/), not in Claude Code's own workflow on this repo.
-- Do not assume — if a design choice isn't covered here or in the code, ask the user.
+The binding rules — TypeScript conventions, `never any`, strict `tsconfig`, terminal-UX priority,
+no orchestrator tests, autonomous+logged tools — live in **[constitution.md](constitution.md)**.
+Read it before touching code.
 
 ## Repo layout
 
