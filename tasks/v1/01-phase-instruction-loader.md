@@ -1,4 +1,4 @@
-> **Status:** ⬜ Not started
+> **Status:** ✅ Completed (2026-07-04)
 
 # 01 — Phase-instruction loader
 

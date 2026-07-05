@@ -1,37 +1,27 @@
 // PhaseFactory — discovers the phase instruction files under rules/phases/ and builds a Phase
 // from one (ports agents/factory.py's AgentFactory). The markdown files are the single source of
-// each phase's behavior; this just reads them.
+// each phase's behavior; this just reads them, delegating the actual read to loadPhasePrompt
+// (V1/01) so instructions are re-read FRESH on every activation and a missing file fails loud
+// with a typed error naming the expected path.
 
-import { existsSync, readFileSync, readdirSync } from 'node:fs';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
-
+import { availablePhaseNames, loadPhasePrompt } from '../context/phase-prompt.js';
 import type { Phase } from './phase.js';
-
-// rules/phases/ sits at the repo root. This file is at <root>/src/phases/factory.ts (tsx) or
-// <root>/dist/phases/factory.js (built) — both two dirs below root — so `../../rules/phases`
-// from this file's directory resolves to the repo root in either run mode.
-const PHASES_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'rules', 'phases');
 
 export class PhaseFactory {
   /** Sorted basenames of rules/phases/*.md (ports available_roles). */
   static availablePhases(): string[] {
-    return readdirSync(PHASES_DIR)
-      .filter((f) => f.endsWith('.md'))
-      .map((f) => path.basename(f, '.md'))
-      .sort();
+    return availablePhaseNames();
   }
 
   /**
-   * Load a phase by name. Normalizes to lowercase; throws a clear "Unknown phase: '<name>'.
-   * Available: …" error if the file is missing (the REPL turns this into a recoverable /swap line).
+   * Load a phase by name. Normalizes to lowercase and reads its instruction markdown fresh via
+   * loadPhasePrompt — which throws a typed PhasePromptError naming `rules/phases/<phase>.md` if the
+   * file is missing (the REPL turns this into a recoverable /swap line; boot turns it into a fatal
+   * error). Called on every activation (constructor + /swap), so edits to a phase file are picked
+   * up on the next swap without restarting.
    */
   static get(name: string): Phase {
     const normalized = name.trim().toLowerCase();
-    const file = path.join(PHASES_DIR, `${normalized}.md`);
-    if (!existsSync(file)) {
-      throw new Error(`Unknown phase: '${name}'. Available: ${PhaseFactory.availablePhases().join(', ')}`);
-    }
-    return { name: normalized, instructions: readFileSync(file, 'utf-8'), tools: [] };
+    return { name: normalized, instructions: loadPhasePrompt(normalized), tools: [] };
   }
 }
