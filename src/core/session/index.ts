@@ -8,3 +8,15 @@ export type { TurnContext } from './turn-loop.js';
 export { dispatchToolCall } from './dispatch.js';
 export type { ToolCallRecord, DispatchDeps } from './dispatch.js';
 export { appendAuditRow, OUTPUT_PREVIEW_LIMIT } from './audit.js';
+export {
+  readBacklog,
+  writeBacklog,
+  setTaskStatus,
+  nextRunnableTasks,
+  allTasks,
+  findTask,
+  parseBacklog,
+  BacklogError,
+} from './backlog.js';
+export type { Backlog, Epic, Story, Task, TaskStatus } from './types.js';
+export { TASK_STATUSES } from './types.js';
