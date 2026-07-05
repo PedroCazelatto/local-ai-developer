@@ -1,3 +1,17 @@
-// tools/ — model-callable actions. Foundation wires ONE tool (read_file) to prove sandbox
-// dispatch; the full registry + audit log land in V1.
-export { READ_FILE_TOOL, readFile } from './read-file.js';
+// tools/ — model-callable actions + the registry/dispatch spine (V1/02). Each tool is a ToolModule
+// dropped into this dir and listed in registry.ts; every phase gets every tool. read_file is the
+// first (V1/03 adds the rest of the file tools, V1/04/05 the shell/container tools).
+export type {
+  ToolModule,
+  ToolContext,
+  ToolResult,
+  StructuredToolResult,
+  JSONSchema,
+  JSONSchemaProperty,
+  JsonObject,
+  JsonValue,
+} from './types.js';
+export { toolError } from './types.js';
+export { createToolContext, resolveInProject, WORKSPACE_PATH } from './context.js';
+export { getTool, toolNames, toolDefinitions } from './registry.js';
+export { readFileTool } from './read-file.js';

@@ -6,11 +6,12 @@
 import { buildSystemPrompt } from '../../context/index.js';
 import { PhaseFactory } from '../../phases/index.js';
 import type { Phase } from '../../phases/index.js';
-import { READ_FILE_TOOL, readFile } from '../../tools/index.js';
+import { createToolContext, toolDefinitions } from '../../tools/index.js';
 import type { SandboxClient } from '../container/index.js';
 import { OllamaClient } from '../llm/index.js';
 import type { Message, StreamHandle, TokenCounts, Tool, ToolCall } from '../llm/index.js';
 import type { SessionConfig } from './config.js';
+import { dispatchToolCall } from './dispatch.js';
 import { SessionMemory } from './memory.js';
 import { processMessage as processTurns } from './turn-loop.js';
 import type { TurnContext } from './turn-loop.js';
@@ -23,17 +24,21 @@ export class SessionOrchestrator implements TurnContext {
   readonly model: string;
   readonly numCtx: number;
 
+  /** Host path to projects/<active> — the ToolContext root and the sandbox's /workspace mount. */
+  private readonly projectPath: string;
   private readonly llm: OllamaClient;
   private readonly sandbox: SandboxClient;
   private readonly memory = new SessionMemory();
   private phase: Phase;
   private lastTokens: TokenCounts = NO_TOKENS;
 
-  // Foundation ships ONE tool (read_file) through the dispatch seam; the real registry is V1.
-  private readonly tools: Tool[] = [READ_FILE_TOOL];
+  // The full tool set from the registry (V1/02), sent on every call for every phase — no per-phase
+  // gating. Built once; the registry is static.
+  private readonly tools: Tool[] = toolDefinitions();
 
   constructor(config: SessionConfig, llm: OllamaClient, sandbox: SandboxClient) {
     this.project = config.projectName;
+    this.projectPath = config.projectPath;
     this.model = config.modelName;
     this.numCtx = config.numCtx;
     this.llm = llm;
@@ -104,20 +109,19 @@ export class SessionOrchestrator implements TurnContext {
   }
 
   /**
-   * The dispatch seam. Foundation routes the one built-in tool through the sandbox; unknown tools
-   * and thrown errors return a structured, recoverable string the model can read and retry from —
-   * it never throws up into the turn loop.
+   * The dispatch seam (V1/02). Builds a ToolContext bound to the active project + CURRENT phase and
+   * runs the call through the registry-backed dispatcher, which validates args, executes the tool,
+   * and returns a structured recoverable string on any bad/unknown call — never throwing up into
+   * the turn loop. The audit sink (V1/06) hooks here via the dispatch `onToolCall` seam.
    */
   async callTool(name: string, args: Record<string, unknown>): Promise<string> {
-    // TODO(V1): append one JSON line per call to .orchestrator/tool_audit.jsonl (audit-log seam).
-    try {
-      if (name === 'read_file') {
-        return await readFile(this.sandbox, args);
-      }
-      return `Error: unknown tool '${name}'.`;
-    } catch (err) {
-      return `Error: ${err instanceof Error ? err.message : String(err)}`;
-    }
+    const ctx = createToolContext({
+      projectName: this.project,
+      projectPath: this.projectPath,
+      sandbox: this.sandbox,
+      phase: this.phase.name,
+    });
+    return dispatchToolCall(ctx, name, args);
   }
 
   /** System prompt (from the ACTIVE phase's instructions + project state) then that phase's history. */

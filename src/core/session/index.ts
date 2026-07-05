@@ -5,3 +5,5 @@ export { SessionMemory } from './memory.js';
 export type { ChatRole } from './memory.js';
 export { MAX_TOOL_ROUNDS } from './turn-loop.js';
 export type { TurnContext } from './turn-loop.js';
+export { dispatchToolCall } from './dispatch.js';
+export type { ToolCallRecord, DispatchDeps } from './dispatch.js';

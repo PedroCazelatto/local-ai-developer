@@ -1,4 +1,4 @@
-> **Status:** ⬜ Not started
+> **Status:** ✅ Completed (2026-07-04)
 
 # 02 — Tool registry and dispatch
 
