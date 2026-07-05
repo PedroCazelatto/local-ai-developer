@@ -10,6 +10,7 @@ import { createToolContext, toolDefinitions } from '../../tools/index.js';
 import type { SandboxClient } from '../container/index.js';
 import { OllamaClient } from '../llm/index.js';
 import type { Message, StreamHandle, TokenCounts, Tool, ToolCall } from '../llm/index.js';
+import { appendAuditRow } from './audit.js';
 import type { SessionConfig } from './config.js';
 import { dispatchToolCall } from './dispatch.js';
 import { SessionMemory } from './memory.js';
@@ -121,7 +122,10 @@ export class SessionOrchestrator implements TurnContext {
       sandbox: this.sandbox,
       phase: this.phase.name,
     });
-    return dispatchToolCall(ctx, name, args);
+    // Every dispatched call — success, failure, or sub-step — is appended to the audit log (V1/06).
+    return dispatchToolCall(ctx, name, args, {
+      onToolCall: (record) => appendAuditRow(this.projectPath, record),
+    });
   }
 
   /** System prompt (from the ACTIVE phase's instructions + project state) then that phase's history. */
