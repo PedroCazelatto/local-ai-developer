@@ -16,6 +16,8 @@ import { dispatchToolCall } from './dispatch.js';
 import { SessionMemory } from './memory.js';
 import { processMessage as processTurns } from './turn-loop.js';
 import type { TurnContext } from './turn-loop.js';
+import type { Task } from './types.js';
+import { runWorkerTask } from './worker-runner.js';
 
 const NO_TOKENS: TokenCounts = { promptTokens: null, evalTokens: null };
 
@@ -26,7 +28,7 @@ export class SessionOrchestrator implements TurnContext {
   readonly numCtx: number;
 
   /** Host path to projects/<active> — the ToolContext root and the sandbox's /workspace mount. */
-  private readonly projectPath: string;
+  readonly projectPath: string;
   private readonly llm: OllamaClient;
   private readonly sandbox: SandboxClient;
   private readonly memory = new SessionMemory();
@@ -84,6 +86,24 @@ export class SessionOrchestrator implements TurnContext {
   /** Entry point the REPL calls for a chat message: run the bounded tool-dispatch turn loop. */
   async processMessage(userInput: string): Promise<void> {
     await processTurns(this, userInput);
+  }
+
+  /**
+   * Spawn a FRESH, isolated Worker window for one backlog task (V1/10) and return its summary. The
+   * window never touches the active phase's history; its tool calls are audited as phase "worker".
+   */
+  runWorkerTask(task: Task, specSlice: string): Promise<string> {
+    return runWorkerTask(
+      {
+        llm: this.llm,
+        tools: this.tools,
+        sandbox: this.sandbox,
+        projectName: this.project,
+        projectPath: this.projectPath,
+      },
+      task,
+      specSlice,
+    );
   }
 
   // ---------------------------------------------------------------- TurnContext seam (turn-loop)

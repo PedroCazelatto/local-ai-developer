@@ -1,4 +1,4 @@
-> **Status:** ⬜ Not started
+> **Status:** ✅ Completed (2026-07-04) — TS committed; rules/phases/worker.md edit left UNCOMMITTED for user review (constitution). Live Worker pass deferred to the final model run.
 
 # 10 — Worker phase + execution trigger
 

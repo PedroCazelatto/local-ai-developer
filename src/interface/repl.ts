@@ -6,14 +6,16 @@
 // The one-time clearScreen() at boot wipes launcher noise; the status bar reserves the bottom row
 // (see status-bar.ts) but the conversation and input stay in the scrolling area, copyable as ever.
 
-import { createInterface } from 'node:readline/promises';
+import { createInterface, type Interface as ReadlineInterface } from 'node:readline/promises';
 import path from 'node:path';
 import { stdin, stdout } from 'node:process';
 
+import type { Task } from '../core/session/index.js';
 import * as renderer from '../core/ui/renderer.js';
 import * as statusBar from '../core/ui/status-bar.js';
 import { stopThinking } from '../core/ui/spinner.js';
 import { newProjectCommand } from './commands/new-project.js';
+import { runCommand } from './commands/run.js';
 
 /**
  * What the REPL needs from the orchestrator (task 06's SessionOrchestrator satisfies this
@@ -25,10 +27,14 @@ export interface ReplOrchestrator {
   readonly numCtx: number;
   /** Current phase name — drives the status line + assistant prefix. */
   readonly activePhase: string;
+  /** Host path to projects/<active> — the /run command reads the backlog from here. */
+  readonly projectPath: string;
   /** EXACT combined tokens from the last turn, or null if Ollama didn't report them. */
   readonly lastTurnTokenTotal: number | null;
   /** Run the full turn loop for a chat message (streams output + dispatches tools). */
   processMessage(userInput: string): Promise<void>;
+  /** Spawn a fresh Worker window for a backlog task and return its summary (V1/10). */
+  runWorkerTask(task: Task, specSlice: string): Promise<string>;
   /** Switch active phase; throws a clear Error on an unknown phase (REPL turns it into a line). */
   switchPhase(name: string): void;
   /** Phase names available for /swap, for the unknown-phase error message. */
@@ -50,7 +56,7 @@ export async function runRepl(orch: ReplOrchestrator): Promise<void> {
       if (line === '') continue;
 
       if (line.startsWith('/')) {
-        if (await handleCommand(orch, line)) break; // /exit
+        if (await handleCommand(orch, line, rl)) break; // /exit
         continue;
       }
       await orch.processMessage(line);
@@ -68,12 +74,22 @@ function updateStatus(orch: ReplOrchestrator): void {
   statusBar.set(`${orch.activePhase} · ${tokens}/${orch.numCtx} tok`);
 }
 
+/** Yes/no prompt on the existing readline (no clack — avoids fighting readline for stdin). */
+async function askYesNo(rl: ReadlineInterface, question: string): Promise<boolean> {
+  const answer = (await rl.question(`${question} [y/N] `)).trim().toLowerCase();
+  return answer === 'y' || answer === 'yes';
+}
+
 /** Dispatch a `/command`. Returns true only for `/exit` (signals the loop to stop). */
-async function handleCommand(orch: ReplOrchestrator, input: string): Promise<boolean> {
+async function handleCommand(orch: ReplOrchestrator, input: string, rl: ReadlineInterface): Promise<boolean> {
   const [command, ...rest] = input.slice(1).split(/\s+/);
   switch (command) {
     case 'exit':
       return true;
+    case 'run':
+      // Execution trigger (V1/10): run backlog tasks sequentially, gating on the user between them.
+      await runCommand(rest, orch, (question) => askYesNo(rl, question));
+      return false;
     case 'new-project': {
       // A user command, never a model tool — scaffolds a NEW project on disk (the session stays
       // locked to its current project; the user restarts to work on the new one).

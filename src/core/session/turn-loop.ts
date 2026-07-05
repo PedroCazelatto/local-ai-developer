@@ -30,17 +30,25 @@ export interface TurnContext {
   callTool(name: string, args: Record<string, unknown>): Promise<string>;
 }
 
-/** Run turns for one user message until the model stops calling tools (or the cap is hit). */
-export async function processMessage(ctx: TurnContext, userInput: string): Promise<void> {
+/**
+ * Run turns for one user message until the model stops calling tools (or the cap is hit). The cap
+ * defaults to MAX_TOOL_ROUNDS for interactive phases; the Worker (V1/10) passes a larger value
+ * since a test-first implement loop (write test → run → implement → run) needs more headroom.
+ */
+export async function processMessage(
+  ctx: TurnContext,
+  userInput: string,
+  maxRounds: number = MAX_TOOL_ROUNDS,
+): Promise<void> {
   if (!(await runTurn(ctx, () => ctx.streamAsk(userInput)))) {
     return; // no tool calls on the first turn → done
   }
-  for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
+  for (let round = 0; round < maxRounds; round++) {
     if (!(await runTurn(ctx, () => ctx.streamContinue()))) {
       return; // model finished
     }
   }
-  renderer.systemMessage(`⚠ Reached tool-call limit (${MAX_TOOL_ROUNDS}). Stopping.`);
+  renderer.systemMessage(`⚠ Reached tool-call limit (${maxRounds}). Stopping.`);
 }
 
 /**
