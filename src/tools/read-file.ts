@@ -6,21 +6,9 @@
 
 import { readFileSync } from 'node:fs';
 
+import { codeOf, decodeUtf8Strict, messageOf } from './fs-support.js';
 import type { ToolModule, ToolResult } from './types.js';
 import { toolError } from './types.js';
-
-function messageOf(err: unknown): string {
-  return err instanceof Error ? err.message : String(err);
-}
-
-/** Node OS errors carry a string `code` (ENOENT, EISDIR, …); read it without asserting `any`. */
-function codeOf(err: unknown): string | undefined {
-  if (typeof err === 'object' && err !== null && 'code' in err) {
-    const code = (err as { code: unknown }).code;
-    return typeof code === 'string' ? code : undefined;
-  }
-  return undefined;
-}
 
 export const readFileTool: ToolModule = {
   name: 'read_file',
@@ -45,8 +33,7 @@ export const readFileTool: ToolModule = {
       return toolError(messageOf(err));
     }
     try {
-      const buffer = readFileSync(resolved);
-      return new TextDecoder('utf-8', { fatal: true }).decode(buffer);
+      return decodeUtf8Strict(readFileSync(resolved));
     } catch (err) {
       if (codeOf(err) === 'ENOENT') {
         return toolError(`File '${path}' not found.`);

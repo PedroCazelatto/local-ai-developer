@@ -4,12 +4,22 @@
 // whitelist (the phase markdown steers which tools to use; the orchestrator never gates access).
 
 import type { Tool } from '../core/llm/index.js';
+import { editFileTool } from './edit-file.js';
+import { listFilesTool } from './list-files.js';
 import { readFileTool } from './read-file.js';
+import { searchInFilesTool } from './search-in-files.js';
 import type { ToolModule } from './types.js';
+import { writeFileTool } from './write-file.js';
 
-// The static module list. Each new tool (V1/03 file tools, V1/04 execute_command, V1/05
-// run_in_project) appends its module here and is picked up everywhere automatically.
-const TOOL_MODULES: readonly ToolModule[] = [readFileTool];
+// The static module list. Each new tool (V1/04 execute_command, V1/05 run_in_project) appends its
+// module here and is picked up everywhere automatically.
+const TOOL_MODULES: readonly ToolModule[] = [
+  listFilesTool,
+  readFileTool,
+  writeFileTool,
+  editFileTool,
+  searchInFilesTool,
+];
 
 /** name → module, built once with a duplicate-name guard (a dup is a build-time mistake, fail loud). */
 const REGISTRY: ReadonlyMap<string, ToolModule> = buildRegistry(TOOL_MODULES);
