@@ -1,15 +1,19 @@
-// The persistent REPL loop: read a line, classify command vs chat message, call the
-// orchestrator, and print the status line. Streaming output + the spinner are driven by the
+// The persistent REPL loop: read a line, classify command vs chat message, call the orchestrator,
+// and repaint the pinned status line. Streaming output + the spinner are driven by the
 // orchestrator's turn loop (task 06); this loop only reads input and renders the shell around it.
 //
-// Scrollback is preserved because we use a plain readline interface writing to the normal buffer
-// (no alt-screen, no clear) — the user can scroll up and copy any prior line.
+// Scrollback is preserved: a plain readline interface writes to the normal buffer (no alt-screen).
+// The one-time clearScreen() at boot wipes launcher noise; the status bar reserves the bottom row
+// (see status-bar.ts) but the conversation and input stay in the scrolling area, copyable as ever.
 
 import { createInterface } from 'node:readline/promises';
+import path from 'node:path';
 import { stdin, stdout } from 'node:process';
 
 import * as renderer from '../core/ui/renderer.js';
+import * as statusBar from '../core/ui/status-bar.js';
 import { stopThinking } from '../core/ui/spinner.js';
+import { newProjectCommand } from './commands/new-project.js';
 
 /**
  * What the REPL needs from the orchestrator (task 06's SessionOrchestrator satisfies this
@@ -33,42 +37,55 @@ export interface ReplOrchestrator {
 
 /** Run the REPL until the user types `/exit` (or EOF). */
 export async function runRepl(orch: ReplOrchestrator): Promise<void> {
-  renderer.banner();
+  renderer.clearScreen(); // one-time: wipe the launcher's boot noise for a clean start
+  statusBar.enable(); // reserve the bottom row BEFORE the header so all output scrolls above it
+  renderer.header({ project: orch.project, model: orch.model, numCtx: orch.numCtx });
   const rl = createInterface({ input: stdin, output: stdout });
   try {
     while (true) {
-      printStatus(orch);
+      // Repaint the pinned status line before each prompt: after a turn it carries fresh tokens,
+      // after /swap the new phase. It updates in place on the bottom row — never reprinted.
+      updateStatus(orch);
       const line = (await rl.question('› ')).trim();
       if (line === '') continue;
 
       if (line.startsWith('/')) {
-        if (handleCommand(orch, line)) break; // /exit
+        if (await handleCommand(orch, line)) break; // /exit
         continue;
       }
       await orch.processMessage(line);
     }
   } finally {
     stopThinking();
+    statusBar.disable(); // release the reserved row and restore normal scrolling
     rl.close();
   }
 }
 
-function printStatus(orch: ReplOrchestrator): void {
-  renderer.statusLine({
-    project: orch.project,
-    phase: orch.activePhase,
-    model: orch.model,
-    tokens: orch.lastTurnTokenTotal,
-    numCtx: orch.numCtx,
-  });
+/** Repaint the pinned status line: `phase · exact tokens / num_ctx`. Tokens are exact or `?`. */
+function updateStatus(orch: ReplOrchestrator): void {
+  const tokens = orch.lastTurnTokenTotal === null ? '?' : String(orch.lastTurnTokenTotal);
+  statusBar.set(`${orch.activePhase} · ${tokens}/${orch.numCtx} tok`);
 }
 
 /** Dispatch a `/command`. Returns true only for `/exit` (signals the loop to stop). */
-function handleCommand(orch: ReplOrchestrator, input: string): boolean {
+async function handleCommand(orch: ReplOrchestrator, input: string): Promise<boolean> {
   const [command, ...rest] = input.slice(1).split(/\s+/);
   switch (command) {
     case 'exit':
       return true;
+    case 'new-project': {
+      // A user command, never a model tool — scaffolds a NEW project on disk (the session stays
+      // locked to its current project; the user restarts to work on the new one).
+      const projectsRoot = path.resolve(process.cwd(), 'projects');
+      const outcome = newProjectCommand(rest, projectsRoot);
+      if (outcome.ok) {
+        renderer.systemMessage(outcome.message);
+      } else {
+        renderer.errorLine(outcome.message);
+      }
+      return false;
+    }
     case 'swap': {
       const target = rest[0];
       if (target === undefined || target === '') {
