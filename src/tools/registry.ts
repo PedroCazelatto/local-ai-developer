@@ -8,12 +8,13 @@ import { editFileTool } from './edit-file.js';
 import { executeCommandTool } from './execute-command.js';
 import { listFilesTool } from './list-files.js';
 import { readFileTool } from './read-file.js';
+import { runInProjectTool } from './run-in-project.js';
 import { searchInFilesTool } from './search-in-files.js';
 import type { ToolModule } from './types.js';
 import { writeFileTool } from './write-file.js';
 
-// The static module list. Each new tool (V1/05 run_in_project) appends its module here and is
-// picked up everywhere automatically.
+// The static module list — every tool the model can call. New tools append here and are picked up
+// everywhere automatically.
 const TOOL_MODULES: readonly ToolModule[] = [
   listFilesTool,
   readFileTool,
@@ -21,6 +22,7 @@ const TOOL_MODULES: readonly ToolModule[] = [
   editFileTool,
   searchInFilesTool,
   executeCommandTool,
+  runInProjectTool,
 ];
 
 /** name → module, built once with a duplicate-name guard (a dup is a build-time mistake, fail loud). */

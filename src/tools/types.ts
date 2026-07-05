@@ -41,6 +41,23 @@ export interface StructuredToolResult {
   readonly error?: string | null;
   /** Tool-specific fields recorded on the audit row (e.g. execute_command's resolved workdir). */
   readonly metadata?: JsonObject;
+  /**
+   * Extra audit rows for internal sub-steps of one tool call — e.g. run_in_project's auto-build,
+   * which is logged as its own row BEFORE the run row (V1/05/06). The dispatcher writes these; the
+   * tool never touches the audit log directly.
+   */
+  readonly auditExtras?: readonly ToolAuditExtra[];
+}
+
+/** One extra audit row a tool declares for an internal sub-step (e.g. a build before a run). */
+export interface ToolAuditExtra {
+  readonly tool: string;
+  readonly args: Record<string, unknown>;
+  readonly exitStatus: number;
+  readonly durationMs: number;
+  readonly output: string;
+  readonly error: string | null;
+  readonly metadata?: JsonObject;
 }
 
 /** A plain string is the simple success path; a StructuredToolResult carries JSON / audit detail. */

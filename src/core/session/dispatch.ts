@@ -6,7 +6,7 @@
 // continues. This is also where the audit log hooks in (V1/06) via the `onToolCall` seam.
 
 import { getTool, toolNames } from '../../tools/registry.js';
-import type { JSONSchema, JsonObject, ToolContext, ToolResult } from '../../tools/types.js';
+import type { JSONSchema, JsonObject, ToolAuditExtra, ToolContext, ToolResult } from '../../tools/types.js';
 import { toolError } from '../../tools/types.js';
 
 /** Raw materials for one audit row, handed to the audit sink (V1/06 formats + writes the JSONL). */
@@ -66,6 +66,7 @@ interface SerializedResult {
   readonly exitStatus: number;
   readonly error: string | null;
   readonly metadata?: JsonObject;
+  readonly auditExtras?: readonly ToolAuditExtra[];
 }
 
 /** Collapse a ToolResult into the model-facing string + the audit exit_status/error/metadata. */
@@ -77,7 +78,7 @@ function serializeResult(result: ToolResult): SerializedResult {
   const errorField = errorOf(result.content);
   const exitStatus = result.exitStatus ?? (errorField !== null ? -1 : 0);
   const error = result.error !== undefined ? result.error : errorField;
-  return { content, exitStatus, error, metadata: result.metadata };
+  return { content, exitStatus, error, metadata: result.metadata, auditExtras: result.auditExtras };
 }
 
 /** The `error` string of a structured payload, if it carries one (for deriving exit_status/error). */
@@ -153,6 +154,20 @@ export async function dispatchToolCall(
   try {
     const result = await tool.execute(ctx, args);
     const s = serializeResult(result);
+    // Extra sub-step rows (e.g. run_in_project's build) are written FIRST so they precede the run.
+    for (const extra of s.auditExtras ?? []) {
+      deps.onToolCall?.({
+        ts,
+        phase: ctx.phase,
+        tool: extra.tool,
+        args: extra.args,
+        exitStatus: extra.exitStatus,
+        durationMs: extra.durationMs,
+        output: extra.output,
+        error: extra.error,
+        ...(extra.metadata !== undefined ? { metadata: extra.metadata } : {}),
+      });
+    }
     return record(args, s.exitStatus, s.content, s.error, Math.round(performance.now() - start), s.metadata);
   } catch (err) {
     const s = serializeResult(toolError(messageOf(err)));
