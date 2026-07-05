@@ -39,6 +39,8 @@ export interface StructuredToolResult {
   readonly content: string | JsonObject;
   readonly exitStatus?: number;
   readonly error?: string | null;
+  /** Tool-specific fields recorded on the audit row (e.g. execute_command's resolved workdir). */
+  readonly metadata?: JsonObject;
 }
 
 /** A plain string is the simple success path; a StructuredToolResult carries JSON / audit detail. */

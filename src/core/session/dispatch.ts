@@ -19,6 +19,7 @@ export interface ToolCallRecord {
   readonly durationMs: number; // wall-clock around execute()
   readonly output: string; // full tool result (the sink truncates to a preview)
   readonly error: string | null; // null on success; the error message on failure
+  readonly metadata?: JsonObject; // tool-specific fields (e.g. execute_command's workdir)
 }
 
 export interface DispatchDeps {
@@ -60,8 +61,15 @@ function firstMissingRequired(schema: JSONSchema, args: Record<string, unknown>)
   return null;
 }
 
-/** Collapse a ToolResult into the model-facing string + the audit exit_status/error. */
-function serializeResult(result: ToolResult): { content: string; exitStatus: number; error: string | null } {
+interface SerializedResult {
+  readonly content: string;
+  readonly exitStatus: number;
+  readonly error: string | null;
+  readonly metadata?: JsonObject;
+}
+
+/** Collapse a ToolResult into the model-facing string + the audit exit_status/error/metadata. */
+function serializeResult(result: ToolResult): SerializedResult {
   if (typeof result === 'string') {
     return { content: result, exitStatus: 0, error: null };
   }
@@ -69,7 +77,7 @@ function serializeResult(result: ToolResult): { content: string; exitStatus: num
   const errorField = errorOf(result.content);
   const exitStatus = result.exitStatus ?? (errorField !== null ? -1 : 0);
   const error = result.error !== undefined ? result.error : errorField;
-  return { content, exitStatus, error };
+  return { content, exitStatus, error, metadata: result.metadata };
 }
 
 /** The `error` string of a structured payload, if it carries one (for deriving exit_status/error). */
@@ -99,8 +107,19 @@ export async function dispatchToolCall(
     output: string,
     error: string | null,
     durationMs: number,
+    metadata?: JsonObject,
   ): string => {
-    deps.onToolCall?.({ ts, phase: ctx.phase, tool: name, args, exitStatus, durationMs, output, error });
+    deps.onToolCall?.({
+      ts,
+      phase: ctx.phase,
+      tool: name,
+      args,
+      exitStatus,
+      durationMs,
+      output,
+      error,
+      ...(metadata !== undefined ? { metadata } : {}),
+    });
     return output;
   };
 
@@ -134,7 +153,7 @@ export async function dispatchToolCall(
   try {
     const result = await tool.execute(ctx, args);
     const s = serializeResult(result);
-    return record(args, s.exitStatus, s.content, s.error, Math.round(performance.now() - start));
+    return record(args, s.exitStatus, s.content, s.error, Math.round(performance.now() - start), s.metadata);
   } catch (err) {
     const s = serializeResult(toolError(messageOf(err)));
     return record(args, s.exitStatus, s.content, s.error, Math.round(performance.now() - start));

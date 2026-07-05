@@ -19,3 +19,5 @@ export { listFilesTool } from './list-files.js';
 export { writeFileTool } from './write-file.js';
 export { editFileTool } from './edit-file.js';
 export { searchInFilesTool } from './search-in-files.js';
+export { executeCommandTool } from './execute-command.js';
+export { truncateHeadTail, DEFAULT_OUTPUT_LIMIT } from './truncate.js';
