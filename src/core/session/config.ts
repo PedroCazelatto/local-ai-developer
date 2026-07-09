@@ -7,8 +7,14 @@
 import { existsSync, statSync } from 'node:fs';
 import path from 'node:path';
 
-/** Hardcoded until the V5 UI model picker; do not add a MODEL_NAME env/UI selector before then. */
-export const DEFAULT_MODEL = 'qwen2.5-coder:14b';
+/**
+ * Hardcoded until the V5 UI model picker; do not add a MODEL_NAME env/UI selector before then.
+ * TEMPORARY (2026-07-09): a 3B model so the loop is testable on an 8 GB M2 Air (unified memory),
+ * where the 14B target won't fit alongside Docker + Node + Ollama. It only needs to emit valid tool
+ * calls; output quality is irrelevant for testing. Revert to 'qwen2.5-coder:14b' — the intended
+ * production model — on the RTX 3060 target.
+ */
+export const DEFAULT_MODEL = 'qwen2.5-coder:3b';
 /** num_ctx is a hard VRAM ceiling — never estimated or invented (CLAUDE.md memory model). */
 export const DEFAULT_NUM_CTX = 16384;
 export const DEFAULT_PHASE = 'discovery';
