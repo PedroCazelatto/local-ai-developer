@@ -1,8 +1,10 @@
 // Persistent-REPL renderer: append-only print helpers. THE whole point of the rewrite is
 // preserving scrollback (the old Rich Live(screen=True) TUI grabbed the alt-buffer and the user
-// couldn't copy/paste from it — see the "verify via scripted live checks" memory). So: NEVER
-// clear the screen, never use the alt-buffer, never own a fixed region. Every helper just
-// appends to the normal terminal buffer, so the user can scroll up and copy freely.
+// couldn't copy/paste from it — see the "verify via scripted live checks" memory). So: never use
+// the alt-buffer and never repaint history — every helper just appends to the normal terminal
+// buffer, so the user can scroll up and copy freely. The one-time clearScreen() at boot wipes
+// launcher noise; the single pinned status row is owned by status-bar.ts via a scroll region, not
+// by clearing or redrawing here.
 //
 // Keep this module dumb (pure printing). Turn-loop logic, tool dispatch, and history live in the
 // orchestrator (task 06); the UI only displays and collects input.
@@ -11,9 +13,23 @@ import { theme } from './theme.js';
 
 const BANNER = 'Local AI Developer  ·  /swap <phase>  ·  /exit';
 
-/** One-time boot banner (ports the old add_system_message banner). */
-export function banner(): void {
-  process.stdout.write(`${theme.banner(BANNER)}\n\n`);
+/** One-time boot clear: wipe the launcher's noise (screen + scrollback), home the cursor. */
+export function clearScreen(): void {
+  if (!process.stdout.isTTY) return; // piped/redirected: nothing to clear, escapes would corrupt output
+  process.stdout.write('\x1b[2J\x1b[3J\x1b[H'); // clear screen, clear scrollback, cursor home
+}
+
+/** Fields shown in the one-time boot header (the live per-turn line lives in the pinned status bar). */
+export interface HeaderInfo {
+  readonly project: string;
+  readonly model: string;
+  readonly numCtx: number;
+}
+
+/** One-time boot header: the banner plus the static session context (project · model · num_ctx). */
+export function header(info: HeaderInfo): void {
+  const context = theme.meta(`${info.project} · ${info.model} · ctx ${info.numCtx}`);
+  process.stdout.write(`${theme.banner(BANNER)}\n${context}\n\n`);
 }
 
 /**
@@ -42,31 +58,4 @@ export function systemMessage(text: string): void {
 /** Recoverable-error line (unknown /swap phase, surfaced tool error). Never throws out. */
 export function errorLine(text: string): void {
   process.stdout.write(`${theme.error(text)}\n`);
-}
-
-export interface StatusLineInfo {
-  readonly project: string;
-  readonly phase: string;
-  readonly model: string;
-  /** EXACT combined token count for the last turn, or null when Ollama did not report it. */
-  readonly tokens: number | null;
-  readonly numCtx: number;
-}
-
-/**
- * Printed status line: `project · phase · model · tokens · num_ctx`. Because we don't own a
- * fixed screen region, this is just another appended line (rendered before each prompt). Tokens
- * are EXACT or `?` — never a fabricated number (CLAUDE.md token rule).
- */
-export function statusLine(info: StatusLineInfo): void {
-  const tokens = info.tokens === null ? '?' : String(info.tokens);
-  const sep = theme.meta(' · ');
-  const line = [
-    theme.meta(info.project),
-    theme.phase(info.phase)(info.phase),
-    theme.meta(info.model),
-    theme.meta(`${tokens} tok`),
-    theme.meta(`ctx ${info.numCtx}`),
-  ].join(sep);
-  process.stdout.write(`${line}\n`);
 }
