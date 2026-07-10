@@ -1,4 +1,4 @@
-> **Status:** ⬜ Not started
+> **Status:** ✅ Completed (2026-07-09) — drift-fix applied to `discovery.md` / `design.md` / `breakdown.md` (dropped `AGENT_NOTES.md`; deferred `search_rules`/`load_rule` as V4; softened cross-phase sections; aligned `PRODUCT_SPEC.md` section names). **Revised 2026-07-10:** `breakdown.md` now targets the `backlog/` Markdown tree (V1/09, revised) instead of `.orchestrator/backlog.json`. Those three `rules/` edits + this status line are left **UNCOMMITTED** for user review (constitution: global instruction files are never auto-committed).
 
 # 08 — Planning-phase content (Discovery / Design / Breakdown)
 

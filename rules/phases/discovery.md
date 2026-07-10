@@ -16,21 +16,22 @@ Turn a vague idea into validated, scoped product requirements — before any arc
 3. List the features **and how they interact** — feature interaction is what makes an Epic coherent, not just a pile of features.
 4. Group the features into one or more **Epics** (a unit of high-level business value, e.g. "User Authentication"). Do not talk about buttons or database tables.
 5. Record the **versioned scope**: what ships in v1, what is deferred to v2/v3, and what is out of scope entirely.
-6. Seed or refresh `PRODUCT_SPEC.md`: Vision, the validated Epic list, the versioned scope, and a ubiquitous-language glossary.
-7. Create `AGENT_NOTES.md` if it does not exist, with one empty `## To: <Phase>` section per phase.
+6. Write your output to `PRODUCT_SPEC.md` at the project root with `edit_file` (or `write_file` if it does not exist yet). Fill only the sections the scaffold already defines — **Vision**, **Domain Glossary**, **Epics** — and do not invent new section names:
+   - **Vision:** the problem, the users, the outcome.
+   - **Domain Glossary:** the ubiquitous language (one line per term).
+   - **Epics:** the validated epic list; for each feature/epic mark **v1** or **deferred (v2/v3)**, and end the section with an explicit **Out of scope** list.
+   - Leave **Stories**, **Architecture**, and **Execution Sequence** for Design and Breakdown.
 
 ## Inputs / Outputs
 - **In:** the user's raw idea.
-- **Out:** `PRODUCT_SPEC.md` (vision + epics + versioned scope) that Design and Breakdown build on.
+- **Out:** `PRODUCT_SPEC.md` (Vision + Domain Glossary + Epics with versioned scope) that Design and Breakdown build on.
+
+## Tools available to you
+`read_file`, `write_file`, `edit_file`, `list_files`, `search_in_files` — all scoped to the project at `/workspace`. That is the whole set for planning in V1. On-demand standards retrieval (`search_rules`/`load_rule`) is a later addition — **do not call it; it does not exist yet.**
 
 ## Communicating with other phases
-Shared channel: `AGENT_NOTES.md` at the project repo root (sibling of `PRODUCT_SPEC.md`). Each phase has its own isolated memory and never sees another phase's turns, so cross-phase signals go through this file.
+Each phase runs in its own isolated window and never sees another phase's turns. In V1 there is no shared file or inbox: when you spot a concern that belongs to Design or Breakdown, **state it plainly in your summary to the user**, who drives the loop and carries the signal to the next phase. (A structured cross-phase inbox arrives in a later version — do not call inbox tools; they do not exist yet.)
 
-- **Phase start:** read your own `## To: Discovery` section and address every `[OPEN]` item before starting new discovery work.
-- **During the phase:** when a concern belongs to another phase, append to their section:
-  `- [OPEN] YYYY-MM-DD Discovery: <concise description, why it matters>`
-- **Resolve items:** flip `[OPEN]` → `[RESOLVED]` with a one-line note. Never edit another phase's open items except to mark them resolved.
-
-### Typical signals from Discovery
-- **To Design:** "User mentioned integration with external system X — architectural implication before epics are finalized?"
-- **To Breakdown:** "Epic Y emerged mid-interview — scope needs extending before stories are written."
+Examples of concerns worth surfacing to the user:
+- **For Design:** "User mentioned integration with external system X — there's an architectural implication before epics are finalized."
+- **For Breakdown:** "Epic Y emerged mid-interview — its scope needs extending before stories are written."
