@@ -19,17 +19,12 @@ export function clearScreen(): void {
   process.stdout.write('\x1b[2J\x1b[3J\x1b[H'); // clear screen, clear scrollback, cursor home
 }
 
-/** Fields shown in the one-time boot header (the live per-turn line lives in the pinned status bar). */
-export interface HeaderInfo {
-  readonly project: string;
-  readonly model: string;
-  readonly numCtx: number;
-}
-
-/** One-time boot header: the banner plus the static session context (project · model · num_ctx). */
-export function header(info: HeaderInfo): void {
-  const context = theme.meta(`${info.project} · ${info.model} · ctx ${info.numCtx}`);
-  process.stdout.write(`${theme.banner(BANNER)}\n${context}\n\n`);
+/**
+ * One-time boot banner. The live session context (project · phase · model · tokens · num_ctx) lives
+ * in the pinned status bar below the input — NOT here — so it never scrolls above the conversation.
+ */
+export function header(): void {
+  process.stdout.write(`${theme.banner(BANNER)}\n\n`);
 }
 
 /**

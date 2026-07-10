@@ -2,7 +2,6 @@
 // that preserves scrollback (never clears / never grabs the alt-buffer). Foundation task 05.
 export { theme } from './theme.js';
 export * as renderer from './renderer.js';
-export type { HeaderInfo } from './renderer.js';
 export * as statusBar from './status-bar.js';
 export { startThinking, stopThinking } from './spinner.js';
 export { confirm, select, textInput } from './prompts.js';

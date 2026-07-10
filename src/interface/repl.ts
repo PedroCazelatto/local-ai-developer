@@ -45,21 +45,37 @@ export interface ReplOrchestrator {
 export async function runRepl(orch: ReplOrchestrator): Promise<void> {
   renderer.clearScreen(); // one-time: wipe the launcher's boot noise for a clean start
   statusBar.enable(); // reserve the bottom row BEFORE the header so all output scrolls above it
-  renderer.header({ project: orch.project, model: orch.model, numCtx: orch.numCtx });
+  renderer.header();
   const rl = createInterface({ input: stdin, output: stdout });
   try {
     while (true) {
       // Repaint the pinned status line before each prompt: after a turn it carries fresh tokens,
       // after /swap the new phase. It updates in place on the bottom row — never reprinted.
       updateStatus(orch);
-      const line = (await rl.question('› ')).trim();
+
+      // A failed `rl.question` means stdin is gone (EOF / Ctrl+D / readline closed) — there is no
+      // input left to read, so end the session gracefully instead of spinning on a dead stream.
+      let line: string;
+      try {
+        line = (await rl.question('› ')).trim();
+      } catch {
+        break;
+      }
       if (line === '') continue;
 
-      if (line.startsWith('/')) {
-        if (await handleCommand(orch, line, rl)) break; // /exit
-        continue;
+      // Any error from a command or a turn is SHOWN and swallowed — one bad turn (a dropped Ollama
+      // stream, a tool blowup) must never kill the session. Only genuinely fatal errors that escape
+      // to `main().catch` (boot failures, Node runtime faults) end the app, printing to the console.
+      try {
+        if (line.startsWith('/')) {
+          if (await handleCommand(orch, line, rl)) break; // /exit
+          continue;
+        }
+        await orch.processMessage(line);
+      } catch (err) {
+        stopThinking(); // a spinner may still be running if the turn threw mid-stream
+        renderer.errorLine(`✖ ${err instanceof Error ? err.message : String(err)}`);
       }
-      await orch.processMessage(line);
     }
   } finally {
     stopThinking();
@@ -68,10 +84,13 @@ export async function runRepl(orch: ReplOrchestrator): Promise<void> {
   }
 }
 
-/** Repaint the pinned status line: `phase · exact tokens / num_ctx`. Tokens are exact or `?`. */
+/**
+ * Repaint the pinned status line (bottom row, below the input): the full session context —
+ * `project · phase · model · exact tokens / num_ctx`. Tokens are the exact last-turn total or `?`.
+ */
 function updateStatus(orch: ReplOrchestrator): void {
   const tokens = orch.lastTurnTokenTotal === null ? '?' : String(orch.lastTurnTokenTotal);
-  statusBar.set(`${orch.activePhase} · ${tokens}/${orch.numCtx} tok`);
+  statusBar.set(`${orch.project} · ${orch.activePhase} · ${orch.model} · ${tokens}/${orch.numCtx} tok`);
 }
 
 /** Yes/no prompt on the existing readline (no clack — avoids fighting readline for stdin). */
