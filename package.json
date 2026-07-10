@@ -9,6 +9,8 @@
   },
   "scripts": {
     "dev": "tsx src/index.ts",
+    "sandbox:up": "docker compose up -d",
+    "sandbox:down": "docker compose stop",
     "build": "tsc",
     "start": "node dist/index.js",
     "typecheck": "tsc --noEmit"
