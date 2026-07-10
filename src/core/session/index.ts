@@ -10,15 +10,16 @@ export type { ToolCallRecord, DispatchDeps } from './dispatch.js';
 export { appendAuditRow, OUTPUT_PREVIEW_LIMIT } from './audit.js';
 export {
   readBacklog,
-  writeBacklog,
   setTaskStatus,
   nextRunnableTasks,
   allTasks,
   findTask,
-  parseBacklog,
+  levelDocs,
+  backlogRoot,
+  BACKLOG_DIRNAME,
   BacklogError,
 } from './backlog.js';
-export type { Backlog, Epic, Story, Task, TaskStatus } from './types.js';
+export type { Backlog, Task, TaskStatus } from './types.js';
 export { TASK_STATUSES } from './types.js';
 export { runWorkerTask } from './worker-runner.js';
 export type { WorkerDeps } from './worker-runner.js';

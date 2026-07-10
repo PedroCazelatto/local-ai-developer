@@ -83,16 +83,13 @@ class WorkerWindow implements TurnContext {
 
 /** Assemble the seed user message: the task definition + the spec slice + the Worker's marching orders. */
 function buildWorkerSeed(task: Task, specSlice: string): string {
-  const deps = task.depends_on.length > 0 ? task.depends_on.join(', ') : 'none';
+  const deps = task.dependsOn.length > 0 ? task.dependsOn.join(', ') : 'none';
   return `You are implementing ONE task from the backlog. Implement exactly this task, test-first — no more, no less.
 
-## Task ${task.id}: ${task.title}
+## Task: ${task.title}
+(backlog id: ${task.id})
 
-Description:
-${task.description}
-
-Acceptance criteria:
-${task.acceptance}
+${task.body}
 
 Depends on: ${deps}
 ${specSlice ? `\n${specSlice}\n` : ''}

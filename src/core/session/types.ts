@@ -1,10 +1,14 @@
-// Task-backlog types (V1/09). The ordered Epic -> Story -> Task hierarchy the planning phases write
-// (as .orchestrator/backlog.json, via the model's write_file tool) and the execution trigger +
-// Worker consume. This resolves CLAUDE.md's open "task backlog format/location" question.
+// Task-backlog types. The backlog is a tree of Markdown files under <projectRoot>/backlog/
+// (COMMITTED — a human-browseable plan + progress trail): up to three levels — an epic folder, a
+// story folder, and a task file — where ONLY task files are required. A task may sit directly in
+// backlog/, or under an epic, or under an epic + story. Each epic/story folder MAY hold a README.md
+// documenting that level; every other .md is a task carrying YAML frontmatter (status/order/
+// depends_on) plus a Markdown body (the definition + acceptance the Worker is seeded with).
 //
-// backlog.json is gitignored SESSION STATE (statuses flip as execution runs); the committed
-// narrative is PRODUCT_SPEC.md. IDs are stable once assigned (E1 / E1-S1 / E1-S1-T1) — the audit,
-// statuses, and Worker seeding all key off them.
+// The PATH is the identity: a task's id is its path relative to backlog/ without the ".md"
+// extension, e.g. "epic-auth/story-signup/01-add-hashing-test". depends_on entries are these same
+// ids. Statuses flip in each file's frontmatter as execution runs; PRODUCT_SPEC.md stays the
+// narrative. (Supersedes the earlier single .orchestrator/backlog.json decision.)
 
 /** pending -> in_progress -> done, plus blocked. In V1, `done` is user-gated (no auto-Reviewer). */
 export type TaskStatus = 'pending' | 'in_progress' | 'done' | 'blocked';
@@ -12,33 +16,26 @@ export type TaskStatus = 'pending' | 'in_progress' | 'done' | 'blocked';
 export const TASK_STATUSES: readonly TaskStatus[] = ['pending', 'in_progress', 'done', 'blocked'];
 
 export interface Task {
-  /** Stable id `<storyId>-T<n>`, e.g. "E1-S1-T1". */
+  /** Stable id = path under backlog/ without ".md", e.g. "epic-auth/story-signup/01-hash-test". */
   readonly id: string;
+  /** Absolute host path to the task's .md file. */
+  readonly filePath: string;
+  /** Title: the body's first H1, else the humanized file slug. */
   readonly title: string;
-  /** Full definition the Worker is seeded with: what to build, constraints. */
-  readonly description: string;
-  /** Observable signal of done, e.g. "npm test passes the hashing spec". */
-  readonly acceptance: string;
-  /** Task ids that must be `done` before this is eligible; [] if none. */
-  readonly depends_on: readonly string[];
-  /** Global execution-sequence index across the whole backlog. */
+  /** Full Markdown body after the frontmatter — the definition + acceptance the Worker is seeded with. */
+  readonly body: string;
+  /** Task ids (backlog-relative paths) that must be `done` before this is eligible; [] if none. */
+  readonly dependsOn: readonly string[];
+  /** Global execution-sequence index across the whole backlog (frontmatter `order`). */
   readonly order: number;
   readonly status: TaskStatus;
-}
-
-export interface Story {
-  readonly id: string; // `<epicId>-S<n>`, e.g. "E1-S1"
-  readonly title: string;
-  readonly tasks: readonly Task[];
-}
-
-export interface Epic {
-  readonly id: string; // `E<n>`, e.g. "E1"
-  readonly title: string;
-  readonly stories: readonly Story[];
+  /** Owning epic slug (top folder under backlog/), or null when the task isn't under an epic. */
+  readonly epic: string | null;
+  /** Owning story slug (second folder), or null when the task isn't under a story. */
+  readonly story: string | null;
 }
 
 export interface Backlog {
-  readonly version: number;
-  readonly epics: readonly Epic[];
+  /** Every task in the tree, sorted by `order` then `id`. */
+  readonly tasks: readonly Task[];
 }

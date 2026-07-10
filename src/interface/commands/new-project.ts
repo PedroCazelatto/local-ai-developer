@@ -8,6 +8,7 @@ import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 
 import {
+  BACKLOG_README_SKELETON,
   isKnownStack,
   KNOWN_STACKS,
   PRODUCT_SPEC_SKELETON,
@@ -52,6 +53,9 @@ export function newProjectCommand(args: readonly string[], projectsRoot: string)
     mkdirSync(projectDir, { recursive: true });
     mkdirSync(path.join(projectDir, '.orchestrator', 'memory'), { recursive: true });
     mkdirSync(path.join(projectDir, '.orchestrator', 'inbox'), { recursive: true });
+    // backlog/ is COMMITTED (not under .orchestrator/): the Breakdown phase fills this tree.
+    mkdirSync(path.join(projectDir, 'backlog'), { recursive: true });
+    writeFileSync(path.join(projectDir, 'backlog', 'README.md'), BACKLOG_README_SKELETON, 'utf-8');
     writeFileSync(path.join(projectDir, '.gitignore'), template.gitignore, 'utf-8');
     writeFileSync(path.join(projectDir, 'docker-compose.yml'), template.compose, 'utf-8');
     writeFileSync(path.join(projectDir, 'README.md'), readmePlaceholder(name, stack), 'utf-8');

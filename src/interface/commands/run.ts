@@ -12,6 +12,7 @@ import {
   allTasks,
   BacklogError,
   findTask,
+  levelDocs,
   nextRunnableTasks,
   readBacklog,
   setTaskStatus,
@@ -40,33 +41,29 @@ function extractSection(markdown: string, heading: string): string {
   return body.join('\n').trim();
 }
 
-/** Owning epic/story for a task id, walking the backlog structure. */
-function ownerOf(backlog: Backlog, taskId: string): { epic: string; story: string } {
-  for (const epic of backlog.epics) {
-    for (const story of epic.stories) {
-      if (story.tasks.some((t) => t.id === taskId)) {
-        return { epic: `${epic.id}: ${epic.title}`, story: `${story.id}: ${story.title}` };
-      }
-    }
-  }
-  return { epic: 'unknown', story: 'unknown' };
-}
+/** Build a FOCUSED context slice for the Worker: its epic/story level docs + the Architecture excerpt. */
+function buildSpecSlice(projectPath: string, task: Task): string {
+  const context: string[] = ['## Context'];
+  const where = [task.epic ? `Epic: ${task.epic}` : null, task.story ? `Story: ${task.story}` : null].filter(
+    (s): s is string => s !== null,
+  );
+  if (where.length > 0) context.push(where.join('  ·  '));
 
-/** Build a FOCUSED context slice for the Worker: owning epic/story + the Architecture excerpt. */
-function buildSpecSlice(projectPath: string, backlog: Backlog, task: Task): string {
-  const { epic, story } = ownerOf(backlog, task.id);
-  let arch = '';
+  const docs = levelDocs(projectPath, task);
+  if (docs.epic) context.push('', `### Epic (${task.epic}/README.md)`, docs.epic.slice(0, SPEC_ARCH_LIMIT));
+  if (docs.story) {
+    context.push('', `### Story (${task.epic}/${task.story}/README.md)`, docs.story.slice(0, SPEC_ARCH_LIMIT));
+  }
+
   const specPath = path.join(projectPath, 'PRODUCT_SPEC.md');
   if (existsSync(specPath)) {
     try {
       const section = extractSection(readFileSync(specPath, 'utf-8'), 'Architecture');
-      if (section) arch = section.slice(0, SPEC_ARCH_LIMIT);
+      if (section) context.push('', '### Architecture (excerpt from PRODUCT_SPEC.md)', section.slice(0, SPEC_ARCH_LIMIT));
     } catch {
-      /* spec unreadable — fall back to just the epic/story context */
+      /* spec unreadable — fall back to just the level-doc context */
     }
   }
-  const context = [`## Context`, `Epic ${epic}`, `Story ${story}`];
-  if (arch) context.push('', '### Architecture (excerpt from PRODUCT_SPEC.md)', arch);
   return context.join('\n');
 }
 
@@ -133,7 +130,7 @@ export async function runCommand(
       continue;
     }
     const statusById = new Map(allTasks(current).map((t) => [t.id, t.status]));
-    const unmet = task.depends_on.filter((d) => statusById.get(d) !== 'done');
+    const unmet = task.dependsOn.filter((d) => statusById.get(d) !== 'done');
     if (unmet.length > 0) {
       renderer.systemMessage(`Skipping ${id}: waiting on ${unmet.join(', ')} (not done).`);
       continue;
@@ -141,7 +138,7 @@ export async function runCommand(
 
     renderer.systemMessage(`▶ Running ${task.id}: ${task.title}`);
     setTaskStatus(orch.projectPath, id, 'in_progress');
-    const specSlice = buildSpecSlice(orch.projectPath, current, task);
+    const specSlice = buildSpecSlice(orch.projectPath, task);
 
     let summary: string;
     try {

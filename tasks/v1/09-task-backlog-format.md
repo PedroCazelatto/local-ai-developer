@@ -1,9 +1,9 @@
-> **Status:** ✅ Completed (2026-07-04)
+> **Status:** ✅ Completed (2026-07-04) · **Revised 2026-07-10** — format changed from a single `.orchestrator/backlog.json` to a **committed `backlog/` tree of Markdown files** (YAML frontmatter for status/order/depends_on). This doc now describes the current (.md-tree) decision; the JSON schema is retired.
 
 # 09 — Task-backlog format
 
 **Version:** V1
-**Depends on:** V1/03 (the planning phases write it via `write_file`/`edit_file`), V1/07 (the scaffold creates `.orchestrator/`).
+**Depends on:** V1/03 (the planning phases write it via `write_file`/`edit_file`), V1/07 (the scaffold creates `backlog/`).
 **Blocks:** V1/08 (planning phases must reference this shape) and V1/10 (Worker + execution trigger consume it).
 
 ## Why
@@ -12,57 +12,55 @@ CLAUDE.md leaves **"Task backlog format/location"** open. This task **decides an
 
 ## Recommendation (decided here)
 
-Store the backlog as **`projects/<active>/.orchestrator/backlog.json`** — a single structured JSON file, machine-read by the orchestrator (execution trigger + Worker seeding) and machine-written by the planning phases via the file tools.
+Store the backlog as a **tree of Markdown files under `backlog/`** at the project root (relative to `/workspace`) — human-browseable and **committed** (the plan and its progress are version-controlled), machine-read by the orchestrator (execution trigger + Worker seeding) and machine-written by the planning phases via the file tools.
 
 Rationale:
-- **JSON, not prose in `PRODUCT_SPEC.md`.** The execution trigger (V1/10) needs to enumerate tasks, read statuses, and pick "one/some/all" deterministically. Parsing that out of free-form markdown is fragile; a local model writing valid JSON via `write_file` is reliable enough and trivially machine-read.
-- **`.orchestrator/` (gitignored), not the repo body.** The backlog is orchestrator session state (statuses flip as execution runs), consistent with `tool_audit.jsonl` and `memory/`. The human-readable narrative (vision, epics, architecture prose) stays in `PRODUCT_SPEC.md`, which **is** committed. The backlog is the operational index over that narrative.
-- **One file.** Epics/Stories/Tasks nest naturally; no need to spread across files in V1.
+- **Markdown files, not one JSON blob.** The plan is meant to be read, reviewed, and committed by the human. A tree of `.md` files renders in any editor/Git host; a single JSON file does not. A local model writing one small `.md` per task via `write_file` is more reliable than emitting one large valid JSON document.
+- **The path IS the identity.** Epic→Story→Task nest as folders/files, so no id bookkeeping is needed in the file body — a task's id is its path under `backlog/` without `.md`.
+- **Committed (not `.orchestrator/`).** Unlike the old JSON (session state), the `.md` backlog is committed alongside `PRODUCT_SPEC.md`; task status flips in each file's frontmatter as execution runs, giving a git-visible progress trail. `PRODUCT_SPEC.md` stays the narrative; `backlog/` is the ordered executable list.
 
-`PRODUCT_SPEC.md` and `backlog.json` are complementary: `PRODUCT_SPEC.md` is the *why/what* for humans and phase context; `backlog.json` is the *ordered executable list* for the loop.
+## Format
 
-## Schema
+```
+backlog/
+  README.md                      # backlog overview (scaffolded); a README.md is NEVER a task
+  epic-<slug>/                   # optional epic folder
+    README.md                    # epic level documentation
+    story-<slug>/                # optional story folder
+      README.md                  # story level documentation
+      01-<slug>.md               # a TASK (required leaf)
+  02-<slug>.md                   # a task with no epic/story is allowed
+```
 
-```jsonc
-{
-  "version": 1,
-  "epics": [
-    {
-      "id": "E1",
-      "title": "User Authentication",
-      "stories": [
-        {
-          "id": "E1-S1",
-          "title": "Email/password sign-up",
-          "tasks": [
-            {
-              "id": "E1-S1-T1",
-              "title": "Add failing test for password hashing",
-              "description": "Full task definition the Worker is seeded with: what to build, acceptance criteria, constraints.",
-              "acceptance": "Observable signal of done (e.g. 'npm test passes the hashing spec').",
-              "depends_on": ["E1-S1-T0"],   // task ids that must be `done` first; [] if none
-              "order": 1,                     // sequence index within the backlog
-              "status": "pending"             // see status states
-            }
-          ]
-        }
-      ]
-    }
-  ]
-}
+- **Only task files are required.** Epic and story folders are optional grouping — a task may sit directly in `backlog/`, or under an epic, or under an epic + story. Max three levels (epic/story/task).
+- A file named **`README.md`** documents its level and is never a task. **Every other `.md` is a task.**
+
+Each **task file** is YAML frontmatter + a Markdown body:
+
+```markdown
+---
+status: pending          # pending | in_progress | done | blocked  (ALWAYS pending on creation)
+order: 1                 # global execution-sequence integer across the whole backlog
+depends_on: []           # task ids that must be done first, e.g. [epic-auth/story-signup/00-scaffold]
+---
+# Short task title
+
+The full definition the Worker is seeded with: what to build, plus constraints.
+
+## Acceptance
+The observable signal of done (e.g. "npm test passes the hashing spec").
 ```
 
 ### ID scheme
 
-- Epic: `E<n>` (`E1`, `E2`, …).
-- Story: `<epicId>-S<n>` (`E1-S1`).
-- Task: `<storyId>-T<n>` (`E1-S1-T1`).
-- IDs are **stable** once assigned — the audit log, statuses, and Worker seeding all key off them. Re-running Breakdown appends/edits but does not renumber existing tasks.
+- A task's **id is its path under `backlog/` without `.md`** — e.g. `epic-auth/story-signup/01-add-hashing-test`.
+- `depends_on` entries are these same ids.
+- Ids are **stable** (the audit log, statuses, and Worker seeding key off them). Re-running Breakdown appends/edits — it does not rename existing task files.
 
 ### Ordering / priority
 
-- `order` is a global integer across the whole backlog giving the **execution sequence** (Breakdown owns it — dependencies first, then value, per `rules/phases/breakdown.md`). The execution trigger (V1/10) iterates tasks sorted by `order`.
-- `depends_on` is a hard constraint: a task is not eligible to run until every id it lists is `done`. `order` must be consistent with `depends_on` (a task never ordered before something it depends on) — Breakdown enforces this when writing.
+- `order` (frontmatter integer) is a **global** execution sequence across the whole backlog (Breakdown owns it — dependencies first, then value). The execution trigger (V1/10) iterates tasks sorted by `order`. If `order` is omitted, a leading number in the filename (`01-…`) is used as a fallback.
+- `depends_on` is a hard constraint: a task is not eligible to run until every id it lists is `done`. `order` must be consistent with `depends_on`.
 
 ### Status states
 
@@ -75,25 +73,26 @@ Rationale:
 | `done` | the Worker finished and the **user** reviewed + git-committed it | the user / trigger after user confirms (V1 has no auto-Reviewer) |
 | `blocked` | cannot proceed (dependency unmet, or — in V2/V3 — a raised blocker) | trigger / later the Reviewer |
 
-In V1 the transition to `done` is **user-gated** (the user reviews and commits — no automated Reviewer). The trigger marks `in_progress` when it spawns the Worker; the user confirms `done` after reviewing. Keep `blocked` in the enum now even though V1 only sets it for unmet dependencies (V3 reuses it for `raise_blocker`).
+In V1 the transition to `done` is **user-gated**. The trigger marks `in_progress` when it spawns the Worker; the user confirms `done` after reviewing. `blocked` stays in the enum even though V1 only surfaces unmet dependencies (V3 reuses it for `raise_blocker`).
 
 ## Files
 
-- `src/core/session/backlog.ts` — `readBacklog(projectPath)`, `writeBacklog(projectPath, backlog)`, `setTaskStatus(projectPath, taskId, status)`, `nextRunnableTasks(backlog)` (sorted by `order`, dependencies satisfied). Typed `Backlog`/`Epic`/`Story`/`Task` interfaces (no `Any`).
-- `src/core/session/types.ts` — the `Backlog`/`Task` types and the `TaskStatus` union.
-- Consumed by V1/10 (execution trigger + Worker seeding); written by V1/08 planning phases through `write_file`/`edit_file` on `.orchestrator/backlog.json`.
+- `src/core/session/backlog.ts` — `readBacklog(projectPath)` (scans the `backlog/` tree, parsing each non-`README.md` `.md` into a `Task`), `setTaskStatus(projectPath, taskId, status)` (surgically rewrites one file's frontmatter `status`), `nextRunnableTasks(backlog)` (sorted by `order`, dependencies satisfied), `allTasks`/`findTask`, `levelDocs` (epic/story README bodies for the Worker slice), `backlogRoot`, `BacklogError`. Frontmatter parsed with `js-yaml`. Typed `Backlog`/`Task` (no `any`).
+- `src/core/session/types.ts` — the `Backlog`/`Task` types and the `TaskStatus` union (path-based `id`, `body`, `dependsOn`, `order`, `status`, `epic`/`story` slugs).
+- `src/interface/commands/project-templates.ts` + `new-project.ts` — the scaffold creates `backlog/` with a `README.md` explaining the format.
+- Consumed by V1/10 (execution trigger + Worker seeding); written by V1/08 planning phases through `write_file`/`edit_file` under `backlog/`.
 
 ## Notes / pitfalls
 
-- **Phases write this file via the model's `write_file`/`edit_file` tools** (path `.orchestrator/backlog.json`, relative to `/workspace`). The orchestrator reads it host-side with `readBacklog`. Validate on read: malformed JSON → a clear error surfaced to the user (and a hint the planning phase should rewrite it), not a crash.
-- **`.orchestrator/` is gitignored (V1/07)** — the backlog is session state. The committed artifact is `PRODUCT_SPEC.md` + the actual code.
+- **Phases write these files via the model's `write_file`/`edit_file` tools** (paths under `backlog/`, relative to `/workspace`). The orchestrator reads them host-side. Malformed frontmatter → a clear typed `BacklogError` surfaced to the user (hint the Breakdown phase to rewrite), not a crash.
+- **`backlog/` is COMMITTED** — do not add it to the project `.gitignore` (only `.orchestrator/` is ignored). Status changes are intentional git diffs.
+- **`README.md` is reserved** as the per-level documentation file; a task must never be named `README.md`.
 - **IDs are load-bearing and stable** — the Worker is seeded by task id; the audit and statuses reference it.
-- **`order` consistent with `depends_on`** — the trigger trusts `order` for the run sequence but must still skip a task whose `depends_on` aren't `done` (defense in depth).
-- This is the **resolution of a CLAUDE.md open question** — once merged, update CLAUDE.md's open-questions list in a separate change (not part of this task's file edits).
+- This is the **resolution of a CLAUDE.md open question** — once merged, update CLAUDE.md's open-questions list in a separate change.
 
 ## Acceptance
 
-- After Discovery→Design→Breakdown on a fresh project, `projects/<active>/.orchestrator/backlog.json` parses against the schema: at least one epic, with stories, with tasks carrying `id`, `description`, `acceptance`, `order`, `status: "pending"`.
+- After Discovery→Design→Breakdown on a fresh project, `projects/<active>/backlog/` contains at least one task `.md` with frontmatter `status: pending` + `order`, and any epic/story folders carry a `README.md`.
 - `nextRunnableTasks(readBacklog(...))` returns tasks in `order`, excluding any whose `depends_on` aren't `done`.
-- `setTaskStatus(..., "E1-S1-T1", "in_progress")` flips exactly that task; re-reading shows the new status; other tasks unchanged.
-- Hand-corrupt the JSON → `readBacklog` returns a clear typed error, the app surfaces it, and nothing crashes.
+- `setTaskStatus(..., "epic-x/story-y/01-task", "in_progress")` flips exactly that file's frontmatter status; re-reading shows the new status; other tasks and the rest of the file (order, depends_on, body) unchanged.
+- Hand-corrupt a task's frontmatter → `readBacklog` returns a clear typed error, the app surfaces it, and nothing crashes.
