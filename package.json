@@ -18,7 +18,7 @@
   "dependencies": {
     "@clack/prompts": "^0.7.0",
     "chalk": "^5.3.0",
-    "dockerode": "^4.0.0",
+    "dockerode": "^5.0.1",
     "dotenv": "^16.4.0",
     "js-yaml": "^5.2.1",
     "ollama": "^0.5.0",
@@ -26,7 +26,6 @@
   },
   "devDependencies": {
     "@types/dockerode": "^3.3.0",
-    "@types/js-yaml": "^4.0.9",
     "@types/node": "^22.0.0",
     "tsx": "^4.16.0",
     "typescript": "^5.5.0"

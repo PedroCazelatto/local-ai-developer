@@ -10,7 +10,7 @@
 import { existsSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 
-import yaml from 'js-yaml';
+import { load as loadYaml } from 'js-yaml';
 
 import type { Backlog, Task, TaskStatus } from './types.js';
 import { TASK_STATUSES } from './types.js';
@@ -52,7 +52,7 @@ function splitFrontmatter(text: string, where: string): Frontmatter {
   if (match === null) return { data: {}, body: text };
   let loaded: unknown;
   try {
-    loaded = yaml.load(match[1] ?? '');
+    loaded = loadYaml(match[1] ?? '');
   } catch (err) {
     throw new BacklogError(`Task '${where}' has malformed YAML frontmatter: ${msg(err)}. The Breakdown phase should rewrite it.`);
   }
