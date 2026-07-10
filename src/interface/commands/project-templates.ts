@@ -21,7 +21,7 @@ interface StackTemplate {
   readonly gitignore: string;
 }
 
-/** node:22-slim / python:3.13-slim runner. Do NOT set network_mode: none — installs need the net. */
+/** node:24-slim / python:3.13-slim runner. Do NOT set network_mode: none — installs need the net. */
 function runnerCompose(image: string): string {
   return `services:
   runner:
@@ -40,7 +40,7 @@ function runnerCompose(image: string): string {
 
 const TEMPLATES: Record<Stack, StackTemplate> = {
   node: {
-    compose: runnerCompose('node:22-slim'),
+    compose: runnerCompose('node:24-slim'),
     gitignore: '.orchestrator/\nnode_modules/\ndist/\n*.log\n',
   },
   python: {

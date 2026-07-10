@@ -16,7 +16,7 @@ import Docker from 'dockerode';
 export const SANDBOX_CONTAINER = 'ai_sandbox';
 
 /** node:<lts>-slim, not debian: V1's project work + `npm i` need node/npm in the box already. */
-const DEFAULT_IMAGE = 'node:22-slim';
+const DEFAULT_IMAGE = 'node:24-slim';
 /** Ported from the old compose caps: cpus '2.0' → 2 CPUs in nano-units. */
 const DEFAULT_NANO_CPUS = 2_000_000_000;
 /** Ported from the old compose caps: memory 4gb. */
@@ -33,7 +33,7 @@ export interface SandboxOptions {
   readonly containerName: string;
   /** Absolute host path bind-mounted at /workspace. THE security boundary — only this is mounted. */
   readonly projectPath: string;
-  /** Override the image for the fallback create path (default node:22-slim). */
+  /** Override the image for the fallback create path (default node:24-slim). */
   readonly image?: string;
   readonly nanoCpus?: number;
   readonly memoryBytes?: number;
