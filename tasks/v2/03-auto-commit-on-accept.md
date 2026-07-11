@@ -1,4 +1,13 @@
-> **Status:** ⬜ Not started
+> **Status:** ✅ Completed (2026-07-11)
+>
+> **As built (user-approved):** commit runs **host-side** (`commitPaths` in
+> `src/core/session/project-git.ts`) — orchestrator-fired on the user's accept, never a model tool,
+> so it lives in `core/session`, not `src/tools/commit.ts`. Stages the **accepted set only** (never
+> `-A`); the guard **refuses any path escaping the project repo** (which covers the orchestrator's
+> `rules/`, since that tree is outside the project) with a "review before continuing" error. Message
+> built by `src/core/session/commit-message.ts` in the confirmed default convention — no human-name
+> trailer. Verified against a throwaway repo (commit, clean-after, escape-guard, empty-set, message).
+> Live `run start` acceptance is the user's step.
 
 # 03 — Auto-commit on accept
 
