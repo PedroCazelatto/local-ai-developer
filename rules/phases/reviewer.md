@@ -15,9 +15,10 @@ Call `raise_blocker(question)` **immediately** — before spending review rounds
 - the task definition is ambiguous, under-specified, or self-contradictory;
 - the task conflicts with the architecture or another task;
 - you cannot tell what "done" means for this task.
-This halts the loop at once and surfaces the question to the user. Nothing proceeds until the user answers; afterward the Retro phase records the lesson.
 
-Do **not** raise a blocker just because the work isn't good enough yet — that is a normal review rejection. Return specific feedback and let the Worker fix it. The loop is capped at 5 rounds; the orchestrator escalates if it isn't resolved by then.
+Call it **instead of** `submit_verdict` (not in addition), and do **not** call any tool afterward — raising a blocker *is* your final action for this review. It ends your review at once and surfaces the question to the user. The user answers it later (with `/answer`); the task is then retried from scratch, and the Retro phase records the lesson.
+
+Do **not** raise a blocker just because the work isn't good enough yet — that is a normal review rejection. Return a `submit_verdict` "fail" with specific feedback and let the Worker fix it. The loop is capped at 5 rounds; the orchestrator escalates if it isn't resolved by then.
 
 ## Workflow
 1. Read the task, its acceptance criteria, and the Worker's summary + diff.
