@@ -1,22 +1,45 @@
-// /answer <task-id> <text> (V3/02) — the user resolves a blocker the Reviewer raised. It records the
-// answer as a durable `resolved` row (blockers.jsonl) and re-queues the task (blocked → pending) so
-// the NEXT /run retries it with a fresh Worker (the blocked attempt was reverted). It deliberately
-// does NOT restart the loop: /run is synchronous, so the user only reaches this prompt while the loop
-// is stopped; they answer every blocker, then run /run again themselves.
+// /answer <task-id> <text> (V3/02 + V3/03) — the user resolves a blocker the Reviewer raised. It
+// records the answer as a durable `resolved` row (blockers.jsonl), re-queues the task (blocked →
+// pending) so the NEXT /run retries it with a fresh Worker, and then spawns the one-shot Retro window
+// (V3/03) to diagnose the misunderstanding and patch the offending file so it can't recur. It
+// deliberately does NOT restart the loop: /run is synchronous, so the user only reaches this prompt
+// while the loop is stopped; they answer every blocker, then run /run again themselves.
 //
-// (V3/03 will spawn the Retro phase here — diagnosing the misunderstanding and patching the offending
-// file — between recording the answer and the re-run. For now the answer is just recorded + re-queued.)
+// Ordering matters: re-queue (setTaskStatus → pending) runs BEFORE Retro so a task-specific patch to the
+// backlog file commits the body at status "pending" and leaves the project tree clean for the next /run.
 
-import { BacklogError, openBlockerForTask, resolveBlocker, setTaskStatus } from '../../core/session/index.js';
+import {
+  BacklogError,
+  findTask,
+  openBlockerForTask,
+  readBacklog,
+  resolveBlocker,
+  RetroError,
+  setTaskStatus,
+} from '../../core/session/index.js';
+import type { RetroInput, RetroResult } from '../../core/session/index.js';
 import * as renderer from '../../core/ui/renderer.js';
+import { renderRetroResult } from '../retro-prompt.js';
 
 const USAGE = 'Usage: /answer <task-id> <answer text>';
+
+/** The slice of the orchestrator /answer needs to spawn Retro — satisfied by SessionOrchestrator. */
+export interface AnswerOrchestrator {
+  readonly projectPath: string;
+  // spawnRetro: the V3/03 one-shot Retro window; patches one file (systemic uncommitted / task-specific committed).
+  spawnRetro(input: RetroInput): Promise<RetroResult>;
+}
+
+function messageOf(err: unknown): string {
+  return err instanceof Error ? err.message : String(err);
+}
 
 /**
  * Handle one `/answer` line. `rawLine` is the full REPL input (e.g. "/answer 01-foo Idempotent wins.")
  * so the answer text keeps its internal spacing (the REPL's whitespace-split would collapse it).
  */
-export function answerCommand(rawLine: string, projectPath: string): void {
+export async function answerCommand(rawLine: string, orch: AnswerOrchestrator): Promise<void> {
+  const projectPath = orch.projectPath;
   // Strip the leading "/answer", then split off the FIRST token (task id) from the REST (the answer).
   const rest = rawLine.replace(/^\/answer\b\s*/i, '');
   const match = /^(\S+)\s+([\s\S]+)$/.exec(rest);
@@ -42,14 +65,32 @@ export function answerCommand(rawLine: string, projectPath: string): void {
   // resolveBlocker: append the durable `resolved` row referencing the raised id.
   resolveBlocker(projectPath, { id: open.id, answer });
 
-  // Re-queue for the next /run. The answer is already recorded, so a missing task file (edited away)
-  // must not lose it — swallow a BacklogError from the status flip and still confirm the answer.
+  // Re-queue for the next /run BEFORE Retro (so a task-specific patch commits at status "pending" and
+  // the project tree stays clean). The answer is already recorded, so a missing task file (edited away)
+  // must not lose it — swallow a BacklogError and confirm the answer without running Retro.
   try {
     setTaskStatus(projectPath, taskId, 'pending');
   } catch (err) {
     if (!(err instanceof BacklogError)) throw err;
     renderer.errorLine(`Recorded the answer, but couldn't re-queue '${taskId}': ${err.message}`);
     return;
+  }
+
+  // Spawn Retro to close the learning loop: diagnose the misunderstanding, patch the one right file.
+  // Retro is best-effort — a RetroError (no edit / never submitted) must not swallow the answer, so warn
+  // and continue. The task definition is what Retro reasons over; a missing task skips Retro entirely.
+  const task = findTask(readBacklog(projectPath), taskId);
+  if (task === undefined) {
+    renderer.systemMessage(`Recorded the answer; skipped Retro ('${taskId}' is no longer in the backlog).`);
+  } else {
+    try {
+      const result = await orch.spawnRetro({ task, misunderstanding: open.question, answer });
+      // renderRetroResult: scope-coded headline, root cause, patched file, and the loud systemic warning.
+      renderRetroResult(result, projectPath);
+    } catch (err) {
+      if (!(err instanceof RetroError)) throw err;
+      renderer.errorLine(`Retro couldn't patch a file: ${messageOf(err)}. Classify + patch it manually if needed.`);
+    }
   }
 
   renderer.systemMessage(`✓ Answered ${open.id}. Re-run with /run ${taskId} (or /run) to retry it.`);

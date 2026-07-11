@@ -18,6 +18,8 @@ import { processMessage as processTurns } from './turn-loop.js';
 import type { TurnContext } from './turn-loop.js';
 import { runTaskLoop } from './run-task-loop.js';
 import type { TaskLoopReporter, TaskLoopResult } from './run-task-loop.type.js';
+import { spawnRetro as spawnRetroWindow } from './retro-runner.js';
+import type { RetroInput, RetroResult } from './retro-runner.type.js';
 import type { Task } from './types.js';
 
 const NO_TOKENS: TokenCounts = { promptTokens: null, evalTokens: null };
@@ -108,6 +110,27 @@ export class SessionOrchestrator implements TurnContext {
       task,
       specSlice,
       reporter,
+    );
+  }
+
+  /**
+   * Spawn the one-shot Retro window (V3/03) after the user resolves a blocker: a fresh, isolated window
+   * that diagnoses the misunderstanding and patches EXACTLY ONE file — a systemic gap edits a global
+   * rules/phases file (left UNCOMMITTED + a review warning), a task-specific gap edits the project doc
+   * (committed via V2/03). Binds the session infra; the caller (/answer) renders the RetroResult and
+   * surfaces any systemic review-warning. Never touches the active phase's history. Throws RetroError if
+   * the Retro produced no edit / never submitted (best-effort learning — the caller keeps going).
+   */
+  spawnRetro(input: RetroInput): Promise<RetroResult> {
+    return spawnRetroWindow(
+      {
+        llm: this.llm,
+        tools: this.tools,
+        sandbox: this.sandbox,
+        projectName: this.project,
+        projectPath: this.projectPath,
+      },
+      input,
     );
   }
 

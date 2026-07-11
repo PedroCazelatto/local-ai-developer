@@ -39,5 +39,7 @@ export {
 export type { ChangedFiles, CommitResult } from './project-git.js';
 export { raiseBlocker, resolveBlocker, openBlockerForTask, readBlockerRows } from './blocker-store.js';
 export type { RaisedBlocker, ResolvedBlocker, BlockerRow } from './blocker-store.type.js';
+export { spawnRetro, RetroError } from './retro-runner.js';
+export type { RetroInput, RetroResult, RetroScope, RetroDeps, RetroSubmission } from './retro-runner.type.js';
 export { buildCommitMessage } from './commit-message.js';
 export type { CommitMessageInput } from './commit-message.js';

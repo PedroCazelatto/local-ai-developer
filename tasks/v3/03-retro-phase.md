@@ -1,4 +1,4 @@
-> **Status:** ⬜ Not started
+> **Status:** ✅ Completed (2026-07-11)
 
 # 03 — Retro phase (patch the right file after a blocker)
 

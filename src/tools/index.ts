@@ -25,3 +25,10 @@ export { truncateHeadTail, DEFAULT_OUTPUT_LIMIT } from './truncate.js';
 // Phase-scoped (Reviewer-only, V2/01) — deliberately NOT added to the registry in registry.ts.
 export { submitVerdictTool, parseVerdict, SUBMIT_VERDICT } from './submit-verdict.js';
 export type { VerdictParse } from './submit-verdict.js';
+// Phase-scoped (Retro-only, V3/03) — also NOT in the registry: only the spawned Retro window offers them.
+export { submitRetroTool, parseRetroSubmission, SUBMIT_RETRO } from './submit-retro.js';
+export type { RetroSubmissionParse } from './submit-retro.js';
+export { readPhaseRuleTool, readPhaseRule, READ_PHASE_RULE } from './read-phase-rule.js';
+export type { PhaseRuleRead } from './read-phase-rule.js';
+export { editPhaseRuleTool, applyPhaseRuleEdit, EDIT_PHASE_RULE } from './edit-phase-rule.js';
+export type { PhaseRuleEdit } from './edit-phase-rule.js';

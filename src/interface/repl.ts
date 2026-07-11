@@ -10,7 +10,7 @@ import { createInterface } from 'node:readline/promises';
 import path from 'node:path';
 import { stdin, stdout } from 'node:process';
 
-import type { Task, TaskLoopReporter, TaskLoopResult } from '../core/session/index.js';
+import type { RetroInput, RetroResult, Task, TaskLoopReporter, TaskLoopResult } from '../core/session/index.js';
 import * as renderer from '../core/ui/renderer.js';
 import * as statusBar from '../core/ui/status-bar.js';
 import { stopThinking } from '../core/ui/spinner.js';
@@ -36,6 +36,8 @@ export interface ReplOrchestrator {
   processMessage(userInput: string): Promise<void>;
   /** Run the V3/01 implement→test→review→fix loop for a backlog task (auto-commits on pass). */
   runTaskLoop(task: Task, specSlice: string, reporter: TaskLoopReporter): Promise<TaskLoopResult>;
+  /** Spawn the V3/03 Retro window after a blocker is answered (patches the one right file). */
+  spawnRetro(input: RetroInput): Promise<RetroResult>;
   /** Switch active phase; throws a clear Error on an unknown phase (REPL turns it into a line). */
   switchPhase(name: string): void;
   /** Phase names available for /swap, for the unknown-phase error message. */
@@ -126,9 +128,10 @@ async function handleCommand(orch: ReplOrchestrator, input: string): Promise<boo
       await runCommand(rest, orch);
       return false;
     case 'answer':
-      // Resolve a blocker the Reviewer raised (V3/02): record the answer + re-queue the task. Pass the
-      // raw line so the answer text keeps its spacing; the loop is stopped, so this is safe to run now.
-      answerCommand(input, orch.projectPath);
+      // Resolve a blocker the Reviewer raised (V3/02): record the answer + re-queue the task, then spawn
+      // Retro (V3/03) to patch the offending file. Pass the raw line so the answer text keeps its
+      // spacing, and the orchestrator so Retro can run; the loop is stopped, so this is safe now.
+      await answerCommand(input, orch);
       return false;
     case 'new-project': {
       // A user command, never a model tool — scaffolds a NEW project on disk (the session stays
