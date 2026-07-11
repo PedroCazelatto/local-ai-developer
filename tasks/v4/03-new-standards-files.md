@@ -1,4 +1,4 @@
-> **Status:** ⬜ Not started
+> **Status:** ✅ Completed (2026-07-11) — six standards files added under `rules/standards/` (`testing-discipline`, `language-idioms` (TS + Python), `error-handling`, `naming-conventions`, `commit-hygiene`, `documentation`), each with V4/01 frontmatter and a body under ~80 lines. `loadCatalog()` now returns **eight** entries with no code change, no duplicate names, no body leak. Verified against the real V4/01 loader.
 
 # 03 — New standards files
 
