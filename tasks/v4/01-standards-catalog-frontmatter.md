@@ -1,4 +1,4 @@
-> **Status:** ⬜ Not started
+> **Status:** ✅ Completed (2026-07-11) — `src/context/standards-catalog.ts` (+ `.type.ts`) and the barrel export committed. The two `rules/standards/*.md` frontmatter edits (`clean-architecture`, `hexagonal-ddd`) are left **UNCOMMITTED** for user review (constitution: global instruction files are never auto-committed). ⚠️ `loadCatalog()` throws on boot until that frontmatter is committed.
 
 # 01 — Standards catalog (frontmatter + loader)
 
