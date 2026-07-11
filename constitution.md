@@ -1,8 +1,11 @@
 # Constitution
 
 Binding engineering constraints for building **the orchestrator itself**. These are invariants:
-every change Claude Code makes to this repo must respect them, no exceptions without the user
-changing this file first.
+**follow every rule in this file by default.** Deviate only when the user *explicitly* tells you to
+override a specific rule — never assume an exception, infer one, or let a general instruction quietly
+override a rule here; if anything seems to conflict, the constitution wins unless the user says
+otherwise. A spoken override applies only to that one case; making an exception permanent means
+editing this file first.
 
 Scope note: this governs the **orchestrator's own TypeScript code**. The *local Ollama model's*
 code-quality standards are a different thing and live in [rules/standards/](rules/standards/); the

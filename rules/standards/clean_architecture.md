@@ -1,3 +1,8 @@
+---
+name: clean-architecture
+description: Onion layering (Entities, Use Cases, Interface Adapters, Frameworks), the inward-only dependency rule, and passing plain DTOs across boundaries. Use when reviewing module boundaries, deciding which layer code belongs in, or checking whether a dependency points inward.
+---
+
 # Manifesto: Clean Architecture
 
 ## 1. The Dependency Rule

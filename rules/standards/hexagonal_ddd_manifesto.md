@@ -1,3 +1,8 @@
+---
+name: hexagonal-ddd
+description: Ports-and-adapters with Domain/Application/Infrastructure layers, DDD tactical patterns (entities, aggregates, value objects), and port/adapter naming rules. Use when reviewing hexagonal boundaries, naming a port or adapter, or keeping infrastructure models out of the domain.
+---
+
 # Manifesto: Hexagonal Architecture & Domain-Driven Design
 
 ## 1. The Core Principle: Dependency Direction
