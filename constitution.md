@@ -23,6 +23,20 @@ model never reads this file. The three-doc split:
   narrowing. Reach for a localized `as` / `// @ts-expect-error` **only** when the type is genuinely
   unknowable, and comment why.
 
+## Code structure & clarity
+
+- **Always follow Clean Code and SOLID.** Every change respects both: small single-purpose units,
+  intention-revealing names, no god objects, dependency inversion over hard-wired concretions.
+- **One function per file — least responsibility.** Each code file holds **exactly one function**,
+  so its responsibility is as small as possible. The kebab-case file name names that function's job.
+  No exceptions: a file that would need a second function means a second file.
+- **Types and schemas go in sibling files, never inline with a function.** Declare them beside the
+  function they serve, named `<name>.type.<ext>` for types and `<name>.schema.<ext>` for schemas
+  (e.g. `parse-config.ts` pairs with `parse-config.type.ts` and `parse-config.schema.ts`).
+- **Document complex functions at the call site.** When you call a non-trivial function, add a
+  brief comment *where it is used* stating what the function does — so reading the calling file
+  tells you the behavior without opening the function's own file.
+
 ## Correctness invariants
 
 - **Token counts are always exact.** Read them from Ollama's response (`prompt_eval_count`,
