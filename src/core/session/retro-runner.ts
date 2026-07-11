@@ -39,9 +39,19 @@ import type { Task } from './types.js';
 // the Worker's implement loop. Give headroom for a few reads + a re-tried edit before the cap trips.
 const RETRO_MAX_ROUNDS = 16;
 
-// The project-scoped registry tools Retro may use: inspect the backlog/spec, and make a TASK-SPECIFIC
-// edit. No write_file (Retro makes the SMALLEST edit, not a rewrite), no shell/container tools.
-const RETRO_PROJECT_TOOL_NAMES: readonly string[] = ['read_file', 'list_files', 'search_in_files', 'edit_file'];
+// The project-scoped registry tools Retro may use: inspect the backlog/spec, make a TASK-SPECIFIC
+// edit, and signal other phases via the cross-phase inbox (V3/04). No write_file (Retro makes the
+// SMALLEST edit, not a rewrite), no shell/container tools. The inbox tools neither read nor touch the
+// single-file edit lock — they go through the read/inbox dispatch branch below.
+const RETRO_PROJECT_TOOL_NAMES: readonly string[] = [
+  'read_file',
+  'list_files',
+  'search_in_files',
+  'edit_file',
+  'inbox_read',
+  'inbox_post',
+  'inbox_resolve',
+];
 
 /** The project-scoped edit tool whose success locks the window's single-file target. */
 const PROJECT_EDIT_TOOL = 'edit_file';
@@ -167,7 +177,7 @@ class RetroWindow implements TurnContext {
       return this.handleProjectEdit(args);
     }
     if (RETRO_PROJECT_TOOL_NAMES.includes(name)) {
-      return this.dispatchProject(name, args); // a read tool — no single-file lock to enforce
+      return this.dispatchProject(name, args); // a read or inbox tool — no single-file lock to enforce
     }
     // Any other tool (write_file, shell/container, unknown) is refused — Retro makes ONE smallest edit.
     return this.refuse(name, args);

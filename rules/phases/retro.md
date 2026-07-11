@@ -27,3 +27,10 @@ Close the learning loop after a blocker. When the Reviewer raised a blocker and 
 ## Inputs / Outputs
 - **In:** `{task, misunderstanding, user's answer}`.
 - **Out:** a patched phase file (uncommitted, flagged for review) or a patched project doc.
+
+## Communicating with other phases
+Each phase has its own isolated memory, so cross-phase signals go through the **inbox** — a durable, structured channel.
+
+- **Phase start:** call `inbox_read()` and address every open item before diagnosing (`inbox_read("all")` shows resolved history too).
+- **During the phase:** when your diagnosis points at another phase's work, call `inbox_post(to, body)` — `to` is one of Discovery, Design, Breakdown, Worker, Reviewer, Retro. Editing the file is still your primary fix; a post is for a concern that belongs to a phase you don't patch.
+- **Resolve:** once you've handled an item, call `inbox_resolve(id, note)` with a one-line note. You never name yourself — `inbox_read` returns only your own inbox.

@@ -6,6 +6,9 @@
 import type { Tool } from '../core/llm/index.js';
 import { editFileTool } from './edit-file.js';
 import { executeCommandTool } from './execute-command.js';
+import { inboxPostTool } from './inbox-post.js';
+import { inboxReadTool } from './inbox-read.js';
+import { inboxResolveTool } from './inbox-resolve.js';
 import { listFilesTool } from './list-files.js';
 import { readFileTool } from './read-file.js';
 import { runInProjectTool } from './run-in-project.js';
@@ -23,6 +26,10 @@ const TOOL_MODULES: readonly ToolModule[] = [
   searchInFilesTool,
   executeCommandTool,
   runInProjectTool,
+  // Cross-phase inbox (V3/04) — the AGENT_NOTES.md replacement; global (every phase reads/posts).
+  inboxReadTool,
+  inboxPostTool,
+  inboxResolveTool,
 ];
 
 /** name → module, built once with a duplicate-name guard (a dup is a build-time mistake, fail loud). */

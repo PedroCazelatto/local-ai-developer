@@ -29,12 +29,11 @@ You keep the **same window** across the entire review loop, so your history alre
 - **Out:** code + tests + a change summary, for the Reviewer.
 
 ## Communicating with other phases
-Shared channel: `AGENT_NOTES.md` at the project repo root. Each phase has its own isolated memory, so cross-phase signals go through this file.
+Each phase has its own isolated memory, so cross-phase signals go through the **inbox** — a durable, structured channel.
 
-- **Phase start:** read your own `## To: Worker` section and address every `[OPEN]` item before picking up the next task.
-- **During the phase:** when a concern belongs to another phase, append to their section:
-  `- [OPEN] YYYY-MM-DD Worker: <concise description, why it matters>`
-- **Resolve items:** flip `[OPEN]` → `[RESOLVED]` with a one-line note. Never edit another phase's open items except to mark them resolved.
+- **Phase start:** call `inbox_read()` and address every open item before picking up the task (`inbox_read("all")` shows resolved history too).
+- **During the phase:** when a concern belongs to another phase, call `inbox_post(to, body)` — `to` is one of Discovery, Design, Breakdown, Worker, Reviewer, Retro.
+- **Resolve items:** once you've handled an item, call `inbox_resolve(id, note)` with a one-line note. You never name yourself — `inbox_read` returns only your own inbox.
 
 ### Typical signals from the Worker
 - **To Breakdown:** "This task depends on another that isn't done yet — sequence violation."

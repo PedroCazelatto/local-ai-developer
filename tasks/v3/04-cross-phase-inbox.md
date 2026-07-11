@@ -1,4 +1,4 @@
-> **Status:** ⬜ Not started
+> **Status:** ✅ Completed (2026-07-11)
 
 # 04 — Cross-phase inbox (replaces `AGENT_NOTES.md`)
 

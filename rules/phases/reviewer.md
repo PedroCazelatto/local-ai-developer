@@ -32,12 +32,11 @@ Do **not** raise a blocker just because the work isn't good enough yet — that 
 - **Out:** approval (→ commit) or a concrete list of required changes (→ Worker fixes in the same window).
 
 ## Communicating with other phases
-Shared channel: `AGENT_NOTES.md` at the project repo root. Each phase has its own isolated memory, so cross-phase signals go through this file.
+Each phase has its own isolated memory, so cross-phase signals go through the **inbox** — a durable, structured channel. This is distinct from `raise_blocker`: post an inbox note for a concern the loop can carry forward; raise a blocker only when the task itself is unjudgeable and must halt now.
 
-- **Phase start:** read your own `## To: Reviewer` section and address every `[OPEN]` item before reviewing new work.
-- **During the phase:** when a concern belongs to another phase, append to their section:
-  `- [OPEN] YYYY-MM-DD Reviewer: <concise description, why it matters>`
-- **Resolve items:** flip `[OPEN]` → `[RESOLVED]` with a one-line note. Never edit another phase's open items except to mark them resolved.
+- **Phase start:** call `inbox_read()` and address every open item before reviewing new work (`inbox_read("all")` shows resolved history too).
+- **During the phase:** when a concern belongs to another phase, call `inbox_post(to, body)` — `to` is one of Discovery, Design, Breakdown, Worker, Reviewer, Retro.
+- **Resolve items:** once you've handled an item, call `inbox_resolve(id, note)` with a one-line note. You never name yourself — `inbox_read` returns only your own inbox.
 
 ### Typical signals from the Reviewer
 - **To Breakdown:** "This task's acceptance criteria can't be verified as written — they need sharpening."
