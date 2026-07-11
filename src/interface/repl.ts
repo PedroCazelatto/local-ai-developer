@@ -10,7 +10,13 @@ import { createInterface, type Interface as ReadlineInterface } from 'node:readl
 import path from 'node:path';
 import { stdin, stdout } from 'node:process';
 
-import type { Task } from '../core/session/index.js';
+import type {
+  ReviewDecision,
+  ReviewerInput,
+  ReviewerOutcome,
+  Task,
+  WorkerResult,
+} from '../core/session/index.js';
 import * as renderer from '../core/ui/renderer.js';
 import * as statusBar from '../core/ui/status-bar.js';
 import { stopThinking } from '../core/ui/spinner.js';
@@ -33,8 +39,10 @@ export interface ReplOrchestrator {
   readonly lastTurnTokenTotal: number | null;
   /** Run the full turn loop for a chat message (streams output + dispatches tools). */
   processMessage(userInput: string): Promise<void>;
-  /** Spawn a fresh Worker window for a backlog task and return its summary (V1/10). */
-  runWorkerTask(task: Task, specSlice: string): Promise<string>;
+  /** Spawn a fresh Worker window for a backlog task and return its result (V1/10). */
+  runWorkerTask(task: Task, specSlice: string): Promise<WorkerResult>;
+  /** Spawn a fresh, isolated Reviewer window to judge a Worker attempt (V2/01). */
+  runReviewerTask(input: ReviewerInput): Promise<ReviewerOutcome>;
   /** Switch active phase; throws a clear Error on an unknown phase (REPL turns it into a line). */
   switchPhase(name: string): void;
   /** Phase names available for /swap, for the unknown-phase error message. */
@@ -113,10 +121,17 @@ function updateStatus(orch: ReplOrchestrator): void {
   statusBar.set(`${orch.project} · ${orch.activePhase} · ${orch.model} · ${tokens}/${orch.numCtx} tok`);
 }
 
-/** Yes/no prompt on the existing readline (no clack — avoids fighting readline for stdin). */
-async function askYesNo(rl: ReadlineInterface, question: string): Promise<boolean> {
-  const answer = (await rl.question(`${question} [y/N] `)).trim().toLowerCase();
-  return answer === 'y' || answer === 'yes';
+/**
+ * Accept / send-back / skip prompt on the existing readline (no clack — avoids fighting readline for
+ * stdin, matching V1's yes/no pattern). An unrecognized / empty answer returns null, which /run
+ * treats as "send back" (the safe choice: never commits).
+ */
+async function askReviewDecision(rl: ReadlineInterface, question: string): Promise<ReviewDecision | null> {
+  const answer = (await rl.question(`${question} [a=accept / s=send back / k=skip] `)).trim().toLowerCase();
+  if (answer === 'a' || answer === 'accept') return 'accept';
+  if (answer === 's' || answer === 'send back' || answer === 'sendback' || answer === 'send') return 'sendBack';
+  if (answer === 'k' || answer === 'skip') return 'skip';
+  return null;
 }
 
 /** Dispatch a `/command`. Returns true only for `/exit` (signals the loop to stop). */
@@ -126,8 +141,9 @@ async function handleCommand(orch: ReplOrchestrator, input: string, rl: Readline
     case 'exit':
       return true;
     case 'run':
-      // Execution trigger (V1/10): run backlog tasks sequentially, gating on the user between them.
-      await runCommand(rest, orch, (question) => askYesNo(rl, question));
+      // Execution trigger (V1/10 + V2): run tasks sequentially — Worker → Reviewer → verdict — and
+      // gate on the user's accept / send-back / skip between them.
+      await runCommand(rest, orch, { askDecision: (question) => askReviewDecision(rl, question) });
       return false;
     case 'new-project': {
       // A user command, never a model tool — scaffolds a NEW project on disk (the session stays

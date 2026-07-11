@@ -28,4 +28,10 @@ export const theme = {
   error: chalk.red as Styler,
   /** The boot banner. */
   banner: chalk.bold as Styler,
+  /** A passing outcome (e.g. a Reviewer PASS verdict). */
+  success: chalk.greenBright as Styler,
+  /** A failing / high-severity outcome (e.g. a Reviewer FAIL verdict, blocker/major issues). */
+  danger: chalk.redBright as Styler,
+  /** Emphasis for headlines / labels (task id, "Issues:"), without a color. */
+  strong: chalk.bold as Styler,
 };

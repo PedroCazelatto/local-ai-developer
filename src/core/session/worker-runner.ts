@@ -6,6 +6,7 @@
 
 import { buildSystemPrompt, loadPhasePrompt } from '../../context/index.js';
 import { createToolContext } from '../../tools/index.js';
+import { truncateHeadTail } from '../../tools/index.js';
 import type { SandboxClient } from '../container/index.js';
 import type { OllamaClient, Message, StreamHandle, TokenCounts, Tool, ToolCall } from '../llm/index.js';
 import { appendAuditRow } from './audit.js';
@@ -26,6 +27,20 @@ export interface WorkerDeps {
   readonly projectPath: string;
 }
 
+/** What one Worker window produces: its final summary + its last test/build run (for the Reviewer). */
+export interface WorkerResult {
+  /** The Worker's final no-tool-call turn — files touched, tests added, assumptions. */
+  readonly summary: string;
+  /**
+   * The Worker's LAST run_in_project invocation (command + output tail), so V2/02 can seed the
+   * Reviewer with the test results; null if the Worker ran none. The Reviewer may re-run regardless.
+   */
+  readonly lastTestRun: string | null;
+}
+
+/** Max chars of a captured run_in_project result carried to the Reviewer (it can re-run for more). */
+const TEST_RUN_CAPTURE_LIMIT = 4000;
+
 /**
  * A single Worker window implementing the turn loop's TurnContext against its OWN messages array —
  * isolated from the session's per-phase histories (Foundation/06) and from other tasks. Tool calls
@@ -36,6 +51,8 @@ class WorkerWindow implements TurnContext {
   readonly messages: Message[];
   /** The last assistant turn with no tool calls — the Worker's summary to the user. */
   summary = '';
+  /** The Worker's last run_in_project invocation (command + output tail), for the Reviewer's seed. */
+  lastTestRun: string | null = null;
 
   constructor(private readonly deps: WorkerDeps, systemPrompt: string) {
     this.messages = [{ role: 'system', content: systemPrompt }];
@@ -68,16 +85,22 @@ class WorkerWindow implements TurnContext {
     this.messages.push({ role: 'tool', content: result, tool_name: toolName });
   }
 
-  callTool(name: string, args: Record<string, unknown>): Promise<string> {
+  async callTool(name: string, args: Record<string, unknown>): Promise<string> {
     const ctx = createToolContext({
       projectName: this.deps.projectName,
       projectPath: this.deps.projectPath,
       sandbox: this.deps.sandbox,
       phase: 'worker',
     });
-    return dispatchToolCall(ctx, name, args, {
+    const result = await dispatchToolCall(ctx, name, args, {
       onToolCall: (record) => appendAuditRow(this.deps.projectPath, record),
     });
+    // Remember the last test/build run so V2/02 can seed the Reviewer with the Worker's own results.
+    if (name === 'run_in_project') {
+      const command = typeof args['command'] === 'string' ? args['command'] : '';
+      this.lastTestRun = `$ ${command}\n${truncateHeadTail(result, TEST_RUN_CAPTURE_LIMIT)}`;
+    }
+    return result;
   }
 }
 
@@ -104,9 +127,9 @@ Rules for this task:
  * Spawn a fresh Worker window for `task`, run it to completion (streaming to the REPL, all tool
  * calls audited), and return its summary. The window is discarded when this resolves.
  */
-export async function runWorkerTask(deps: WorkerDeps, task: Task, specSlice: string): Promise<string> {
+export async function runWorkerTask(deps: WorkerDeps, task: Task, specSlice: string): Promise<WorkerResult> {
   const systemPrompt = buildSystemPrompt(loadPhasePrompt('worker'), `Project: ${deps.projectName}`);
   const window = new WorkerWindow(deps, systemPrompt);
   await processMessage(window, buildWorkerSeed(task, specSlice), WORKER_MAX_ROUNDS);
-  return window.summary;
+  return { summary: window.summary, lastTestRun: window.lastTestRun };
 }

@@ -22,4 +22,12 @@ export {
 export type { Backlog, Task, TaskStatus } from './types.js';
 export { TASK_STATUSES } from './types.js';
 export { runWorkerTask } from './worker-runner.js';
-export type { WorkerDeps } from './worker-runner.js';
+export type { WorkerDeps, WorkerResult } from './worker-runner.js';
+export { runReviewerTask, ReviewerVerdictError, REVIEWER_TOOL_NAMES } from './reviewer-runner.js';
+export type { ReviewerDeps, ReviewerInput, ReviewerOutcome } from './reviewer-runner.js';
+export type { ReviewVerdict, ReviewIssue, Severity, ReviewDecision } from './review-types.js';
+export { SEVERITIES } from './review-types.js';
+export { isWorkingTreeDirty, captureChangedFiles, commitPaths, REVIEW_DIFF_BUDGET } from './project-git.js';
+export type { ChangedFiles, CommitResult } from './project-git.js';
+export { buildCommitMessage } from './commit-message.js';
+export type { CommitMessageInput } from './commit-message.js';

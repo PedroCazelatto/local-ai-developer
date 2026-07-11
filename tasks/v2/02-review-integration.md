@@ -1,4 +1,13 @@
-> **Status:** ⬜ Not started
+> **Status:** ✅ Completed (2026-07-11)
+>
+> **As built (user-approved):** git diff-capture runs **host-side** (`src/core/session/project-git.ts`,
+> like `showTouchedFiles`) — the node:24-slim sandbox ships no git and these are orchestrator actions,
+> not model tool calls. **Dirty tree → halt** the run at a task's start (each review isolates exactly
+> that task's changes); a fresh scaffold must be committed first. Test results captured from the
+> Worker's last `run_in_project` (`WorkerResult`). Verdict rendered in
+> `src/interface/review-prompt.ts`; the accept/send-back/skip prompt is readline-based (matches
+> `/run`'s pattern, avoids fighting clack for stdin). Logic verified with throwaway scripts; live
+> `run start` acceptance is the user's step.
 
 # 02 — Review integration
 

@@ -16,8 +16,11 @@ import { dispatchToolCall } from './dispatch.js';
 import { SessionMemory } from './memory.js';
 import { processMessage as processTurns } from './turn-loop.js';
 import type { TurnContext } from './turn-loop.js';
+import type { ReviewerInput, ReviewerOutcome } from './reviewer-runner.js';
+import { runReviewerTask } from './reviewer-runner.js';
 import type { Task } from './types.js';
 import { runWorkerTask } from './worker-runner.js';
+import type { WorkerResult } from './worker-runner.js';
 
 const NO_TOKENS: TokenCounts = { promptTokens: null, evalTokens: null };
 
@@ -89,10 +92,10 @@ export class SessionOrchestrator implements TurnContext {
   }
 
   /**
-   * Spawn a FRESH, isolated Worker window for one backlog task (V1/10) and return its summary. The
+   * Spawn a FRESH, isolated Worker window for one backlog task (V1/10) and return its result. The
    * window never touches the active phase's history; its tool calls are audited as phase "worker".
    */
-  runWorkerTask(task: Task, specSlice: string): Promise<string> {
+  runWorkerTask(task: Task, specSlice: string): Promise<WorkerResult> {
     return runWorkerTask(
       {
         llm: this.llm,
@@ -104,6 +107,27 @@ export class SessionOrchestrator implements TurnContext {
       task,
       specSlice,
     );
+  }
+
+  /**
+   * Spawn a FRESH, isolated Reviewer window (V2/01) to judge one Worker attempt and return its
+   * validated verdict + exact tokens. Isolated from every phase history and from the Worker's, so it
+   * judges independently. Surfaces the Reviewer's exact token usage to the status line (never
+   * estimated). Throws ReviewerVerdictError if the Reviewer produced no usable verdict.
+   */
+  async runReviewerTask(input: ReviewerInput): Promise<ReviewerOutcome> {
+    const outcome = await runReviewerTask(
+      {
+        llm: this.llm,
+        tools: this.tools,
+        sandbox: this.sandbox,
+        projectName: this.project,
+        projectPath: this.projectPath,
+      },
+      input,
+    );
+    this.lastTokens = outcome.tokens;
+    return outcome;
   }
 
   // ---------------------------------------------------------------- TurnContext seam (turn-loop)
