@@ -1,52 +1,33 @@
-// /run <selector> (V1/10 + V2/02–03) — the execution trigger. Runs backlog tasks SEQUENTIALLY (no
-// parallelism), a FRESH Worker window per task, then a FRESH Reviewer window that judges the Worker's
-// output (V2/01). The verdict is surfaced to the user, who decides accept / send back / skip:
-// - accept    → commit the reviewed changed-files set to the project repo (V2/03) + mark the task done
-// - send back → leave the work uncommitted; the user re-engages the Worker manually; task stays open
-// - skip      → leave uncommitted, task stays open
-// SINGLE PASS: after one verdict, control returns to the user — no automatic re-spawn (that, plus
-// raise_blocker and Retro, is V3). Selector: `next` (top runnable), a task id, a comma list, or `all`.
+// /run <selector> (V3/01) — the execution trigger. Runs backlog tasks SEQUENTIALLY (no parallelism);
+// each task goes through the bounded implement→test→review→fix loop (runTaskLoop): a PERSISTENT
+// Worker window across up to 5 rounds, a FRESH Reviewer each round, AUTO-COMMIT on a pass, escalate
+// after 5 with nothing committed. The user is pulled in only on an escalation or a blocker — not on
+// every round (that was V2's accept/send-back/skip gate). Selector: `next` (top runnable), a task id,
+// a comma list, or `all`.
 
 import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 
+import type { TokenCounts } from '../../core/llm/index.js';
 import * as renderer from '../../core/ui/renderer.js';
 import {
   allTasks,
-  BACKLOG_DIRNAME,
   BacklogError,
-  buildCommitMessage,
-  captureChangedFiles,
-  commitPaths,
   findTask,
   isWorkingTreeDirty,
   levelDocs,
   nextRunnableTasks,
   readBacklog,
-  setTaskStatus,
 } from '../../core/session/index.js';
-import type {
-  Backlog,
-  ReviewDecision,
-  ReviewerInput,
-  ReviewerOutcome,
-  Task,
-  WorkerResult,
-} from '../../core/session/index.js';
+import type { Backlog, Task, TaskLoopReporter, TaskLoopResult } from '../../core/session/index.js';
 import { renderVerdict } from '../review-prompt.js';
 
 /** The slice of the orchestrator /run needs — satisfied structurally by SessionOrchestrator. */
 export interface RunOrchestrator {
   readonly project: string;
   readonly projectPath: string;
-  runWorkerTask(task: Task, specSlice: string): Promise<WorkerResult>;
-  runReviewerTask(input: ReviewerInput): Promise<ReviewerOutcome>;
-}
-
-/** Discrete prompts /run needs from the REPL (readline-backed, to avoid fighting clack for stdin). */
-export interface RunPrompts {
-  /** Collect the accept / send-back / skip decision after a verdict. null ⇒ treated as send back. */
-  askDecision(question: string): Promise<ReviewDecision | null>;
+  // runTaskLoop: the V3/01 implement→test→review→fix controller for one task; auto-commits on pass.
+  runTaskLoop(task: Task, specSlice: string, reporter: TaskLoopReporter): Promise<TaskLoopResult>;
 }
 
 const SPEC_ARCH_LIMIT = 2500;
@@ -109,110 +90,63 @@ function resolveSelector(backlog: Backlog, selector: string): string[] {
   return selector.split(',').map((s) => s.trim()).filter((s) => s !== '');
 }
 
-/**
- * Commit the accepted changed-files set (V2/03) and mark the task done, or report a recoverable
- * failure and leave the tree dirty + the task pending. Only ever called on an explicit user accept.
- */
-function acceptAndCommit(orch: RunOrchestrator, task: Task, outcome: ReviewerOutcome, files: string[]): void {
-  const message = buildCommitMessage({
-    taskId: task.id,
-    taskTitle: task.title,
-    type: 'feat',
-    reviewerSummary: outcome.verdict.summary,
-  });
-  // Mark the task done BEFORE committing, and stage its backlog file WITH the reviewed change, so the
-  // commit records `status: done` and the working tree is CLEAN afterwards. Writing done AFTER the
-  // commit (the old order) left backlog/<id>.md dirty — which halted the next task in a batch (the
-  // dirty-tree guard) and committed a stale `in_progress` status. setTaskStatus(in_progress) at task
-  // start already put this file in `files`; add it defensively so the commit is correct regardless.
-  setTaskStatus(orch.projectPath, task.id, 'done');
-  const backlogRel = `${BACKLOG_DIRNAME}/${task.id}.md`;
-  const staged = files.includes(backlogRel) ? files : [...files, backlogRel];
-
-  const commit = commitPaths(orch.projectPath, message, staged);
-  if (commit.committed) {
-    renderer.systemMessage(`✓ ${task.id} committed ${commit.sha ?? ''} — ${commit.files.length} file(s) — and marked done.`);
-    return;
-  }
-  // Commit failed (e.g. a refused out-of-project path → global rule edits are never auto-committed).
-  // Revert the status so the task stays runnable and the dirty tree honestly reflects "not committed".
-  setTaskStatus(orch.projectPath, task.id, 'pending');
-  renderer.errorLine(`⚠ Commit failed for ${task.id}: ${commit.error ?? 'unknown error'} Left uncommitted + pending.`);
+/** Exact loop-cost line — never a length estimate; says "not reported" when a metric was omitted. */
+function tokenCostLine(tokens: TokenCounts): string {
+  const prompt = tokens.promptTokens === null ? 'not reported' : String(tokens.promptTokens);
+  const evalT = tokens.evalTokens === null ? 'not reported' : String(tokens.evalTokens);
+  return `loop cost — prompt ${prompt}, completion ${evalT} tokens (exact, summed over all rounds)`;
 }
 
-/** Run one already-eligible task: Worker → capture diff → Reviewer → verdict → user decision. */
-async function runOneTask(orch: RunOrchestrator, task: Task, prompts: RunPrompts): Promise<void> {
-  setTaskStatus(orch.projectPath, task.id, 'in_progress');
+/** Render the loop's terminal outcome: passed (committed), blocked (question), or escalated (feedback). */
+function renderOutcome(result: TaskLoopResult): void {
+  const cost = tokenCostLine(result.tokens);
+  if (result.outcome === 'passed') {
+    renderer.systemMessage(
+      `✓ ${result.taskId} PASSED in ${result.rounds} round(s) — committed ${result.commit ?? '(no sha)'} + marked done · ${cost}`,
+    );
+    return;
+  }
+  if (result.outcome === 'blocked') {
+    renderer.errorLine(`⛔ ${result.taskId} BLOCKED at round ${result.rounds}: ${result.question ?? ''}`);
+    renderer.systemMessage(`Answer the blocker, then re-run ${result.taskId}. · ${cost}`);
+    return;
+  }
+  // escalated — 5 rounds with no pass (or an empty diff / no verdict). Nothing was committed.
+  renderer.errorLine(
+    `⚠ ${result.taskId} ESCALATED after ${result.rounds} round(s) without a pass — left uncommitted for you to inspect.`,
+  );
+  if (result.lastFeedback !== undefined && result.lastFeedback.trim() !== '') {
+    renderer.systemMessage(`Last Reviewer feedback:\n${result.lastFeedback.trim()}`);
+  }
+  renderer.systemMessage(cost);
+}
+
+/** The UI the loop reports progress through (injected — the core loop hard-wires no renderer). */
+function buildReporter(task: Task): TaskLoopReporter {
+  return {
+    roundStarted: (round, maxRounds) => renderer.systemMessage(`▶ Round ${round}/${maxRounds} — ${task.id}`),
+    filesChanged: (status) => renderer.systemMessage(`Files changed:\n${status}`),
+    // renderVerdict: PASS/FAIL headline, summary, issues by severity, exact Reviewer tokens (V2/02).
+    verdictReady: (verdict, changedCount, tokens) =>
+      renderVerdict(verdict, { taskId: task.id, taskTitle: task.title, changedCount, tokens }),
+  };
+}
+
+/** Run one already-eligible task through the V3/01 fix loop and render its terminal outcome. */
+async function runOneTask(orch: RunOrchestrator, task: Task): Promise<void> {
   const specSlice = buildSpecSlice(orch.projectPath, task);
-
-  let worker: WorkerResult;
+  let result: TaskLoopResult;
   try {
-    worker = await orch.runWorkerTask(task, specSlice);
+    // runTaskLoop: persistent Worker across ≤5 rounds, fresh Reviewer each round, auto-commit on pass.
+    result = await orch.runTaskLoop(task, specSlice, buildReporter(task));
   } catch (err) {
-    setTaskStatus(orch.projectPath, task.id, 'pending');
-    renderer.errorLine(`Worker failed on ${task.id}: ${messageOf(err)}`);
+    renderer.errorLine(`Task loop failed on ${task.id}: ${messageOf(err)}. Left uncommitted.`);
     return;
   }
-
-  if (worker.summary.trim() !== '') {
-    renderer.systemMessage(`— ${task.id} summary —`);
-    renderer.systemMessage(worker.summary.trim());
-  }
-
-  // Capture what the Worker changed (host git; the tree was clean at task start). No change ⇒ nothing
-  // to review, so don't spawn the Reviewer on an empty diff.
-  const changed = captureChangedFiles(orch.projectPath);
-  if (changed.files.length === 0) {
-    setTaskStatus(orch.projectPath, task.id, 'pending');
-    renderer.systemMessage(`${task.id}: the Worker changed no files — nothing to review. Left pending.`);
-    return;
-  }
-  renderer.systemMessage(`Files changed:\n${changed.status}`);
-
-  // Spawn a FRESH, isolated Reviewer (V2/01) seeded with the task + bounded diff + the Worker's tests.
-  let outcome: ReviewerOutcome;
-  try {
-    outcome = await orch.runReviewerTask({
-      task,
-      workerSummary: worker.summary,
-      changedFiles: changed.diff !== '' ? `${changed.status}\n\n${changed.diff}` : changed.status,
-      testResults: worker.lastTestRun ?? '',
-    });
-  } catch (err) {
-    setTaskStatus(orch.projectPath, task.id, 'pending');
-    renderer.errorLine(`Reviewer produced no verdict for ${task.id}: ${messageOf(err)}. Left pending (uncommitted).`);
-    return;
-  }
-
-  renderVerdict(outcome.verdict, {
-    taskId: task.id,
-    taskTitle: task.title,
-    changedCount: changed.files.length,
-    tokens: outcome.tokens,
-  });
-
-  // The USER decides — single pass, no auto re-spawn (V3). Only an explicit accept ever commits.
-  const question =
-    outcome.verdict.result === 'pass'
-      ? `Accept ${task.id} and commit?`
-      : `${task.id} did NOT pass review — accept anyway, send back, or skip?`;
-  const decision = await prompts.askDecision(question);
-
-  if (decision === 'accept') {
-    acceptAndCommit(orch, task, outcome, changed.files);
-    return;
-  }
-  // send back / skip / cancelled → never commit; leave the tree dirty for the user to continue.
-  setTaskStatus(orch.projectPath, task.id, 'pending');
-  const how = decision === 'skip' ? 'skipped' : 'sent back';
-  renderer.systemMessage(`${task.id} ${how} — left uncommitted + pending. Resolve/commit before the next run.`);
+  renderOutcome(result);
 }
 
-export async function runCommand(
-  args: readonly string[],
-  orch: RunOrchestrator,
-  prompts: RunPrompts,
-): Promise<void> {
+export async function runCommand(args: readonly string[], orch: RunOrchestrator): Promise<void> {
   const selector = args[0] ?? 'next';
 
   let backlog: Backlog;
@@ -266,6 +200,6 @@ export async function runCommand(
     }
 
     renderer.systemMessage(`▶ Running ${task.id}: ${task.title}`);
-    await runOneTask(orch, task, prompts);
+    await runOneTask(orch, task);
   }
 }

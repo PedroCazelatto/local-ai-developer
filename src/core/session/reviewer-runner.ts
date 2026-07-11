@@ -19,6 +19,7 @@ import { toolError } from '../../tools/index.js';
 import { SUBMIT_VERDICT, parseVerdict, submitVerdictTool } from '../../tools/submit-verdict.js';
 import type { SandboxClient } from '../container/index.js';
 import type { OllamaClient, Message, StreamHandle, TokenCounts, Tool, ToolCall } from '../llm/index.js';
+import { addTokenCounts } from './add-token-counts.js';
 import { appendAuditRow } from './audit.js';
 import type { ToolCallRecord } from './dispatch.js';
 import { dispatchToolCall } from './dispatch.js';
@@ -69,10 +70,18 @@ export interface ReviewerInput {
   readonly testResults: string;
 }
 
-/** The Reviewer's result: the validated verdict + the exact tokens from its final turn. */
+/** The Reviewer's result: the validated verdict + exact tokens (last turn AND the whole-window sum). */
 export interface ReviewerOutcome {
   readonly verdict: ReviewVerdict;
+  /** Exact tokens from the Reviewer's FINAL turn (its context size) — the status-line / per-round figure. */
   readonly tokens: TokenCounts;
+  /** Exact SUM across every turn of this Reviewer window — what the V3/01 loop folds into its total. */
+  readonly tokensTotal: TokenCounts;
+  /**
+   * Present only when the Reviewer raised a blocker (V3/02) instead of a plain verdict; the V3/01 loop
+   * short-circuits to `blocked` on it. Undefined here until V3/02 wires the raise_blocker tool.
+   */
+  readonly blocker?: { readonly question: string };
 }
 
 /** The Reviewer ended without a usable verdict (never submitted, or malformed past the re-prompt). */
@@ -97,6 +106,8 @@ class ReviewerWindow implements TurnContext {
   private readonly reviewerTools: Tool[];
   /** Exact token counts from the most recent Reviewer turn (nulls preserved — never estimated). */
   private lastTokens: TokenCounts = { promptTokens: null, evalTokens: null };
+  /** Running EXACT sum across every turn of this window (a null metric poisons the sum). */
+  private tokenSum: TokenCounts = { promptTokens: 0, evalTokens: 0 };
   /** The captured, validated verdict — null until submit_verdict succeeds. */
   private verdict: ReviewVerdict | null = null;
   /** Non-null once we give up after the re-prompt (holds the last rejection reason). */
@@ -128,6 +139,11 @@ class ReviewerWindow implements TurnContext {
     return this.lastTokens;
   }
 
+  /** Exact summed tokens across every turn this window ran (for the V3/01 whole-loop total). */
+  get tokensTotal(): TokenCounts {
+    return this.tokenSum;
+  }
+
   streamAsk(userInput: string): StreamHandle {
     this.messages.push({ role: 'user', content: userInput });
     return this.deps.llm.stream(this.messages, this.reviewerTools);
@@ -139,6 +155,8 @@ class ReviewerWindow implements TurnContext {
 
   onTokens(tokens: TokenCounts): void {
     this.lastTokens = tokens;
+    // Also accumulate across turns so the fix loop can sum the Reviewer's whole-window token cost.
+    this.tokenSum = addTokenCounts(this.tokenSum, tokens);
   }
 
   addAssistant(content: string, toolCalls?: ToolCall[]): void {
@@ -289,5 +307,5 @@ export async function runReviewerTask(deps: ReviewerDeps, input: ReviewerInput):
         `The Reviewer ended after ${REVIEWER_MAX_ROUNDS} rounds without calling ${SUBMIT_VERDICT} with a valid verdict.`,
     );
   }
-  return { verdict, tokens: window.tokens };
+  return { verdict, tokens: window.tokens, tokensTotal: window.tokensTotal };
 }

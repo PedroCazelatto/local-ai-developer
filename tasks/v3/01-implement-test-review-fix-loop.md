@@ -1,4 +1,4 @@
-> **Status:** ⬜ Not started
+> **Status:** ✅ Completed (2026-07-11)
 
 # 01 — Implement→test→review→fix loop
 

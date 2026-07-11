@@ -9,6 +9,7 @@ import { createToolContext } from '../../tools/index.js';
 import { truncateHeadTail } from '../../tools/index.js';
 import type { SandboxClient } from '../container/index.js';
 import type { OllamaClient, Message, StreamHandle, TokenCounts, Tool, ToolCall } from '../llm/index.js';
+import { addTokenCounts } from './add-token-counts.js';
 import { appendAuditRow } from './audit.js';
 import { dispatchToolCall } from './dispatch.js';
 import { processMessage } from './turn-loop.js';
@@ -17,7 +18,8 @@ import type { Task } from './types.js';
 
 // A test-first implement loop (write test → run → implement → run → summarize) needs more rounds
 // than an interactive chat turn, so give the Worker generous headroom before the loop cap trips.
-const WORKER_MAX_ROUNDS = 24;
+// Exported so the V3/01 fix loop reuses the SAME per-round budget it grants each interactive pass.
+export const WORKER_MAX_ROUNDS = 24;
 
 export interface WorkerDeps {
   readonly llm: OllamaClient;
@@ -44,18 +46,28 @@ const TEST_RUN_CAPTURE_LIMIT = 4000;
 /**
  * A single Worker window implementing the turn loop's TurnContext against its OWN messages array —
  * isolated from the session's per-phase histories (Foundation/06) and from other tasks. Tool calls
- * dispatch through the shared registry and are audited as phase "worker".
+ * dispatch through the shared registry and are audited as phase "worker". Reused ACROSS the V3/01 fix
+ * loop (created once per task, never reset between rounds); one class = one cohesive unit.
  */
-class WorkerWindow implements TurnContext {
+export class WorkerWindow implements TurnContext {
   readonly activePhase = 'worker';
   readonly messages: Message[];
   /** The last assistant turn with no tool calls — the Worker's summary to the user. */
   summary = '';
   /** The Worker's last run_in_project invocation (command + output tail), for the Reviewer's seed. */
   lastTestRun: string | null = null;
+  /** Running EXACT sum of every turn's tokens (a null metric poisons the sum — never estimated). */
+  private tokenSum: TokenCounts = { promptTokens: 0, evalTokens: 0 };
 
-  constructor(private readonly deps: WorkerDeps, systemPrompt: string) {
+  constructor(private readonly deps: WorkerDeps) {
+    // The window builds its own system prompt from rules/phases/worker.md (V1/01), read fresh here.
+    const systemPrompt = buildSystemPrompt(loadPhasePrompt('worker'), `Project: ${deps.projectName}`);
     this.messages = [{ role: 'system', content: systemPrompt }];
+  }
+
+  /** EXACT summed tokens across every turn of this window's whole life (all fix rounds). */
+  get tokens(): TokenCounts {
+    return this.tokenSum;
   }
 
   streamAsk(userInput: string): StreamHandle {
@@ -67,8 +79,9 @@ class WorkerWindow implements TurnContext {
     return this.deps.llm.stream(this.messages, this.deps.tools);
   }
 
-  onTokens(_tokens: TokenCounts): void {
-    // The Worker window's size isn't shown in the session status line; nothing to track here.
+  onTokens(tokens: TokenCounts): void {
+    // Sum exact counts across every turn so the V3/01 loop can report the Worker's whole-task cost.
+    this.tokenSum = addTokenCounts(this.tokenSum, tokens);
   }
 
   addAssistant(content: string, toolCalls?: ToolCall[]): void {
@@ -105,7 +118,7 @@ class WorkerWindow implements TurnContext {
 }
 
 /** Assemble the seed user message: the task definition + the spec slice + the Worker's marching orders. */
-function buildWorkerSeed(task: Task, specSlice: string): string {
+export function buildWorkerSeed(task: Task, specSlice: string): string {
   const deps = task.dependsOn.length > 0 ? task.dependsOn.join(', ') : 'none';
   return `You are implementing ONE task from the backlog. Implement exactly this task, test-first — no more, no less.
 
@@ -128,8 +141,7 @@ Rules for this task:
  * calls audited), and return its summary. The window is discarded when this resolves.
  */
 export async function runWorkerTask(deps: WorkerDeps, task: Task, specSlice: string): Promise<WorkerResult> {
-  const systemPrompt = buildSystemPrompt(loadPhasePrompt('worker'), `Project: ${deps.projectName}`);
-  const window = new WorkerWindow(deps, systemPrompt);
+  const window = new WorkerWindow(deps);
   await processMessage(window, buildWorkerSeed(task, specSlice), WORKER_MAX_ROUNDS);
   return { summary: window.summary, lastTestRun: window.lastTestRun };
 }

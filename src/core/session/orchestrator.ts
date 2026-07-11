@@ -16,11 +16,9 @@ import { dispatchToolCall } from './dispatch.js';
 import { SessionMemory } from './memory.js';
 import { processMessage as processTurns } from './turn-loop.js';
 import type { TurnContext } from './turn-loop.js';
-import type { ReviewerInput, ReviewerOutcome } from './reviewer-runner.js';
-import { runReviewerTask } from './reviewer-runner.js';
+import { runTaskLoop } from './run-task-loop.js';
+import type { TaskLoopReporter, TaskLoopResult } from './run-task-loop.type.js';
 import type { Task } from './types.js';
-import { runWorkerTask } from './worker-runner.js';
-import type { WorkerResult } from './worker-runner.js';
 
 const NO_TOKENS: TokenCounts = { promptTokens: null, evalTokens: null };
 
@@ -92,11 +90,14 @@ export class SessionOrchestrator implements TurnContext {
   }
 
   /**
-   * Spawn a FRESH, isolated Worker window for one backlog task (V1/10) and return its result. The
-   * window never touches the active phase's history; its tool calls are audited as phase "worker".
+   * Run the bounded implement→test→review→fix loop (V3/01) for one backlog task: a persistent Worker
+   * window across rounds, a FRESH Reviewer each round, auto-commit on a `pass`, escalate after the
+   * hard cap of 5 rounds. Windows are isolated from every phase history and from each other. This
+   * just binds the session's infra deps; the caller supplies the reporter (UI is injected, not
+   * hard-wired). Never touches the active phase's history.
    */
-  runWorkerTask(task: Task, specSlice: string): Promise<WorkerResult> {
-    return runWorkerTask(
+  runTaskLoop(task: Task, specSlice: string, reporter: TaskLoopReporter): Promise<TaskLoopResult> {
+    return runTaskLoop(
       {
         llm: this.llm,
         tools: this.tools,
@@ -106,28 +107,8 @@ export class SessionOrchestrator implements TurnContext {
       },
       task,
       specSlice,
+      reporter,
     );
-  }
-
-  /**
-   * Spawn a FRESH, isolated Reviewer window (V2/01) to judge one Worker attempt and return its
-   * validated verdict + exact tokens. Isolated from every phase history and from the Worker's, so it
-   * judges independently. Surfaces the Reviewer's exact token usage to the status line (never
-   * estimated). Throws ReviewerVerdictError if the Reviewer produced no usable verdict.
-   */
-  async runReviewerTask(input: ReviewerInput): Promise<ReviewerOutcome> {
-    const outcome = await runReviewerTask(
-      {
-        llm: this.llm,
-        tools: this.tools,
-        sandbox: this.sandbox,
-        projectName: this.project,
-        projectPath: this.projectPath,
-      },
-      input,
-    );
-    this.lastTokens = outcome.tokens;
-    return outcome;
   }
 
   // ---------------------------------------------------------------- TurnContext seam (turn-loop)

@@ -25,6 +25,8 @@ export { runWorkerTask } from './worker-runner.js';
 export type { WorkerDeps, WorkerResult } from './worker-runner.js';
 export { runReviewerTask, ReviewerVerdictError, REVIEWER_TOOL_NAMES } from './reviewer-runner.js';
 export type { ReviewerDeps, ReviewerInput, ReviewerOutcome } from './reviewer-runner.js';
+export { runTaskLoop, MAX_ROUNDS } from './run-task-loop.js';
+export type { TaskLoopResult, TaskLoopOutcome, TaskLoopDeps, TaskLoopReporter } from './run-task-loop.type.js';
 export type { ReviewVerdict, ReviewIssue, Severity, ReviewDecision } from './review-types.js';
 export { SEVERITIES } from './review-types.js';
 export { isWorkingTreeDirty, captureChangedFiles, commitPaths, REVIEW_DIFF_BUDGET } from './project-git.js';

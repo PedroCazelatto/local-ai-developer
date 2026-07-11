@@ -6,17 +6,11 @@
 // The one-time clearScreen() at boot wipes launcher noise; the status bar reserves the bottom row
 // (see status-bar.ts) but the conversation and input stay in the scrolling area, copyable as ever.
 
-import { createInterface, type Interface as ReadlineInterface } from 'node:readline/promises';
+import { createInterface } from 'node:readline/promises';
 import path from 'node:path';
 import { stdin, stdout } from 'node:process';
 
-import type {
-  ReviewDecision,
-  ReviewerInput,
-  ReviewerOutcome,
-  Task,
-  WorkerResult,
-} from '../core/session/index.js';
+import type { Task, TaskLoopReporter, TaskLoopResult } from '../core/session/index.js';
 import * as renderer from '../core/ui/renderer.js';
 import * as statusBar from '../core/ui/status-bar.js';
 import { stopThinking } from '../core/ui/spinner.js';
@@ -39,10 +33,8 @@ export interface ReplOrchestrator {
   readonly lastTurnTokenTotal: number | null;
   /** Run the full turn loop for a chat message (streams output + dispatches tools). */
   processMessage(userInput: string): Promise<void>;
-  /** Spawn a fresh Worker window for a backlog task and return its result (V1/10). */
-  runWorkerTask(task: Task, specSlice: string): Promise<WorkerResult>;
-  /** Spawn a fresh, isolated Reviewer window to judge a Worker attempt (V2/01). */
-  runReviewerTask(input: ReviewerInput): Promise<ReviewerOutcome>;
+  /** Run the V3/01 implement→test→review→fix loop for a backlog task (auto-commits on pass). */
+  runTaskLoop(task: Task, specSlice: string, reporter: TaskLoopReporter): Promise<TaskLoopResult>;
   /** Switch active phase; throws a clear Error on an unknown phase (REPL turns it into a line). */
   switchPhase(name: string): void;
   /** Phase names available for /swap, for the unknown-phase error message. */
@@ -94,7 +86,7 @@ export async function runRepl(orch: ReplOrchestrator): Promise<void> {
       // to `main().catch` (boot failures, Node runtime faults) end the app, printing to the console.
       try {
         if (line.startsWith('/')) {
-          if (await handleCommand(orch, line, rl)) break; // /exit
+          if (await handleCommand(orch, line)) break; // /exit
           continue;
         }
         await orch.processMessage(line);
@@ -121,29 +113,16 @@ function updateStatus(orch: ReplOrchestrator): void {
   statusBar.set(`${orch.project} · ${orch.activePhase} · ${orch.model} · ${tokens}/${orch.numCtx} tok`);
 }
 
-/**
- * Accept / send-back / skip prompt on the existing readline (no clack — avoids fighting readline for
- * stdin, matching V1's yes/no pattern). An unrecognized / empty answer returns null, which /run
- * treats as "send back" (the safe choice: never commits).
- */
-async function askReviewDecision(rl: ReadlineInterface, question: string): Promise<ReviewDecision | null> {
-  const answer = (await rl.question(`${question} [a=accept / s=send back / k=skip] `)).trim().toLowerCase();
-  if (answer === 'a' || answer === 'accept') return 'accept';
-  if (answer === 's' || answer === 'send back' || answer === 'sendback' || answer === 'send') return 'sendBack';
-  if (answer === 'k' || answer === 'skip') return 'skip';
-  return null;
-}
-
 /** Dispatch a `/command`. Returns true only for `/exit` (signals the loop to stop). */
-async function handleCommand(orch: ReplOrchestrator, input: string, rl: ReadlineInterface): Promise<boolean> {
+async function handleCommand(orch: ReplOrchestrator, input: string): Promise<boolean> {
   const [command, ...rest] = input.slice(1).split(/\s+/);
   switch (command) {
     case 'exit':
       return true;
     case 'run':
-      // Execution trigger (V1/10 + V2): run tasks sequentially — Worker → Reviewer → verdict — and
-      // gate on the user's accept / send-back / skip between them.
-      await runCommand(rest, orch, { askDecision: (question) => askReviewDecision(rl, question) });
+      // Execution trigger (V3/01): run tasks sequentially through the implement→test→review→fix loop
+      // — auto-committing each pass; the user is pulled in only on an escalation or a blocker.
+      await runCommand(rest, orch);
       return false;
     case 'new-project': {
       // A user command, never a model tool — scaffolds a NEW project on disk (the session stays
