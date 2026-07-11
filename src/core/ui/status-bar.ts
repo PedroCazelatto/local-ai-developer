@@ -70,6 +70,19 @@ export function set(text: string): void {
   if (rows !== null) paint(rows);
 }
 
+/**
+ * Repaint the current text on the reserved row without changing it. The caller uses this to restore
+ * the bar after something erased it: Node's `readline` writes `ESC[0J` (erase-to-end-of-display) on
+ * every prompt refresh, which wipes the reserved bottom row — DECSTBM fences the row off from
+ * SCROLLING but not from an explicit erase. So the REPL repaints after each prompt draw / keypress
+ * (see repl.ts). No-op until enable() succeeds.
+ */
+export function repaint(): void {
+  if (!active) return;
+  const rows = terminalRows();
+  if (rows !== null) paint(rows);
+}
+
 /** Release the reserved row: drop the resize listener, reset the scroll region, clear the bar. */
 export function disable(): void {
   if (!active) return;

@@ -47,6 +47,22 @@ export async function runRepl(orch: ReplOrchestrator): Promise<void> {
   statusBar.enable(); // reserve the bottom row BEFORE the header so all output scrolls above it
   renderer.header();
   const rl = createInterface({ input: stdin, output: stdout });
+
+  // readline erases from the cursor to the bottom of the screen (`ESC[0J`) on every line refresh —
+  // prompt draw, backspace, arrow keys, history — which wipes the pinned bottom row. Repaint the bar
+  // after each keypress so it survives editing. setImmediate defers the repaint to after readline has
+  // finished writing its refreshed line this tick; the flag coalesces a burst (e.g. a paste) into one.
+  let repaintScheduled = false;
+  const repaintBar = (): void => {
+    if (repaintScheduled) return;
+    repaintScheduled = true;
+    setImmediate(() => {
+      repaintScheduled = false;
+      statusBar.repaint();
+    });
+  };
+  if (stdin.isTTY) stdin.on('keypress', repaintBar);
+
   try {
     while (true) {
       // Repaint the pinned status line before each prompt: after a turn it carries fresh tokens,
@@ -57,7 +73,9 @@ export async function runRepl(orch: ReplOrchestrator): Promise<void> {
       // input left to read, so end the session gracefully instead of spinning on a dead stream.
       let line: string;
       try {
-        line = (await rl.question('› ')).trim();
+        const answer = rl.question('› ');
+        statusBar.repaint(); // readline drew the prompt (and erased the bar) synchronously — restore it
+        line = (await answer).trim();
       } catch {
         break;
       }
@@ -79,6 +97,7 @@ export async function runRepl(orch: ReplOrchestrator): Promise<void> {
     }
   } finally {
     stopThinking();
+    if (stdin.isTTY) stdin.removeListener('keypress', repaintBar);
     statusBar.disable(); // release the reserved row and restore normal scrolling
     rl.close();
   }
@@ -86,10 +105,11 @@ export async function runRepl(orch: ReplOrchestrator): Promise<void> {
 
 /**
  * Repaint the pinned status line (bottom row, below the input): the full session context —
- * `project · phase · model · exact tokens / num_ctx`. Tokens are the exact last-turn total or `?`.
+ * `project · phase · model · exact tokens / num_ctx`. Tokens are the exact last-turn total, or `0`
+ * before the first turn reports counts (Ollama hasn't returned any yet).
  */
 function updateStatus(orch: ReplOrchestrator): void {
-  const tokens = orch.lastTurnTokenTotal === null ? '?' : String(orch.lastTurnTokenTotal);
+  const tokens = orch.lastTurnTokenTotal === null ? '0' : String(orch.lastTurnTokenTotal);
   statusBar.set(`${orch.project} · ${orch.activePhase} · ${orch.model} · ${tokens}/${orch.numCtx} tok`);
 }
 
