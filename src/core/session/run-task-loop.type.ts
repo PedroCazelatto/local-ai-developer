@@ -33,6 +33,8 @@ export interface TaskLoopResult {
   readonly commit?: string;
   /** The Reviewer's blocker question — present only when outcome === "blocked" (V3/02). */
   readonly question?: string;
+  /** The persisted blocker id (`${taskId}#${n}`) — present only when outcome === "blocked" (V3/02). */
+  readonly blockerId?: string;
   /** The last Reviewer feedback — present when outcome === "escalated", so a human sees why. */
   readonly lastFeedback?: string;
   /**

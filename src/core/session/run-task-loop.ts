@@ -74,15 +74,17 @@ export async function runTaskLoop(
       // structured input below — never the Worker's internal turns (CLAUDE.md: histories are isolated).
       const outcome = await runReviewerTask(deps, {
         task,
+        round,
         workerSummary: worker.summary,
         changedFiles: changed.diff !== '' ? `${changed.status}\n\n${changed.diff}` : changed.status,
         testResults: worker.lastTestRun ?? '',
       });
       reviewerTokens = addTokenCounts(reviewerTokens, outcome.tokensTotal);
-      reporter.verdictReady(outcome.verdict, changed.files.length, outcome.tokens);
 
-      // Blocker short-circuit (V3/02 populates outcome.blocker): halt immediately, before any fix
-      // round, committing nothing. Undefined until V3/02 wires raise_blocker, so this stays dormant.
+      // Blocker short-circuit (V3/02): the Reviewer raised a blocker INSTEAD of a verdict — the task
+      // itself is unjudgeable. Halt immediately, BEFORE any verdict handling or fix round, committing
+      // nothing. The `raised` row is already durable (the Reviewer window persisted it); the /run
+      // scheduler reverts the tree and moves on to other runnable tasks.
       if (outcome.blocker) {
         setTaskStatus(deps.projectPath, task.id, 'blocked');
         return {
@@ -90,13 +92,30 @@ export async function runTaskLoop(
           outcome: 'blocked',
           rounds: round,
           question: outcome.blocker.question,
+          blockerId: outcome.blocker.id,
           tokens: addTokenCounts(reviewerTokens, worker.tokens),
         };
       }
 
-      if (outcome.verdict.result === 'pass') {
+      // Past the blocker check, runReviewerTask guarantees a verdict (it returns exactly one of the
+      // two). Narrow the optional here, and defensively escalate rather than crash if a future change
+      // ever returns neither.
+      const verdict = outcome.verdict;
+      if (verdict === undefined) {
+        setTaskStatus(deps.projectPath, task.id, 'pending');
+        return {
+          taskId: task.id,
+          outcome: 'escalated',
+          rounds: round,
+          lastFeedback: 'The Reviewer returned neither a verdict nor a blocker.',
+          tokens: addTokenCounts(reviewerTokens, worker.tokens),
+        };
+      }
+      reporter.verdictReady(verdict, changed.files.length, outcome.tokens);
+
+      if (verdict.result === 'pass') {
         // commitPassedTask: flip status→done, stage the reviewed set + backlog file, commit (V2/03).
-        const commit = commitPassedTask(deps.projectPath, task, outcome.verdict, changed.files);
+        const commit = commitPassedTask(deps.projectPath, task, verdict, changed.files);
         return {
           taskId: task.id,
           outcome: 'passed',
@@ -107,7 +126,7 @@ export async function runTaskLoop(
       }
 
       // fail → carry the Reviewer's feedback into the next Worker turn (and out, if this was round 5).
-      lastFeedback = formatReviewFeedback(outcome.verdict);
+      lastFeedback = formatReviewFeedback(verdict);
     }
   } catch (err) {
     // Any mid-loop failure commits nothing; revert to pending so the task stays runnable. A Reviewer

@@ -67,6 +67,20 @@ export function isWorkingTreeDirty(projectPath: string): boolean {
   return runGit(projectPath, ['status', '--porcelain']).stdout.trim() !== '';
 }
 
+/**
+ * Discard every uncommitted change, restoring the tree to the last commit: revert tracked edits
+ * (`reset --hard HEAD`) and remove untracked files (`clean -fd`). Used after a task is BLOCKED (V3/02)
+ * so the NEXT task's review stays isolated — the blocked Worker's attempt is throwaway (a fresh Worker
+ * re-runs the task after the user answers). `-e .orchestrator` keeps session state (the just-written
+ * `raised` row + the audit log) even if a project forgot to git-ignore it; `clean` without `-x` also
+ * never removes git-ignored deps (node_modules, dist). Never throws — a git failure just leaves the
+ * tree dirty, and the /run dirty-tree guard then halts before the next task (the safe fallback).
+ */
+export function discardWorkingTreeChanges(projectPath: string): void {
+  runGit(projectPath, ['reset', '--hard', 'HEAD']);
+  runGit(projectPath, ['clean', '-fd', '-e', '.orchestrator']);
+}
+
 /** Render a new (untracked) file as a diff-style block, reading its content from the host fs. */
 function renderNewFile(projectPath: string, rel: string): string {
   const abs = path.join(projectPath, rel);

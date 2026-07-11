@@ -16,11 +16,14 @@
 import { buildSystemPrompt, loadPhasePrompt } from '../../context/index.js';
 import { createToolContext } from '../../tools/index.js';
 import { toolError } from '../../tools/index.js';
+import { RAISE_BLOCKER, raiseBlockerTool, validateBlockerRequest } from '../../tools/raise-blocker.js';
 import { SUBMIT_VERDICT, parseVerdict, submitVerdictTool } from '../../tools/submit-verdict.js';
 import type { SandboxClient } from '../container/index.js';
 import type { OllamaClient, Message, StreamHandle, TokenCounts, Tool, ToolCall } from '../llm/index.js';
 import { addTokenCounts } from './add-token-counts.js';
 import { appendAuditRow } from './audit.js';
+import { raiseBlocker } from './blocker-store.js';
+import type { RaisedBlocker } from './blocker-store.type.js';
 import type { ToolCallRecord } from './dispatch.js';
 import { dispatchToolCall } from './dispatch.js';
 import type { ReviewVerdict } from './review-types.js';
@@ -62,6 +65,8 @@ export interface ReviewerDeps {
 export interface ReviewerInput {
   /** The task under review — same definition + acceptance the Worker was seeded with. */
   readonly task: Task;
+  /** The fix-loop round (1..MAX_ROUNDS) being reviewed — stamped onto a raised blocker (V3/02). */
+  readonly round: number;
   /** The Worker's plain-text change summary (its final no-tool turn). */
   readonly workerSummary: string;
   /** Changed-files set / diff for the attempt; "" if not captured (Reviewer inspects the tree itself). */
@@ -70,18 +75,20 @@ export interface ReviewerInput {
   readonly testResults: string;
 }
 
-/** The Reviewer's result: the validated verdict + exact tokens (last turn AND the whole-window sum). */
+/**
+ * The Reviewer's result: EXACTLY ONE of `verdict` (it judged) or `blocker` (it raised a blocker
+ * instead), plus exact tokens (last turn AND the whole-window sum). The V3/01 loop short-circuits to
+ * `blocked` when `blocker` is present, otherwise acts on the verdict.
+ */
 export interface ReviewerOutcome {
-  readonly verdict: ReviewVerdict;
+  /** The validated verdict — present unless the Reviewer raised a blocker (V3/02) instead. */
+  readonly verdict?: ReviewVerdict;
   /** Exact tokens from the Reviewer's FINAL turn (its context size) — the status-line / per-round figure. */
   readonly tokens: TokenCounts;
   /** Exact SUM across every turn of this Reviewer window — what the V3/01 loop folds into its total. */
   readonly tokensTotal: TokenCounts;
-  /**
-   * Present only when the Reviewer raised a blocker (V3/02) instead of a plain verdict; the V3/01 loop
-   * short-circuits to `blocked` on it. Undefined here until V3/02 wires the raise_blocker tool.
-   */
-  readonly blocker?: { readonly question: string };
+  /** Present INSTEAD of a verdict when the Reviewer raised a blocker (V3/02); already persisted. */
+  readonly blocker?: RaisedBlocker;
 }
 
 /** The Reviewer ended without a usable verdict (never submitted, or malformed past the re-prompt). */
@@ -110,23 +117,38 @@ class ReviewerWindow implements TurnContext {
   private tokenSum: TokenCounts = { promptTokens: 0, evalTokens: 0 };
   /** The captured, validated verdict — null until submit_verdict succeeds. */
   private verdict: ReviewVerdict | null = null;
+  /** The captured blocker — null until raise_blocker succeeds; set INSTEAD of a verdict (V3/02). */
+  private blockerRaised: RaisedBlocker | null = null;
   /** Non-null once we give up after the re-prompt (holds the last rejection reason). */
   private failure: string | null = null;
   /** How many times submit_verdict was called with an invalid payload. */
   private verdictAttempts = 0;
 
-  constructor(private readonly deps: ReviewerDeps, systemPrompt: string) {
+  constructor(
+    private readonly deps: ReviewerDeps,
+    systemPrompt: string,
+    /** The task under review + the round — stamped onto a raised blocker's durable record (V3/02). */
+    private readonly task: Task,
+    private readonly round: number,
+  ) {
     this.messages = [{ role: 'system', content: systemPrompt }];
     const allowed = deps.tools.filter((tool) => {
       const name = tool.function.name;
       return name !== undefined && REVIEWER_TOOL_NAMES.includes(name);
     });
-    this.reviewerTools = [...allowed, submitVerdictTool];
+    // submit_verdict (the normal exit) + raise_blocker (the halt exit) are BOTH phase-scoped here and
+    // never in the global registry — so the Worker's tool list can't contain either.
+    this.reviewerTools = [...allowed, submitVerdictTool, raiseBlockerTool];
   }
 
   /** The validated verdict, or null if the Reviewer never produced a usable one. */
   get result(): ReviewVerdict | null {
     return this.verdict;
+  }
+
+  /** The blocker the Reviewer raised (V3/02), or null if it judged normally. */
+  get blocker(): RaisedBlocker | null {
+    return this.blockerRaised;
   }
 
   /** Why the Reviewer failed to produce a verdict (set only on the give-up path). */
@@ -171,14 +193,17 @@ class ReviewerWindow implements TurnContext {
     this.messages.push({ role: 'tool', content: result, tool_name: toolName });
   }
 
-  /** Terminal once the verdict is captured OR we gave up after the re-prompt — stops the turn loop. */
+  /** Terminal once a verdict OR a blocker is captured, or we gave up after the re-prompt — ends the loop. */
   isComplete(): boolean {
-    return this.verdict !== null || this.failure !== null;
+    return this.verdict !== null || this.blockerRaised !== null || this.failure !== null;
   }
 
   async callTool(name: string, args: Record<string, unknown>): Promise<string> {
     if (name === SUBMIT_VERDICT) {
       return this.captureVerdict(args);
+    }
+    if (name === RAISE_BLOCKER) {
+      return this.captureBlocker(args);
     }
     if (REVIEWER_TOOL_NAMES.includes(name)) {
       const ctx = createToolContext({
@@ -222,6 +247,36 @@ class ReviewerWindow implements TurnContext {
     );
     const output = typeof err.content === 'string' ? err.content : JSON.stringify(err.content);
     this.audit(SUBMIT_VERDICT, args, err.exitStatus ?? -1, output, err.error ?? parsed.error, start);
+    return output;
+  }
+
+  /**
+   * Capture a raise_blocker call (V3/02): gate it (Reviewer-only + non-empty question), and on
+   * acceptance persist the durable `raised` row (blockers.jsonl) and set `blockerRaised` so the
+   * window becomes terminal — the loop then halts as `blocked`, running no fix round and committing
+   * nothing. An empty question is a RECOVERABLE structured error: the turn continues so the Reviewer
+   * can re-call with a real question (it does NOT crash or halt).
+   */
+  private captureBlocker(args: Record<string, unknown>): string {
+    const start = performance.now();
+    const request = validateBlockerRequest(this.activePhase, args['question']);
+    if (!request.ok) {
+      const output = JSON.stringify({ ok: false, error: request.error, message: request.message });
+      this.audit(RAISE_BLOCKER, args, -1, output, request.message, start);
+      return output;
+    }
+    // Durable BEFORE we go terminal: the raised row must survive even if everything downstream fails.
+    const raised = raiseBlocker(this.deps.projectPath, {
+      taskId: this.task.id,
+      round: this.round,
+      question: request.question,
+    });
+    this.blockerRaised = raised;
+    const output = JSON.stringify({
+      ok: true,
+      blocker: { id: raised.id, question: raised.question, raisedAt: raised.raisedAt },
+    });
+    this.audit(RAISE_BLOCKER, args, 0, output, null, start);
     return output;
   }
 
@@ -287,7 +342,8 @@ How to review:
 - Do NOT trust the summary alone — read the changed files and the tests, and reason about correctness + edge cases.
 - When in doubt, re-run the tests/build with run_in_project rather than trusting the transcript.
 - You have READ/INSPECT tools only (read_file, search_in_files, list_files, run_in_project, execute_command). You cannot edit or commit — you judge.
-- When done, call ${SUBMIT_VERDICT} EXACTLY ONCE. result "pass" only if BOTH axes pass; any blocker/major issue means "fail"; every issue must be concrete and name the offending file + fix direction. Do not call any tool after ${SUBMIT_VERDICT}.`;
+- When done, call ${SUBMIT_VERDICT} EXACTLY ONCE. result "pass" only if BOTH axes pass; any blocker/major issue means "fail"; every issue must be concrete and name the offending file + fix direction. Do not call any tool after ${SUBMIT_VERDICT}.
+- If the TASK ITSELF is unjudgeable — ambiguous, under-specified, self-contradictory, or conflicting with the architecture — call ${RAISE_BLOCKER} with a precise question INSTEAD of a verdict, immediately. That is for a broken task, not for code that is merely wrong (a wrong-code case is a "fail" verdict with fix feedback).`;
 }
 
 /**
@@ -297,8 +353,15 @@ How to review:
  */
 export async function runReviewerTask(deps: ReviewerDeps, input: ReviewerInput): Promise<ReviewerOutcome> {
   const systemPrompt = buildSystemPrompt(loadPhasePrompt('reviewer'), `Project: ${deps.projectName}`);
-  const window = new ReviewerWindow(deps, systemPrompt);
+  const window = new ReviewerWindow(deps, systemPrompt, input.task, input.round);
   await processMessage(window, buildReviewerSeed(input), REVIEWER_MAX_ROUNDS);
+
+  // A raised blocker takes precedence over any verdict: the Reviewer halted because the TASK is the
+  // problem, not the code. Return it INSTEAD of a verdict (already persisted) so the loop goes blocked.
+  const blocker = window.blocker;
+  if (blocker !== null) {
+    return { blocker, tokens: window.tokens, tokensTotal: window.tokensTotal };
+  }
 
   const verdict = window.result;
   if (verdict === null) {

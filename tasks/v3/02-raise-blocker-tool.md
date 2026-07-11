@@ -1,4 +1,18 @@
-> **Status:** ⬜ Not started
+> **Status:** ✅ Completed (2026-07-11)
+
+> **Implemented as (decisions that refine the plan below):**
+> - **Gating is phase-scoped, not registry-gated.** Like `submit_verdict` (V2/01), `raise_blocker`
+>   lives OUTSIDE the global registry and is offered only inside the Reviewer window
+>   (`reviewer-runner.ts`), so the Worker — sent the whole registry — literally cannot see it. The
+>   `not_authorized` result is a defense-in-depth guard in the shared handler (`validateBlockerRequest`);
+>   a stray call from another phase actually falls through dispatch as `unknown tool`.
+> - **Interactive /run is skip-and-continue, not pause.** On a blocker the task is marked `blocked`, its
+>   throwaway changes reverted (`discardWorkingTreeChanges`), and the run moves on to other runnable
+>   tasks (dependents skip naturally on unmet deps). When nothing runnable remains the run ends; the
+>   user answers with **`/answer <task-id> <text>`** (records the `resolved` row + re-queues
+>   `blocked→pending`) and re-runs. `/answer` never restarts the loop. (Retro spawn on answer is V3/03.)
+> - **Blocker ids are `${taskId}#${n}`** (a per-task question counter), not a ULID — no id dependency
+>   exists yet (V3/04's inbox). `blockers.jsonl` under `.orchestrator/`, append-only, replayed for state.
 
 # 02 — `raise_blocker` tool (Reviewer-only loop halt)
 

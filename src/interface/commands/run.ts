@@ -13,6 +13,7 @@ import * as renderer from '../../core/ui/renderer.js';
 import {
   allTasks,
   BacklogError,
+  discardWorkingTreeChanges,
   findTask,
   isWorkingTreeDirty,
   levelDocs,
@@ -108,7 +109,10 @@ function renderOutcome(result: TaskLoopResult): void {
   }
   if (result.outcome === 'blocked') {
     renderer.errorLine(`⛔ ${result.taskId} BLOCKED at round ${result.rounds}: ${result.question ?? ''}`);
-    renderer.systemMessage(`Answer the blocker, then re-run ${result.taskId}. · ${cost}`);
+    renderer.systemMessage(
+      `Persisted as ${result.blockerId ?? result.taskId}; its changes were reverted and the run continues ` +
+        `with other runnable tasks. Answer later with: /answer ${result.taskId} <your answer> · ${cost}`,
+    );
     return;
   }
   // escalated — 5 rounds with no pass (or an empty diff / no verdict). Nothing was committed.
@@ -132,8 +136,8 @@ function buildReporter(task: Task): TaskLoopReporter {
   };
 }
 
-/** Run one already-eligible task through the V3/01 fix loop and render its terminal outcome. */
-async function runOneTask(orch: RunOrchestrator, task: Task): Promise<void> {
+/** Run one already-eligible task through the V3/01 fix loop, render its outcome, and return it (or null on error). */
+async function runOneTask(orch: RunOrchestrator, task: Task): Promise<TaskLoopResult | null> {
   const specSlice = buildSpecSlice(orch.projectPath, task);
   let result: TaskLoopResult;
   try {
@@ -141,9 +145,10 @@ async function runOneTask(orch: RunOrchestrator, task: Task): Promise<void> {
     result = await orch.runTaskLoop(task, specSlice, buildReporter(task));
   } catch (err) {
     renderer.errorLine(`Task loop failed on ${task.id}: ${messageOf(err)}. Left uncommitted.`);
-    return;
+    return null;
   }
   renderOutcome(result);
+  return result;
 }
 
 export async function runCommand(args: readonly string[], orch: RunOrchestrator): Promise<void> {
@@ -167,6 +172,12 @@ export async function runCommand(args: readonly string[], orch: RunOrchestrator)
     return;
   }
 
+  // Task ids blocked during THIS run, for the closing summary. A blocker doesn't abort the run: the
+  // task is skipped, its changes reverted, and the loop moves on to whatever is still runnable (the
+  // user answers with /answer afterward, then re-runs). Its dependents fall out naturally — they wait
+  // on a task that isn't `done`, so the unmet-deps check below skips them.
+  const blockedThisRun: string[] = [];
+
   for (const id of ids) {
     // Reload each iteration: the user's done/pending decisions change what is now eligible.
     const current = readBacklog(orch.projectPath);
@@ -177,6 +188,10 @@ export async function runCommand(args: readonly string[], orch: RunOrchestrator)
     }
     if (task.status === 'done') {
       renderer.systemMessage(`Skipping ${id}: already done.`);
+      continue;
+    }
+    if (task.status === 'blocked') {
+      renderer.systemMessage(`Skipping ${id}: blocked, awaiting your /answer. Answer it, then /run again.`);
       continue;
     }
     const statusById = new Map(allTasks(current).map((t) => [t.id, t.status]));
@@ -190,6 +205,7 @@ export async function runCommand(args: readonly string[], orch: RunOrchestrator)
     // choice). A fresh scaffold is dirty (git init, no commit), so the user commits the baseline —
     // scaffold + backlog + spec — first; a sent-back/skipped prior task also leaves the tree dirty.
     // A dirty tree won't clear itself, so halt the whole run rather than mixing two tasks' changes.
+    // (A just-blocked task does NOT trip this: its changes are reverted below before we continue.)
     if (isWorkingTreeDirty(orch.projectPath)) {
       renderer.errorLine(
         `Halting before ${id}: the project working tree has uncommitted changes, so its review can't ` +
@@ -200,6 +216,21 @@ export async function runCommand(args: readonly string[], orch: RunOrchestrator)
     }
 
     renderer.systemMessage(`▶ Running ${task.id}: ${task.title}`);
-    await runOneTask(orch, task);
+    const result = await runOneTask(orch, task);
+
+    // On a blocker: revert the blocked Worker's throwaway attempt so the tree is clean for the next
+    // task (its review must stay isolated), then move on. The task is already marked `blocked` and the
+    // question persisted; the user answers it later and re-runs. A fresh Worker redoes the work then.
+    if (result?.outcome === 'blocked') {
+      discardWorkingTreeChanges(orch.projectPath);
+      blockedThisRun.push(task.id);
+    }
+  }
+
+  if (blockedThisRun.length > 0) {
+    renderer.systemMessage(
+      `Run finished with ${blockedThisRun.length} blocked task(s): ${blockedThisRun.join(', ')}. ` +
+        `Answer each with /answer <task-id> <text>, then /run again to retry them.`,
+    );
   }
 }

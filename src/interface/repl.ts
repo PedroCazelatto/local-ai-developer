@@ -14,6 +14,7 @@ import type { Task, TaskLoopReporter, TaskLoopResult } from '../core/session/ind
 import * as renderer from '../core/ui/renderer.js';
 import * as statusBar from '../core/ui/status-bar.js';
 import { stopThinking } from '../core/ui/spinner.js';
+import { answerCommand } from './commands/answer.js';
 import { newProjectCommand } from './commands/new-project.js';
 import { runCommand } from './commands/run.js';
 
@@ -123,6 +124,11 @@ async function handleCommand(orch: ReplOrchestrator, input: string): Promise<boo
       // Execution trigger (V3/01): run tasks sequentially through the implement→test→review→fix loop
       // — auto-committing each pass; the user is pulled in only on an escalation or a blocker.
       await runCommand(rest, orch);
+      return false;
+    case 'answer':
+      // Resolve a blocker the Reviewer raised (V3/02): record the answer + re-queue the task. Pass the
+      // raw line so the answer text keeps its spacing; the loop is stopped, so this is safe to run now.
+      answerCommand(input, orch.projectPath);
       return false;
     case 'new-project': {
       // A user command, never a model tool — scaffolds a NEW project on disk (the session stays

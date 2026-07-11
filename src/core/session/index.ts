@@ -29,7 +29,15 @@ export { runTaskLoop, MAX_ROUNDS } from './run-task-loop.js';
 export type { TaskLoopResult, TaskLoopOutcome, TaskLoopDeps, TaskLoopReporter } from './run-task-loop.type.js';
 export type { ReviewVerdict, ReviewIssue, Severity, ReviewDecision } from './review-types.js';
 export { SEVERITIES } from './review-types.js';
-export { isWorkingTreeDirty, captureChangedFiles, commitPaths, REVIEW_DIFF_BUDGET } from './project-git.js';
+export {
+  isWorkingTreeDirty,
+  discardWorkingTreeChanges,
+  captureChangedFiles,
+  commitPaths,
+  REVIEW_DIFF_BUDGET,
+} from './project-git.js';
 export type { ChangedFiles, CommitResult } from './project-git.js';
+export { raiseBlocker, resolveBlocker, openBlockerForTask, readBlockerRows } from './blocker-store.js';
+export type { RaisedBlocker, ResolvedBlocker, BlockerRow } from './blocker-store.type.js';
 export { buildCommitMessage } from './commit-message.js';
 export type { CommitMessageInput } from './commit-message.js';
