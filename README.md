@@ -14,19 +14,20 @@ All of this while not spending a penny on inference. Just using my RTX 3060 and 
 
 - Ollama App
 - Docker
-- Python 3 (latest LTS)
+- Node 24 LTS
 
 ## Commands
 
 ### Host
 
-- `.\run.ps1 install` — install everything
-- `.\run.ps1 start <project-name>` — start the orchestrator focused on _project-name_
-- `.\run.ps1 stop` — shut down Docker
+- `npm i` - install everything
+- `npm run sandbox:up` - start the Docker sandbox environment, where the project will be hosted
+- `npm run dev -- <project-name>` — start the orchestrator focused on _project-name_
+- `npm run sandbox:down` — shut down Docker
 
 ## What is the application?
 
-The main application is a Python Rich Terminal with an input and some commands.
+The main application is a Node Terminal with an input and some commands.
 
 Behind the terminal, a local model is used to create everything. As the Ollama API is stateless, each request contains it's own context window, and by playing with an array of contexts, we can create virtually infinite agents to work on the project.
 
@@ -40,7 +41,7 @@ So that is the principle behind the phases at this application:
 4. Worker
 5. Reviewer
 
-## In-app commands (Rich terminal)
+## In-app commands (Application terminal)
 
 - `/exit` — stop the application
 
@@ -65,11 +66,12 @@ Phase definitions live as Markdown in [rules/phases/](rules/phases/) (all curren
 
 I've selected some models to run locally, but you can choose the one that fits you the best:
 
-1. qwen2.5-coder:14b
-2. qwen3.5:27b
-3. qwen3-coder:30b
+1. qwen2.5-coder:3b
+2. qwen2.5-coder:14b
+3. qwen3.5:27b
+4. qwen3-coder:30b
 
-The model name is currently hardcoded in [main.py](main.py). Moving that choice to the terminal UI is planned.
+The model name is currently hardcoded in [config.ts](config.ts). Moving that choice to the terminal UI is planned.
 
 ## AI Inference
 
