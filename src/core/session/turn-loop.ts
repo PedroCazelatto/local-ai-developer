@@ -28,6 +28,12 @@ export interface TurnContext {
   addToolResult(toolName: string, result: string): void;
   /** Dispatch one tool call; returns a string result (recoverable errors included, never throws). */
   callTool(name: string, args: Record<string, unknown>): Promise<string>;
+  /**
+   * Optional: a spawned window that reaches a terminal state mid-turn (e.g. the Reviewer captured
+   * its verdict via submit_verdict) returns true here to stop the loop immediately, instead of
+   * running another turn. Absent/false for the interactive phases and the Worker.
+   */
+  isComplete?(): boolean;
 }
 
 /**
@@ -97,6 +103,11 @@ async function runTurn(ctx: TurnContext, start: () => StreamHandle): Promise<boo
     renderer.systemMessage(`→ tool: ${name}`);
     const result = await ctx.callTool(name, args);
     ctx.addToolResult(name, result);
+  }
+  // A spawned window can signal it reached its terminal result during this turn's tool calls (the
+  // Reviewer captured its verdict) — stop now rather than prompting for another turn.
+  if (ctx.isComplete?.()) {
+    return false;
   }
   return true;
 }

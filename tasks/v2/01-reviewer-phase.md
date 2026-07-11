@@ -1,4 +1,12 @@
-> **Status:** ⬜ Not started
+> **Status:** ✅ Completed (2026-07-11)
+>
+> **As built (user-approved):** verdict via the `submit_verdict` tool-call route (rides the existing
+> tool-call recovery pipeline — reliable across models/hardware). Runner lives at
+> `src/core/session/reviewer-runner.ts` (mirrors `worker-runner.ts`), not `src/phases/`; verdict
+> types in `src/core/session/review-types.ts`. Prompt stays `rules/phases/reviewer.md` via
+> `loadPhasePrompt`. Read-mostly allowlist enforced in the window (mutating tools refused, recoverable
+> + audited); loop stops via the new optional `TurnContext.isComplete()`. Logic verified with
+> throwaway scripts; live `run start` acceptance is the user's step.
 
 # 01 — Reviewer phase
 

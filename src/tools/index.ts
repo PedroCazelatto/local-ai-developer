@@ -22,3 +22,6 @@ export { searchInFilesTool } from './search-in-files.js';
 export { executeCommandTool } from './execute-command.js';
 export { runInProjectTool } from './run-in-project.js';
 export { truncateHeadTail, DEFAULT_OUTPUT_LIMIT } from './truncate.js';
+// Phase-scoped (Reviewer-only, V2/01) — deliberately NOT added to the registry in registry.ts.
+export { submitVerdictTool, parseVerdict, SUBMIT_VERDICT } from './submit-verdict.js';
+export type { VerdictParse } from './submit-verdict.js';

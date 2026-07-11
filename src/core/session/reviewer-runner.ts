@@ -1,0 +1,293 @@
+// Reviewer runner (V2/01) — spawns a FRESH, ISOLATED Reviewer window to judge ONE Worker attempt.
+// Mirrors worker-runner.ts: an empty messages array seeded with the Reviewer system prompt
+// (rules/phases/reviewer.md via loadPhasePrompt) + a user message carrying the task, the Worker's
+// change summary, the changed files, and the test results. It runs the SAME tool-dispatch loop, but
+// with a READ-MOSTLY tool allowlist (no write_file/edit_file/commit) PLUS the phase-scoped
+// submit_verdict tool. When the Reviewer calls submit_verdict, the window captures + validates the
+// ReviewVerdict, ends the turn (via TurnContext.isComplete), and is DISCARDED.
+//
+// Isolation is the whole point: the window never sees the Worker's history, so it cannot rationalize
+// the Worker's own work (CLAUDE.md, Memory model — the Reviewer is a separate fresh window).
+//
+// Scope (V2/01): ONE spawn, ONE verdict. No fix loop, no raise_blocker, no Retro, no inbox — those
+// are V3. The parsed ReviewVerdict is the ONLY contract; V2/02 wires this after the Worker and
+// surfaces the verdict + exact tokens.
+
+import { buildSystemPrompt, loadPhasePrompt } from '../../context/index.js';
+import { createToolContext } from '../../tools/index.js';
+import { toolError } from '../../tools/index.js';
+import { SUBMIT_VERDICT, parseVerdict, submitVerdictTool } from '../../tools/submit-verdict.js';
+import type { SandboxClient } from '../container/index.js';
+import type { OllamaClient, Message, StreamHandle, TokenCounts, Tool, ToolCall } from '../llm/index.js';
+import { appendAuditRow } from './audit.js';
+import type { ToolCallRecord } from './dispatch.js';
+import { dispatchToolCall } from './dispatch.js';
+import type { ReviewVerdict } from './review-types.js';
+import { processMessage } from './turn-loop.js';
+import type { TurnContext } from './turn-loop.js';
+import type { Task } from './types.js';
+
+// The Reviewer inspects (a few reads + maybe a test re-run) then submits — lighter than the Worker's
+// test-first implement loop, but give headroom for reading several files before the verdict.
+const REVIEWER_MAX_ROUNDS = 16;
+
+// Re-prompt ONCE on a malformed/inconsistent verdict, then give up and surface failure to the user.
+const MAX_VERDICT_ATTEMPTS = 2;
+
+/**
+ * The Reviewer's read-mostly tool allowlist. It judges — it never mutates or commits, so it gets no
+ * write_file/edit_file/commit tool. execute_command is read-mostly by nature (root sandbox at
+ * /workspace) and allowed for inspection; the prompt steers it toward reads, not mutation.
+ * search_rules/load_rule are a V4 capability and simply absent here.
+ */
+export const REVIEWER_TOOL_NAMES: readonly string[] = [
+  'read_file',
+  'search_in_files',
+  'list_files',
+  'run_in_project',
+  'execute_command',
+];
+
+export interface ReviewerDeps {
+  readonly llm: OllamaClient;
+  /** The full registry tool set (toolDefinitions()); filtered here to read-mostly + submit_verdict. */
+  readonly tools: Tool[];
+  readonly sandbox: SandboxClient;
+  readonly projectName: string;
+  readonly projectPath: string;
+}
+
+/** What the Reviewer window is told about the Worker's attempt (assembled by V2/02). */
+export interface ReviewerInput {
+  /** The task under review — same definition + acceptance the Worker was seeded with. */
+  readonly task: Task;
+  /** The Worker's plain-text change summary (its final no-tool turn). */
+  readonly workerSummary: string;
+  /** Changed-files set / diff for the attempt; "" if not captured (Reviewer inspects the tree itself). */
+  readonly changedFiles: string;
+  /** The test output the Worker produced (stdout/stderr + exit); "" if not captured (Reviewer re-runs). */
+  readonly testResults: string;
+}
+
+/** The Reviewer's result: the validated verdict + the exact tokens from its final turn. */
+export interface ReviewerOutcome {
+  readonly verdict: ReviewVerdict;
+  readonly tokens: TokenCounts;
+}
+
+/** The Reviewer ended without a usable verdict (never submitted, or malformed past the re-prompt). */
+export class ReviewerVerdictError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'ReviewerVerdictError';
+  }
+}
+
+/**
+ * A single Reviewer window implementing the turn loop's TurnContext against its OWN messages array —
+ * isolated from the session's per-phase histories and from the Worker. Read/inspect tool calls
+ * dispatch through the shared registry (audited as phase "reviewer"); submit_verdict is captured
+ * here directly (it is not a registry tool); any mutating tool is refused with a recoverable error.
+ */
+class ReviewerWindow implements TurnContext {
+  readonly activePhase = 'reviewer';
+  readonly messages: Message[];
+
+  /** The read-mostly tool subset + submit_verdict, sent to the model on every turn. */
+  private readonly reviewerTools: Tool[];
+  /** Exact token counts from the most recent Reviewer turn (nulls preserved — never estimated). */
+  private lastTokens: TokenCounts = { promptTokens: null, evalTokens: null };
+  /** The captured, validated verdict — null until submit_verdict succeeds. */
+  private verdict: ReviewVerdict | null = null;
+  /** Non-null once we give up after the re-prompt (holds the last rejection reason). */
+  private failure: string | null = null;
+  /** How many times submit_verdict was called with an invalid payload. */
+  private verdictAttempts = 0;
+
+  constructor(private readonly deps: ReviewerDeps, systemPrompt: string) {
+    this.messages = [{ role: 'system', content: systemPrompt }];
+    const allowed = deps.tools.filter((tool) => {
+      const name = tool.function.name;
+      return name !== undefined && REVIEWER_TOOL_NAMES.includes(name);
+    });
+    this.reviewerTools = [...allowed, submitVerdictTool];
+  }
+
+  /** The validated verdict, or null if the Reviewer never produced a usable one. */
+  get result(): ReviewVerdict | null {
+    return this.verdict;
+  }
+
+  /** Why the Reviewer failed to produce a verdict (set only on the give-up path). */
+  get failureReason(): string | null {
+    return this.failure;
+  }
+
+  /** Exact tokens from the Reviewer's final turn. */
+  get tokens(): TokenCounts {
+    return this.lastTokens;
+  }
+
+  streamAsk(userInput: string): StreamHandle {
+    this.messages.push({ role: 'user', content: userInput });
+    return this.deps.llm.stream(this.messages, this.reviewerTools);
+  }
+
+  streamContinue(): StreamHandle {
+    return this.deps.llm.stream(this.messages, this.reviewerTools);
+  }
+
+  onTokens(tokens: TokenCounts): void {
+    this.lastTokens = tokens;
+  }
+
+  addAssistant(content: string, toolCalls?: ToolCall[]): void {
+    const entry: Message = { role: 'assistant', content };
+    if (toolCalls && toolCalls.length > 0) {
+      entry.tool_calls = toolCalls;
+    }
+    this.messages.push(entry);
+  }
+
+  addToolResult(toolName: string, result: string): void {
+    this.messages.push({ role: 'tool', content: result, tool_name: toolName });
+  }
+
+  /** Terminal once the verdict is captured OR we gave up after the re-prompt — stops the turn loop. */
+  isComplete(): boolean {
+    return this.verdict !== null || this.failure !== null;
+  }
+
+  async callTool(name: string, args: Record<string, unknown>): Promise<string> {
+    if (name === SUBMIT_VERDICT) {
+      return this.captureVerdict(args);
+    }
+    if (REVIEWER_TOOL_NAMES.includes(name)) {
+      const ctx = createToolContext({
+        projectName: this.deps.projectName,
+        projectPath: this.deps.projectPath,
+        sandbox: this.deps.sandbox,
+        phase: 'reviewer',
+      });
+      return dispatchToolCall(ctx, name, args, {
+        onToolCall: (record) => appendAuditRow(this.deps.projectPath, record),
+      });
+    }
+    // A mutating / commit / unknown tool — refuse (recoverable + audited). The Reviewer judges; it
+    // does not modify or commit, so these are never wired into its tool list in the first place.
+    return this.refuse(name, args);
+  }
+
+  /** Validate the submit_verdict payload; capture on success, re-prompt once, then give up. */
+  private captureVerdict(args: Record<string, unknown>): string {
+    const start = performance.now();
+    const parsed = parseVerdict(args);
+    if (parsed.ok) {
+      this.verdict = parsed.verdict;
+      const output = `Verdict recorded: ${parsed.verdict.result} — ${parsed.verdict.issues.length} issue(s).`;
+      this.audit(SUBMIT_VERDICT, args, 0, output, null, start);
+      return output;
+    }
+
+    this.verdictAttempts += 1;
+    if (this.verdictAttempts >= MAX_VERDICT_ATTEMPTS) {
+      // Re-prompt already spent — surface failure to the user (V2/02 catches ReviewerVerdictError).
+      this.failure = parsed.error;
+      const output = `Verdict rejected again: ${parsed.error}`;
+      this.audit(SUBMIT_VERDICT, args, -1, output, parsed.error, start);
+      return output;
+    }
+    // First invalid verdict → recoverable error so the model fixes the fields and re-submits once.
+    const err = toolError(
+      `Invalid verdict: ${parsed.error}`,
+      'Fix the fields and call submit_verdict again with a valid, consistent verdict.',
+    );
+    const output = typeof err.content === 'string' ? err.content : JSON.stringify(err.content);
+    this.audit(SUBMIT_VERDICT, args, err.exitStatus ?? -1, output, err.error ?? parsed.error, start);
+    return output;
+  }
+
+  /** Refuse a tool the Reviewer must not use, as a recoverable error the model can read and adapt to. */
+  private refuse(name: string, args: Record<string, unknown>): string {
+    const err = toolError(
+      `tool '${name}' is not available to the Reviewer in this phase — it judges (read-only); it does not modify or commit.`,
+      `Inspect with read_file / search_in_files / list_files / run_in_project / execute_command, then call ${SUBMIT_VERDICT}.`,
+    );
+    const output = typeof err.content === 'string' ? err.content : JSON.stringify(err.content);
+    this.audit(name, args, err.exitStatus ?? -1, output, err.error ?? `tool '${name}' not available`, performance.now());
+    return output;
+  }
+
+  /** Append one audit row for a call this window handles directly (submit_verdict / a refusal). */
+  private audit(
+    tool: string,
+    args: Record<string, unknown>,
+    exitStatus: number,
+    output: string,
+    error: string | null,
+    startedAt: number,
+  ): void {
+    const record: ToolCallRecord = {
+      ts: new Date().toISOString(),
+      phase: 'reviewer',
+      tool,
+      args,
+      exitStatus,
+      durationMs: Math.round(performance.now() - startedAt),
+      output,
+      error,
+    };
+    appendAuditRow(this.deps.projectPath, record);
+  }
+}
+
+/** Assemble the seed user message: the task + the Worker's summary/diff/test results + review orders. */
+function buildReviewerSeed(input: ReviewerInput): string {
+  const { task, workerSummary, changedFiles, testResults } = input;
+  const changed = changedFiles.trim()
+    ? `\n${changedFiles.trim()}`
+    : ' — not captured; inspect the working tree yourself with list_files / read_file / execute_command (git).';
+  const tests = testResults.trim()
+    ? `\n${testResults.trim()}`
+    : ' — not captured; re-run the tests yourself with run_in_project before deciding.';
+
+  return `Review the Worker's attempt at ONE task. Judge it on BOTH axes — behavior (does it satisfy the task, including edge cases?) and standards (architecture, naming, testing conventions) — then submit ONE verdict.
+
+## Task under review: ${task.title}
+(backlog id: ${task.id})
+
+${task.body}
+
+## Worker's change summary
+${workerSummary.trim() || '(the Worker left no summary)'}
+
+## Changed files${changed}
+
+## Test results the Worker reported${tests}
+
+How to review:
+- Do NOT trust the summary alone — read the changed files and the tests, and reason about correctness + edge cases.
+- When in doubt, re-run the tests/build with run_in_project rather than trusting the transcript.
+- You have READ/INSPECT tools only (read_file, search_in_files, list_files, run_in_project, execute_command). You cannot edit or commit — you judge.
+- When done, call ${SUBMIT_VERDICT} EXACTLY ONCE. result "pass" only if BOTH axes pass; any blocker/major issue means "fail"; every issue must be concrete and name the offending file + fix direction. Do not call any tool after ${SUBMIT_VERDICT}.`;
+}
+
+/**
+ * Spawn a fresh Reviewer window for one Worker attempt, run it to completion (streaming to the REPL,
+ * all tool calls audited), and return the validated verdict + exact tokens. The window is discarded
+ * when this resolves. Throws ReviewerVerdictError if the Reviewer never produced a usable verdict.
+ */
+export async function runReviewerTask(deps: ReviewerDeps, input: ReviewerInput): Promise<ReviewerOutcome> {
+  const systemPrompt = buildSystemPrompt(loadPhasePrompt('reviewer'), `Project: ${deps.projectName}`);
+  const window = new ReviewerWindow(deps, systemPrompt);
+  await processMessage(window, buildReviewerSeed(input), REVIEWER_MAX_ROUNDS);
+
+  const verdict = window.result;
+  if (verdict === null) {
+    throw new ReviewerVerdictError(
+      window.failureReason ??
+        `The Reviewer ended after ${REVIEWER_MAX_ROUNDS} rounds without calling ${SUBMIT_VERDICT} with a valid verdict.`,
+    );
+  }
+  return { verdict, tokens: window.tokens };
+}
