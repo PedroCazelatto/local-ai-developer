@@ -1,4 +1,4 @@
-> **Status:** ⬜ Not started
+> **Status:** ✅ Completed (2026-07-11)
 
 # 05 — Unattended batch execution (run it overnight)
 

@@ -305,3 +305,11 @@ loop, and re-homed onto the TS + networked-sandbox base.
 - **Which model powers the `search_rules` / summarization throwaway context** — same local model
   (current lean) or a smaller/faster one.
 - **Auto-init of project artifacts** on session start vs. leaving creation to the scaffold / Discovery.
+- **Execution isolation via branches + PRs (future).** Today the fix loop works directly on the project
+  working tree: a passing task commits to the current branch, and a non-passing task's attempt is
+  preserved with `git stash` (V3/05) — kept for Retro to inspect on `/answer`, never reused by the Worker
+  (a fresh Worker redoes the task from scratch). This stash approach is a **stopgap**: stashes made
+  against one base can conflict once later tasks commit, and there is no clean per-task review surface.
+  The intended future model is to run **each task on its own branch and open a PR** (per-task isolation,
+  reviewable diffs, trivial revert), which also generalizes to real parallelism if that ever changes.
+  Deferred — the stash keeps overnight batches unblocked for now.

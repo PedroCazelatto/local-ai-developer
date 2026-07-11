@@ -14,6 +14,7 @@ export {
   nextRunnableTasks,
   allTasks,
   findTask,
+  taskSkipReason,
   levelDocs,
   backlogRoot,
   BACKLOG_DIRNAME,
@@ -31,12 +32,26 @@ export type { ReviewVerdict, ReviewIssue, Severity, ReviewDecision } from './rev
 export { SEVERITIES } from './review-types.js';
 export {
   isWorkingTreeDirty,
-  discardWorkingTreeChanges,
   captureChangedFiles,
   commitPaths,
+  stashTaskAttempt,
+  readTaskStashDiff,
+  dropTaskStash,
   REVIEW_DIFF_BUDGET,
 } from './project-git.js';
 export type { ChangedFiles, CommitResult } from './project-git.js';
+export { runBatch, batchSummaryFileName, BATCHES_DIRNAME } from './batch.js';
+export type {
+  BatchSummary,
+  BatchDeps,
+  BatchReporter,
+  BatchPosition,
+  BatchPassed,
+  BatchEscalated,
+  BatchBlocked,
+  BatchSkipped,
+} from './batch.type.js';
+export { rulesPhasesDirty } from './rules-phases-dirty.js';
 export { raiseBlocker, resolveBlocker, openBlockerForTask, readBlockerRows } from './blocker-store.js';
 export type { RaisedBlocker, ResolvedBlocker, BlockerRow } from './blocker-store.type.js';
 export { spawnRetro, RetroError } from './retro-runner.js';

@@ -368,7 +368,18 @@ function candidatePhaseFile(phase: unknown): string | null {
 
 /** Assemble the seed user message: the inputs + the classification rules + the tool + one-file contract. */
 function buildRetroSeed(input: RetroInput): string {
-  const { task, misunderstanding, answer } = input;
+  const { task, misunderstanding, answer, failedAttempt } = input;
+  // The stashed failed attempt (V3/05) is advisory evidence of HOW the ambiguity misled implementation —
+  // included only when present; never presented as correct (the Worker redoes the task from scratch).
+  const attemptSection =
+    failedAttempt !== undefined && failedAttempt.trim() !== ''
+      ? `\n## The failed Worker attempt that triggered the blocker (stashed diff — evidence, NOT correct code)
+Use this to see HOW the ambiguous task misled implementation; do not treat it as a solution to preserve.
+\`\`\`diff
+${failedAttempt.trim()}
+\`\`\`
+`
+      : '';
   return `You are the Retro phase. A Reviewer raised a blocker on ONE task, the user answered it, and your job is to make the SMALLEST edit to ONE file so this class of misunderstanding cannot recur. Diagnose the ROOT cause — what upstream gap let an ambiguous task reach execution — classify it, patch exactly one file, then call ${SUBMIT_RETRO}.
 
 ## Task that blocked: ${task.title}
@@ -381,7 +392,7 @@ ${misunderstanding}
 
 ## The user's resolving answer
 ${answer}
-
+${attemptSection}
 How to patch (choose ONE file — editing two means you mis-classified):
 - SYSTEMIC gap — a question the protocol should ALWAYS ask, or a check the Reviewer should ALWAYS run (it should have been caught in Discovery / Design / Review). Fix the matching GLOBAL phase file: read it with ${READ_PHASE_RULE}, then patch it with ${EDIT_PHASE_RULE} (discovery | design | breakdown | worker | reviewer). This edit is left UNCOMMITTED for the user to review.
 - TASK-SPECIFIC gap — a one-off hole in THIS task's wording or acceptance criteria. Fix the project doc: read it with read_file, then patch the task's backlog file (or PRODUCT_SPEC.md) with edit_file.

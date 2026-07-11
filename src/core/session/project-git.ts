@@ -67,18 +67,56 @@ export function isWorkingTreeDirty(projectPath: string): boolean {
   return runGit(projectPath, ['status', '--porcelain']).stdout.trim() !== '';
 }
 
+// Stash label prefix: a task-keyed `git stash` message so a failed attempt is recoverable by task id
+// (the stash message IS the durable record — no separate store). One stash per task at a time.
+const STASH_LABEL_PREFIX = 'lad-stash:';
+
+/** The `stash@{n}` ref of the task's labeled stash, or null if it has none (found by message, not index,
+ * so it survives other stashes pushed after it). */
+function findTaskStashRef(projectPath: string, taskId: string): string | null {
+  const label = `${STASH_LABEL_PREFIX}${taskId}`;
+  for (const line of runGit(projectPath, ['stash', 'list']).stdout.split('\n')) {
+    // `git stash list` prints `stash@{n}: On <branch>: <message>` — the message is the trailing text.
+    const ref = /^(stash@\{\d+\})/.exec(line)?.[1];
+    if (ref !== undefined && line.trimEnd().endsWith(`: ${label}`)) return ref;
+  }
+  return null;
+}
+
 /**
- * Discard every uncommitted change, restoring the tree to the last commit: revert tracked edits
- * (`reset --hard HEAD`) and remove untracked files (`clean -fd`). Used after a task is BLOCKED (V3/02)
- * so the NEXT task's review stays isolated — the blocked Worker's attempt is throwaway (a fresh Worker
- * re-runs the task after the user answers). `-e .orchestrator` keeps session state (the just-written
- * `raised` row + the audit log) even if a project forgot to git-ignore it; `clean` without `-x` also
- * never removes git-ignored deps (node_modules, dist). Never throws — a git failure just leaves the
- * tree dirty, and the /run dirty-tree guard then halts before the next task (the safe fallback).
+ * Stash the current uncommitted attempt under a task-keyed label so it is preserved (not discarded) when
+ * a task ends non-passing — the Worker NEVER reuses it (a fresh Worker redoes the task from scratch); it
+ * exists so Retro can inspect what went wrong (blocked) or the user can review it (escalated). Includes
+ * untracked files (`-u`) but never git-ignored state (`.orchestrator/`). Supersedes any prior stash for
+ * the task (keeps only the latest attempt). Returns the stable label, or null if there was nothing to
+ * stash. Never throws — a git failure just returns null (the caller falls back to a dirty/clean tree).
  */
-export function discardWorkingTreeChanges(projectPath: string): void {
-  runGit(projectPath, ['reset', '--hard', 'HEAD']);
-  runGit(projectPath, ['clean', '-fd', '-e', '.orchestrator']);
+export function stashTaskAttempt(projectPath: string, taskId: string): string | null {
+  dropTaskStash(projectPath, taskId); // supersede a prior attempt so at most one stash per task exists
+  const label = `${STASH_LABEL_PREFIX}${taskId}`;
+  const push = runGit(projectPath, ['stash', 'push', '-u', '-m', label]);
+  // "No local changes to save" exits 0 and creates NO stash (e.g. an escalation with an empty diff).
+  if (!push.ok || /no local changes/i.test(push.stdout)) return null;
+  return findTaskStashRef(projectPath, taskId) === null ? null : label;
+}
+
+/**
+ * The task's stashed attempt as a bounded diff (tracked edits + new files via `--include-untracked`),
+ * for Retro to read what the failed Worker produced — or null if the task has no stash. Truncated to
+ * REVIEW_DIFF_BUDGET so a huge attempt can't blow past num_ctx when fed to the Retro window.
+ */
+export function readTaskStashDiff(projectPath: string, taskId: string, budget: number = REVIEW_DIFF_BUDGET): string | null {
+  const ref = findTaskStashRef(projectPath, taskId);
+  if (ref === null) return null;
+  const show = runGit(projectPath, ['--no-pager', 'stash', 'show', '-p', '--include-untracked', ref]);
+  const diff = show.stdout.trim();
+  return diff === '' ? null : truncateHeadTail(diff, budget);
+}
+
+/** Drop the task's labeled stash if it has one (a no-op otherwise). Never throws. */
+export function dropTaskStash(projectPath: string, taskId: string): void {
+  const ref = findTaskStashRef(projectPath, taskId);
+  if (ref !== null) runGit(projectPath, ['stash', 'drop', ref]);
 }
 
 /** Render a new (untracked) file as a diff-style block, reading its content from the host fs. */

@@ -1,9 +1,14 @@
-// /run <selector> (V3/01) — the execution trigger. Runs backlog tasks SEQUENTIALLY (no parallelism);
-// each task goes through the bounded implement→test→review→fix loop (runTaskLoop): a PERSISTENT
-// Worker window across up to 5 rounds, a FRESH Reviewer each round, AUTO-COMMIT on a pass, escalate
-// after 5 with nothing committed. The user is pulled in only on an escalation or a blocker — not on
-// every round (that was V2's accept/send-back/skip gate). Selector: `next` (top runnable), a task id,
-// a comma list, or `all`.
+// /run <selector> (V1/10 trigger → V3/01 loop → V3/05 batch). Runs backlog tasks SEQUENTIALLY (no
+// parallelism); each task goes through the bounded implement→test→review→fix loop (runTaskLoop): a
+// PERSISTENT Worker window across up to 5 rounds, a FRESH Reviewer each round, AUTO-COMMIT on a pass,
+// escalate after 5 with nothing committed. The user is pulled in only on an escalation or a blocker.
+//
+// Selector → dispatch:
+//   - a single task (`next`, or one explicit id) runs one runTaskLoop directly (this file).
+//   - a batch (`all`, or a comma list of 2+ ids) runs UNATTENDED via runBatch (V3/05): sequential,
+//     queues escalations/blockers without aborting, prints + persists an end-of-batch summary.
+// A non-passing single task stashes its failed attempt (kept for a later /answer→Retro, or inspection)
+// and leaves the tree clean — the Worker never reuses it; a fresh Worker redoes the task from scratch.
 
 import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
@@ -13,14 +18,25 @@ import * as renderer from '../../core/ui/renderer.js';
 import {
   allTasks,
   BacklogError,
-  discardWorkingTreeChanges,
   findTask,
   isWorkingTreeDirty,
   levelDocs,
   nextRunnableTasks,
   readBacklog,
+  runBatch,
+  stashTaskAttempt,
+  taskSkipReason,
 } from '../../core/session/index.js';
-import type { Backlog, Task, TaskLoopReporter, TaskLoopResult } from '../../core/session/index.js';
+import type {
+  Backlog,
+  BatchDeps,
+  BatchPosition,
+  BatchReporter,
+  Task,
+  TaskLoopReporter,
+  TaskLoopResult,
+} from '../../core/session/index.js';
+import { renderBatchSummary } from '../batch-summary.js';
 import { renderVerdict } from '../review-prompt.js';
 
 /** The slice of the orchestrator /run needs — satisfied structurally by SessionOrchestrator. */
@@ -31,7 +47,17 @@ export interface RunOrchestrator {
   runTaskLoop(task: Task, specSlice: string, reporter: TaskLoopReporter): Promise<TaskLoopResult>;
 }
 
+/** A resolved selector: the ordered task ids to attempt, and whether it is an unattended batch. */
+interface Selection {
+  readonly ids: string[];
+  readonly isBatch: boolean;
+}
+
 const SPEC_ARCH_LIMIT = 2500;
+
+const HALT_DIRTY =
+  'the project working tree has uncommitted changes, so its review can\'t be isolated. Commit or stash ' +
+  'them first (right after /new-project, commit the scaffold + backlog + PRODUCT_SPEC), then re-run.';
 
 function messageOf(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
@@ -76,19 +102,21 @@ function buildSpecSlice(projectPath: string, task: Task): string {
   return context.join('\n');
 }
 
-/** Resolve the selector to an ordered list of task ids to attempt. */
-function resolveSelector(backlog: Backlog, selector: string): string[] {
+/** Resolve the selector to the ordered ids to attempt, and whether it is a batch (all, or 2+ ids). */
+function resolveSelector(backlog: Backlog, selector: string): Selection {
   if (selector === 'all') {
-    return allTasks(backlog)
+    const ids = allTasks(backlog)
       .filter((t) => t.status !== 'done')
       .sort((a, b) => a.order - b.order)
       .map((t) => t.id);
+    return { ids, isBatch: true };
   }
   if (selector === 'next') {
     const next = nextRunnableTasks(backlog)[0];
-    return next ? [next.id] : [];
+    return { ids: next ? [next.id] : [], isBatch: false };
   }
-  return selector.split(',').map((s) => s.trim()).filter((s) => s !== '');
+  const ids = selector.split(',').map((s) => s.trim()).filter((s) => s !== '');
+  return { ids, isBatch: ids.length > 1 };
 }
 
 /** Exact loop-cost line — never a length estimate; says "not reported" when a metric was omitted. */
@@ -98,7 +126,7 @@ function tokenCostLine(tokens: TokenCounts): string {
   return `loop cost — prompt ${prompt}, completion ${evalT} tokens (exact, summed over all rounds)`;
 }
 
-/** Render the loop's terminal outcome: passed (committed), blocked (question), or escalated (feedback). */
+/** Render one task's terminal outcome: passed (committed), blocked (question), or escalated (feedback). */
 function renderOutcome(result: TaskLoopResult): void {
   const cost = tokenCostLine(result.tokens);
   if (result.outcome === 'passed') {
@@ -110,14 +138,13 @@ function renderOutcome(result: TaskLoopResult): void {
   if (result.outcome === 'blocked') {
     renderer.errorLine(`⛔ ${result.taskId} BLOCKED at round ${result.rounds}: ${result.question ?? ''}`);
     renderer.systemMessage(
-      `Persisted as ${result.blockerId ?? result.taskId}; its changes were reverted and the run continues ` +
-        `with other runnable tasks. Answer later with: /answer ${result.taskId} <your answer> · ${cost}`,
+      `Persisted as ${result.blockerId ?? result.taskId}. Answer later with: /answer ${result.taskId} <your answer> · ${cost}`,
     );
     return;
   }
   // escalated — 5 rounds with no pass (or an empty diff / no verdict). Nothing was committed.
   renderer.errorLine(
-    `⚠ ${result.taskId} ESCALATED after ${result.rounds} round(s) without a pass — left uncommitted for you to inspect.`,
+    `⚠ ${result.taskId} ESCALATED after ${result.rounds} round(s) without a pass — left uncommitted.`,
   );
   if (result.lastFeedback !== undefined && result.lastFeedback.trim() !== '') {
     renderer.systemMessage(`Last Reviewer feedback:\n${result.lastFeedback.trim()}`);
@@ -125,14 +152,26 @@ function renderOutcome(result: TaskLoopResult): void {
   renderer.systemMessage(cost);
 }
 
-/** The UI the loop reports progress through (injected — the core loop hard-wires no renderer). */
-function buildReporter(task: Task): TaskLoopReporter {
+/** The per-task UI the loop reports progress through (injected). `position` adds the batch `[N/M]` prefix. */
+function buildReporter(task: Task, position?: BatchPosition): TaskLoopReporter {
+  const prefix = position ? `[${position.index}/${position.total}] ${task.id}` : task.id;
   return {
-    roundStarted: (round, maxRounds) => renderer.systemMessage(`▶ Round ${round}/${maxRounds} — ${task.id}`),
+    roundStarted: (round, maxRounds) => renderer.systemMessage(`▶ ${prefix} · round ${round}/${maxRounds}`),
     filesChanged: (status) => renderer.systemMessage(`Files changed:\n${status}`),
     // renderVerdict: PASS/FAIL headline, summary, issues by severity, exact Reviewer tokens (V2/02).
     verdictReady: (verdict, changedCount, tokens) =>
       renderVerdict(verdict, { taskId: task.id, taskTitle: task.title, changedCount, tokens }),
+  };
+}
+
+/** The batch-level UI seam (V3/05): per-task start/skip lines, each outcome, and the end-of-batch table. */
+function buildBatchReporter(): BatchReporter {
+  return {
+    taskStarted: (position, task) =>
+      renderer.systemMessage(`▶ [${position.index}/${position.total}] ${task.id}: ${task.title}`),
+    taskSkipped: (taskId, reason) => renderer.systemMessage(`Skipping ${taskId}: ${reason}`),
+    taskOutcome: (result) => renderOutcome(result),
+    finished: (summary) => renderBatchSummary(summary),
   };
 }
 
@@ -151,6 +190,41 @@ async function runOneTask(orch: RunOrchestrator, task: Task): Promise<TaskLoopRe
   return result;
 }
 
+/** Run exactly one selected task directly (the `next` / single-id path). */
+async function runSingle(orch: RunOrchestrator, id: string): Promise<void> {
+  const backlog = readBacklog(orch.projectPath);
+  const reason = taskSkipReason(backlog, id);
+  if (reason !== null) {
+    renderer.systemMessage(`Skipping ${id}: ${reason}`);
+    return;
+  }
+  const task = findTask(backlog, id);
+  if (task === undefined) return; // unreachable (taskSkipReason returned null), guarded defensively
+
+  // Block on a dirty tree: each review must capture EXACTLY this task's changes (a fresh scaffold is
+  // dirty until the user commits the baseline; a prior non-passing task stashes itself clean).
+  if (isWorkingTreeDirty(orch.projectPath)) {
+    renderer.errorLine(`Halting before ${id}: ${HALT_DIRTY}`);
+    return;
+  }
+
+  renderer.systemMessage(`▶ Running ${task.id}: ${task.title}`);
+  const result = await runOneTask(orch, task);
+
+  // A non-passing task stashes its failed attempt so the tree is left clean and the work is preserved —
+  // blocked → the later /answer→Retro reads it; escalated → the user can inspect it. The Worker NEVER
+  // reuses the stash (a fresh Worker redoes the task from scratch); a git failure just returns null.
+  if (result !== null && result.outcome !== 'passed') {
+    const stashRef = stashTaskAttempt(orch.projectPath, task.id);
+    const where = stashRef ?? 'nothing to stash';
+    if (result.outcome === 'blocked') {
+      renderer.systemMessage(`Attempt stashed (${where}). Answer with /answer ${task.id} <text>, then /run to retry.`);
+    } else {
+      renderer.systemMessage(`Attempt stashed (${where}) for inspection; /run ${task.id} to retry from scratch.`);
+    }
+  }
+}
+
 export async function runCommand(args: readonly string[], orch: RunOrchestrator): Promise<void> {
   const selector = args[0] ?? 'next';
 
@@ -162,8 +236,8 @@ export async function runCommand(args: readonly string[], orch: RunOrchestrator)
     return;
   }
 
-  const ids = resolveSelector(backlog, selector);
-  if (ids.length === 0) {
+  const selection = resolveSelector(backlog, selector);
+  if (selection.ids.length === 0) {
     renderer.systemMessage(
       selector === 'next' || selector === 'all'
         ? 'No runnable tasks (all done, or blocked by unmet dependencies).'
@@ -172,65 +246,18 @@ export async function runCommand(args: readonly string[], orch: RunOrchestrator)
     return;
   }
 
-  // Task ids blocked during THIS run, for the closing summary. A blocker doesn't abort the run: the
-  // task is skipped, its changes reverted, and the loop moves on to whatever is still runnable (the
-  // user answers with /answer afterward, then re-runs). Its dependents fall out naturally — they wait
-  // on a task that isn't `done`, so the unmet-deps check below skips them.
-  const blockedThisRun: string[] = [];
-
-  for (const id of ids) {
-    // Reload each iteration: the user's done/pending decisions change what is now eligible.
-    const current = readBacklog(orch.projectPath);
-    const task = findTask(current, id);
-    if (task === undefined) {
-      renderer.errorLine(`Skipping '${id}': not found in the backlog.`);
-      continue;
-    }
-    if (task.status === 'done') {
-      renderer.systemMessage(`Skipping ${id}: already done.`);
-      continue;
-    }
-    if (task.status === 'blocked') {
-      renderer.systemMessage(`Skipping ${id}: blocked, awaiting your /answer. Answer it, then /run again.`);
-      continue;
-    }
-    const statusById = new Map(allTasks(current).map((t) => [t.id, t.status]));
-    const unmet = task.dependsOn.filter((d) => statusById.get(d) !== 'done');
-    if (unmet.length > 0) {
-      renderer.systemMessage(`Skipping ${id}: waiting on ${unmet.join(', ')} (not done).`);
-      continue;
-    }
-
-    // Block on a dirty tree: each review must capture EXACTLY this task's changes (the user's V2
-    // choice). A fresh scaffold is dirty (git init, no commit), so the user commits the baseline —
-    // scaffold + backlog + spec — first; a sent-back/skipped prior task also leaves the tree dirty.
-    // A dirty tree won't clear itself, so halt the whole run rather than mixing two tasks' changes.
-    // (A just-blocked task does NOT trip this: its changes are reverted below before we continue.)
-    if (isWorkingTreeDirty(orch.projectPath)) {
-      renderer.errorLine(
-        `Halting before ${id}: the project working tree has uncommitted changes, so its review can't ` +
-          `be isolated. Commit or stash them first (right after /new-project, commit the scaffold + ` +
-          `backlog + PRODUCT_SPEC), then re-run.`,
-      );
-      return;
-    }
-
-    renderer.systemMessage(`▶ Running ${task.id}: ${task.title}`);
-    const result = await runOneTask(orch, task);
-
-    // On a blocker: revert the blocked Worker's throwaway attempt so the tree is clean for the next
-    // task (its review must stay isolated), then move on. The task is already marked `blocked` and the
-    // question persisted; the user answers it later and re-runs. A fresh Worker redoes the work then.
-    if (result?.outcome === 'blocked') {
-      discardWorkingTreeChanges(orch.projectPath);
-      blockedThisRun.push(task.id);
-    }
+  if (!selection.isBatch) {
+    await runSingle(orch, selection.ids[0] ?? '');
+    return;
   }
 
-  if (blockedThisRun.length > 0) {
-    renderer.systemMessage(
-      `Run finished with ${blockedThisRun.length} blocked task(s): ${blockedThisRun.join(', ')}. ` +
-        `Answer each with /answer <task-id> <text>, then /run again to retry them.`,
-    );
-  }
+  // Unattended batch (V3/05): runBatch walks the ids sequentially, queuing escalations/blockers without
+  // aborting, and prints + persists the summary. The runTask seam wraps runTaskLoop with the Worker's
+  // spec slice + a position-aware reporter, so the core driver never imports a renderer (dependency
+  // inversion). Per-task eligibility, dirty-tree guarding, and stashing live inside runBatch.
+  const deps: BatchDeps = {
+    projectPath: orch.projectPath,
+    runTask: (task, position) => orch.runTaskLoop(task, buildSpecSlice(orch.projectPath, task), buildReporter(task, position)),
+  };
+  await runBatch(deps, selection.ids, buildBatchReporter());
 }

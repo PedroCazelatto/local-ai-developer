@@ -10,9 +10,11 @@
 
 import {
   BacklogError,
+  dropTaskStash,
   findTask,
   openBlockerForTask,
   readBacklog,
+  readTaskStashDiff,
   resolveBlocker,
   RetroError,
   setTaskStatus,
@@ -76,6 +78,11 @@ export async function answerCommand(rawLine: string, orch: AnswerOrchestrator): 
     return;
   }
 
+  // readTaskStashDiff: the failed Worker attempt stashed at block time (V3/05), as a bounded diff — advisory
+  // evidence for Retro to see HOW the ambiguity misled implementation. The Worker never reuses it (a fresh
+  // Worker redoes the task from scratch); absent (undefined) if nothing was stashed.
+  const failedAttempt = readTaskStashDiff(projectPath, taskId) ?? undefined;
+
   // Spawn Retro to close the learning loop: diagnose the misunderstanding, patch the one right file.
   // Retro is best-effort — a RetroError (no edit / never submitted) must not swallow the answer, so warn
   // and continue. The task definition is what Retro reasons over; a missing task skips Retro entirely.
@@ -84,7 +91,7 @@ export async function answerCommand(rawLine: string, orch: AnswerOrchestrator): 
     renderer.systemMessage(`Recorded the answer; skipped Retro ('${taskId}' is no longer in the backlog).`);
   } else {
     try {
-      const result = await orch.spawnRetro({ task, misunderstanding: open.question, answer });
+      const result = await orch.spawnRetro({ task, misunderstanding: open.question, answer, failedAttempt });
       // renderRetroResult: scope-coded headline, root cause, patched file, and the loud systemic warning.
       renderRetroResult(result, projectPath);
     } catch (err) {
@@ -92,6 +99,10 @@ export async function answerCommand(rawLine: string, orch: AnswerOrchestrator): 
       renderer.errorLine(`Retro couldn't patch a file: ${messageOf(err)}. Classify + patch it manually if needed.`);
     }
   }
+
+  // The stashed attempt has served its purpose (Retro read it) and is now superseded — a fresh Worker
+  // redoes the task from scratch on re-run. Drop it so stashes don't pile up (a no-op if none was stashed).
+  dropTaskStash(projectPath, taskId);
 
   renderer.systemMessage(`✓ Answered ${open.id}. Re-run with /run ${taskId} (or /run) to retry it.`);
 }

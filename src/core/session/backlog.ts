@@ -189,6 +189,22 @@ export function nextRunnableTasks(backlog: Backlog): Task[] {
     .sort((a, b) => a.order - b.order);
 }
 
+/**
+ * Why a task can't run right now — already done, blocked awaiting the user's /answer, or a dependency
+ * that isn't `done` — or null when it is runnable. Shared by the single-task /run path and the batch
+ * driver (V3/05) so both skip identically. A missing task id is itself a skip reason.
+ */
+export function taskSkipReason(backlog: Backlog, taskId: string): string | null {
+  const task = findTask(backlog, taskId);
+  if (task === undefined) return 'not found in the backlog.';
+  if (task.status === 'done') return 'already done.';
+  if (task.status === 'blocked') return 'blocked, awaiting your /answer (answer it, then re-run).';
+  const statusById = new Map(backlog.tasks.map((t) => [t.id, t.status]));
+  const unmet = task.dependsOn.filter((depId) => statusById.get(depId) !== 'done');
+  if (unmet.length > 0) return `waiting on ${unmet.join(', ')} (not done).`;
+  return null;
+}
+
 /** README.md bodies documenting the task's epic and story levels (best-effort), for the Worker slice. */
 export function levelDocs(projectPath: string, task: Task): { epic: string | null; story: string | null } {
   const root = backlogRoot(projectPath);

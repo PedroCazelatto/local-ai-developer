@@ -30,6 +30,12 @@ export interface RetroInput {
   readonly misunderstanding: string;
   /** The user's resolving answer (from /answer). */
   readonly answer: string;
+  /**
+   * The failed Worker attempt that triggered the blocker, as a bounded stash diff (V3/05) — advisory
+   * evidence so Retro can see HOW the ambiguity misled implementation. Absent if nothing was stashed. The
+   * Worker never reuses it; a fresh Worker redoes the task from scratch.
+   */
+  readonly failedAttempt?: string;
 }
 
 /** The routed outcome of one Retro: the single patched file + its authoritative (path-derived) fate. */
