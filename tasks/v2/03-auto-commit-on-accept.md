@@ -8,6 +8,14 @@
 > built by `src/core/session/commit-message.ts` in the confirmed default convention — no human-name
 > trailer. Verified against a throwaway repo (commit, clean-after, escape-guard, empty-set, message).
 > Live `run start` acceptance is the user's step.
+>
+> **Fix (2026-07-11):** `acceptAndCommit` (`src/interface/commands/run.ts`) now marks the task
+> `done` **before** `commitPaths` and stages the task's `backlog/<id>.md` **with** the reviewed set,
+> so the commit records `status: done` and the working tree is clean afterward. The prior order
+> (mark done *after* the commit) left the tracked backlog file dirty — which halted the next task in
+> a `/run all` batch via the dirty-tree guard and committed a stale `in_progress` status. Confirmed
+> at the git level: committed status is `done`, and the post-accept tree is clean so the batch
+> continues.
 
 # 03 — Auto-commit on accept
 

@@ -13,6 +13,7 @@ import path from 'node:path';
 import * as renderer from '../../core/ui/renderer.js';
 import {
   allTasks,
+  BACKLOG_DIRNAME,
   BacklogError,
   buildCommitMessage,
   captureChangedFiles,
@@ -119,13 +120,22 @@ function acceptAndCommit(orch: RunOrchestrator, task: Task, outcome: ReviewerOut
     type: 'feat',
     reviewerSummary: outcome.verdict.summary,
   });
-  const commit = commitPaths(orch.projectPath, message, files);
+  // Mark the task done BEFORE committing, and stage its backlog file WITH the reviewed change, so the
+  // commit records `status: done` and the working tree is CLEAN afterwards. Writing done AFTER the
+  // commit (the old order) left backlog/<id>.md dirty — which halted the next task in a batch (the
+  // dirty-tree guard) and committed a stale `in_progress` status. setTaskStatus(in_progress) at task
+  // start already put this file in `files`; add it defensively so the commit is correct regardless.
+  setTaskStatus(orch.projectPath, task.id, 'done');
+  const backlogRel = `${BACKLOG_DIRNAME}/${task.id}.md`;
+  const staged = files.includes(backlogRel) ? files : [...files, backlogRel];
+
+  const commit = commitPaths(orch.projectPath, message, staged);
   if (commit.committed) {
-    setTaskStatus(orch.projectPath, task.id, 'done');
     renderer.systemMessage(`✓ ${task.id} committed ${commit.sha ?? ''} — ${commit.files.length} file(s) — and marked done.`);
     return;
   }
-  // Recoverable (e.g. a refused out-of-project path → global rule edits are never auto-committed).
+  // Commit failed (e.g. a refused out-of-project path → global rule edits are never auto-committed).
+  // Revert the status so the task stays runnable and the dirty tree honestly reflects "not committed".
   setTaskStatus(orch.projectPath, task.id, 'pending');
   renderer.errorLine(`⚠ Commit failed for ${task.id}: ${commit.error ?? 'unknown error'} Left uncommitted + pending.`);
 }
