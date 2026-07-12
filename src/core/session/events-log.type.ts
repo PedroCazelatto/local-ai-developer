@@ -1,0 +1,39 @@
+// Types for the orchestrator EVENTS log (V5/04). Kept in a sibling `.type.ts` per the constitution.
+// The events log is a SIBLING of the tool-audit log under projects/<active>/.orchestrator/: the audit
+// log records the MODEL's tool calls, this records the ORCHESTRATOR's own structural actions the user
+// can't otherwise see or replay — swapping phases, loading a phase's persisted memory, firing the
+// summarization failsafe, spawning/dismissing a sub-agent, switching model. Append-only, never loaded
+// into any prompt (a replay/audit artifact, exactly like the audit log).
+
+/** The structural actions worth recording. Phase terminology only — never "persona"/"role". */
+export type OrchestratorEventType =
+  | 'phase_swap'
+  | 'memory_load'
+  | 'summarization_fire'
+  | 'subagent_spawn'
+  | 'subagent_dismiss'
+  | 'model_use';
+
+/**
+ * One events-log line. Any token figure here is the EXACT Ollama count (constitution: never a
+ * length-based estimate); a genuinely-absent count is surfaced by OMITTING the field (and, for
+ * before/after pairs, a `detail.incomplete` flag), never papered over with a guess or a zero.
+ */
+export interface OrchestratorEvent {
+  /** UTC ISO-8601 ms, stamped by appendEvent at write time. */
+  readonly ts: string;
+  readonly type: OrchestratorEventType;
+  /** Active phase when the event fired ("" if none applies). For sub-agent events, the master phase. */
+  readonly phase: string;
+  /** Present for sub-agent events — the id whose lineage the row traces back to. */
+  readonly subagentId?: string;
+  /** Type-specific fields, e.g. `{ from: "discovery", to: "design" }` or `{ before, after }`. */
+  readonly detail: Record<string, string | number | boolean>;
+  /** Exact prompt_eval_count carried by the event (e.g. a restored/initial figure), when it has one. */
+  readonly promptTokens?: number;
+  /** Exact eval_count carried by the event, when it has one. */
+  readonly evalTokens?: number;
+}
+
+/** The caller-supplied fields — everything except `ts`, which appendEvent stamps at write time. */
+export type OrchestratorEventInput = Omit<OrchestratorEvent, 'ts'>;

@@ -11,7 +11,7 @@
 
 import type { Message, ToolCall } from '../llm/index.js';
 import { appendRecord, archiveActive, listArchives, readRecords, recordsToMessages, restoreArchive, visibleRecords } from './memory-store.js';
-import type { ArchiveSummary, ClearResult, MemoryRecord } from './memory-store.type.js';
+import type { ArchiveSummary, ClearResult, MemoryRecord, PhaseLoad } from './memory-store.type.js';
 
 /** Valid chat roles for a stored message. */
 export type ChatRole = 'system' | 'user' | 'assistant' | 'tool';
@@ -40,12 +40,24 @@ export class SessionMemory {
 
   constructor(private readonly projectPath: string) {}
 
-  /** Point at a phase's history, LAZILY loading it from disk the first time it is activated. */
-  activatePhase(name: string): void {
+  /**
+   * Point at a phase's history, LAZILY loading it from disk the first time it is activated. Returns a
+   * PhaseLoad so the orchestrator can emit a V5/04 `memory_load` event: whether an actual disk read
+   * happened (only on first activation), how many turns it restored, and the EXACT last persisted
+   * prompt_eval_count (the restored context size).
+   */
+  activatePhase(name: string): PhaseLoad {
     this.active = name;
-    if (!this.records.has(name)) {
+    const firstActivation = !this.records.has(name);
+    if (firstActivation) {
       this.records.set(name, readRecords(this.projectPath, name));
     }
+    const records = this.records.get(name) ?? [];
+    return {
+      loadedFromDisk: firstActivation,
+      turns: recordsToMessages(records).length,
+      lastPromptTokens: lastPromptTokensOf(records),
+    };
   }
 
   /** Append a message to the ACTIVE phase's history — both the RAM array AND its `<phase>.jsonl`. */
@@ -134,4 +146,13 @@ export class SessionMemory {
     }
     return this.active;
   }
+}
+
+/** The most recent EXACT prompt_eval_count among the records, or null if none recorded one (never estimated). */
+function lastPromptTokensOf(records: readonly MemoryRecord[]): number | null {
+  for (let i = records.length - 1; i >= 0; i -= 1) {
+    const prompt = records[i]?.tokens.prompt;
+    if (typeof prompt === 'number') return prompt;
+  }
+  return null;
 }

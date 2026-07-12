@@ -19,6 +19,7 @@ import * as renderer from '../ui/renderer.js';
 import { addTokenCounts } from './add-token-counts.js';
 import { appendAuditRow } from './audit.js';
 import { dispatchToolCall } from './dispatch.js';
+import { appendEvent } from './events-log.js';
 import { generateSubagentId } from './generate-subagent-id.js';
 import type {
   SubagentAskOutcome,
@@ -73,6 +74,17 @@ export class SubagentManager implements SubagentHandle {
     };
     this.agents.set(id, state);
     const response = await this.runTurns(state, task);
+    // V5/04 subagent_spawn: log the new sub-agent with its initial EXACT token figures (omitted when a
+    // turn didn't report them — never estimated). `phase` is the master phase (the spawner), `subagentId`
+    // its lineage — so detail carries nothing extra.
+    appendEvent(this.deps.projectPath, {
+      type: 'subagent_spawn',
+      phase: masterPhase,
+      subagentId: id,
+      detail: {},
+      ...(state.promptTokens !== null ? { promptTokens: state.promptTokens } : {}),
+      ...(state.evalTokens !== null ? { evalTokens: state.evalTokens } : {}),
+    });
     return { id, response };
   }
 
@@ -86,8 +98,19 @@ export class SubagentManager implements SubagentHandle {
   }
 
   dismiss(id: string): { readonly ok: boolean } {
-    this.agents.delete(id); // Map.delete on a missing key is a no-op — idempotent by construction
-    return { ok: true };
+    // Log a V5/04 subagent_dismiss only for an id that actually existed (its master phase is on the
+    // state) — an idempotent no-op dismiss of an unknown id isn't a structural event worth a row.
+    const state = this.agents.get(id);
+    if (state !== undefined) {
+      this.agents.delete(id);
+      appendEvent(this.deps.projectPath, {
+        type: 'subagent_dismiss',
+        phase: state.masterPhase,
+        subagentId: id,
+        detail: {},
+      });
+    }
+    return { ok: true }; // still idempotent — an unknown/already-dismissed id returns ok
   }
 
   list(): SubagentInfo[] {

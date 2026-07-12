@@ -52,6 +52,8 @@ export interface ReplOrchestrator {
   readonly projectPath: string;
   /** EXACT combined tokens from the last turn, or null if Ollama didn't report them. */
   readonly lastTurnTokenTotal: number | null;
+  /** EXACT cumulative token total for the ACTIVE phase (V5/04) — 0 before its first turn, null if incomplete. */
+  readonly activePhaseTokenTotal: number | null;
   /** Count of live sub-agents (V5/01) — the status line shows `Subagents: N` while any are active. */
   readonly subagentCount: number;
   /** /subagents (V5/01): a snapshot of every live sub-agent (id, age, message count, exact tokens). */
@@ -197,6 +199,10 @@ function cyclePhase(orch: ReplOrchestrator, dir: 1 | -1): void {
  */
 function updateStatus(orch: ReplOrchestrator): void {
   const tokens = orch.lastTurnTokenTotal === null ? '?' : String(orch.lastTurnTokenTotal);
+  // Cumulative EXACT per-phase total (V5/04), compact `Σ45.2k`: `Σ?` when a turn's count was
+  // unreported (incomplete, never estimated), and omitted entirely before the phase's first turn.
+  const phaseTotal = orch.activePhaseTokenTotal;
+  const phaseField = phaseTotal === null ? ' · Σ?' : phaseTotal > 0 ? ` · Σ${compactTokens(phaseTotal)}` : '';
   // `Subagents: N` is appended only while any are active (V5/01); dropped entirely at zero.
   const subs = orch.subagentCount > 0 ? ` · Subagents: ${orch.subagentCount}` : '';
   // The live activity field (V5/03): `running <tool> (X.Xs)` while a tool runs, else a thinking/stall
@@ -205,8 +211,15 @@ function updateStatus(orch: ReplOrchestrator): void {
   const activityField = activity !== null ? ` · ${activity}` : '';
   const head = theme.meta(`${orch.project} · `);
   const phase = theme.phase(orch.activePhase)(orch.activePhase);
-  const tail = theme.meta(` · ${orch.model} · ${tokens}/${orch.numCtx} tok${subs}${activityField}`);
+  const tail = theme.meta(` · ${orch.model} · ${tokens}/${orch.numCtx} tok${phaseField}${subs}${activityField}`);
   statusBar.setStatus(`${head}${phase}${tail}`);
+}
+
+/** Compact a token count for the status line: `945` · `45.2k` · `1.3M` — keeps the pinned line scannable. */
+function compactTokens(n: number): string {
+  if (n < 1000) return String(n);
+  if (n < 1_000_000) return `${(n / 1000).toFixed(1)}k`;
+  return `${(n / 1_000_000).toFixed(1)}M`;
 }
 
 /**

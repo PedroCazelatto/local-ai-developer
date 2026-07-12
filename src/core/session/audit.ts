@@ -5,25 +5,24 @@
 //
 // Append-only + flushed (fsync) per row: a kill mid-tool leaves a partial LAST line at worst, never
 // a torn earlier row. Only a ~1 KB output PREVIEW is stored — full stdout/build logs stay out of
-// the log (full-output persistence is deferred).
+// the log (full-output persistence is deferred). The fsync-per-line durability lives in the shared
+// appendJsonlLine writer, which the sibling events log (V5/04) uses too.
 
-import { closeSync, fsyncSync, mkdirSync, openSync, writeSync } from 'node:fs';
 import path from 'node:path';
 
+import { appendJsonlLine } from './append-jsonl-line.js';
 import type { ToolCallRecord } from './dispatch.js';
 
 /** Only the first ~1 KB of a tool's result is kept on the row (never the full output). */
 export const OUTPUT_PREVIEW_LIMIT = 1024;
 
 /**
- * Append one audit row for a dispatched tool call. Creates `<projectPath>/.orchestrator/` on first
- * write (no startup dance), opens the JSONL in append mode, writes the line, and fsyncs before
- * closing so prior rows are always intact on disk.
+ * Append one audit row for a dispatched tool call. Builds the row shape, then hands it to the shared
+ * appendJsonlLine writer, which creates `<projectPath>/.orchestrator/` on first write and fsyncs the
+ * line so prior rows are always intact on disk.
  */
 export function appendAuditRow(projectPath: string, record: ToolCallRecord): void {
-  const dir = path.join(projectPath, '.orchestrator');
-  mkdirSync(dir, { recursive: true });
-  const file = path.join(dir, 'tool_audit.jsonl');
+  const file = path.join(projectPath, '.orchestrator', 'tool_audit.jsonl');
 
   const output = record.output;
   const row: Record<string, unknown> = {
@@ -46,12 +45,5 @@ export function appendAuditRow(projectPath: string, record: ToolCallRecord): voi
     row['subagent_id'] = record.subagentId;
   }
 
-  const line = `${JSON.stringify(row)}\n`;
-  const fd = openSync(file, 'a');
-  try {
-    writeSync(fd, line);
-    fsyncSync(fd);
-  } finally {
-    closeSync(fd);
-  }
+  appendJsonlLine(file, row);
 }

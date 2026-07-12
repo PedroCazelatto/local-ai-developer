@@ -11,12 +11,14 @@ import type { SandboxClient } from '../container/index.js';
 import { OllamaClient } from '../llm/index.js';
 import type { Message, StreamHandle, TokenCounts, Tool, ToolCall } from '../llm/index.js';
 import * as renderer from '../ui/renderer.js';
+import { addTokenCounts } from './add-token-counts.js';
 import { appendAuditRow } from './audit.js';
 import type { SessionConfig } from './config.js';
 import { dispatchToolCall } from './dispatch.js';
+import { appendEvent } from './events-log.js';
 import { SessionMemory } from './memory.js';
 import { compactActivePhase } from './summarizer.js';
-import type { ArchiveSummary, ClearResult } from './memory-store.type.js';
+import type { ArchiveSummary, ClearResult, PhaseLoad } from './memory-store.type.js';
 import { SubagentManager, SUBAGENT_TOOL_NAMES } from './subagents.js';
 import type { SubagentInfo } from './subagents.type.js';
 import { processMessage as processTurns } from './turn-loop.js';
@@ -51,6 +53,17 @@ export class SessionOrchestrator implements TurnContext {
   // The EXACT prompt_eval_count of each phase's most recent call (null when Ollama omitted it).
   private readonly lastPromptTokens = new Map<string, number | null>();
 
+  // Cost visibility (V5/04): the EXACT cumulative token total per phase, folded from each turn's
+  // prompt_eval_count / eval_count via addTokenCounts (a null on any turn POISONS the sum to null,
+  // so a missing count is surfaced as incomplete — never estimated). Surfaced on the status line.
+  private readonly phaseTokens = new Map<string, TokenCounts>();
+
+  // Summarization events (V5/04) are DEFERRED: when beforeModelCall compacts a phase, we can't yet
+  // know the post-compaction prompt size — that arrives on the NEXT call's onTokens. This maps a phase
+  // to its pre-compaction EXACT prompt count ("before"); onTokens emits summarization_fire with the
+  // next call's exact prompt count as "after", then clears the entry.
+  private readonly pendingSummarization = new Map<string, number | null>();
+
   // The full tool set from the registry (V1/02), sent on every call for every phase — no per-phase
   // gating. Built once; the registry is static. Includes the three sub-agent tools (V5/01).
   private readonly tools: Tool[] = toolDefinitions();
@@ -78,7 +91,9 @@ export class SessionOrchestrator implements TurnContext {
     this.memory = new SessionMemory(config.projectPath); // JSONL-backed, under the project's .orchestrator/
     this.phase = PhaseFactory.get(config.initialPhase);
     // activatePhase LAZILY loads this phase's `<phase>.jsonl` — so a restart resumes where it stopped.
-    this.memory.activatePhase(this.phase.name);
+    // On a restart that restores persisted turns, emit a V5/04 memory_load carrying the exact restored
+    // prompt_eval_count (a fresh project with no history emits nothing — emitMemoryLoad guards on turns).
+    this.emitMemoryLoad(this.memory.activatePhase(this.phase.name));
     // The manager gets the FULL tool set and filters the three sub-agent tools out of each sub-agent's
     // own defs (no nesting). num_ctx is the session's; the live model is read from `llm` at spawn (V5/02 —
     // every window shares the one live model, which only ever changes between turns).
@@ -105,7 +120,13 @@ export class SessionOrchestrator implements TurnContext {
    * is blocked during any turn/batch), so nothing in flight ever changes model mid-work.
    */
   useModel(name: string): void {
+    const from = this.llm.model;
     this.llm.setModel(name);
+    // V5/04 model_use: only a real switch is worth a row (a no-op `/models use <current>` is dropped
+    // earlier by the command, but guard here too).
+    if (from !== name) {
+      appendEvent(this.projectPath, { type: 'model_use', phase: this.phase.name, detail: { from, to: name } });
+    }
   }
 
   /** Count of live sub-agents (V5/01) — the status line's `Subagents: N`, omitted when zero. */
@@ -136,6 +157,18 @@ export class SessionOrchestrator implements TurnContext {
     return promptTokens + evalTokens;
   }
 
+  /**
+   * Cost visibility (V5/04): the ACTIVE phase's EXACT cumulative token total (prompt + eval summed
+   * across every turn), for the status line's `Σ` field. `0` before the phase has taken any turn;
+   * `null` when some turn's count was unreported (surfaced as incomplete, never estimated).
+   */
+  get activePhaseTokenTotal(): number | null {
+    const total = this.phaseTokens.get(this.phase.name);
+    if (total === undefined) return 0;
+    if (total.promptTokens === null || total.evalTokens === null) return null;
+    return total.promptTokens + total.evalTokens;
+  }
+
   availablePhases(): string[] {
     return PhaseFactory.availablePhases();
   }
@@ -147,8 +180,35 @@ export class SessionOrchestrator implements TurnContext {
 
   /** Switch active phase; loads its instructions and (lazily, from disk) its own history (no leak). */
   switchPhase(name: string): void {
+    const from = this.phase.name;
     this.phase = PhaseFactory.get(name);
-    this.memory.activatePhase(this.phase.name);
+    const load = this.memory.activatePhase(this.phase.name);
+    // V5/04 phase_swap (covers /swap AND the Shift+Tab cycle — both route through here); skip a no-op
+    // swap to the same phase. `phase` is the now-active phase; `detail` carries both ends.
+    if (from !== this.phase.name) {
+      appendEvent(this.projectPath, {
+        type: 'phase_swap',
+        phase: this.phase.name,
+        detail: { from, to: this.phase.name },
+      });
+    }
+    // A first-time activation that restored persisted turns also logs a memory_load (V5/04).
+    this.emitMemoryLoad(load);
+  }
+
+  /**
+   * Emit a V5/04 `memory_load` event when a phase activation actually restored persisted history: only
+   * on a first-time disk load with turns to show (a fresh phase or a re-activation from RAM emits
+   * nothing). Carries turnsLoaded + the EXACT restored prompt_eval_count when one was recorded.
+   */
+  private emitMemoryLoad(load: PhaseLoad): void {
+    if (!load.loadedFromDisk || load.turns === 0) return;
+    appendEvent(this.projectPath, {
+      type: 'memory_load',
+      phase: this.phase.name,
+      detail: { phase: this.phase.name, turnsLoaded: load.turns },
+      ...(load.lastPromptTokens !== null ? { promptTokens: load.lastPromptTokens } : {}),
+    });
   }
 
   /** `/clear` (V4/04): archive the active phase's history, reset it in-RAM. Other phases untouched. */
@@ -227,14 +287,38 @@ export class SessionOrchestrator implements TurnContext {
 
   onTokens(tokens: TokenCounts): void {
     this.lastTokens = tokens;
+    const phase = this.phase.name;
+    // Cost visibility (V5/04): fold this turn's EXACT counts into the phase's running total (a null
+    // poisons the sum to null, surfaced as incomplete on the status line — never a 0-coerced guess).
+    const prior = this.phaseTokens.get(phase) ?? { promptTokens: 0, evalTokens: 0 };
+    this.phaseTokens.set(phase, addTokenCounts(prior, tokens));
+    // If a compaction fired for this phase before THIS call, this call's prompt_eval_count is the exact
+    // post-compaction "after" — pair it with the stored "before" and emit the deferred summarization_fire.
+    if (this.pendingSummarization.has(phase)) {
+      const before = this.pendingSummarization.get(phase) ?? null;
+      this.pendingSummarization.delete(phase);
+      this.emitSummarizationFire(phase, before, tokens.promptTokens);
+    }
     // Failsafe trigger (V4/05): remember this phase's EXACT last prompt size and, if it reached the
     // threshold, schedule a compaction to run BEFORE this phase's next model call. A null count
     // (Ollama omitted the metric) can't ground a VRAM decision — never estimate, so never schedule.
-    const phase = this.phase.name;
     this.lastPromptTokens.set(phase, tokens.promptTokens);
     if (tokens.promptTokens !== null && tokens.promptTokens >= this.summarizationThreshold) {
       this.scheduledPhases.add(phase);
     }
+  }
+
+  /**
+   * Emit a V5/04 `summarization_fire` with EXACT before/after prompt-token counts. Either count may be
+   * null (Ollama omitted it) — a null is OMITTED from `detail` and flagged `incomplete: true` rather
+   * than estimated (constitution: surface a missing metric, never guess).
+   */
+  private emitSummarizationFire(phase: string, before: number | null, after: number | null): void {
+    const detail: Record<string, string | number | boolean> = {};
+    if (before !== null) detail['before'] = before;
+    if (after !== null) detail['after'] = after;
+    if (before === null || after === null) detail['incomplete'] = true;
+    appendEvent(this.projectPath, { type: 'summarization_fire', phase, detail });
   }
 
   /**
@@ -248,11 +332,18 @@ export class SessionOrchestrator implements TurnContext {
     const phase = this.phase.name;
     if (!this.scheduledPhases.has(phase)) return;
     this.scheduledPhases.delete(phase);
+    // The EXACT prompt size that tripped the failsafe — the "before" for the V5/04 summarization_fire.
+    const before = this.lastPromptTokens.get(phase) ?? null;
     // The one user-visible status line the task specifies.
     renderer.systemMessage(`Compacting ${titleCase(phase)} history (failsafe)...`);
     // compactActivePhase: collapse the active phase's oldest ~50% visible turns into one `summary`
     // record (throwaway oneShot; append-only on disk; the in-RAM view collapses). Exact tokens only.
-    await compactActivePhase({ llm: this.llm, memory: this.memory });
+    const result = await compactActivePhase({ llm: this.llm, memory: this.memory });
+    // Only a real compaction earns an event: defer it to the next call's onTokens, which supplies the
+    // exact post-compaction "after" prompt count. Nothing-to-compact (null) emits nothing.
+    if (result !== null) {
+      this.pendingSummarization.set(phase, before);
+    }
   }
 
   addAssistant(content: string, toolCalls?: ToolCall[]): void {

@@ -43,6 +43,19 @@ export interface ClearResult {
 }
 
 /**
+ * What `activatePhase` reports back so the orchestrator can emit a V5/04 `memory_load` event. A load
+ * only counts on a phase's FIRST activation this session (an actual disk read); re-activating a phase
+ * already in RAM reads nothing new. `lastPromptTokens` is the most recent persisted prompt_eval_count
+ * — the EXACT restored context size — or null if none was ever recorded (never estimated).
+ */
+export interface PhaseLoad {
+  readonly loadedFromDisk: boolean;
+  /** Visible messages rebuilt into the prompt on load (0 for a fresh phase with no persisted turns). */
+  readonly turns: number;
+  readonly lastPromptTokens: number | null;
+}
+
+/**
  * A `/resume` listing entry for one archived history, derived DIRECTLY from the JSONL — no LLM call,
  * no cost. `file` is the archive basename to restore; the rest is the human-readable summary line.
  */

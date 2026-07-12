@@ -6,12 +6,15 @@ export type { AppState } from './app-state.type.js';
 export { SessionOrchestrator } from './orchestrator.js';
 export { SessionMemory } from './memory.js';
 export type { ChatRole } from './memory.js';
-export type { ArchiveSummary, ClearResult, MemoryRecord, MemoryRole } from './memory-store.type.js';
+export type { ArchiveSummary, ClearResult, MemoryRecord, MemoryRole, PhaseLoad } from './memory-store.type.js';
 export { MAX_TOOL_ROUNDS } from './turn-loop.js';
 export type { TurnContext } from './turn-loop.js';
 export { dispatchToolCall } from './dispatch.js';
 export type { ToolCallRecord, DispatchDeps } from './dispatch.js';
 export { appendAuditRow, OUTPUT_PREVIEW_LIMIT } from './audit.js';
+export { appendJsonlLine } from './append-jsonl-line.js';
+export { appendEvent } from './events-log.js';
+export type { OrchestratorEvent, OrchestratorEventInput, OrchestratorEventType } from './events-log.type.js';
 export {
   readBacklog,
   setTaskStatus,
