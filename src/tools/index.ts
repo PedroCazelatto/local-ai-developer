@@ -27,6 +27,10 @@ export { inboxResolveTool } from './inbox-resolve.js';
 // On-demand standards retrieval (V4/02) — global registry tools.
 export { searchRulesTool } from './search-rules.js';
 export { loadRuleTool } from './load-rule.js';
+// Sub-agents (V5/01) — global registry tools; the orchestrator backs them with the SubagentManager.
+export { spawnSubagentTool, SPAWN_SUBAGENT } from './spawn-subagent.js';
+export { askSubagentTool, ASK_SUBAGENT } from './ask-subagent.js';
+export { dismissSubagentTool, DISMISS_SUBAGENT } from './dismiss-subagent.js';
 export { truncateHeadTail, DEFAULT_OUTPUT_LIMIT } from './truncate.js';
 // Phase-scoped (Reviewer-only, V2/01) — deliberately NOT added to the registry in registry.ts.
 export { submitVerdictTool, parseVerdict, SUBMIT_VERDICT } from './submit-verdict.js';

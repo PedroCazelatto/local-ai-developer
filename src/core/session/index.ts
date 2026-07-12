@@ -59,3 +59,12 @@ export { spawnRetro, RetroError } from './retro-runner.js';
 export type { RetroInput, RetroResult, RetroScope, RetroDeps, RetroSubmission } from './retro-runner.type.js';
 export { buildCommitMessage } from './commit-message.js';
 export type { CommitMessageInput } from './commit-message.js';
+export { SubagentManager, SUBAGENT_TOOL_NAMES, SUBAGENT_SHORT_ID_LEN } from './subagents.js';
+export type {
+  SubagentInfo,
+  SubagentState,
+  SubagentDeps,
+  SubagentHandle,
+  SubagentSpawnResult,
+  SubagentAskOutcome,
+} from './subagents.type.js';

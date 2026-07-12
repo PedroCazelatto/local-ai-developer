@@ -17,6 +17,8 @@ import { dispatchToolCall } from './dispatch.js';
 import { SessionMemory } from './memory.js';
 import { compactActivePhase } from './summarizer.js';
 import type { ArchiveSummary, ClearResult } from './memory-store.type.js';
+import { SubagentManager, SUBAGENT_TOOL_NAMES } from './subagents.js';
+import type { SubagentInfo } from './subagents.type.js';
 import { processMessage as processTurns } from './turn-loop.js';
 import type { TurnContext } from './turn-loop.js';
 import { runTaskLoop } from './run-task-loop.js';
@@ -51,8 +53,19 @@ export class SessionOrchestrator implements TurnContext {
   private readonly lastPromptTokens = new Map<string, number | null>();
 
   // The full tool set from the registry (V1/02), sent on every call for every phase — no per-phase
-  // gating. Built once; the registry is static.
+  // gating. Built once; the registry is static. Includes the three sub-agent tools (V5/01).
   private readonly tools: Tool[] = toolDefinitions();
+
+  // The tool set handed to spawned EXECUTION windows (Worker/Reviewer/Retro): `tools` minus the three
+  // sub-agent tools, since those windows have no SubagentManager to back them. Interactive phases still
+  // get the full `tools`. Built once (the registry is static).
+  private readonly executionTools: Tool[] = this.tools.filter(
+    (tool) => !SUBAGENT_TOOL_NAMES.includes(tool.function.name ?? ''),
+  );
+
+  // Sub-agents (V5/01) the interactive phases spawn mid-turn: in-memory only, dropped at session end.
+  // Exposed to the sub-agent tools via ctx.subagents, to `/subagents`, and to the status-line count.
+  private readonly subagents: SubagentManager;
 
   constructor(config: SessionConfig, llm: OllamaClient, sandbox: SandboxClient) {
     this.project = config.projectName;
@@ -68,6 +81,27 @@ export class SessionOrchestrator implements TurnContext {
     this.phase = PhaseFactory.get(config.initialPhase);
     // activatePhase LAZILY loads this phase's `<phase>.jsonl` — so a restart resumes where it stopped.
     this.memory.activatePhase(this.phase.name);
+    // The manager gets the FULL tool set and filters the three sub-agent tools out of each sub-agent's
+    // own defs (no nesting). Same session model + num_ctx (no per-sub-agent config).
+    this.subagents = new SubagentManager({
+      llm: this.llm,
+      tools: this.tools,
+      sandbox: this.sandbox,
+      projectName: this.project,
+      projectPath: this.projectPath,
+      model: this.model,
+      numCtx: this.numCtx,
+    });
+  }
+
+  /** Count of live sub-agents (V5/01) — the status line's `Subagents: N`, omitted when zero. */
+  get subagentCount(): number {
+    return this.subagents.count;
+  }
+
+  /** Snapshot of every live sub-agent for the `/subagents` command (id, age, messages, exact tokens). */
+  listSubagents(): SubagentInfo[] {
+    return this.subagents.list();
   }
 
   get activePhase(): string {
@@ -134,7 +168,7 @@ export class SessionOrchestrator implements TurnContext {
     return runTaskLoop(
       {
         llm: this.llm,
-        tools: this.tools,
+        tools: this.executionTools, // spawned windows don't get the sub-agent tools (no manager backs them)
         sandbox: this.sandbox,
         projectName: this.project,
         projectPath: this.projectPath,
@@ -157,7 +191,7 @@ export class SessionOrchestrator implements TurnContext {
     return spawnRetroWindow(
       {
         llm: this.llm,
-        tools: this.tools,
+        tools: this.executionTools, // spawned windows don't get the sub-agent tools (no manager backs them)
         sandbox: this.sandbox,
         projectName: this.project,
         projectPath: this.projectPath,
@@ -231,6 +265,7 @@ export class SessionOrchestrator implements TurnContext {
       sandbox: this.sandbox,
       phase: this.phase.name,
       llm: this.llm, // backs ctx.oneShot for search_rules (V4/02)
+      subagents: this.subagents, // ONLY the interactive master phases can spawn sub-agents (V5/01)
     });
     // Every dispatched call — success, failure, or sub-step — is appended to the audit log (V1/06).
     return dispatchToolCall(ctx, name, args, {

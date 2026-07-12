@@ -6,6 +6,7 @@
 
 import type { SandboxClient } from '../core/container/index.js';
 import type { Message, OneShotResult } from '../core/llm/index.js';
+import type { SubagentHandle } from '../core/session/subagents.type.js';
 
 // ------------------------------------------------------------------ JSON + JSON-schema vocabulary
 
@@ -97,6 +98,13 @@ export interface ToolContext {
    * by createToolContext; most tools ignore it.
    */
   oneShot(messages: Message[]): Promise<OneShotResult>;
+  /**
+   * The session's sub-agent manager (V5/01), present ONLY for the interactive master phases — they can
+   * spawn/ask/dismiss sub-agents. Undefined inside spawned windows (Worker/Reviewer/Retro) and inside a
+   * sub-agent's own dispatch, so those cannot spawn (no nesting — also enforced by the three tools being
+   * absent from their tool lists). Only the three sub-agent tools read this; every other tool ignores it.
+   */
+  readonly subagents?: SubagentHandle;
 }
 
 /** One model-callable action. Dropped into src/tools/ and picked up by the registry (V1/02). */

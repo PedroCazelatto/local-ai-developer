@@ -9,6 +9,7 @@ import path from 'node:path';
 import type { SandboxClient } from '../core/container/index.js';
 import { oneShot } from '../core/llm/index.js';
 import type { Message, OllamaClient, OneShotResult } from '../core/llm/index.js';
+import type { SubagentHandle } from '../core/session/subagents.type.js';
 import type { ToolContext } from './types.js';
 
 /** "/workspace" — where the active project is bind-mounted inside the sandbox (Foundation/04). */
@@ -36,6 +37,12 @@ export interface ToolContextInit {
   readonly phase: string;
   /** The session's OllamaClient — backs ctx.oneShot for the standards-retrieval tools (V4/02). */
   readonly llm: OllamaClient;
+  /**
+   * The session's sub-agent manager (V5/01), passed ONLY by the orchestrator for interactive master
+   * phases. Omitted by the spawned-window runners (Worker/Reviewer/Retro) and the sub-agent's own
+   * dispatch, so `ctx.subagents` is undefined there and the sub-agent tools degrade to a recoverable error.
+   */
+  readonly subagents?: SubagentHandle;
 }
 
 /**
@@ -51,5 +58,6 @@ export function createToolContext(init: ToolContextInit): ToolContext {
     phase: init.phase,
     resolve: (relative: string): string => resolveInProject(init.projectPath, relative),
     oneShot: (messages: Message[]): Promise<OneShotResult> => oneShot(init.llm, messages),
+    subagents: init.subagents, // undefined for every context except the interactive master phases (V5/01)
   };
 }

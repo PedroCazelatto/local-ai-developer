@@ -20,6 +20,7 @@ export interface ToolCallRecord {
   readonly output: string; // full tool result (the sink truncates to a preview)
   readonly error: string | null; // null on success; the error message on failure
   readonly metadata?: JsonObject; // tool-specific fields (e.g. execute_command's workdir)
+  readonly subagentId?: string; // set (by the SubagentManager sink) for a sub-agent's own call — V5/01 lineage
 }
 
 export interface DispatchDeps {

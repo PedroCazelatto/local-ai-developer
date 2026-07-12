@@ -4,6 +4,8 @@
 // whitelist (the phase markdown steers which tools to use; the orchestrator never gates access).
 
 import type { Tool } from '../core/llm/index.js';
+import { askSubagentTool } from './ask-subagent.js';
+import { dismissSubagentTool } from './dismiss-subagent.js';
 import { editFileTool } from './edit-file.js';
 import { executeCommandTool } from './execute-command.js';
 import { inboxPostTool } from './inbox-post.js';
@@ -15,6 +17,7 @@ import { readFileTool } from './read-file.js';
 import { runInProjectTool } from './run-in-project.js';
 import { searchInFilesTool } from './search-in-files.js';
 import { searchRulesTool } from './search-rules.js';
+import { spawnSubagentTool } from './spawn-subagent.js';
 import type { ToolModule } from './types.js';
 import { writeFileTool } from './write-file.js';
 
@@ -36,6 +39,12 @@ const TOOL_MODULES: readonly ToolModule[] = [
   // resolve an intent to a standard name and load that one body without the catalog entering context.
   searchRulesTool,
   loadRuleTool,
+  // Sub-agents (V5/01) — spawn/ask/dismiss a fresh-context worker. Registered globally so the
+  // interactive phases advertise them; the orchestrator backs them with the SubagentManager and does
+  // NOT pass them to the spawned execution windows (Worker/Reviewer/Retro), which have no manager.
+  spawnSubagentTool,
+  askSubagentTool,
+  dismissSubagentTool,
 ];
 
 /** name → module, built once with a duplicate-name guard (a dup is a build-time mistake, fail loud). */

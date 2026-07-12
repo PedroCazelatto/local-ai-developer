@@ -16,6 +16,7 @@ import type {
   ClearResult,
   RetroInput,
   RetroResult,
+  SubagentInfo,
   Task,
   TaskLoopReporter,
   TaskLoopResult,
@@ -28,6 +29,7 @@ import { clearCommand } from './commands/clear.js';
 import { newProjectCommand } from './commands/new-project.js';
 import { resumeCommand } from './commands/resume.js';
 import { runCommand } from './commands/run.js';
+import { subagentsCommand } from './commands/subagents.js';
 
 /**
  * What the REPL needs from the orchestrator (task 06's SessionOrchestrator satisfies this
@@ -43,6 +45,10 @@ export interface ReplOrchestrator {
   readonly projectPath: string;
   /** EXACT combined tokens from the last turn, or null if Ollama didn't report them. */
   readonly lastTurnTokenTotal: number | null;
+  /** Count of live sub-agents (V5/01) — the status line shows `Subagents: N` while any are active. */
+  readonly subagentCount: number;
+  /** /subagents (V5/01): a snapshot of every live sub-agent (id, age, message count, exact tokens). */
+  listSubagents(): SubagentInfo[];
   /** Run the full turn loop for a chat message (streams output + dispatches tools). */
   processMessage(userInput: string): Promise<void>;
   /** Run the V3/01 implement→test→review→fix loop for a backlog task (auto-commits on pass). */
@@ -130,7 +136,9 @@ export async function runRepl(orch: ReplOrchestrator): Promise<void> {
  */
 function updateStatus(orch: ReplOrchestrator): void {
   const tokens = orch.lastTurnTokenTotal === null ? '0' : String(orch.lastTurnTokenTotal);
-  statusBar.set(`${orch.project} · ${orch.activePhase} · ${orch.model} · ${tokens}/${orch.numCtx} tok`);
+  // `Subagents: N` is appended only while any are active (V5/01); dropped entirely at zero.
+  const subs = orch.subagentCount > 0 ? ` · Subagents: ${orch.subagentCount}` : '';
+  statusBar.set(`${orch.project} · ${orch.activePhase} · ${orch.model} · ${tokens}/${orch.numCtx} tok${subs}`);
 }
 
 /** Dispatch a `/command`. Returns true only for `/exit` (signals the loop to stop). */
@@ -180,6 +188,10 @@ async function handleCommand(orch: ReplOrchestrator, input: string, rl: Readline
     case 'clear':
       // Wipe ONLY the active phase's history (V4/04): archive its JSONL + reset in-RAM, no confirm.
       clearCommand(orch);
+      return false;
+    case 'subagents':
+      // List the live sub-agents this session spawned (V5/01): id, age, message count, exact tokens.
+      subagentsCommand(orch);
       return false;
     case 'resume':
       // Restore one of the active phase's last-3 archives (V4/04): prompts over the REPL's readline.

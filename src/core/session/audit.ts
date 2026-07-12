@@ -40,6 +40,11 @@ export function appendAuditRow(projectPath: string, record: ToolCallRecord): voi
   if (record.metadata !== undefined) {
     row['metadata'] = record.metadata;
   }
+  // A sub-agent's own tool call (V5/01) carries its id so lineage traces back to the sub-agent; a
+  // master-phase call omits the field entirely (never a null placeholder).
+  if (record.subagentId !== undefined) {
+    row['subagent_id'] = record.subagentId;
+  }
 
   const line = `${JSON.stringify(row)}\n`;
   const fd = openSync(file, 'a');
