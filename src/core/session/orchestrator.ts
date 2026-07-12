@@ -10,10 +10,12 @@ import { createToolContext, toolDefinitions } from '../../tools/index.js';
 import type { SandboxClient } from '../container/index.js';
 import { OllamaClient } from '../llm/index.js';
 import type { Message, StreamHandle, TokenCounts, Tool, ToolCall } from '../llm/index.js';
+import * as renderer from '../ui/renderer.js';
 import { appendAuditRow } from './audit.js';
 import type { SessionConfig } from './config.js';
 import { dispatchToolCall } from './dispatch.js';
 import { SessionMemory } from './memory.js';
+import { compactActivePhase } from './summarizer.js';
 import type { ArchiveSummary, ClearResult } from './memory-store.type.js';
 import { processMessage as processTurns } from './turn-loop.js';
 import type { TurnContext } from './turn-loop.js';
@@ -39,6 +41,15 @@ export class SessionOrchestrator implements TurnContext {
   private phase: Phase;
   private lastTokens: TokenCounts = NO_TOKENS;
 
+  // Summarization failsafe (V4/05). The trigger point (exact tokens): a phase whose last
+  // prompt_eval_count reaches this many tokens is scheduled to compact before its NEXT model call.
+  private readonly summarizationThreshold: number;
+  // Phases scheduled to compact before their next call. In-RAM only + keyed by phase, so it survives
+  // /swap but not a restart (post-restart the first call re-measures and reschedules if still large).
+  private readonly scheduledPhases = new Set<string>();
+  // The EXACT prompt_eval_count of each phase's most recent call (null when Ollama omitted it).
+  private readonly lastPromptTokens = new Map<string, number | null>();
+
   // The full tool set from the registry (V1/02), sent on every call for every phase — no per-phase
   // gating. Built once; the registry is static.
   private readonly tools: Tool[] = toolDefinitions();
@@ -48,6 +59,9 @@ export class SessionOrchestrator implements TurnContext {
     this.projectPath = config.projectPath;
     this.model = config.modelName;
     this.numCtx = config.numCtx;
+    // Exact token ceiling for the failsafe: ratio × num_ctx. Compared against the EXACT
+    // prompt_eval_count (never a length estimate — constitution) to schedule a compaction.
+    this.summarizationThreshold = config.summarizationThresholdRatio * config.numCtx;
     this.llm = llm;
     this.sandbox = sandbox;
     this.memory = new SessionMemory(config.projectPath); // JSONL-backed, under the project's .orchestrator/
@@ -165,6 +179,32 @@ export class SessionOrchestrator implements TurnContext {
 
   onTokens(tokens: TokenCounts): void {
     this.lastTokens = tokens;
+    // Failsafe trigger (V4/05): remember this phase's EXACT last prompt size and, if it reached the
+    // threshold, schedule a compaction to run BEFORE this phase's next model call. A null count
+    // (Ollama omitted the metric) can't ground a VRAM decision — never estimate, so never schedule.
+    const phase = this.phase.name;
+    this.lastPromptTokens.set(phase, tokens.promptTokens);
+    if (tokens.promptTokens !== null && tokens.promptTokens >= this.summarizationThreshold) {
+      this.scheduledPhases.add(phase);
+    }
+  }
+
+  /**
+   * Failsafe hook (V4/05), awaited by the turn loop before EACH model call. If this phase was
+   * scheduled (its last prompt_eval_count reached SUMMARIZATION_THRESHOLD_RATIO × num_ctx), compact
+   * its oldest ~50% of visible turns into a `summary` record via a throwaway call — synchronously, in
+   * this single-threaded loop (no parallelism, CLAUDE.md) — so the imminent call runs on the shrunken
+   * history. Cleared once per trip; if the next call is still large, onTokens simply reschedules.
+   */
+  async beforeModelCall(): Promise<void> {
+    const phase = this.phase.name;
+    if (!this.scheduledPhases.has(phase)) return;
+    this.scheduledPhases.delete(phase);
+    // The one user-visible status line the task specifies.
+    renderer.systemMessage(`Compacting ${titleCase(phase)} history (failsafe)...`);
+    // compactActivePhase: collapse the active phase's oldest ~50% visible turns into one `summary`
+    // record (throwaway oneShot; append-only on disk; the in-RAM view collapses). Exact tokens only.
+    await compactActivePhase({ llm: this.llm, memory: this.memory });
   }
 
   addAssistant(content: string, toolCalls?: ToolCall[]): void {
@@ -203,4 +243,9 @@ export class SessionOrchestrator implements TurnContext {
     const system = buildSystemPrompt(this.phase.instructions, `Project: ${this.project}`);
     return [{ role: 'system', content: system }, ...this.memory.history];
   }
+}
+
+/** Phase ids are lowercase in-code; display them Titlecased to match the task's `<Phase>` wording. */
+function titleCase(phase: string): string {
+  return phase.charAt(0).toUpperCase() + phase.slice(1);
 }

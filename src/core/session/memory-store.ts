@@ -144,23 +144,24 @@ function toMessage(record: MemoryRecord): Message {
 }
 
 /**
- * The live in-memory view of a phase's records: walk them in order, DROPPING any turn a later
- * `summary` record `replaces` (V4/05's collapse), and convert the survivors to Messages. This task
- * implements the skip walk so V4/05 only has to add the WRITING side.
+ * The currently-visible records of a phase: walk them in order, DROPPING any turn a later `summary`
+ * record `replaces` (V4/05's collapse), and keep the survivors (summaries included). THE single
+ * source of truth for "what the phase still sees" — recordsToMessages renders it, and V4/05's
+ * oldest-50% selection is taken from it — so the skip walk is defined exactly once.
  */
-export function recordsToMessages(records: readonly MemoryRecord[]): Message[] {
+export function visibleRecords(records: readonly MemoryRecord[]): MemoryRecord[] {
   const replaced = new Set<string>();
   for (const record of records) {
     if (record.role === 'summary' && record.replaces !== undefined) {
       for (const id of record.replaces) replaced.add(id);
     }
   }
-  const messages: Message[] = [];
-  for (const record of records) {
-    if (replaced.has(record.id)) continue;
-    messages.push(toMessage(record));
-  }
-  return messages;
+  return records.filter((record) => !replaced.has(record.id));
+}
+
+/** The live in-memory Message view of a phase's records: the visible survivors, converted to Messages. */
+export function recordsToMessages(records: readonly MemoryRecord[]): Message[] {
+  return visibleRecords(records).map(toMessage);
 }
 
 /**

@@ -10,7 +10,7 @@
 // count-then-append is race-free, so no locking is needed.
 
 import type { Message, ToolCall } from '../llm/index.js';
-import { appendRecord, archiveActive, listArchives, readRecords, recordsToMessages, restoreArchive } from './memory-store.js';
+import { appendRecord, archiveActive, listArchives, readRecords, recordsToMessages, restoreArchive, visibleRecords } from './memory-store.js';
 import type { ArchiveSummary, ClearResult, MemoryRecord } from './memory-store.type.js';
 
 /** Valid chat roles for a stored message. */
@@ -64,6 +64,42 @@ export class SessionMemory {
     records.push(record);
     this.records.set(phase, records);
     appendRecord(this.projectPath, phase, record);
+  }
+
+  /**
+   * V4/05 failsafe: append a synthetic `summary` record that COLLAPSES the turns in `replaces`.
+   * Mirrors add() but for the `summary` role (which add() forbids) and carries the throwaway
+   * summarization call's EXACT tokens. The record lands in the RAM array AND `<phase>.jsonl`
+   * (append-only — originals are never removed); the live `history` view then drops every replaced
+   * turn (recordsToMessages) and renders this summary in their place.
+   */
+  appendSummary(
+    content: string,
+    replaces: string[],
+    tokens: { readonly prompt: number | null; readonly completion: number | null },
+  ): void {
+    const phase = this.requireActive();
+    const records = this.records.get(phase) ?? [];
+    const record: MemoryRecord = {
+      id: String(records.length + 1), // per-file sequential id == file line count (as in add)
+      ts: new Date().toISOString(),
+      role: 'summary',
+      content,
+      tokens,
+      replaces,
+    };
+    records.push(record);
+    this.records.set(phase, records);
+    appendRecord(this.projectPath, phase, record);
+  }
+
+  /**
+   * The active phase's CURRENTLY-VISIBLE records (turns already collapsed by an earlier summary are
+   * dropped) — the summarizer's input for its oldest-50% selection. Empty when no phase is active.
+   */
+  activeVisibleRecords(): readonly MemoryRecord[] {
+    if (this.active === null) return [];
+    return visibleRecords(this.records.get(this.active) ?? []);
   }
 
   /** `/clear`: archive the active phase's file, then reset its in-RAM history to empty. */

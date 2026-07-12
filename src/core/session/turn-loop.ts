@@ -16,6 +16,12 @@ export const MAX_TOOL_ROUNDS = 8;
 /** What the turn loop needs from the orchestrator. Keeps the loop decoupled from its internals. */
 export interface TurnContext {
   readonly activePhase: string;
+  /**
+   * Optional failsafe hook run BEFORE each model call (V4/05). The orchestrator uses it to compact an
+   * over-threshold phase's history synchronously, so the imminent call streams on the shrunken view.
+   * Absent for spawned windows (Worker/Reviewer/Retro) — they have no persisted history to compact.
+   */
+  beforeModelCall?(): Promise<void>;
   /** Add the user message to memory, then start streaming the reply. */
   streamAsk(userInput: string): StreamHandle;
   /** Stream the next assistant turn from current memory WITHOUT injecting a user message. */
@@ -62,6 +68,9 @@ export async function processMessage(
  * dispatched (caller should run another turn), false otherwise.
  */
 async function runTurn(ctx: TurnContext, start: () => StreamHandle): Promise<boolean> {
+  // Run any pre-call failsafe (V4/05 summarization) BEFORE the user turn is added / the stream opens,
+  // so the imminent call runs on the compacted history. A no-op for spawned windows (hook absent).
+  await ctx.beforeModelCall?.();
   startThinking();
   const handle = start();
 

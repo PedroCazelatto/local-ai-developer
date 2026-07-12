@@ -18,6 +18,11 @@ export const DEFAULT_MODEL = 'qwen2.5-coder:3b';
 /** num_ctx is a hard VRAM ceiling — never estimated or invented (CLAUDE.md memory model). */
 export const DEFAULT_NUM_CTX = 16384;
 export const DEFAULT_PHASE = 'discovery';
+/**
+ * Summarization failsafe trigger (V4/05): compact a phase once its EXACT prompt_eval_count reaches
+ * this fraction of num_ctx. 0.75 leaves headroom for the next response + tool-result payloads.
+ */
+export const DEFAULT_SUMMARIZATION_THRESHOLD_RATIO = 0.75;
 
 export interface SessionConfig {
   /** The locked <project-name> from argv (source of truth). */
@@ -28,6 +33,12 @@ export interface SessionConfig {
   readonly modelName: string;
   /** From OLLAMA_NUM_CTX, else DEFAULT_NUM_CTX. */
   readonly numCtx: number;
+  /**
+   * From SUMMARIZATION_THRESHOLD_RATIO (a value in (0, 1]), else
+   * DEFAULT_SUMMARIZATION_THRESHOLD_RATIO. The failsafe (V4/05) compacts a phase when its exact
+   * prompt_eval_count ≥ this ratio × numCtx.
+   */
+  readonly summarizationThresholdRatio: number;
   /** Phase the session opens in. */
   readonly initialPhase: string;
 }
@@ -46,6 +57,27 @@ function resolveNumCtx(): number {
     return DEFAULT_NUM_CTX;
   }
   return Math.floor(parsed);
+}
+
+/**
+ * Read SUMMARIZATION_THRESHOLD_RATIO, guarding NaN / a value outside (0, 1] by falling back loudly.
+ * A ratio ≤ 0 never leaves headroom, and a ratio > 1 would let a phase blow past num_ctx before the
+ * failsafe fires — both defeat the VRAM safety it exists for, so reject them and use the default.
+ */
+function resolveThresholdRatio(): number {
+  const raw = process.env.SUMMARIZATION_THRESHOLD_RATIO;
+  if (raw === undefined || raw.trim() === '') {
+    return DEFAULT_SUMMARIZATION_THRESHOLD_RATIO;
+  }
+  const parsed = Number(raw);
+  if (!Number.isFinite(parsed) || parsed <= 0 || parsed > 1) {
+    console.warn(
+      `Warning: SUMMARIZATION_THRESHOLD_RATIO='${raw}' is not a number in (0, 1]; ` +
+        `using default ${DEFAULT_SUMMARIZATION_THRESHOLD_RATIO}.`,
+    );
+    return DEFAULT_SUMMARIZATION_THRESHOLD_RATIO;
+  }
+  return parsed;
 }
 
 /**
@@ -77,6 +109,7 @@ export function loadConfig(projectName: string): SessionConfig {
     projectPath,
     modelName: DEFAULT_MODEL,
     numCtx: resolveNumCtx(),
+    summarizationThresholdRatio: resolveThresholdRatio(),
     initialPhase: DEFAULT_PHASE,
   };
 }
