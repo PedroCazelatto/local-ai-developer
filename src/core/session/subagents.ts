@@ -58,7 +58,10 @@ export class SubagentManager implements SubagentHandle {
     const id = generateSubagentId();
     const state: SubagentState = {
       id,
-      model: this.deps.model,
+      // The live session model AT SPAWN (V5/02). Recorded for reference only — its turns dispatch through
+      // the shared client, so it follows the session's current live model like every other window (the
+      // model only ever changes between turns). Same at spawn since a switch can't happen mid-work.
+      model: this.deps.llm.model,
       numCtx: this.deps.numCtx,
       // Seeded ONLY with the master's brief + task — never the master's history (isolation).
       messages: [{ role: 'system', content: initialContext }],

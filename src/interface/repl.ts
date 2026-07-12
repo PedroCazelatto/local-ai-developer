@@ -24,6 +24,7 @@ import type {
 import * as renderer from '../core/ui/renderer.js';
 import * as statusBar from '../core/ui/status-bar.js';
 import { stopThinking } from '../core/ui/spinner.js';
+import { getCommand } from './command-registry.js';
 import { answerCommand } from './commands/answer.js';
 import { clearCommand } from './commands/clear.js';
 import { newProjectCommand } from './commands/new-project.js';
@@ -37,10 +38,13 @@ import { subagentsCommand } from './commands/subagents.js';
  */
 export interface ReplOrchestrator {
   readonly project: string;
+  /** Live session model (V5/02) — the status line reads it; /models use changes it via useModel. */
   readonly model: string;
   readonly numCtx: number;
   /** Current phase name — drives the status line + assistant prefix. */
   readonly activePhase: string;
+  /** /models use (V5/02): switch the live session model; the next turn + new windows/sub-agents use it. */
+  useModel(name: string): void;
   /** Host path to projects/<active> — the /run command reads the backlog from here. */
   readonly projectPath: string;
   /** EXACT combined tokens from the last turn, or null if Ollama didn't report them. */
@@ -143,7 +147,17 @@ function updateStatus(orch: ReplOrchestrator): void {
 
 /** Dispatch a `/command`. Returns true only for `/exit` (signals the loop to stop). */
 async function handleCommand(orch: ReplOrchestrator, input: string, rl: ReadlineInterface): Promise<boolean> {
-  const [command, ...rest] = input.slice(1).split(/\s+/);
+  const withoutSlash = input.slice(1);
+  const [command, ...rest] = withoutSlash.split(/\s+/);
+
+  // Registry-backed commands first (V5/02, e.g. /models). The switch below holds the not-yet-migrated
+  // commands; V5/03 migrates the rest and adds /help off the same registry. None of these exit the REPL.
+  const registered = getCommand(command ?? '');
+  if (registered) {
+    await registered.run({ orch, rl, args: rest, raw: withoutSlash });
+    return false;
+  }
+
   switch (command) {
     case 'exit':
       return true;
@@ -198,7 +212,7 @@ async function handleCommand(orch: ReplOrchestrator, input: string, rl: Readline
       await resumeCommand(orch, rl);
       return false;
     default:
-      // Shift+Tab phase-cycle and /help are V5; /models is V5. Not here.
+      // /models is handled above via the command registry (V5/02). Shift+Tab phase-cycle and /help are V5/03.
       renderer.errorLine(`Unknown command: /${command ?? ''}`);
       return false;
   }

@@ -13,7 +13,11 @@ import type { Message, OllamaClient, Tool } from '../llm/index.js';
  */
 export interface SubagentState {
   readonly id: string;
-  /** Model it was created with — kept for its whole life even if the session model later changes (V5/02). */
+  /**
+   * The live session model at spawn — a reference record only. A sub-agent's turns dispatch through the
+   * shared client, so it uses the session's CURRENT live model, not a pin (V5/02: every window shares the
+   * one model; it only changes between turns, never mid-work).
+   */
   readonly model: string;
   readonly numCtx: number;
   /** Its OWN isolated history: the system brief + the task + every turn since. Never the master's history. */
@@ -38,8 +42,7 @@ export interface SubagentDeps {
   readonly sandbox: SandboxClient;
   readonly projectName: string;
   readonly projectPath: string;
-  /** Session model + num_ctx, recorded on each SubagentState (same model — no per-sub-agent config). */
-  readonly model: string;
+  /** num_ctx recorded on each SubagentState. The model is read LIVE from `llm` at spawn (V5/02). */
   readonly numCtx: number;
 }
 

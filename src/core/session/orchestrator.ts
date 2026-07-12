@@ -32,7 +32,6 @@ const NO_TOKENS: TokenCounts = { promptTokens: null, evalTokens: null };
 export class SessionOrchestrator implements TurnContext {
   /** Read-only session facts for the status line (locked for the session's lifetime). */
   readonly project: string;
-  readonly model: string;
   readonly numCtx: number;
 
   /** Host path to projects/<active> — the ToolContext root and the sandbox's /workspace mount. */
@@ -70,7 +69,6 @@ export class SessionOrchestrator implements TurnContext {
   constructor(config: SessionConfig, llm: OllamaClient, sandbox: SandboxClient) {
     this.project = config.projectName;
     this.projectPath = config.projectPath;
-    this.model = config.modelName;
     this.numCtx = config.numCtx;
     // Exact token ceiling for the failsafe: ratio × num_ctx. Compared against the EXACT
     // prompt_eval_count (never a length estimate — constitution) to schedule a compaction.
@@ -82,16 +80,32 @@ export class SessionOrchestrator implements TurnContext {
     // activatePhase LAZILY loads this phase's `<phase>.jsonl` — so a restart resumes where it stopped.
     this.memory.activatePhase(this.phase.name);
     // The manager gets the FULL tool set and filters the three sub-agent tools out of each sub-agent's
-    // own defs (no nesting). Same session model + num_ctx (no per-sub-agent config).
+    // own defs (no nesting). num_ctx is the session's; the live model is read from `llm` at spawn (V5/02 —
+    // every window shares the one live model, which only ever changes between turns).
     this.subagents = new SubagentManager({
       llm: this.llm,
       tools: this.tools,
       sandbox: this.sandbox,
       projectName: this.project,
       projectPath: this.projectPath,
-      model: this.model,
       numCtx: this.numCtx,
     });
+  }
+
+  /** Live session model (V5/02) — the status line reads this; `/models use` changes it via useModel. */
+  get model(): string {
+    return this.llm.model;
+  }
+
+  /**
+   * Apply `/models use` (V5/02): switch the live model on the one shared client. Every subsequent turn —
+   * the active phase, and any newly spawned Worker/Reviewer/Retro window or sub-agent — runs against it;
+   * the status line reflects it on the next prompt (it reads `model`). Session-local; the command persists
+   * the choice to state.json so the next `run start` defaults to it. Callable only between turns (the REPL
+   * is blocked during any turn/batch), so nothing in flight ever changes model mid-work.
+   */
+  useModel(name: string): void {
+    this.llm.setModel(name);
   }
 
   /** Count of live sub-agents (V5/01) — the status line's `Subagents: N`, omitted when zero. */

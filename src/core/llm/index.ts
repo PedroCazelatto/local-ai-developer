@@ -6,6 +6,9 @@ export type { StreamHandle } from './client.js';
 // search_rules and shared with summarization (V4/05).
 export { oneShot } from './one-shot.js';
 export type { OneShotResult } from './one-shot.type.js';
+// V5/02: daemon model-management wrappers (list / pull / hasModel) for the `/models` command.
+export { listModels, hasModel, pullModel } from './ollama-models.js';
+export type { InstalledModel, PullProgress, PullProgressHandler, PullOutcome } from './ollama-models.type.js';
 export { StreamFilter } from './stream-filter.js';
 export { loadsOrRepair, repairDecode } from './json-repair.js';
 export { recoverToolCalls } from './tool-call-recovery.js';

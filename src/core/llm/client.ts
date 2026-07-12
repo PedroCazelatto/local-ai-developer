@@ -23,7 +23,11 @@ export interface StreamHandle {
 
 export class OllamaClient {
   private readonly ollama: Ollama;
-  private readonly modelName: string;
+  // Mutable session model (V5/02): the single source of truth for which model turns go to. Set at boot
+  // from config (state.json → DEFAULT_MODEL) and changed live by `/models use`. Every consumer — phase
+  // turns, spawned Worker/Reviewer/Retro windows, sub-agents, oneShot — reads it through this one client,
+  // so they all follow the live model together (the model only ever changes between turns, never mid-work).
+  private modelName: string;
   private readonly numCtx: number;
   private lastTokens: TokenCounts = NO_TOKENS;
 
@@ -31,6 +35,16 @@ export class OllamaClient {
     this.modelName = opts.modelName;
     this.numCtx = opts.numCtx;
     this.ollama = new Ollama();
+  }
+
+  /** The live session model — read by the status line and stamped onto new sub-agents at spawn (V5/02). */
+  get model(): string {
+    return this.modelName;
+  }
+
+  /** Switch the live session model (V5/02 `/models use`); the next chat/stream call uses it. */
+  setModel(name: string): void {
+    this.modelName = name;
   }
 
   /** Exact token counts from the most recent completed call (chat or stream). */

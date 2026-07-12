@@ -1,5 +1,8 @@
 // core/session/ — session orchestrator, per-phase isolated memory, and config.
 export * from './config.js';
+// V5/02: host-global app state (~/.local-ai-developer/state.json) — the persisted `/models use` choice.
+export { loadAppState, saveAppState } from './app-state.js';
+export type { AppState } from './app-state.type.js';
 export { SessionOrchestrator } from './orchestrator.js';
 export { SessionMemory } from './memory.js';
 export type { ChatRole } from './memory.js';

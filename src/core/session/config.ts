@@ -7,8 +7,12 @@
 import { existsSync, statSync } from 'node:fs';
 import path from 'node:path';
 
+import { loadAppState } from './app-state.js';
+
 /**
- * Hardcoded until the V5 UI model picker; do not add a MODEL_NAME env/UI selector before then.
+ * The FALLBACK default model — used only when neither state.json (a prior `/models use`, V5/02) nor a
+ * MODEL_NAME env var (there is none by design — model selection is a UI choice, not env) has set one.
+ * Runtime resolution order: state.json's activeModel → DEFAULT_MODEL.
  * TEMPORARY (2026-07-09): a 3B model so the loop is testable on an 8 GB M2 Air (unified memory),
  * where the 14B target won't fit alongside Docker + Node + Ollama. It only needs to emit valid tool
  * calls; output quality is irrelevant for testing. Revert to 'qwen2.5-coder:14b' — the intended
@@ -29,7 +33,7 @@ export interface SessionConfig {
   readonly projectName: string;
   /** Absolute path to projects/<name> — the same path task 04 bind-mounts as /workspace. */
   readonly projectPath: string;
-  /** DEFAULT_MODEL constant for now; UI picker is V5. */
+  /** Boot model: state.json's activeModel (a prior `/models use`, V5/02) if present, else DEFAULT_MODEL. */
   readonly modelName: string;
   /** From OLLAMA_NUM_CTX, else DEFAULT_NUM_CTX. */
   readonly numCtx: number;
@@ -104,10 +108,14 @@ export function loadConfig(projectName: string): SessionConfig {
     );
   }
 
+  // Resolution order (task 02): persisted state.json → DEFAULT_MODEL. loadAppState never throws — a
+  // missing file is normal, a corrupt one falls back with a surfaced warning — so boot can't crash here.
+  const modelName = loadAppState().activeModel ?? DEFAULT_MODEL;
+
   return {
     projectName,
     projectPath,
-    modelName: DEFAULT_MODEL,
+    modelName,
     numCtx: resolveNumCtx(),
     summarizationThresholdRatio: resolveThresholdRatio(),
     initialPhase: DEFAULT_PHASE,
