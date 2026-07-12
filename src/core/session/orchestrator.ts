@@ -169,6 +169,7 @@ export class SessionOrchestrator implements TurnContext {
       projectPath: this.projectPath,
       sandbox: this.sandbox,
       phase: this.phase.name,
+      llm: this.llm, // backs ctx.oneShot for search_rules (V4/02)
     });
     // Every dispatched call — success, failure, or sub-step — is appended to the audit log (V1/06).
     return dispatchToolCall(ctx, name, args, {

@@ -104,6 +104,7 @@ export class WorkerWindow implements TurnContext {
       projectPath: this.deps.projectPath,
       sandbox: this.deps.sandbox,
       phase: 'worker',
+      llm: this.deps.llm, // backs ctx.oneShot for search_rules (V4/02)
     });
     const result = await dispatchToolCall(ctx, name, args, {
       onToolCall: (record) => appendAuditRow(this.deps.projectPath, record),

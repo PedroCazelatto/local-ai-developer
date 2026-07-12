@@ -24,6 +24,9 @@ export { runInProjectTool } from './run-in-project.js';
 export { inboxReadTool } from './inbox-read.js';
 export { inboxPostTool } from './inbox-post.js';
 export { inboxResolveTool } from './inbox-resolve.js';
+// On-demand standards retrieval (V4/02) — global registry tools.
+export { searchRulesTool } from './search-rules.js';
+export { loadRuleTool } from './load-rule.js';
 export { truncateHeadTail, DEFAULT_OUTPUT_LIMIT } from './truncate.js';
 // Phase-scoped (Reviewer-only, V2/01) — deliberately NOT added to the registry in registry.ts.
 export { submitVerdictTool, parseVerdict, SUBMIT_VERDICT } from './submit-verdict.js';

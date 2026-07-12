@@ -5,6 +5,7 @@
 // validated, executed, audited (V1/06), and turned into a `tool` message the model reads.
 
 import type { SandboxClient } from '../core/container/index.js';
+import type { Message, OneShotResult } from '../core/llm/index.js';
 
 // ------------------------------------------------------------------ JSON + JSON-schema vocabulary
 
@@ -89,6 +90,13 @@ export interface ToolContext {
   readonly phase: string; // active phase name, for the audit row
   /** Join `relative` onto the project root, rejecting any path that escapes it (throws on escape). */
   resolve(relative: string): string;
+  /**
+   * A fresh, HISTORY-FREE call to the session model (same model + num_ctx), returning content + exact
+   * tokens. search_rules (V4/02) uses it to resolve an intent against the standards catalog inside a
+   * throwaway context — those turns never enter any phase's memory. Bound to the session's OllamaClient
+   * by createToolContext; most tools ignore it.
+   */
+  oneShot(messages: Message[]): Promise<OneShotResult>;
 }
 
 /** One model-callable action. Dropped into src/tools/ and picked up by the registry (V1/02). */

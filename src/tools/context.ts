@@ -7,6 +7,8 @@
 import path from 'node:path';
 
 import type { SandboxClient } from '../core/container/index.js';
+import { oneShot } from '../core/llm/index.js';
+import type { Message, OllamaClient, OneShotResult } from '../core/llm/index.js';
 import type { ToolContext } from './types.js';
 
 /** "/workspace" — where the active project is bind-mounted inside the sandbox (Foundation/04). */
@@ -32,9 +34,14 @@ export interface ToolContextInit {
   readonly projectPath: string;
   readonly sandbox: SandboxClient;
   readonly phase: string;
+  /** The session's OllamaClient — backs ctx.oneShot for the standards-retrieval tools (V4/02). */
+  readonly llm: OllamaClient;
 }
 
-/** Build the ToolContext for a dispatch: binds `resolve` to the active project + fixes /workspace. */
+/**
+ * Build the ToolContext for a dispatch: binds `resolve` to the active project + fixes /workspace, and
+ * binds `oneShot` to a fresh, history-free call against the session model (search_rules, V4/02).
+ */
 export function createToolContext(init: ToolContextInit): ToolContext {
   return {
     projectName: init.projectName,
@@ -43,5 +50,6 @@ export function createToolContext(init: ToolContextInit): ToolContext {
     sandbox: init.sandbox,
     phase: init.phase,
     resolve: (relative: string): string => resolveInProject(init.projectPath, relative),
+    oneShot: (messages: Message[]): Promise<OneShotResult> => oneShot(init.llm, messages),
   };
 }

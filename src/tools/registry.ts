@@ -10,9 +10,11 @@ import { inboxPostTool } from './inbox-post.js';
 import { inboxReadTool } from './inbox-read.js';
 import { inboxResolveTool } from './inbox-resolve.js';
 import { listFilesTool } from './list-files.js';
+import { loadRuleTool } from './load-rule.js';
 import { readFileTool } from './read-file.js';
 import { runInProjectTool } from './run-in-project.js';
 import { searchInFilesTool } from './search-in-files.js';
+import { searchRulesTool } from './search-rules.js';
 import type { ToolModule } from './types.js';
 import { writeFileTool } from './write-file.js';
 
@@ -30,6 +32,10 @@ const TOOL_MODULES: readonly ToolModule[] = [
   inboxReadTool,
   inboxPostTool,
   inboxResolveTool,
+  // On-demand standards retrieval (V4/02) — global; every phase (and the Worker/Reviewer windows) can
+  // resolve an intent to a standard name and load that one body without the catalog entering context.
+  searchRulesTool,
+  loadRuleTool,
 ];
 
 /** name → module, built once with a duplicate-name guard (a dup is a build-time mistake, fail loud). */

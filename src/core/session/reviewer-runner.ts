@@ -42,9 +42,10 @@ const MAX_VERDICT_ATTEMPTS = 2;
  * The Reviewer's read-mostly tool allowlist. It judges — it never mutates or commits, so it gets no
  * write_file/edit_file/commit tool. execute_command is read-mostly by nature (root sandbox at
  * /workspace) and allowed for inspection; the prompt steers it toward reads, not mutation.
- * search_rules/load_rule are a V4 capability and simply absent here. The cross-phase inbox tools
- * (V3/04) are the one deliberate write channel: the Reviewer already signalled other phases via the
- * shared channel (was AGENT_NOTES.md) — the inbox is its structured replacement.
+ * search_rules/load_rule (V4/02) let the Reviewer resolve a layering/testing/naming question to a
+ * standard and load its body to judge + cite against, without the catalog ever entering context. The
+ * cross-phase inbox tools (V3/04) are the one deliberate write channel: the Reviewer already signalled
+ * other phases via the shared channel (was AGENT_NOTES.md) — the inbox is its structured replacement.
  */
 export const REVIEWER_TOOL_NAMES: readonly string[] = [
   'read_file',
@@ -52,6 +53,9 @@ export const REVIEWER_TOOL_NAMES: readonly string[] = [
   'list_files',
   'run_in_project',
   'execute_command',
+  // Standards retrieval (V4/02) — cite a standard while judging Worker code (the V4 exit criterion).
+  'search_rules',
+  'load_rule',
   'inbox_read',
   'inbox_post',
   'inbox_resolve',
@@ -216,6 +220,7 @@ class ReviewerWindow implements TurnContext {
         projectPath: this.deps.projectPath,
         sandbox: this.deps.sandbox,
         phase: 'reviewer',
+        llm: this.deps.llm, // backs ctx.oneShot for search_rules (V4/02)
       });
       return dispatchToolCall(ctx, name, args, {
         onToolCall: (record) => appendAuditRow(this.deps.projectPath, record),

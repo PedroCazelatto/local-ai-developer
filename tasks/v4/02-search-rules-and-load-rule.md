@@ -1,4 +1,4 @@
-> **Status:** ⬜ Not started
+> **Status:** ✅ Completed (2026-07-11) — `tools/search-rules.ts` + `tools/load-rule.ts` (registered globally + added to the spawned Reviewer's allowlist); `core/llm/one-shot.ts` (+ `.type`) is the shared throwaway-call helper (used via a narrow `ctx.oneShot` seam added to `ToolContext` and threaded through all four `createToolContext` call sites); `context/load-standard-body.ts` (+ `.type`) does the frontmatter-stripped body read behind `load_rule`. Verified end-to-end against the live model: `search_rules("dependency rule / layering between domain and infrastructure")` → `["clean-architecture"]` with exact throwaway tokens recorded on the audit row.
 
 # 02 — `search_rules` and `load_rule` tools
 

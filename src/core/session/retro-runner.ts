@@ -219,6 +219,7 @@ class RetroWindow implements TurnContext {
       projectPath: this.deps.projectPath,
       sandbox: this.deps.sandbox,
       phase: 'retro',
+      llm: this.deps.llm, // required by createToolContext; Retro's tools don't use ctx.oneShot
     });
     return dispatchToolCall(ctx, name, args, {
       onToolCall: (record) => appendAuditRow(this.deps.projectPath, record),
