@@ -3,6 +3,7 @@ export * from './config.js';
 export { SessionOrchestrator } from './orchestrator.js';
 export { SessionMemory } from './memory.js';
 export type { ChatRole } from './memory.js';
+export type { ArchiveSummary, ClearResult, MemoryRecord, MemoryRole } from './memory-store.type.js';
 export { MAX_TOOL_ROUNDS } from './turn-loop.js';
 export type { TurnContext } from './turn-loop.js';
 export { dispatchToolCall } from './dispatch.js';

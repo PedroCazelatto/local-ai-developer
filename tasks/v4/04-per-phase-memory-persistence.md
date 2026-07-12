@@ -1,4 +1,4 @@
-> **Status:** ⬜ Not started
+> **Status:** ✅ Completed (2026-07-11) — per-phase append-only JSONL under `projects/<active>/.orchestrator/memory/` (`memory-store.ts` + `memory.ts`), lazily loaded on `activatePhase` so a restart resumes where it stopped. Tokens are **exact**: assistant records carry the turn's `prompt_eval_count`/`eval_count`, user/tool records `null`/`null` (no Ollama call) — never a length estimate. `/clear` archives `<phase>.jsonl` → `archive/<phase>-<ts>-<n>.jsonl` and resets in-RAM; `/resume` lists the last 3 archives (timestamp · turns · tokens · first→last user turn, all derived from JSONL, no LLM call) and restores a pick. Ids are **per-file sequential integers** (user's decision — no ULID dependency, matching inbox/blocker); archive names use a compact UTC ts + sequential index so rapid clears never collide. The loader already implements the `replaces` skip walk so V4/05 only adds the writing side. Verified 26/26 behavioral checks (persist→restart→resume, exact tokens, isolation, replaces walk).
 
 # 04 — Per-phase memory persistence (`/clear` and `/resume`)
 

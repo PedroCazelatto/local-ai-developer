@@ -14,6 +14,7 @@ import { appendAuditRow } from './audit.js';
 import type { SessionConfig } from './config.js';
 import { dispatchToolCall } from './dispatch.js';
 import { SessionMemory } from './memory.js';
+import type { ArchiveSummary, ClearResult } from './memory-store.type.js';
 import { processMessage as processTurns } from './turn-loop.js';
 import type { TurnContext } from './turn-loop.js';
 import { runTaskLoop } from './run-task-loop.js';
@@ -34,7 +35,7 @@ export class SessionOrchestrator implements TurnContext {
   readonly projectPath: string;
   private readonly llm: OllamaClient;
   private readonly sandbox: SandboxClient;
-  private readonly memory = new SessionMemory();
+  private readonly memory: SessionMemory;
   private phase: Phase;
   private lastTokens: TokenCounts = NO_TOKENS;
 
@@ -49,8 +50,10 @@ export class SessionOrchestrator implements TurnContext {
     this.numCtx = config.numCtx;
     this.llm = llm;
     this.sandbox = sandbox;
+    this.memory = new SessionMemory(config.projectPath); // JSONL-backed, under the project's .orchestrator/
     this.phase = PhaseFactory.get(config.initialPhase);
-    this.memory.setActivePhase(this.phase.name);
+    // activatePhase LAZILY loads this phase's `<phase>.jsonl` — so a restart resumes where it stopped.
+    this.memory.activatePhase(this.phase.name);
   }
 
   get activePhase(): string {
@@ -80,10 +83,25 @@ export class SessionOrchestrator implements TurnContext {
     return this.memory.history;
   }
 
-  /** Switch active phase; loads its instructions and points memory at its own history (no leak). */
+  /** Switch active phase; loads its instructions and (lazily, from disk) its own history (no leak). */
   switchPhase(name: string): void {
     this.phase = PhaseFactory.get(name);
-    this.memory.setActivePhase(this.phase.name);
+    this.memory.activatePhase(this.phase.name);
+  }
+
+  /** `/clear` (V4/04): archive the active phase's history, reset it in-RAM. Other phases untouched. */
+  clearActivePhase(): ClearResult {
+    return this.memory.clearActive();
+  }
+
+  /** `/resume` listing: the last `limit` archives for the active phase (summaries from JSONL, no LLM). */
+  activePhaseArchives(limit: number): ArchiveSummary[] {
+    return this.memory.archivesForActive(limit);
+  }
+
+  /** `/resume` restore: swap a chosen archive back into the active file and reload it into RAM. */
+  resumeActivePhaseArchive(basename: string): void {
+    this.memory.restoreActive(basename);
   }
 
   /** Entry point the REPL calls for a chat message: run the bounded tool-dispatch turn loop. */
@@ -150,7 +168,10 @@ export class SessionOrchestrator implements TurnContext {
   }
 
   addAssistant(content: string, toolCalls?: ToolCall[]): void {
-    this.memory.add('assistant', content, toolCalls ? { toolCalls } : undefined);
+    // Persist the EXACT counts Ollama just reported for THIS turn (set by onTokens immediately prior
+    // in the turn loop): prompt_eval_count→prompt, eval_count→completion. Never estimated.
+    const tokens = { prompt: this.lastTokens.promptTokens, completion: this.lastTokens.evalTokens };
+    this.memory.add('assistant', content, toolCalls ? { toolCalls, tokens } : { tokens });
   }
 
   addToolResult(toolName: string, result: string): void {

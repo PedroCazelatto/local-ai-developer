@@ -7,15 +7,26 @@
 // (see status-bar.ts) but the conversation and input stay in the scrolling area, copyable as ever.
 
 import { createInterface } from 'node:readline/promises';
+import type { Interface as ReadlineInterface } from 'node:readline/promises';
 import path from 'node:path';
 import { stdin, stdout } from 'node:process';
 
-import type { RetroInput, RetroResult, Task, TaskLoopReporter, TaskLoopResult } from '../core/session/index.js';
+import type {
+  ArchiveSummary,
+  ClearResult,
+  RetroInput,
+  RetroResult,
+  Task,
+  TaskLoopReporter,
+  TaskLoopResult,
+} from '../core/session/index.js';
 import * as renderer from '../core/ui/renderer.js';
 import * as statusBar from '../core/ui/status-bar.js';
 import { stopThinking } from '../core/ui/spinner.js';
 import { answerCommand } from './commands/answer.js';
+import { clearCommand } from './commands/clear.js';
 import { newProjectCommand } from './commands/new-project.js';
+import { resumeCommand } from './commands/resume.js';
 import { runCommand } from './commands/run.js';
 
 /**
@@ -42,6 +53,12 @@ export interface ReplOrchestrator {
   switchPhase(name: string): void;
   /** Phase names available for /swap, for the unknown-phase error message. */
   availablePhases(): string[];
+  /** /clear (V4/04): archive the active phase's history and reset it in-RAM (other phases untouched). */
+  clearActivePhase(): ClearResult;
+  /** /resume (V4/04): the active phase's last `limit` archives, most recent first (summaries from JSONL). */
+  activePhaseArchives(limit: number): ArchiveSummary[];
+  /** /resume (V4/04): restore a chosen archive back into the active file and reload it into RAM. */
+  resumeActivePhaseArchive(basename: string): void;
 }
 
 /** Run the REPL until the user types `/exit` (or EOF). */
@@ -89,7 +106,7 @@ export async function runRepl(orch: ReplOrchestrator): Promise<void> {
       // to `main().catch` (boot failures, Node runtime faults) end the app, printing to the console.
       try {
         if (line.startsWith('/')) {
-          if (await handleCommand(orch, line)) break; // /exit
+          if (await handleCommand(orch, line, rl)) break; // /exit
           continue;
         }
         await orch.processMessage(line);
@@ -117,7 +134,7 @@ function updateStatus(orch: ReplOrchestrator): void {
 }
 
 /** Dispatch a `/command`. Returns true only for `/exit` (signals the loop to stop). */
-async function handleCommand(orch: ReplOrchestrator, input: string): Promise<boolean> {
+async function handleCommand(orch: ReplOrchestrator, input: string, rl: ReadlineInterface): Promise<boolean> {
   const [command, ...rest] = input.slice(1).split(/\s+/);
   switch (command) {
     case 'exit':
@@ -160,8 +177,16 @@ async function handleCommand(orch: ReplOrchestrator, input: string): Promise<boo
       }
       return false;
     }
+    case 'clear':
+      // Wipe ONLY the active phase's history (V4/04): archive its JSONL + reset in-RAM, no confirm.
+      clearCommand(orch);
+      return false;
+    case 'resume':
+      // Restore one of the active phase's last-3 archives (V4/04): prompts over the REPL's readline.
+      await resumeCommand(orch, rl);
+      return false;
     default:
-      // Shift+Tab phase-cycle and /help are V5; /clear /resume /models are V4/V5. Not here.
+      // Shift+Tab phase-cycle and /help are V5; /models is V5. Not here.
       renderer.errorLine(`Unknown command: /${command ?? ''}`);
       return false;
   }
