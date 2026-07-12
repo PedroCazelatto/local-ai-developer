@@ -6,6 +6,7 @@
 import type { SubagentInfo } from '../../core/session/index.js';
 import * as renderer from '../../core/ui/renderer.js';
 import { theme } from '../../core/ui/theme.js';
+import type { Command } from '../command-registry.js';
 
 /** The slice of the orchestrator /subagents needs — satisfied structurally by SessionOrchestrator. */
 export interface SubagentsOrchestrator {
@@ -46,7 +47,7 @@ function tokenLabel(info: SubagentInfo): string {
   return `${fmt(promptTokens + evalTokens)} tokens (${fmt(promptTokens)} prompt + ${fmt(evalTokens)} eval)`;
 }
 
-export function subagentsCommand(orch: SubagentsOrchestrator): void {
+function listSubagents(orch: SubagentsOrchestrator): void {
   const agents = orch.listSubagents();
   if (agents.length === 0) {
     renderer.systemMessage('No active sub-agents.');
@@ -62,3 +63,10 @@ export function subagentsCommand(orch: SubagentsOrchestrator): void {
   }
   write('');
 }
+
+export const subagentsCommand: Command = {
+  name: 'subagents',
+  group: 'subagents',
+  description: 'List the live sub-agents this session spawned (id, age, messages, exact tokens)',
+  run: (ctx) => listSubagents(ctx.orch),
+};

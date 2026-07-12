@@ -5,6 +5,7 @@
 
 import type { ClearResult } from '../../core/session/index.js';
 import * as renderer from '../../core/ui/renderer.js';
+import type { Command } from '../command-registry.js';
 
 /** The slice of the orchestrator /clear needs — satisfied structurally by SessionOrchestrator. */
 export interface ClearOrchestrator {
@@ -18,7 +19,7 @@ function titleCase(phase: string): string {
   return phase.charAt(0).toUpperCase() + phase.slice(1);
 }
 
-export function clearCommand(orch: ClearOrchestrator): void {
+function clearActivePhase(orch: ClearOrchestrator): void {
   const { phase, archived } = orch.clearActivePhase();
   const name = titleCase(phase);
   // Report faithfully: an empty phase had no file to archive, so don't claim one was made.
@@ -28,3 +29,10 @@ export function clearCommand(orch: ClearOrchestrator): void {
   }
   renderer.systemMessage(`Cleared ${name} · archived (use /resume to restore)`);
 }
+
+export const clearCommand: Command = {
+  name: 'clear',
+  group: 'session',
+  description: "Wipe the active phase's history (archived — /resume restores it; other phases untouched)",
+  run: (ctx) => clearActivePhase(ctx.orch),
+};

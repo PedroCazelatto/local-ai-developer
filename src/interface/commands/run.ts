@@ -38,6 +38,7 @@ import type {
 } from '../../core/session/index.js';
 import { renderBatchSummary } from '../batch-summary.js';
 import { renderVerdict } from '../review-prompt.js';
+import type { Command } from '../command-registry.js';
 
 /** The slice of the orchestrator /run needs — satisfied structurally by SessionOrchestrator. */
 export interface RunOrchestrator {
@@ -225,7 +226,7 @@ async function runSingle(orch: RunOrchestrator, id: string): Promise<void> {
   }
 }
 
-export async function runCommand(args: readonly string[], orch: RunOrchestrator): Promise<void> {
+async function dispatchRun(args: readonly string[], orch: RunOrchestrator): Promise<void> {
   const selector = args[0] ?? 'next';
 
   let backlog: Backlog;
@@ -261,3 +262,11 @@ export async function runCommand(args: readonly string[], orch: RunOrchestrator)
   };
   await runBatch(deps, selection.ids, buildBatchReporter());
 }
+
+export const runCommand: Command = {
+  name: 'run',
+  group: 'execution',
+  description: 'Run backlog tasks through the implement→test→review→fix loop (auto-commits each pass)',
+  usage: '/run [next | all | <task-id>[,<id>…]]',
+  run: (ctx) => dispatchRun(ctx.args, ctx.orch),
+};

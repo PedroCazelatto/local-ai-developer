@@ -12,6 +12,7 @@ import type { ArchiveSummary } from '../../core/session/index.js';
 import * as renderer from '../../core/ui/renderer.js';
 import * as statusBar from '../../core/ui/status-bar.js';
 import { theme } from '../../core/ui/theme.js';
+import type { Command } from '../command-registry.js';
 
 /** The slice of the orchestrator /resume needs — satisfied structurally by SessionOrchestrator. */
 export interface ResumeOrchestrator {
@@ -68,7 +69,7 @@ function renderList(phase: string, archives: readonly ArchiveSummary[]): void {
   });
 }
 
-export async function resumeCommand(orch: ResumeOrchestrator, rl: ReadlineInterface): Promise<void> {
+async function resumeArchive(orch: ResumeOrchestrator, rl: ReadlineInterface): Promise<void> {
   const phase = orch.activePhase;
   const archives = orch.activePhaseArchives(MAX_LISTED);
   if (archives.length === 0) {
@@ -100,3 +101,10 @@ export async function resumeCommand(orch: ResumeOrchestrator, rl: ReadlineInterf
     renderer.errorLine(`Couldn't restore: ${err instanceof Error ? err.message : String(err)}`);
   }
 }
+
+export const resumeCommand: Command = {
+  name: 'resume',
+  group: 'session',
+  description: "Restore one of the active phase's recent history archives",
+  run: (ctx) => resumeArchive(ctx.orch, ctx.rl),
+};

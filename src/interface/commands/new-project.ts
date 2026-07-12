@@ -7,6 +7,8 @@ import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 
+import * as renderer from '../../core/ui/renderer.js';
+import type { Command } from '../command-registry.js';
 import {
   BACKLOG_README_SKELETON,
   isKnownStack,
@@ -29,7 +31,7 @@ const SAFE_NAME = /^[a-zA-Z0-9._-]+$/;
  * existing directory. Pure filesystem + `git init`; independent of the active session (the user
  * restarts with `run start <name>` to work on it).
  */
-export function newProjectCommand(args: readonly string[], projectsRoot: string): CommandOutcome {
+function scaffoldProject(args: readonly string[], projectsRoot: string): CommandOutcome {
   const name = args[0];
   const stack = args[1];
 
@@ -77,3 +79,20 @@ export function newProjectCommand(args: readonly string[], projectsRoot: string)
     message: `Created projects/${name}/ (${stack}).${gitNote} Run \`run start ${name}\` to work on it.`,
   };
 }
+
+export const newProjectCommand: Command = {
+  name: 'new-project',
+  group: 'projects',
+  description: 'Scaffold a new project on disk (the session stays on its project — restart to open the new one)',
+  usage: '/new-project <name> <stack>',
+  run: (ctx) => {
+    // The session stays locked to its current project; scaffold under the orchestrator's projects/ root.
+    const projectsRoot = path.resolve(process.cwd(), 'projects');
+    const outcome = scaffoldProject(ctx.args, projectsRoot);
+    if (outcome.ok) {
+      renderer.systemMessage(outcome.message);
+    } else {
+      renderer.errorLine(outcome.message);
+    }
+  },
+};

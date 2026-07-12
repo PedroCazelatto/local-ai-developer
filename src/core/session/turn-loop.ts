@@ -8,6 +8,7 @@
 
 import type { StreamHandle, TokenCounts, ToolCall } from '../llm/index.js';
 import * as renderer from '../ui/renderer.js';
+import * as statusActivity from '../ui/status-activity.js';
 import { startThinking, stopThinking } from '../ui/spinner.js';
 
 /** Exact value ported from main.py — caps the implement/continue rounds per user message. */
@@ -52,15 +53,22 @@ export async function processMessage(
   userInput: string,
   maxRounds: number = MAX_TOOL_ROUNDS,
 ): Promise<void> {
-  if (!(await runTurn(ctx, () => ctx.streamAsk(userInput)))) {
-    return; // no tool calls on the first turn → done
-  }
-  for (let round = 0; round < maxRounds; round++) {
-    if (!(await runTurn(ctx, () => ctx.streamContinue()))) {
-      return; // model finished
+  // Mark a turn in flight so the status line (V5/03) can show the live thinking/elapsed field, and
+  // always clear it — even if a stream throws mid-turn — so idle never shows a stuck "thinking".
+  statusActivity.turnStarted();
+  try {
+    if (!(await runTurn(ctx, () => ctx.streamAsk(userInput)))) {
+      return; // no tool calls on the first turn → done
     }
+    for (let round = 0; round < maxRounds; round++) {
+      if (!(await runTurn(ctx, () => ctx.streamContinue()))) {
+        return; // model finished
+      }
+    }
+    renderer.systemMessage(`⚠ Reached tool-call limit (${maxRounds}). Stopping.`);
+  } finally {
+    statusActivity.turnEnded();
   }
-  renderer.systemMessage(`⚠ Reached tool-call limit (${maxRounds}). Stopping.`);
 }
 
 /**
@@ -110,8 +118,16 @@ async function runTurn(ctx: TurnContext, start: () => StreamHandle): Promise<boo
     const name = call.function.name;
     const args = call.function.arguments;
     renderer.systemMessage(`→ tool: ${name}`);
-    const result = await ctx.callTool(name, args);
-    ctx.addToolResult(name, result);
+    // Surface the executing tool + a live elapsed timer on the status line (V5/03); always clear it
+    // when the call returns (or throws — callTool never throws, but be defensive) so the field is gone
+    // the instant the tool finishes.
+    statusActivity.toolStarted(name);
+    try {
+      const result = await ctx.callTool(name, args);
+      ctx.addToolResult(name, result);
+    } finally {
+      statusActivity.toolEnded();
+    }
   }
   // A spawned window can signal it reached its terminal result during this turn's tool calls (the
   // Reviewer captured its verdict) — stop now rather than prompting for another turn.

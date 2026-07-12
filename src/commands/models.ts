@@ -179,7 +179,8 @@ async function run(ctx: CommandContext): Promise<void> {
 
 export const modelsCommand: Command = {
   name: 'models',
-  summary: 'List, pull, and switch the local Ollama model',
+  group: 'models',
+  description: 'List, pull, and switch the local Ollama model',
   usage: USAGE,
   run,
 };

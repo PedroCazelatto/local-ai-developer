@@ -22,6 +22,7 @@ import {
 import type { RetroInput, RetroResult } from '../../core/session/index.js';
 import * as renderer from '../../core/ui/renderer.js';
 import { renderRetroResult } from '../retro-prompt.js';
+import type { Command } from '../command-registry.js';
 
 const USAGE = 'Usage: /answer <task-id> <answer text>';
 
@@ -40,7 +41,7 @@ function messageOf(err: unknown): string {
  * Handle one `/answer` line. `rawLine` is the full REPL input (e.g. "/answer 01-foo Idempotent wins.")
  * so the answer text keeps its internal spacing (the REPL's whitespace-split would collapse it).
  */
-export async function answerCommand(rawLine: string, orch: AnswerOrchestrator): Promise<void> {
+async function dispatchAnswer(rawLine: string, orch: AnswerOrchestrator): Promise<void> {
   const projectPath = orch.projectPath;
   // Strip the leading "/answer", then split off the FIRST token (task id) from the REST (the answer).
   const rest = rawLine.replace(/^\/answer\b\s*/i, '');
@@ -106,3 +107,13 @@ export async function answerCommand(rawLine: string, orch: AnswerOrchestrator): 
 
   renderer.systemMessage(`✓ Answered ${open.id}. Re-run with /run ${taskId} (or /run) to retry it.`);
 }
+
+export const answerCommand: Command = {
+  name: 'answer',
+  group: 'execution',
+  description: 'Resolve a Reviewer blocker; re-queues the task and spawns Retro to patch the gap',
+  usage: '/answer <task-id> <answer text>',
+  // ctx.raw is the line minus its leading slash; re-add it so dispatchAnswer's own `/answer` strip and
+  // the answer text's internal spacing are preserved (the whitespace-split ctx.args would collapse it).
+  run: (ctx) => dispatchAnswer(`/${ctx.raw}`, ctx.orch),
+};
