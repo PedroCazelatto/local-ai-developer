@@ -44,7 +44,7 @@ A **TypeScript/Node CLI** that orchestrates a **locally-run** Ollama model to au
 
 There is exactly **one** local Ollama model. Everything else is context windows.
 
-- Ollama's chat API is **stateless**. The model knows only what is in the `messages` array you send it on a given call — there is no hidden server-side memory. "Memory" = the orchestrator replaying the accumulated history every call (`LLMProvider.chat`/`stream` in [core/llm/provider.py](core/llm/provider.py)). `num_ctx` (`OLLAMA_NUM_CTX`) is a hard token ceiling; exceed it and Ollama silently drops the oldest tokens.
+- Ollama's chat API is **stateless**. The model knows only what is in the `messages` array you send it on a given call — there is no hidden server-side memory. "Memory" = the orchestrator replaying the accumulated history every call (`OllamaClient.chat`/`stream` in [src/core/llm/client.ts](src/core/llm/client.ts)). `num_ctx` (`OLLAMA_NUM_CTX`) is a hard token ceiling; exceed it and Ollama silently drops the oldest tokens.
 - A **"subagent" is not a new model** — it is a fresh, empty `messages` array with a one-shot system prompt + a single task, run against the same Ollama, then discarded. Isolation is just a separate list.
 - A **phase** is the unit of work and the unit of instruction. Each phase has an instruction set (its markdown under [rules/](rules/)) that configures the window it runs in. Elsewhere these are called "skills" or "personas" — in this project the single word is **phase**.
 
@@ -182,30 +182,29 @@ Read it before touching code.
 
 ## Repo layout
 
-> The tree below is the **Python reference layout** (deleted at parity). The **target TypeScript
-> layout** lives under `src/` and is finalized in
+> The TypeScript source lives under `src/`; the layout was finalized in
 > [tasks/foundation/01-repo-skeleton-and-toolchain.md](tasks/foundation/01-repo-skeleton-and-toolchain.md).
-> Mentally map: `main.py`→`src/index.ts`, `core/*`→`src/core/*`, `agents/`→`src/phases/`,
-> `interface/`→`src/interface/`, `tools/*.py`→`src/tools/*.ts`.
+> The Python reference implementation has been deleted (parity reached, V5 complete).
 
 ```
 local-ai-developer/
-├── main.py                 # CLI entry; owns the REPL loop
-├── core/
-│   ├── session/            # orchestrator, memory, state, manager
-│   ├── container/          # Docker client
-│   ├── llm/                # Ollama provider
-│   └── ui/                 # Rich renderer + theme
-├── agents/                 # phase classes (base, factory)
-├── context/                # prompt/context builders, rules loader
-├── interface/              # terminal loop
-├── tools/                  # actions — each file is a tool (model-callable), a command (user-callable via `/name`), or both
+├── src/
+│   ├── index.ts            # CLI entry; boots the session
+│   ├── core/
+│   │   ├── session/        # orchestrator, memory, batch, backlog, inbox, blocker, retro, reviewer, worker, subagents
+│   │   ├── container/      # Docker sandbox + per-project runner (dockerode)
+│   │   ├── llm/            # Ollama client, one-shot throwaway calls, stream filter, json repair
+│   │   └── ui/             # renderer, status bar, theme, prompts, spinner
+│   ├── phases/             # phase abstraction + factory
+│   ├── context/            # system/phase prompt + standards catalog loaders
+│   ├── interface/          # REPL, command registry, /commands
+│   └── tools/              # actions — each file is a model-callable tool
 ├── rules/
-│   ├── phases/             # phase instruction sets (markdown) — physically still `personas/`, rename pending
+│   ├── phases/             # phase instruction sets (markdown), injected on phase load
 │   └── standards/          # on-demand reference rules (markdown)
 ├── projects/               # each child is its own git repo, developed by the model
 ├── docker-compose.yml
-└── run.ps1                 # install / start / stop
+└── run.ps1                 # thin wrapper: install / start <project> / stop
 ```
 
 The [README.md](README.md) is being rewritten by the user to match this phase-based model — do not edit it without being asked; validate it when requested.
