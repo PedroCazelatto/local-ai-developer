@@ -14,7 +14,7 @@ services:
     # a registry allowlist/proxy) is an open ROADMAP question — default to open egress for now.
     volumes:
       # Mount ONLY the active project at /workspace, so the model literally cannot see (or
-      # escape into) other projects or the host. ACTIVE_PROJECT is set by run.ps1. Fail closed:
+      # escape into) other projects or the host. ACTIVE_PROJECT is set by the launcher (scripts/run.mjs). Fail closed:
       # if it is unset, mount a non-existent sentinel dir rather than ./projects (which would
       # re-expose everything).
       - ./projects/${ACTIVE_PROJECT:-__no_project__}:/workspace

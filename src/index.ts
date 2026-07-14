@@ -30,7 +30,7 @@ function resolveOrExit(projectName: string): SessionConfig {
 async function main(): Promise<void> {
   const projectName = process.argv[2];
   if (projectName === undefined || projectName.trim() === '') {
-    // Usage mirrors the user-facing run.ps1 verb, not `node ...`.
+    // Usage mirrors the user-facing launcher verb (scripts/run.mjs start), not `node ...`.
     fail('Usage: run start <project-name>');
   }
 
@@ -42,7 +42,7 @@ async function main(): Promise<void> {
     projectPath: config.projectPath,
   });
 
-  // run.ps1 already did `docker compose up -d`; this attaches (or starts/creates as a fallback).
+  // The launcher (scripts/run.mjs) already did `docker compose up -d`; this attaches (or starts/creates as a fallback).
   // A missing Docker daemon is a fatal boot error, not a recoverable per-turn one.
   try {
     await sandbox.ensureStarted();
@@ -51,7 +51,7 @@ async function main(): Promise<void> {
   }
 
   const orchestrator = new SessionOrchestrator(config, llm, sandbox);
-  // run.ps1's `finally` stops Docker on exit, so we don't stop the sandbox here.
+  // The launcher's `finally` stops Docker on exit, so we don't stop the sandbox here.
   await runRepl(orchestrator);
 }
 

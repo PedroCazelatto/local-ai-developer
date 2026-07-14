@@ -98,7 +98,7 @@ export function loadConfig(projectName: string): SessionConfig {
     );
   }
 
-  // run.ps1 sets $env:ACTIVE_PROJECT for docker compose; argv is the source of truth.
+  // The launcher (scripts/run.mjs) sets ACTIVE_PROJECT for docker compose; argv is the source of truth.
   // A stale env var must not silently point the sandbox at a different project.
   const activeProject = process.env.ACTIVE_PROJECT;
   if (activeProject !== undefined && activeProject !== projectName) {

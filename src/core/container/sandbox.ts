@@ -77,7 +77,7 @@ export class SandboxClient {
   }
 
   /**
-   * Ensure the root sandbox is up. `run.ps1 start` already does `docker compose up -d`, so the
+   * Ensure the root sandbox is up. `run.mjs start` already does `docker compose up -d`, so the
    * common path is "container exists and runs → just attach". Idempotent: start it if stopped,
    * create it from the image if missing (fallback for a compose-less boot). Fails loud at boot
    * (this is not a per-turn call) rather than returning a recoverable error like `exec`.
@@ -96,7 +96,7 @@ export class SandboxClient {
     await this.createAndStart();
   }
 
-  /** Stop the container (matches `run.ps1 stop`). Does NOT remove it — persistent so deps survive. */
+  /** Stop the container (matches `run.mjs stop`). Does NOT remove it — persistent so deps survive. */
   async stop(): Promise<void> {
     const container = this.docker.getContainer(this.containerName);
     try {

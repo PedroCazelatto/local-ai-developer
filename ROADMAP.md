@@ -76,8 +76,8 @@ reaches a loop I would actually run.
 
 Scope:
 
-- Node/TS project: `package.json`, strict `tsconfig`, source tree, build/run scripts replacing the
-  `run.ps1` verbs (`install` / `start <project>` / `stop`).
+- Node/TS project: `package.json`, strict `tsconfig`, source tree, and a cross-platform Node
+  launcher (`scripts/run.mjs`) providing the `install` / `start <project>` / `stop` verbs.
 - Ollama JS client: `chat` + `stream` + **tool-calling**, `num_ctx` option, and **exact** token
   counts read from `prompt_eval_count` / `eval_count` (never estimated).
 - Docker sandbox layer via **dockerode**: a persistent root sandbox container, **networked +
@@ -295,8 +295,9 @@ loop, and re-homed onto the TS + networked-sandbox base.
 
 ## Open questions (carried forward / newly opened by the pivot)
 
-- **Build/run tooling:** `tsc` vs `tsx`/`esbuild` for dev runs; does `run.ps1` survive as a thin
-  wrapper that calls `node`, or is it replaced by `npm` scripts? (Foundation/01 decides.)
+- ~~**Build/run tooling:**~~ **Resolved (Foundation/01 + 2026-07-13):** `tsx` for dev, `tsc` for
+  typecheck/build; the entrypoint is a cross-platform **Node launcher** (`scripts/run.mjs`) shelling
+  out to `npm`/`docker compose` — replacing the old `run.ps1` so the CLI is OS-agnostic.
 - **Sandbox container lifecycle:** persistent root sandbox (recommended — `node_modules` survives)
   vs. the ephemeral `--rm`-per-command pattern from the dockerode note (re-installs every call).
 - **How hard to cap the network:** open egress vs. an allowlist/proxy for package registries only.

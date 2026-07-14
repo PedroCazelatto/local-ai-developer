@@ -37,7 +37,7 @@ A **TypeScript/Node CLI** that orchestrates a **locally-run** Ollama model to au
 - Not a "vibe coding" tool.
 - No backend/frontend deployment for the orchestrator itself.
 - No multi-user support.
-- No cross-platform support yet (Windows-first until it works flawlessly).
+- ~~No cross-platform support yet (Windows-first until it works flawlessly).~~ **Superseded (2026-07-13):** the orchestrator must stay **OS-agnostic** — it runs on Windows, macOS, and Linux from a single Node entrypoint (`scripts/run.mjs`, not a PowerShell script), and the `src/` code carries no OS-specific assumptions (paths via `path`/`os.homedir()`, dual line-ending handling). Windows remains the primary test bed.
 - **No parallelism.** Phases run **one at a time**, sequentially. The intended way to scale is to start a batch and let it run unattended (e.g. overnight), not to run windows concurrently. (A 3060's VRAM wouldn't comfortably hold parallel slots anyway.)
 
 ## Core mental model: one model, many context windows
@@ -52,7 +52,7 @@ So the design is not "personas vs. skills." It is: **which phases the user drive
 
 ## How a session works
 
-`.\run.ps1 start <project-name>` boots the orchestrator locked to one project. Switching projects requires restarting the orchestrator process. All planning artifacts a project produces live **inside the project repo**, not in the orchestrator repo — each project carries its own agent files.
+`node scripts/run.mjs start <project-name>` boots the orchestrator locked to one project. Switching projects requires restarting the orchestrator process. All planning artifacts a project produces live **inside the project repo**, not in the orchestrator repo — each project carries its own agent files.
 
 Work is organized into **phases**. A phase is an instruction set loaded into a context window. The planning phases are interactive (the user drives them); the execution phases are spawned automatically once the user triggers them.
 
@@ -166,7 +166,7 @@ Standards:
 
 Two-tier Docker model. **Hard rule: the model touches only Docker, never the host filesystem.** Every command it runs and every file it edits happens inside a container; the orchestrator is the only host-side process. **Containers have controlled internet** (so projects can `npm i`, `pip install`, etc.) — hardened per the dockerode model: rootless user, CPU/RAM caps, disposable lifecycle.
 
-- **Root sandbox** ([docker-compose.yml](docker-compose.yml)): one long-lived container named `ai_sandbox`. It mounts **only the active project** at `/workspace` — `./projects/${ACTIVE_PROJECT}:/workspace`, where `run.ps1` sets `ACTIVE_PROJECT` from the session's project arg. Other projects and the host filesystem are therefore **not mounted at all**, so the model cannot reach them no matter how a command is written (`..`, `$(...)`, variables, symlinks). `/workspace` IS the project root; `execute_command` runs there. It runs **plain shell commands** (file operations, navigation, piping) without giving the model host access.
+- **Root sandbox** ([docker-compose.yml](docker-compose.yml)): one long-lived container named `ai_sandbox`. It mounts **only the active project** at `/workspace` — `./projects/${ACTIVE_PROJECT}:/workspace`, where the launcher (`scripts/run.mjs`) sets `ACTIVE_PROJECT` from the session's project arg. Other projects and the host filesystem are therefore **not mounted at all**, so the model cannot reach them no matter how a command is written (`..`, `$(...)`, variables, symlinks). `/workspace` IS the project root; `execute_command` runs there. It runs **plain shell commands** (file operations, navigation, piping) without giving the model host access.
 - **Per-project sandbox**: each project folder carries its own `docker-compose.yml` declaring a `runner` service with the language toolchain (Python, Node, Rust, etc.) and network access. The execution loop's **test/build/install steps** run against this container via the **host-dispatched `run_in_project` tool** (decided — no docker socket inside `ai_sandbox`). It runs in Docker, never on the host.
 
 Other ground rules:
@@ -203,8 +203,9 @@ local-ai-developer/
 │   ├── phases/             # phase instruction sets (markdown), injected on phase load
 │   └── standards/          # on-demand reference rules (markdown)
 ├── projects/               # each child is its own git repo, developed by the model
-├── docker-compose.yml
-└── run.ps1                 # thin wrapper: install / start <project> / stop
+├── scripts/
+│   └── run.mjs             # cross-platform launcher: install / start <project> / stop
+└── docker-compose.yml
 ```
 
 The [README.md](README.md) is being rewritten by the user to match this phase-based model — do not edit it without being asked; validate it when requested.
@@ -212,9 +213,9 @@ The [README.md](README.md) is being rewritten by the user to match this phase-ba
 ## Commands (as of today)
 
 Host:
-- `.\run.ps1 install` — install everything
-- `.\run.ps1 start <project-name>` — start session for a project
-- `.\run.ps1 stop` — shut down Docker
+- `node scripts/run.mjs install` — install everything
+- `node scripts/run.mjs start <project-name>` — start session for a project
+- `node scripts/run.mjs stop` — shut down Docker
 
 In-app (terminal):
 - `/swap <phase>` — switch active phase
@@ -232,7 +233,7 @@ ordering live in [ROADMAP.md](ROADMAP.md).
 
 **Opened by the 2026-06-21 pivot:**
 
-- **TS build/run tooling:** `tsc` vs `tsx`/`esbuild` for dev runs; does `run.ps1` stay as a thin wrapper calling `node`, or do `npm` scripts replace it? (Foundation decides.)
+- ~~**TS build/run tooling:**~~ **Resolved:** `tsx` runs the dev loop and `tsc` typechecks/builds (`package.json`); the old `run.ps1` is replaced by a cross-platform **Node launcher** (`scripts/run.mjs`) that shells out to `npm`/`docker compose`, keeping the entrypoint OS-agnostic.
 - **Sandbox network hardness:** open egress vs. an allowlist/registry proxy; persistent root sandbox vs. ephemeral `--rm`-per-command containers.
 - **Parity cutover:** which version reaches behavior parity and triggers deletion of the Python code.
 
