@@ -9,6 +9,7 @@
 // backlog file commits the body at status "pending" and leaves the project tree clean for the next /run.
 
 import {
+  allTasks,
   BacklogError,
   dropTaskStash,
   findTask,
@@ -22,7 +23,7 @@ import {
 import type { RetroInput, RetroResult } from '../../core/session/index.js';
 import * as renderer from '../../core/ui/renderer.js';
 import { renderRetroResult } from '../retro-prompt.js';
-import type { Command } from '../command-registry.js';
+import type { Command, CompletionContext } from '../command-registry.js';
 
 const USAGE = 'Usage: /answer <task-id> <answer text>';
 
@@ -108,11 +109,30 @@ async function dispatchAnswer(rawLine: string, orch: AnswerOrchestrator): Promis
   renderer.systemMessage(`✓ Answered ${open.id}. Re-run with /run ${taskId} (or /run) to retry it.`);
 }
 
+/**
+ * Tab candidates for `/answer <task-id>`: ONLY tasks sitting at `blocked`, which is exactly the set this
+ * command can act on — an id with no open blocker is rejected below, so offering more would just invite
+ * that error. Everything past the id is free-text answer prose.
+ */
+function completeAnswer(ctx: CompletionContext): string[] {
+  if (ctx.args.length > 0) return [];
+  try {
+    // readBacklog is a SYNC file read — safe inside a completer that must never await (complete-line.ts).
+    // No backlog (or an unreadable one) simply means no ids to offer, never a thrown Tab.
+    return allTasks(readBacklog(ctx.orch.projectPath))
+      .filter((t) => t.status === 'blocked')
+      .map((t) => t.id);
+  } catch {
+    return [];
+  }
+}
+
 export const answerCommand: Command = {
   name: 'answer',
   group: 'execution',
   description: 'Resolve a Reviewer blocker; re-queues the task and spawns Retro to patch the gap',
   usage: '/answer <task-id> <answer text>',
+  complete: completeAnswer,
   // ctx.raw is the line minus its leading slash; re-add it so dispatchAnswer's own `/answer` strip and
   // the answer text's internal spacing are preserved (the whitespace-split ctx.args would collapse it).
   run: (ctx) => dispatchAnswer(`/${ctx.raw}`, ctx.orch),

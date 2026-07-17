@@ -28,9 +28,10 @@ import * as statusBar from '../core/ui/status-bar.js';
 import { theme } from '../core/ui/theme.js';
 import { stopThinking } from '../core/ui/spinner.js';
 import { getCommand } from './command-registry.js';
+import { completeLine } from './complete-line.js';
 
 /** The persistent hint shown on the pinned footer row — the wired-but-invisible keys, made visible. */
-const FOOTER_HINT = 'Shift+Tab: cycle phase · /swap <phase>: jump · /help: commands';
+const FOOTER_HINT = 'Tab: complete · Shift+Tab: cycle phase · /swap <phase>: jump · /help: commands';
 
 /** How often (ms) the status line repaints while a turn/command runs, to tick the live elapsed timer. */
 const STATUS_TICK_MS = 100;
@@ -82,7 +83,15 @@ export async function runRepl(orch: ReplOrchestrator): Promise<void> {
   statusBar.enable(); // reserve the two bottom rows BEFORE the header so all output scrolls above them
   statusBar.setFooter(theme.meta(FOOTER_HINT)); // static hint on the bottom pinned row
   renderer.header();
-  const rl = createInterface({ input: stdin, output: stdout });
+  // completeLine: Tab-completes `/command` names off the registry and delegates the argument being typed
+  // to that command's own complete(). Synchronous on purpose — readline prints its candidate list before
+  // the keypress repaint below restores the pinned rows; an async completer would land after it and leave
+  // them blank (see complete-line.ts).
+  const rl = createInterface({
+    input: stdin,
+    output: stdout,
+    completer: (line: string): [string[], string] => completeLine(line, orch),
+  });
 
   // True only while a command / chat turn is being handled. Gates Shift+Tab (never cycle phase mid-turn:
   // an in-flight turn is bound to the active phase's history) and drives the live status ticker.

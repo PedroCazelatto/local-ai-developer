@@ -11,6 +11,9 @@ export const swapCommand: Command = {
   group: 'session',
   description: 'Switch the active phase (each phase keeps its own isolated history)',
   usage: '/swap <phase>',
+  // Tab: the phase names — the same list Shift+Tab cycles and switchPhase validates against. /swap takes
+  // exactly one arg, so there is nothing to offer past it.
+  complete: (ctx) => (ctx.args.length === 0 ? ctx.orch.availablePhases() : []),
   run: (ctx) => {
     const target = ctx.args[0];
     if (target === undefined || target === '') {

@@ -39,6 +39,14 @@ export interface CommandContext {
   requestExit(): void;
 }
 
+/** What a command's `complete()` receives to offer Tab candidates for the argument being typed. */
+export interface CompletionContext {
+  /** The session orchestrator — the source of live candidates (phases, the project path for the backlog). */
+  readonly orch: ReplOrchestrator;
+  /** The SETTLED args before the word being typed — `['use']` when the cursor sits in `/models use qw⎸`. */
+  readonly args: string[];
+}
+
 /** A registered slash-command. `group`/`description`/`usage` feed `/help`; `run` does the work. */
 export interface Command {
   /** The word after the slash, e.g. `models` for `/models`. Unique across the registry. */
@@ -49,6 +57,13 @@ export interface Command {
   readonly description: string;
   /** Optional usage/syntax line for `/help`, e.g. `/models list | pull <name> | use <name>`. */
   readonly usage?: string;
+  /**
+   * Optional Tab-completion candidates for the argument at `ctx.args.length` — return EVERY valid word
+   * for that position; complete-line.ts filters them against what's typed. Omit it for a command with no
+   * completable args. MUST be synchronous and cheap: it runs on the keypress, and an await would blank
+   * the pinned status rows (the full reasoning lives in complete-line.ts).
+   */
+  complete?(ctx: CompletionContext): string[];
   run(ctx: CommandContext): void | Promise<void>;
 }
 

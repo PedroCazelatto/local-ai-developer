@@ -62,7 +62,8 @@ function renderHelp(): void {
   }
 
   write('');
-  write(theme.meta('  Shift+Tab: cycle the active phase · /swap <phase>: jump straight to one'));
+  write(theme.meta('  Tab: complete a command or its argument · Shift+Tab: cycle the active phase'));
+  write(theme.meta('  /swap <phase>: jump straight to one'));
   write('');
 }
 

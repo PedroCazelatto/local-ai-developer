@@ -85,6 +85,9 @@ export const newProjectCommand: Command = {
   group: 'projects',
   description: 'Scaffold a new project on disk (the session stays on its project — restart to open the new one)',
   usage: '/new-project <name> <stack>',
+  // Tab: the stack is arg 1 of `/new-project <name> <stack>`, offered from the same KNOWN_STACKS list
+  // scaffoldProject validates against. Arg 0 is a free-text project name, so it has nothing to suggest.
+  complete: (ctx) => (ctx.args.length === 1 ? [...KNOWN_STACKS] : []),
   run: (ctx) => {
     // The session stays locked to its current project; scaffold under the orchestrator's projects/ root.
     const projectsRoot = path.resolve(process.cwd(), 'projects');

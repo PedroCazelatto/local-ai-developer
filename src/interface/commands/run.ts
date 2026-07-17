@@ -38,7 +38,7 @@ import type {
 } from '../../core/session/index.js';
 import { renderBatchSummary } from '../batch-summary.js';
 import { renderVerdict } from '../review-prompt.js';
-import type { Command } from '../command-registry.js';
+import type { Command, CompletionContext } from '../command-registry.js';
 
 /** The slice of the orchestrator /run needs — satisfied structurally by SessionOrchestrator. */
 export interface RunOrchestrator {
@@ -263,10 +263,30 @@ async function dispatchRun(args: readonly string[], orch: RunOrchestrator): Prom
   await runBatch(deps, selection.ids, buildBatchReporter());
 }
 
+/**
+ * Tab candidates for `/run <selector>`: the two static selectors plus every not-done task id — the same
+ * set `all` would sweep, so nothing is offered that resolveSelector would then skip. Only the selector is
+ * completable; a comma list past the first id isn't (the partial word carries the commas with it).
+ */
+function completeRun(ctx: CompletionContext): string[] {
+  if (ctx.args.length > 0) return [];
+  try {
+    // readBacklog is a SYNC file read, which is what makes it safe in a completer that must never await
+    // (complete-line.ts). A missing or malformed backlog just means no ids to offer, never a thrown Tab.
+    const ids = allTasks(readBacklog(ctx.orch.projectPath))
+      .filter((t) => t.status !== 'done')
+      .map((t) => t.id);
+    return ['next', 'all', ...ids];
+  } catch {
+    return ['next', 'all'];
+  }
+}
+
 export const runCommand: Command = {
   name: 'run',
   group: 'execution',
   description: 'Run backlog tasks through the implement→test→review→fix loop (auto-commits each pass)',
   usage: '/run [next | all | <task-id>[,<id>…]]',
+  complete: completeRun,
   run: (ctx) => dispatchRun(ctx.args, ctx.orch),
 };

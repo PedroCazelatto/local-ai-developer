@@ -22,6 +22,9 @@ import { theme } from '../core/ui/theme.js';
 
 const USAGE = 'Usage: /models list | pull <name> | use <name>';
 
+/** The subcommands `run` dispatches on, as Tab candidates. Kept beside that switch so the two stay in step. */
+const SUBCOMMANDS: readonly string[] = ['list', 'pull', 'use'];
+
 function write(line: string): void {
   process.stdout.write(`${line}\n`);
 }
@@ -212,5 +215,9 @@ export const modelsCommand: Command = {
   group: 'models',
   description: 'List, pull, and switch the local Ollama model',
   usage: USAGE,
+  // Tab: the subcommands only. Model NAMES are deliberately left uncompleted — listing them means an async
+  // call to the Ollama daemon, and an async completer blanks the pinned rows (see complete-line.ts). `pull`
+  // names aren't local anyway; they're arbitrary registry strings.
+  complete: (ctx) => (ctx.args.length === 0 ? [...SUBCOMMANDS] : []),
   run,
 };
