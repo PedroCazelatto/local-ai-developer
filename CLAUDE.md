@@ -226,9 +226,34 @@ In-app (terminal) — all implemented:
 - `/subagents` — list active sub-agents
 - `/help` — list every command · `/exit` — quit
 
+## Model selection
+
+**There is no default model.** A model name compiled into the orchestrator says nothing about what the
+user has actually pulled — a hard-coded default locks a fresh install to a model that isn't there, and
+every turn fails. The **installed set is the only ground truth**, so boot asks the Ollama daemon and
+picks from what exists ([src/core/session/resolve-boot-model.ts](src/core/session/resolve-boot-model.ts)):
+
+1. `state.json`'s `activeModel`, **if it is installed** — the user's own explicit choice always wins.
+2. `state.json`'s `activeModel`, **if it is not installed** — offer to re-pull it (single-keypress y/n).
+3. Otherwise — the **smallest installed model**. VRAM is the binding constraint, so an unattended boot
+   lands on the model most likely to fit.
+4. **Nothing installed at all** — offer to pull `SUGGESTED_MODEL`, which exists *only* as this download
+   suggestion for a fresh machine and is never a value the session silently boots on.
+5. **Every offer declined** — no model. This is a valid session, not an error: the REPL still boots (so
+   the user can `/models pull`), the status line reads `no model`, and a turn fails with an actionable
+   "pull one" line instead of an Ollama 404.
+
+A declined pull is never chased with a second offer for a different model — **one ask per boot**.
+
+Only an explicit `/models use` writes `state.json`, so an inferred boot pick never overwrites a stated
+choice. **An unreachable Ollama daemon is fatal at boot** — like a missing Docker daemon: boot needs the
+installed list to decide anything, and a session without Ollama can do nothing at all.
+
 ## Environment
 
-- [.env.example](.env.example) currently only sets `OLLAMA_NUM_CTX`. Model name and active phase will eventually move to the UI, not `.env`.
+- [.env.example](.env.example) currently only sets `OLLAMA_NUM_CTX`. The model name has **moved to the UI**
+  (`/models`, persisted to `state.json` — see [Model selection](#model-selection)) and is deliberately not
+  an env var; the active phase will eventually follow.
 
 ## Open questions / not yet decided
 

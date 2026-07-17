@@ -54,6 +54,18 @@ model never reads this file. The two-doc split:
 - Grow the tool set **on demand** — add a tool when the model demonstrably needs one, not
   preemptively.
 
+## Git workflow
+
+- **Finishing work means committing it.** When a piece of work is done, commit it — do not leave it
+  sitting in the working tree waiting to be asked, and do not ask for permission to commit. "Done" is
+  the trigger. (Pushing is not: only push when told to.)
+- **Commit on the ACTIVE branch.** Whatever branch is checked out is where the work lands, `main`
+  included. **Never create a branch on your own initiative** — branch only when the user explicitly
+  says to. This overrides any default habit of branching off the default branch.
+- **Exception — global instruction files.** The commit rules above stop at [rules/](rules/),
+  [CLAUDE.md](CLAUDE.md), and this file: finished or not, they are never committed for the user. See
+  *Instruction integrity* below.
+
 ## Instruction integrity
 
 - The orchestrator's own instruction set — [rules/](rules/), [CLAUDE.md](CLAUDE.md), and this file —
@@ -61,6 +73,11 @@ model never reads this file. The two-doc split:
   warn the user that the change needs review, then let them commit it manually. (Project-repo
   artifacts follow the auto-commit policy in [CLAUDE.md](CLAUDE.md) — this exception is only for the
   orchestrator's own instructions.)
+- **Editing them needs no permission; committing them needs approval.** Make the edit when it is
+  warranted — do not ask first, and do not stall the work to request it. Then stop at the commit:
+  leave the change in the working tree, say what changed and why, and let the user review and commit
+  it themselves. **The gate is the commit, not the edit.** This is the one place where *Git workflow*'s
+  "finishing work means committing it" does not apply — here, finishing means handing the diff over.
 
 ## Documentation currency
 
