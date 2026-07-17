@@ -6,3 +6,4 @@ export * as statusBar from './status-bar.js';
 export { startThinking, stopThinking } from './spinner.js';
 export { confirm, select, textInput } from './prompts.js';
 export type { SelectChoice } from './prompts.js';
+export { confirmKey } from './confirm-key.js';

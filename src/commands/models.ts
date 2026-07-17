@@ -1,9 +1,11 @@
 // /models (V5/02) — the model picker: `list` (installed models, active one marked), `pull <name>`
-// (streamed, Ctrl-C-abortable, BLOCKS until done), `use <name>` (switch the live session model, guarded
-// against a not-yet-pulled name, persisted to state.json). A user command, never a model tool — the
-// model never picks its own runtime, so this lives in src/commands/ and hangs off the command registry
-// (V5/02), not src/tools/. All three talk to the HOST Ollama daemon directly (Ollama runs on the host
-// GPU, not the sandbox — CLAUDE.md); the session orchestrator only holds/applies the active model.
+// (streamed, Ctrl-C-abortable, BLOCKS until done), `use <name>` (switch the live session model,
+// persisted to state.json). When `use` names a model that isn't pulled yet, it doesn't error — it
+// offers to download it inline via a single-keypress y/n confirm (no Enter), pulls on `y`, then
+// switches. A user command, never a model tool — the model never picks its own runtime, so this lives
+// in src/commands/ and hangs off the command registry (V5/02), not src/tools/. All talk to the HOST
+// Ollama daemon directly (Ollama runs on the host GPU, not the sandbox — CLAUDE.md); the session
+// orchestrator only holds/applies the active model.
 //
 // A cohesive command module (dispatch + the three subcommands + formatters), like resume.ts/subagents.ts
 // — not one function per file.
@@ -14,6 +16,7 @@ import type { Command, CommandContext } from '../interface/command-registry.js';
 import { hasModel, listModels, pullModel } from '../core/llm/index.js';
 import type { PullProgress } from '../core/llm/index.js';
 import { saveAppState } from '../core/session/index.js';
+import { confirmKey } from '../core/ui/confirm-key.js';
 import * as renderer from '../core/ui/renderer.js';
 import { theme } from '../core/ui/theme.js';
 
@@ -92,18 +95,18 @@ function progressText(name: string, p: PullProgress): string {
   return `pulling ${name} · ${status}`;
 }
 
+/** Outcome of a streamed pull, so callers decide the follow-up (print a hint vs. switch to the model). */
+type PullResult = 'ok' | 'cancelled' | 'error';
+
 /**
- * `/models pull <name>` — stream the pull with a live ora line and BLOCK until it finishes (the REPL is
- * single-threaded, so nothing else — including `/models use` — runs until this resolves). Ctrl-C aborts
- * ONLY this pull: we register a one-shot SIGINT listener on the REPL's readline that trips an
- * AbortController, whose signal ollama-models bridges onto the streamed request. `discardStdin: false`
- * matches spinner.ts — the REPL owns stdin via readline, so ora must not pause/raw-toggle it.
+ * Stream a pull with a live ora line and BLOCK until it finishes (the REPL is single-threaded, so nothing
+ * else runs until this resolves), returning the outcome without printing a final line — the caller owns
+ * that message. Ctrl-C aborts ONLY this pull: we register a one-shot SIGINT listener on the REPL's
+ * readline that trips an AbortController, whose signal ollama-models bridges onto the streamed request.
+ * `discardStdin: false` matches spinner.ts — the REPL owns stdin via readline, so ora must not
+ * pause/raw-toggle it. `cancelled` and `error` are reported here; `ok` is left for the caller to phrase.
  */
-async function pullSubcommand(ctx: CommandContext, name: string | undefined): Promise<void> {
-  if (name === undefined || name === '') {
-    renderer.errorLine('Usage: /models pull <name>');
-    return;
-  }
+async function streamPull(ctx: CommandContext, name: string): Promise<PullResult> {
   const controller = new AbortController();
   const onSigint = (): void => controller.abort();
   // readline emits 'SIGINT' on Ctrl-C while the interface is live (it owns the TTY); reuse it rather than
@@ -117,22 +120,50 @@ async function pullSubcommand(ctx: CommandContext, name: string | undefined): Pr
     spinner.stop();
     if (outcome.cancelled) {
       renderer.systemMessage(`Pull of ${name} cancelled — returned to the prompt (a partial blob is Ollama's to clean up).`);
-      return;
+      return 'cancelled';
     }
-    renderer.systemMessage(`Pulled ${name}. Switch to it with  /models use ${name}`);
+    return 'ok';
   } catch (err) {
     spinner.stop();
     renderer.errorLine(`Couldn't pull ${name}: ${errMessage(err)}`);
+    return 'error';
   } finally {
     ctx.rl.removeListener('SIGINT', onSigint);
   }
 }
 
+/** `/models pull <name>` — stream the pull, then point the user at `/models use` on success. */
+async function pullSubcommand(ctx: CommandContext, name: string | undefined): Promise<void> {
+  if (name === undefined || name === '') {
+    renderer.errorLine('Usage: /models pull <name>');
+    return;
+  }
+  if (await streamPull(ctx, name) === 'ok') {
+    renderer.systemMessage(`Pulled ${name}. Switch to it with  /models use ${name}`);
+  }
+}
+
 /**
- * `/models use <name>` — switch the live session model immediately (the next phase turn + any newly
- * spawned window/sub-agent uses it) and persist the choice so the next `run start` defaults to it. Guarded
- * by hasModel so an un-pulled name fails with a recoverable hint instead of sending an unknown model to
- * Ollama. Persistence is best-effort: a failed write still leaves the session switched, with a warning.
+ * Apply `name` as the live session model (the next phase turn + any newly spawned window/sub-agent uses
+ * it) and persist the choice so the next `run start` defaults to it. Persistence is best-effort: a failed
+ * write still leaves the session switched, with a warning. Caller guarantees `name` is actually pulled.
+ */
+function applyModel(ctx: CommandContext, name: string): void {
+  ctx.orch.useModel(name);
+  renderer.systemMessage(`→ model: ${name}`);
+  try {
+    saveAppState({ activeModel: name });
+  } catch (err) {
+    renderer.systemMessage(`  (switched, but couldn't persist to state.json: ${errMessage(err)} — applies this session only)`);
+  }
+}
+
+/**
+ * `/models use <name>` — switch the live session model. If `name` isn't pulled yet, we don't error: we
+ * ask "Download it now? (y/n)" answered by a SINGLE keystroke (no Enter, via confirmKey), and on `y`
+ * pull it (blocking, Ctrl-C-abortable) and then switch. On `n`/cancel we leave the current model in
+ * place. hasModel is the guard so an unknown name never reaches Ollama; a merely-started pull still
+ * counts as not-present.
  */
 async function useSubcommand(ctx: CommandContext, name: string | undefined): Promise<void> {
   if (name === undefined || name === '') {
@@ -143,19 +174,18 @@ async function useSubcommand(ctx: CommandContext, name: string | undefined): Pro
     renderer.systemMessage(`Already using ${name}.`);
     return;
   }
-  // Block use of a model that isn't actually present locally (even if a pull was merely started).
   const present = await hasModel(name);
   if (!present) {
-    renderer.errorLine(`Model '${name}' is not pulled. Run  /models pull ${name}  first, then  /models use ${name}.`);
-    return;
+    // confirmKey blocks on one y/n keystroke (no Enter); false on n / Esc / Ctrl-C / non-TTY.
+    const wantsPull = await confirmKey(`Model '${name}' isn't pulled. Download it now?`);
+    if (!wantsPull) {
+      renderer.systemMessage(`Kept current model — still using ${ctx.orch.model}.`);
+      return;
+    }
+    // streamPull reports cancel/error itself; only 'ok' means the blob is present and we can switch.
+    if (await streamPull(ctx, name) !== 'ok') return;
   }
-  ctx.orch.useModel(name);
-  renderer.systemMessage(`→ model: ${name}`);
-  try {
-    saveAppState({ activeModel: name });
-  } catch (err) {
-    renderer.systemMessage(`  (switched, but couldn't persist to state.json: ${errMessage(err)} — applies this session only)`);
-  }
+  applyModel(ctx, name);
 }
 
 /** Dispatch `/models <sub>` — bare `/models` lists; an unknown subcommand prints usage. */
