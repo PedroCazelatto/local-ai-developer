@@ -8,6 +8,9 @@ export { oneShot } from './one-shot.js';
 export type { OneShotResult } from './one-shot.type.js';
 // V5/02: daemon model-management wrappers (list / pull / hasModel) for the `/models` command.
 export { listModels, hasModel, pullModel } from './ollama-models.js';
+// The boot pick rule + the shared name/tag match, used by resolve-boot-model and `/models`.
+export { pickSmallestModel } from './pick-smallest-model.js';
+export { matchesModelName } from './matches-model-name.js';
 export type { InstalledModel, PullProgress, PullProgressHandler, PullOutcome } from './ollama-models.type.js';
 export { StreamFilter } from './stream-filter.js';
 export { loadsOrRepair, repairDecode } from './json-repair.js';

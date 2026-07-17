@@ -24,21 +24,44 @@ export interface StreamHandle {
 export class OllamaClient {
   private readonly ollama: Ollama;
   // Mutable session model (V5/02): the single source of truth for which model turns go to. Set at boot
-  // from config (state.json → DEFAULT_MODEL) and changed live by `/models use`. Every consumer — phase
-  // turns, spawned Worker/Reviewer/Retro windows, sub-agents, oneShot — reads it through this one client,
-  // so they all follow the live model together (the model only ever changes between turns, never mid-work).
-  private modelName: string;
+  // from the models Ollama actually has installed (resolve-boot-model.ts) and changed live by
+  // `/models use`. Every consumer — phase turns, spawned Worker/Reviewer/Retro windows, sub-agents,
+  // oneShot — reads it through this one client, so they all follow the live model together (the model
+  // only ever changes between turns, never mid-work).
+  //
+  // `undefined` is a real, reachable state, not a placeholder: a machine with no models installed where
+  // the user declined the boot download still gets a working REPL (to run `/models pull`), it just cannot
+  // take a turn yet. Every path that needs a name for real goes through requireModel().
+  private modelName: string | undefined;
   private readonly numCtx: number;
   private lastTokens: TokenCounts = NO_TOKENS;
 
-  constructor(opts: { modelName: string; numCtx: number }) {
+  constructor(opts: { modelName: string | undefined; numCtx: number }) {
     this.modelName = opts.modelName;
     this.numCtx = opts.numCtx;
     this.ollama = new Ollama();
   }
 
-  /** The live session model — read by the status line and stamped onto new sub-agents at spawn (V5/02). */
-  get model(): string {
+  /**
+   * The live session model, or undefined when none is selected — read by the status line, which renders
+   * the empty case rather than pretending. Callers that need a name to actually CALL Ollama use
+   * requireModel() instead.
+   */
+  get model(): string | undefined {
+    return this.modelName;
+  }
+
+  /**
+   * The live session model, or a clear, actionable throw when there is none. The REPL catches it and
+   * prints it as one recoverable line, so a model-less session answers "why did nothing happen?" at the
+   * moment the user tries — instead of sending `model: undefined` to Ollama and surfacing its 404.
+   */
+  requireModel(): string {
+    if (this.modelName === undefined) {
+      throw new Error(
+        `No model selected. Pull one with  /models pull <name>  (or  /models use <name>  if it's already installed).`,
+      );
+    }
     return this.modelName;
   }
 
@@ -55,7 +78,8 @@ export class OllamaClient {
   /** Non-streaming turn. Ports provider.chat() + orchestrator's tool-call recovery. */
   async chat(messages: Message[], tools?: Tool[]): Promise<ChatResult> {
     const response = await this.ollama.chat({
-      model: this.modelName,
+      // requireModel throws a "no model selected, pull one" line if the session has none (see the field).
+      model: this.requireModel(),
       messages,
       tools,
       stream: false,
@@ -71,6 +95,11 @@ export class OllamaClient {
    */
   stream(messages: Message[], tools?: Tool[]): StreamHandle {
     let finalResult: ChatResult | null = null;
+    // Resolved HERE, not inside the generator: an async generator's body doesn't run until its first
+    // next(), so a throw from within would surface only once a caller started consuming deltas — long
+    // after the turn looked like it had started. requireModel throws a "no model selected, pull one"
+    // line if the session has none (see the field), and this way it lands on the stream() call itself.
+    const model = this.requireModel();
 
     const run = async function* (this: OllamaClient): AsyncGenerator<string, void, unknown> {
       const filter = new StreamFilter();
@@ -79,7 +108,7 @@ export class OllamaClient {
       let tokens: TokenCounts = NO_TOKENS;
 
       const iterator = await this.ollama.chat({
-        model: this.modelName,
+        model,
         messages,
         tools,
         stream: true,

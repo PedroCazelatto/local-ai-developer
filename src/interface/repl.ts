@@ -22,6 +22,7 @@ import type {
   TaskLoopReporter,
   TaskLoopResult,
 } from '../core/session/index.js';
+import { SUGGESTED_MODEL } from '../core/session/index.js';
 import * as renderer from '../core/ui/renderer.js';
 import * as statusActivity from '../core/ui/status-activity.js';
 import * as statusBar from '../core/ui/status-bar.js';
@@ -42,8 +43,11 @@ const STATUS_TICK_MS = 100;
  */
 export interface ReplOrchestrator {
   readonly project: string;
-  /** Live session model (V5/02) — the status line reads it; /models use changes it via useModel. */
-  readonly model: string;
+  /**
+   * Live session model (V5/02) — the status line reads it; /models use changes it via useModel.
+   * undefined when no model is selected (nothing installed and the boot download declined).
+   */
+  readonly model: string | undefined;
   readonly numCtx: number;
   /** Current phase name — drives the status line + assistant prefix. */
   readonly activePhase: string;
@@ -83,6 +87,12 @@ export async function runRepl(orch: ReplOrchestrator): Promise<void> {
   statusBar.enable(); // reserve the two bottom rows BEFORE the header so all output scrolls above them
   statusBar.setFooter(theme.meta(FOOTER_HINT)); // static hint on the bottom pinned row
   renderer.header();
+  // A model-less session is valid but can't take a turn, so say so where it STICKS. Boot resolved the
+  // model (and offered a download) before we were called, but clearScreen above just wiped that
+  // exchange — this is the one surface the user still sees. The status line shows the same state live.
+  if (orch.model === undefined) {
+    renderer.systemMessage(`No model selected. Pull one with  /models pull ${SUGGESTED_MODEL}`);
+  }
   // completeLine: Tab-completes `/command` names off the registry and delegates the argument being typed
   // to that command's own complete(). Synchronous on purpose — readline prints its candidate list before
   // the keypress repaint below restores the pinned rows; an async completer would land after it and leave
@@ -218,9 +228,12 @@ function updateStatus(orch: ReplOrchestrator): void {
   // timer while a turn streams, else null (idle) → the field is omitted.
   const activity = statusActivity.label();
   const activityField = activity !== null ? ` · ${activity}` : '';
+  // `no model` (not a blank or a guessed name) when none is selected — the pinned line must never imply
+  // a model is loaded when a turn would fail. It appears the moment /models use|pull resolves one.
+  const model = orch.model ?? 'no model';
   const head = theme.meta(`${orch.project} · `);
   const phase = theme.phase(orch.activePhase)(orch.activePhase);
-  const tail = theme.meta(` · ${orch.model} · ${tokens}/${orch.numCtx} tok${phaseField}${subs}${activityField}`);
+  const tail = theme.meta(` · ${model} · ${tokens}/${orch.numCtx} tok${phaseField}${subs}${activityField}`);
   statusBar.setStatus(`${head}${phase}${tail}`);
 }
 

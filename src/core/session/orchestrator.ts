@@ -107,8 +107,12 @@ export class SessionOrchestrator implements TurnContext {
     });
   }
 
-  /** Live session model (V5/02) — the status line reads this; `/models use` changes it via useModel. */
-  get model(): string {
+  /**
+   * Live session model (V5/02), or undefined when none is selected — the status line reads this and
+   * renders the empty case. Undefined is reachable only on a machine with no models installed where the
+   * user declined the boot download (resolve-boot-model.ts); a turn then fails with an actionable line.
+   */
+  get model(): string | undefined {
     return this.llm.model;
   }
 
@@ -123,9 +127,14 @@ export class SessionOrchestrator implements TurnContext {
     const from = this.llm.model;
     this.llm.setModel(name);
     // V5/04 model_use: only a real switch is worth a row (a no-op `/models use <current>` is dropped
-    // earlier by the command, but guard here too).
+    // earlier by the command, but guard here too). `from` is OMITTED when the session had no model to
+    // switch away from — this file's own convention for a genuinely-absent value, never invented as "".
     if (from !== name) {
-      appendEvent(this.projectPath, { type: 'model_use', phase: this.phase.name, detail: { from, to: name } });
+      appendEvent(this.projectPath, {
+        type: 'model_use',
+        phase: this.phase.name,
+        detail: { ...(from !== undefined && { from }), to: name },
+      });
     }
   }
 

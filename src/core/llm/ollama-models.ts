@@ -9,6 +9,7 @@
 
 import { Ollama } from 'ollama';
 
+import { matchesModelName } from './matches-model-name.js';
 import type { InstalledModel, PullOutcome, PullProgressHandler } from './ollama-models.type.js';
 
 /** One stateless client to the default local daemon; every wrapper reuses it (no per-call construction). */
@@ -24,13 +25,13 @@ export async function listModels(): Promise<InstalledModel[]> {
 
 /**
  * Whether `name` is actually pulled locally — the guard `/models use` runs so we never send an unknown
- * model to Ollama. Matches the full tag exactly; if the user omitted the tag, also accepts the `:latest`
- * form (Ollama's implicit default), matching how `ollama run <name>` resolves it.
+ * model to Ollama. matchesModelName holds the tag rule (exact, or the implicit `:latest` when tagless).
+ * Callers that ALREADY hold a listModels() result should match against it directly rather than call this
+ * (it re-lists); this is the convenience form for a one-off check.
  */
 export async function hasModel(name: string): Promise<boolean> {
-  const wanted = name.includes(':') ? name : `${name}:latest`;
   const installed = await listModels();
-  return installed.some((m) => m.name === name || m.name === wanted);
+  return installed.some((m) => matchesModelName(m.name, name));
 }
 
 /**

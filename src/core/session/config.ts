@@ -7,18 +7,15 @@
 import { existsSync, statSync } from 'node:fs';
 import path from 'node:path';
 
-import { loadAppState } from './app-state.js';
-
 /**
- * The FALLBACK default model — used only when neither state.json (a prior `/models use`, V5/02) nor a
- * MODEL_NAME env var (there is none by design — model selection is a UI choice, not env) has set one.
- * Runtime resolution order: state.json's activeModel → DEFAULT_MODEL.
- * TEMPORARY (2026-07-09): a 3B model so the loop is testable on an 8 GB M2 Air (unified memory),
- * where the 14B target won't fit alongside Docker + Node + Ollama. It only needs to emit valid tool
- * calls; output quality is irrelevant for testing. Revert to 'qwen2.5-coder:14b' — the intended
- * production model — on the RTX 3060 target.
+ * The model we SUGGEST DOWNLOADING when Ollama has nothing installed at all — a starting point for a
+ * fresh machine, never a value the session silently boots on. It was formerly DEFAULT_MODEL, the boot
+ * fallback, which was the bug: a hard-coded name says nothing about what is actually pulled, so a fresh
+ * install booted locked to a model that did not exist and every turn failed. The boot model now comes
+ * from the installed set (resolve-boot-model.ts); this name only ever reaches the user as an offer.
+ * A 3B is deliberate for the suggestion: it is the least likely first download to not fit.
  */
-export const DEFAULT_MODEL = 'qwen2.5-coder:3b';
+export const SUGGESTED_MODEL = 'qwen2.5-coder:3b';
 /** num_ctx is a hard VRAM ceiling — never estimated or invented (CLAUDE.md memory model). */
 export const DEFAULT_NUM_CTX = 16384;
 export const DEFAULT_PHASE = 'discovery';
@@ -33,8 +30,10 @@ export interface SessionConfig {
   readonly projectName: string;
   /** Absolute path to projects/<name> — the same path task 04 bind-mounts as /workspace. */
   readonly projectPath: string;
-  /** Boot model: state.json's activeModel (a prior `/models use`, V5/02) if present, else DEFAULT_MODEL. */
-  readonly modelName: string;
+  // No modelName here by design: unlike everything else in this file, the model is neither static for the
+  // session's lifetime (`/models use` switches it live) nor knowable without asking the Ollama daemon what
+  // is installed. It is resolved separately at boot (resolve-boot-model.ts) and owned by OllamaClient
+  // thereafter — `orch.model` is the single source of truth for which model turns go to.
   /** From OLLAMA_NUM_CTX, else DEFAULT_NUM_CTX. */
   readonly numCtx: number;
   /**
@@ -108,14 +107,9 @@ export function loadConfig(projectName: string): SessionConfig {
     );
   }
 
-  // Resolution order (task 02): persisted state.json → DEFAULT_MODEL. loadAppState never throws — a
-  // missing file is normal, a corrupt one falls back with a surfaced warning — so boot can't crash here.
-  const modelName = loadAppState().activeModel ?? DEFAULT_MODEL;
-
   return {
     projectName,
     projectPath,
-    modelName,
     numCtx: resolveNumCtx(),
     summarizationThresholdRatio: resolveThresholdRatio(),
     initialPhase: DEFAULT_PHASE,

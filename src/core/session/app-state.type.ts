@@ -7,8 +7,11 @@
 /** The shape persisted to ~/.local-ai-developer/state.json. Grows over time; keep every field optional. */
 export interface AppState {
   /**
-   * The model name the user last selected via `/models use`. Read at boot AFTER DEFAULT_MODEL so the
-   * next `run start` defaults to it; absent (fresh install / never switched) → DEFAULT_MODEL fallback.
+   * The model name the user last selected via `/models use` — their explicit choice, so it outranks
+   * anything the orchestrator would infer. It is a preference, NOT a guarantee: the blob can be deleted,
+   * or the file can be carried to a machine that never pulled it, so boot verifies it against the
+   * installed set before honouring it and offers to re-pull it when it's gone (resolve-boot-model.ts).
+   * Absent (fresh install / never switched) → boot picks the smallest installed model.
    */
   readonly activeModel?: string;
 }

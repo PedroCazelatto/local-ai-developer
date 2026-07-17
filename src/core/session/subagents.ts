@@ -62,7 +62,10 @@ export class SubagentManager implements SubagentHandle {
       // The live session model AT SPAWN (V5/02). Recorded for reference only — its turns dispatch through
       // the shared client, so it follows the session's current live model like every other window (the
       // model only ever changes between turns). Same at spawn since a switch can't happen mid-work.
-      model: this.deps.llm.model,
+      // requireModel, not model: a spawn only ever happens inside a master turn, which cannot have started
+      // without a model — so this can't throw in practice, and typing it `string | undefined` would be a
+      // lie the whole SubagentState surface then has to carry.
+      model: this.deps.llm.requireModel(),
       numCtx: this.deps.numCtx,
       // Seeded ONLY with the master's brief + task — never the master's history (isolation).
       messages: [{ role: 'system', content: initialContext }],

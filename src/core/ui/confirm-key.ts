@@ -1,16 +1,16 @@
-// Single-keypress y/n confirmation for the REPL — resolves on ONE key, no Enter required. Used by
-// `/models use <name>` to offer pulling a not-yet-installed model inline ("Download it now? (y/n)"
-// answered with a single y/n keystroke).
+// Single-keypress y/n confirmation — resolves on ONE key, no Enter required. Used by `/models use
+// <name>` to offer pulling a not-yet-installed model inline ("Download it now? (y/n)" answered with a
+// single y/n keystroke), and by the boot model resolution to offer the same before any REPL exists.
 //
-// Why it detaches readline's keypress handling for the read: the REPL owns stdin through a live
-// `readline` interface, and readline buffers EVERY printable keypress into its own line even between
-// questions (`this.line`) — so a naive read would leak the pressed `y`/`n` into the next `› ` prompt.
-// We therefore snapshot and remove all current `keypress` listeners (readline's internal handler AND
-// the REPL's status-repaint handler), attach a throwaway one-shot listener for the single key, then
-// restore the originals — leaving stdin exactly as found. `emitKeypressEvents` decodes bytes via a
-// separate `data` listener that stays attached, so `keypress` events keep flowing to our listener.
+// Why it detaches readline's keypress handling for the read: inside the REPL, readline owns stdin and
+// buffers EVERY printable keypress into its own line even between questions (`this.line`) — so a naive
+// read would leak the pressed `y`/`n` into the next `› ` prompt. We therefore snapshot and remove all
+// current `keypress` listeners (readline's internal handler AND the REPL's status-repaint handler),
+// attach a throwaway one-shot listener for the single key, then restore the originals — leaving stdin
+// exactly as found.
 
 import { stdin } from 'node:process';
+import { emitKeypressEvents } from 'node:readline';
 import type { Key } from 'node:readline';
 
 import { theme } from './theme.js';
@@ -25,6 +25,12 @@ type KeypressListener = (str: string | undefined, key: Key | undefined) => void;
  */
 export async function confirmKey(message: string): Promise<boolean> {
   if (!stdin.isTTY) return false;
+
+  // Install the byte→`keypress` decoder. Inside the REPL, createInterface already did this and the call
+  // is a no-op (Node guards it with an internal symbol); at boot NOTHING has, and without it no
+  // `keypress` event would ever fire and the await below would hang forever. The decoder attaches its
+  // own `data` listener that survives our snapshot/restore, so events keep flowing to our listener.
+  emitKeypressEvents(stdin);
 
   process.stdout.write(`${theme.meta(message)} ${theme.meta('(y/n)')} `);
 

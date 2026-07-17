@@ -1,16 +1,17 @@
 // CLI / REPL entry point.
 //
 // Boot sequence: load .env, parse the required <project-name> argv, resolve + validate the
-// session config (02), ensure the sandbox container is up (04), build the orchestrator (06), and
-// hand it to the persistent REPL (05). Streams turns with exact token counts, switches phases
-// with isolated histories, and dispatches model tool calls into the sandbox — the Foundation bar.
+// session config (02), resolve the model against what Ollama actually has installed, ensure the
+// sandbox container is up (04), build the orchestrator (06), and hand it to the persistent REPL (05).
+// Streams turns with exact token counts, switches phases with isolated histories, and dispatches model
+// tool calls into the sandbox — the Foundation bar.
 //
 // `import 'dotenv/config'` MUST come before any process.env read, or OLLAMA_NUM_CTX is undefined.
 import 'dotenv/config';
 
 import { SANDBOX_CONTAINER, SandboxClient } from './core/container/index.js';
 import { OllamaClient } from './core/llm/index.js';
-import { SessionOrchestrator, loadConfig, type SessionConfig } from './core/session/index.js';
+import { SessionOrchestrator, loadConfig, resolveBootModel, type SessionConfig } from './core/session/index.js';
 import { runRepl } from './interface/index.js';
 
 function fail(message: string): never {
@@ -36,7 +37,20 @@ async function main(): Promise<void> {
 
   const config = resolveOrExit(projectName);
 
-  const llm = new OllamaClient({ modelName: config.modelName, numCtx: config.numCtx });
+  // resolveBootModel asks the daemon what is INSTALLED and picks from that (state.json's choice if it's
+  // still there → else the smallest installed → else offer to pull the suggestion), rather than trusting
+  // a hard-coded default that may not exist locally. It may prompt + pull, so it BLOCKS boot; it returns
+  // undefined only if the user declined, which is a valid model-less session (the REPL prints the hint).
+  // An unreachable daemon is fatal here for the same reason a missing Docker daemon is: without Ollama a
+  // session can do nothing at all, so say so now instead of failing on the user's first message.
+  let modelName: string | undefined;
+  try {
+    modelName = await resolveBootModel();
+  } catch (err) {
+    fail(`could not reach Ollama: ${err instanceof Error ? err.message : String(err)}`);
+  }
+
+  const llm = new OllamaClient({ modelName, numCtx: config.numCtx });
   const sandbox = new SandboxClient({
     containerName: SANDBOX_CONTAINER,
     projectPath: config.projectPath,
