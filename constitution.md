@@ -9,11 +9,10 @@ editing this file first.
 
 Scope note: this governs the **orchestrator's own TypeScript code**. The *local Ollama model's*
 code-quality standards are a different thing and live in [rules/standards/](rules/standards/); the
-model never reads this file. The three-doc split:
+model never reads this file. The two-doc split:
 
 - **[CLAUDE.md](CLAUDE.md)** — the *objective*: what we're building and why.
 - **constitution.md** (this file) — the *how*: the quality bar every change must clear.
-- **task files** ([tasks/](tasks/)) — the *what*: the specific work in flight.
 
 ## Language & style
 
@@ -62,6 +61,18 @@ model never reads this file. The three-doc split:
   warn the user that the change needs review, then let them commit it manually. (Project-repo
   artifacts follow the auto-commit policy in [CLAUDE.md](CLAUDE.md) — this exception is only for the
   orchestrator's own instructions.)
+
+## Documentation currency
+
+- **This constitution MUST be kept up to date on every commit — it must never carry outdated
+  information.** Any commit that changes a rule, convention, invariant, file-layout assumption, or
+  workflow described here updates this file **in that same commit**. A rule that no longer matches
+  the code is worse than no rule: stale guidance is a defect, not a cosmetic lag. The same duty
+  applies to [CLAUDE.md](CLAUDE.md) (the objective) — if a change makes either doc wrong, correcting
+  the doc is part of that change, not a follow-up.
+- This does **not** relax *Instruction integrity* above: a doc edit is still a global-instruction
+  change — surfaced for the user's review and committed by them, never silently auto-committed. It is
+  simply never allowed to lag behind the code it describes.
 
 ## Terminal UX
 

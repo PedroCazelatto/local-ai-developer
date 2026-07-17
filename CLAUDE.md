@@ -6,23 +6,20 @@ Guidance for Claude Code when working in this repo. This file is for you (Claude
 > **Read [constitution.md](constitution.md) before writing or changing any code, every session.**
 > It holds the binding engineering constraints (TypeScript conventions, `never any`, exact token
 > counts, tool logging, instruction integrity). The docs divide as: **CLAUDE.md = the objective**
-> (what we're building and why), **[constitution.md](constitution.md) = the how** (the quality bar
-> every change must clear), **[tasks/](tasks/) = the what** (the specific work in flight).
+> (what we're building and why) and **[constitution.md](constitution.md) = the how** (the quality
+> bar every change must clear).
 
 ## Prime directive: do not assume, ask
 
 This project's requirements live mostly in the user's head. When a task is ambiguous, **ask clarifying questions instead of guessing**. Even small decisions (tool signatures, file layout, naming, what a phase means) should be confirmed if not already documented here or obvious from the code.
 
-**The rule is absolute: if you have any doubt, ask. If a decision is not already specified in documentation — CLAUDE.md, [constitution.md](constitution.md), the task files, or the code — you must ask the user before acting. Never fill a gap with an assumption.** A missing decision is a question for the user, not a default for you to pick.
+**The rule is absolute: if you have any doubt, ask. If a decision is not already specified in documentation — CLAUDE.md, [constitution.md](constitution.md), or the code — you must ask the user before acting. Never fill a gap with an assumption.** A missing decision is a question for the user, not a default for you to pick.
 
 Corollary: if you learn a new product requirement during a conversation, propose adding it to this file.
 
 ## What this project is
 
-> **Platform migration in progress (2026-06-21): Python → TypeScript/Node.** The Python code in
-> this repo is **reference only** and is deleted once the TS rewrite reaches parity. Do not build
-> new features on the Python code. The version plan lives in [ROADMAP.md](ROADMAP.md); `*.py`
-> file references below describe *behavior to port*, not the target implementation.
+> **Platform: TypeScript/Node.**
 
 A **TypeScript/Node CLI** that orchestrates a **locally-run** Ollama model to autonomously develop code projects. The user's goals:
 
@@ -98,8 +95,9 @@ When the user answers a blocker, the orchestrator spawns a **Retro** window with
 ### Inter-phase communication: `AGENT_NOTES.md` *(superseded by the V3 inbox)*
 
 > **Superseded:** the structured cross-phase **inbox** (`inbox_post`/`inbox_read`/`inbox_resolve`,
-> append-only JSONL — see [ROADMAP.md](ROADMAP.md) V3) replaces this markdown-file mechanism. The
-> description below is retained as the conceptual model for *why* cross-phase signaling exists.
+> append-only JSONL under `src/tools/` + `src/core/session/inbox-store.ts`) replaces this
+> markdown-file mechanism. The description below is retained as the conceptual model for *why*
+> cross-phase signaling exists.
 
 Because each window has its **own isolated history** and never sees another phase's turns, cross-phase signals need a file on disk. The convention is a shared file in the **project repo root** (sibling of `PRODUCT_SPEC.md`):
 
@@ -172,7 +170,7 @@ Two-tier Docker model. **Hard rule: the model touches only Docker, never the hos
 Other ground rules:
 
 - The local Ollama model runs on GPU/VRAM on the host (Docker is CPU-focused and cannot host it).
-- Tools run **autonomously** and **every call is logged**, and the tool set is grown **on demand** — see [constitution.md](constitution.md). Current (Python reference) tools live in [tools/](tools/); the TS tool set is defined per [ROADMAP.md](ROADMAP.md) V1.
+- Tools run **autonomously** and **every call is logged**, and the tool set is grown **on demand** — see [constitution.md](constitution.md). The tools live under [src/tools/](src/tools/) — one model-callable tool per file.
 
 ## Code conventions (for the orchestrator itself)
 
@@ -182,9 +180,8 @@ Read it before touching code.
 
 ## Repo layout
 
-> The TypeScript source lives under `src/`; the layout was finalized in
-> [tasks/foundation/01-repo-skeleton-and-toolchain.md](tasks/foundation/01-repo-skeleton-and-toolchain.md).
-> The Python reference implementation has been deleted (parity reached, V5 complete).
+> The TypeScript source lives under `src/`. The Python reference implementation has been deleted
+> (parity reached, all planned versions shipped).
 
 ```
 local-ai-developer/
@@ -212,15 +209,22 @@ The [README.md](README.md) is being rewritten by the user to match this phase-ba
 
 ## Commands (as of today)
 
-Host:
-- `node scripts/run.mjs install` — install everything
-- `node scripts/run.mjs start <project-name>` — start session for a project
-- `node scripts/run.mjs stop` — shut down Docker
+Host (npm scripts wrapping the cross-platform `scripts/run.mjs` launcher):
+- `npm run setup` — install Node deps and pull the sandbox image
+- `npm run start -- <project-name>` — start a session for a project
+- `npm run stop` — shut down Docker
 
-In-app (terminal):
-- `/swap <phase>` — switch active phase
-- `/exit` — quit
-- (Other commands — `/clear`, `/resume`, `/models …`, `/new-project`, `/help` — are planned per [ROADMAP.md](ROADMAP.md); confirm with the user before relying on any not yet implemented.)
+(The launcher also runs directly: `node scripts/run.mjs install | start <project> | stop`.)
+
+In-app (terminal) — all implemented:
+- `/swap <phase>` — switch the active phase
+- `/new-project <name> <stack>` — scaffold a new project (`node` | `python`)
+- `/run <selector>` — run backlog tasks (`next` | a task id | `all`)
+- `/answer <task-id> <text>` — resolve a raised blocker (re-queues the task)
+- `/models list | pull <name> | use <name>` — manage the active model
+- `/clear` · `/resume` — clear or restore the active phase's history
+- `/subagents` — list active sub-agents
+- `/help` — list every command · `/exit` — quit
 
 ## Environment
 
@@ -228,19 +232,16 @@ In-app (terminal):
 
 ## Open questions / not yet decided
 
-Track these here as they come up so future-you knows what's still fuzzy. The current plan and
-ordering live in [ROADMAP.md](ROADMAP.md).
+Track these here as they come up so future-you knows what's still fuzzy.
 
 **Opened by the 2026-06-21 pivot:**
 
 - ~~**TS build/run tooling:**~~ **Resolved:** `tsx` runs the dev loop and `tsc` typechecks/builds (`package.json`); the old `run.ps1` is replaced by a cross-platform **Node launcher** (`scripts/run.mjs`) that shells out to `npm`/`docker compose`, keeping the entrypoint OS-agnostic.
 - **Sandbox network hardness:** open egress vs. an allowlist/registry proxy; persistent root sandbox vs. ephemeral `--rm`-per-command containers.
-- **Parity cutover:** which version reaches behavior parity and triggers deletion of the Python code.
 
 **Carried forward:**
 
-- **Task backlog format/location:** where the ordered Task list (with per-task status) and the Epic→Story→Task hierarchy live inside the project repo, and in what format. (V1 decides.)
-- Where `PRODUCT_SPEC.md`, the inbox, and per-phase memory live under `projects/<name>/.orchestrator/` (filename, folder).
+- Whether more project stacks beyond `node` / `python` are worth scaffolding (add on demand).
 - Memory summarization trigger thresholds and who decides (orchestrator heuristic vs. model self-report).
 - Which LLM (and which context size) powers the `search_rules` / summarization throwaway context — same local model, or a smaller/faster one?
 - Whether the orchestrator should auto-initialize project artifacts on session start, or leave creation to the scaffold/Discovery phase.

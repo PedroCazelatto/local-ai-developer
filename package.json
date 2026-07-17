@@ -8,11 +8,10 @@
     "node": ">=22"
   },
   "scripts": {
+    "setup": "node scripts/run.mjs install",
+    "start": "node scripts/run.mjs start",
+    "stop": "node scripts/run.mjs stop",
     "dev": "tsx src/index.ts",
-    "sandbox:up": "docker compose up -d",
-    "sandbox:down": "docker compose stop",
-    "build": "tsc",
-    "start": "node dist/index.js",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
