@@ -1,5 +1,4 @@
 .env
-.venv
 
 # Machine-local Docker resource overrides (per-host CPU/RAM tuning)
 docker-compose.override.yml
@@ -14,6 +13,3 @@ projects/
 # Logs
 logs
 *.log
-
-__pycache__/
-projects/hello-world/.orchestrator
