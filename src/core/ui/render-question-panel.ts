@@ -100,10 +100,16 @@ function reviewBody(state: QuestionPanelState, width: number): string[] {
 
 /** The keymap, restated every frame — the widget is transient, so nothing else can teach it. */
 function hint(state: QuestionPanelState, isReview: boolean, width: number): string {
+  // On the free-text option, typing writes straight into it — teach that instead of "enter confirm".
+  const options = state.options[state.tab];
+  const onFreeText =
+    !isReview && state.mode === 'select' && options !== undefined && state.cursor === options.length - 1;
   const keys = state.mode === 'text'
     ? 'enter save · esc back to the options'
     : isReview
       ? 'enter submit · ←→ tab · esc close (unanswered are saved)'
-      : '↑↓ choose · enter confirm & next · ←→ tab · esc close';
+      : onFreeText
+        ? 'type to answer · ↑↓ choose · ←→ tab · esc close'
+        : '↑↓ choose · enter confirm & next · ←→ tab · esc close';
   return `${INDENT}${theme.meta(truncateToWidth(keys, width - 1))}`;
 }

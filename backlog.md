@@ -12,7 +12,7 @@ Pending tasks and changes for the orchestrator. Check an item off when it ships.
   response message.
 - [ ] **Autocomplete: single option list.** When autocomplete shows its options, print the option
   list **only once**, and once an option is selected remove that list from the terminal scrollback.
-- [ ] **Inline free-text answer in `ask_user`.** For a question's "user answer" (free-text) option,
+- [x] **Inline free-text answer in `ask_user`.** For a question's "user answer" (free-text) option,
   selecting it and starting to type should immediately begin writing the user's message into that
   option — no separate prompt step.
 

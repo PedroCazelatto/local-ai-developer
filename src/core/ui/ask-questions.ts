@@ -174,6 +174,22 @@ export async function askQuestions(phase: string, questions: readonly AskQuestio
           if (tab === reviewTab) return finish(); // the Review tab's Enter is the submit
           return confirmOption();
         }
+        // Typing while the free-text option is highlighted drops straight into the editor, seeding the
+        // draft with that first character — no separate Enter to "open" it. Gated to the LAST option
+        // (the appended free-text escape) by position, so a keystroke never hijacks a fixed choice.
+        const optionCount = options[tab]?.length ?? 0;
+        if (
+          str !== undefined &&
+          str.length === 1 &&
+          str >= ' ' &&
+          key.ctrl !== true &&
+          tab < reviewTab &&
+          cursor === optionCount - 1
+        ) {
+          mode = 'text';
+          draft = str;
+          return draw();
+        }
       };
       stdin.on('keypress', onKey);
     });
