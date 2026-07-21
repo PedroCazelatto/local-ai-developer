@@ -27,9 +27,11 @@ import * as renderer from '../core/ui/renderer.js';
 import * as statusActivity from '../core/ui/status-activity.js';
 import * as statusBar from '../core/ui/status-bar.js';
 import { theme } from '../core/ui/theme.js';
+import { terminalColumns } from '../core/ui/terminal-columns.js';
+import { truncateToWidth } from '../core/ui/truncate-to-width.js';
 import { stopThinking } from '../core/ui/spinner.js';
 import { getCommand } from './command-registry.js';
-import { completeLine } from './complete-line.js';
+import { completeAction } from './complete-action.js';
 
 /** The persistent hint shown on the pinned footer row — the wired-but-invisible keys, made visible. */
 const FOOTER_HINT = 'Tab: complete · Shift+Tab: cycle phase · /swap <phase>: jump · /help: commands';
@@ -83,9 +85,11 @@ export interface ReplOrchestrator {
 
 /** Run the REPL until the user types `/exit` (or EOF). */
 export async function runRepl(orch: ReplOrchestrator): Promise<void> {
+  // The static footer hint, kept so the transient completion list (Tab) can restore it afterwards.
+  const footerHint = theme.meta(FOOTER_HINT);
   renderer.clearScreen(); // one-time: wipe the launcher's boot noise for a clean start
-  statusBar.enable(); // reserve the two bottom rows BEFORE the header so all output scrolls above them
-  statusBar.setFooter(theme.meta(FOOTER_HINT)); // static hint on the bottom pinned row
+  statusBar.enable(); // reserve the bottom rows BEFORE the header so all output scrolls above them
+  statusBar.setFooter(footerHint); // static hint on the bottom pinned row
   renderer.header();
   // A model-less session is valid but can't take a turn, so say so where it STICKS. Boot resolved the
   // model (and offered a download) before we were called, but clearScreen above just wiped that
@@ -93,14 +97,14 @@ export async function runRepl(orch: ReplOrchestrator): Promise<void> {
   if (orch.model === undefined) {
     renderer.systemMessage(`No model selected. Pull one with  /models pull ${SUGGESTED_MODEL}`);
   }
-  // completeLine: Tab-completes `/command` names off the registry and delegates the argument being typed
-  // to that command's own complete(). Synchronous on purpose — readline prints its candidate list before
-  // the keypress repaint below restores the pinned rows; an async completer would land after it and leave
-  // them blank (see complete-line.ts).
+  // A no-op completer: it swallows Tab (so readline never inserts a literal tab and never prints its
+  // own inline candidate list), leaving completion entirely to the keypress handler below. That handler
+  // extends the shared prefix and renders any remaining choices as a TRANSIENT list on the footer row —
+  // shown once, cleared on the next keystroke, never spilled into the append-only scrollback.
   const rl = createInterface({
     input: stdin,
     output: stdout,
-    completer: (line: string): [string[], string] => completeLine(line, orch),
+    completer: (line: string): [string[], string] => [[], line],
   });
 
   // True only while a command / chat turn is being handled. Gates Shift+Tab (never cycle phase mid-turn:
@@ -125,12 +129,41 @@ export async function runRepl(orch: ReplOrchestrator): Promise<void> {
       statusBar.repaint(); // readline's ESC[0J erased BOTH pinned rows — restore the footer row too
     });
   };
-  // On Shift+Tab (back-tab), cycle the active phase so the user can flip phases without typing /swap;
-  // the persistent color-coded phase field then shows which phase the next message will hit. Guarded to
-  // idle only, so a keypress can never switch a phase out from under an in-flight turn.
+  // Whether the footer row is currently showing a transient completion list (from Tab) rather than the
+  // static hint — so the next keystroke knows to restore the hint, and we don't repaint it every key.
+  let completionsShown = false;
+  /** Show the candidate list on the footer row, truncated to width — a transient, in-place widget. */
+  const showCompletions = (candidates: readonly string[]): void => {
+    statusBar.setFooter(theme.meta(truncateToWidth(candidates.join('  ·  '), terminalColumns() - 1)));
+    completionsShown = true;
+  };
+  /** Put the static hint back once the user moves on from a shown completion (typing, submitting, …). */
+  const restoreFooter = (): void => {
+    if (!completionsShown) return;
+    statusBar.setFooter(footerHint);
+    completionsShown = false;
+  };
+  /** Resolve a Tab at the current cursor: extend the shared prefix, then show any remaining choice. */
+  const runCompletion = (): void => {
+    const action = completeAction(rl.line.slice(0, rl.cursor), orch); // line up to cursor → insert + list
+    if (action.extend !== '') rl.write(action.extend); // feed the extension into the line as if typed
+    if (action.candidates.length >= 2) showCompletions(action.candidates);
+    else restoreFooter();
+  };
+  // Keypress handling for the input line's wired-but-invisible keys, all gated to idle (`!processing`)
+  // so a keystroke can never act on an in-flight turn bound to the active phase's history:
+  //   • Shift+Tab (back-tab) cycles the active phase — flip phases without typing /swap.
+  //   • Tab drives our own completion (extend the shared prefix + a transient footer list).
+  //   • any other key dismisses a shown completion list, restoring the static hint.
   const onKeypress = (_str: string | undefined, key: Key | undefined): void => {
-    if (key !== undefined && isBackTab(key) && !processing) {
-      cyclePhase(orch, key.ctrl === true ? -1 : 1); // Ctrl+Shift+Tab goes backward where the terminal distinguishes it
+    if (key !== undefined && !processing) {
+      if (isBackTab(key)) {
+        cyclePhase(orch, key.ctrl === true ? -1 : 1); // Ctrl+Shift+Tab goes backward where the terminal distinguishes it
+      } else if (isTab(key)) {
+        runCompletion();
+      } else {
+        restoreFooter();
+      }
     }
     scheduleStatus();
   };
@@ -211,6 +244,11 @@ export async function runRepl(orch: ReplOrchestrator): Promise<void> {
 /** True for Shift+Tab (back-tab): most terminals send `ESC[Z`, surfaced as name `tab` with `shift`. */
 function isBackTab(key: Key): boolean {
   return (key.name === 'tab' && key.shift === true) || key.sequence === '\x1b[Z';
+}
+
+/** True for a plain forward Tab (completion trigger) — Shift+Tab is handled by isBackTab first. */
+function isTab(key: Key): boolean {
+  return key.name === 'tab' && key.shift !== true;
 }
 
 /** Advance the active phase by `dir` (+1 next / -1 previous), wrapping around availablePhases(). */

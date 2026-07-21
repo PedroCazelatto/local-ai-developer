@@ -12,8 +12,11 @@ Pending tasks and changes for the orchestrator. Check an item off when it ships.
   top rule and a pinned rule row above the status bar.)*
 - [x] **Remove the phase-name prefix** (e.g. `discovery ›`) from the start of every assistant
   response message.
-- [ ] **Autocomplete: single option list.** When autocomplete shows its options, print the option
+- [x] **Autocomplete: single option list.** When autocomplete shows its options, print the option
   list **only once**, and once an option is selected remove that list from the terminal scrollback.
+  *(Chosen: type-to-complete. Tab extends the shared prefix and renders any remaining choices as a
+  transient list on the pinned footer row — shown once, cleared on the next keystroke, never in
+  scrollback.)*
 - [x] **Inline free-text answer in `ask_user`.** For a question's "user answer" (free-text) option,
   selecting it and starting to type should immediately begin writing the user's message into that
   option — no separate prompt step.

@@ -1,14 +1,16 @@
-// Tab completion for the REPL prompt — Node's readline `completer` hook (wired into createInterface in
-// repl.ts). It completes `/command` names straight off the registry, then hands the ARGUMENT being typed
-// to that command's own optional complete(). So the registry stays the single source of truth and a newly
-// registered command gets completion for free, exactly as /help does via listCommands() — no second list
-// to drift out of sync.
+// The catalog of what completes where, for the REPL prompt. It completes `/command` names straight off
+// the registry, then hands the ARGUMENT being typed to that command's own optional complete(). So the
+// registry stays the single source of truth and a newly registered command gets completion for free,
+// exactly as /help does via listCommands() — no second list to drift out of sync.
 //
-// SYNCHRONOUS by contract, and that is a hard constraint rather than a preference. readline erases the two
-// pinned rows with ESC[0J on every line refresh, and repl.ts repaints them from its `keypress` handler via
-// setImmediate. A sync completer prints its candidate list BEFORE that repaint lands, so the rows come
-// back; an async one would resolve AFTER it and leave the status + footer rows blank until the next
-// keypress. That is exactly why model names are not completed (`/models use <name>` needs an async call to
+// NOT wired as readline's `completer` anymore (repl.ts gives readline a no-op completer to swallow Tab):
+// complete-action.ts calls this from the `keypress` handler to drive our own transient completion. The
+// [candidates, partial] shape is kept because it is precisely what that caller needs — the words to
+// offer and the partial word they extend.
+//
+// SYNCHRONOUS by contract, still a hard constraint. The keypress handler runs completion inline and then
+// repl.ts repaints the pinned rows via setImmediate; an async lookup would land after that repaint and
+// stall the input. That is why model names are not completed (`/models use <name>` needs an async call to
 // the Ollama daemon) while task ids are (readBacklog is a plain sync file read).
 //
 // A line that doesn't start with '/' gets no candidates, so Tab stays inert while composing a chat message
