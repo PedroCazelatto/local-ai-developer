@@ -1,14 +1,23 @@
 // Persistent-REPL renderer: append-only print helpers. THE whole point of the rewrite is
 // preserving scrollback (the old Rich Live(screen=True) TUI grabbed the alt-buffer and the user
 // couldn't copy/paste from it — see the "verify via scripted live checks" memory). So: never use
-// the alt-buffer and never repaint history — every helper just appends to the normal terminal
-// buffer, so the user can scroll up and copy freely. The one-time clearScreen() at boot wipes
-// launcher noise; the single pinned status row is owned by status-bar.ts via a scroll region, not
-// by clearing or redrawing here.
+// the alt-buffer, and never repaint HISTORY — anything that has scrolled is immutable, so the user
+// can scroll up and copy freely. The one-time clearScreen() at boot wipes launcher noise; the pinned
+// rows are owned by status-bar.ts via a scroll region, not by clearing or redrawing here.
+//
+// Live output is the one nuance (constitution, Terminal UX): assistantStream rewrites the line it is
+// CURRENTLY streaming — still under the cursor, not yet history — to render its markdown once the
+// line completes. Every line it leaves behind is final. Transient widgets (ask-questions.ts, the
+// spinner) may likewise repaint their own frame, then must collapse into one static, copyable summary.
 //
 // Keep this module dumb (pure printing). Turn-loop logic, tool dispatch, and history live in the
 // orchestrator (task 06); the UI only displays and collects input.
 
+import { stdout } from 'node:process';
+
+import { createMarkdownStream } from './create-markdown-stream.js';
+import type { MarkdownStream } from './markdown-stream.type.js';
+import { terminalColumns } from './terminal-columns.js';
 import { theme } from './theme.js';
 
 const BANNER = 'Local AI Developer  ·  /swap <phase>  ·  /exit';
@@ -28,21 +37,19 @@ export function header(): void {
 }
 
 /**
- * Colored attribution printed once before a streamed assistant turn, e.g. `discovery ›`. No
- * trailing newline — the streamed prose continues inline on the same line.
+ * Open the output sink for ONE streamed assistant turn: deltas in, markdown on screen. The colored
+ * `discovery ›` attribution is the stream's prefix — it owns it because repainting the first line
+ * clears the row the prefix sits on and has to restore it (see create-markdown-stream.ts).
+ *
+ * Call once per turn, on the FIRST visible delta, so a pure tool-call turn prints no empty header.
  */
-export function assistantPrefix(phase: string): void {
-  process.stdout.write(`${theme.phase(phase)(`${phase} ›`)} `);
+export function assistantStream(phase: string): MarkdownStream {
+  return createMarkdownStream(`${theme.phase(phase)(`${phase} ›`)} `);
 }
 
-/** Write one streamed delta immediately (token-by-token), no redraw / no clear. */
-export function streamDelta(text: string): void {
-  process.stdout.write(text);
-}
-
-/** Close a streamed assistant block with a newline. */
-export function endAssistant(): void {
-  process.stdout.write('\n');
+/** A dim full-width horizontal rule — fences the input line (repl.ts). */
+export function rule(): void {
+  stdout.write(`${theme.divider('─'.repeat(terminalColumns()))}\n`);
 }
 
 /** Dimmed inline meta line, e.g. `→ tool: read_file` (ports ui.add_system_message). */

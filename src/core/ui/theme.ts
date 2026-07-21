@@ -17,6 +17,10 @@ const PHASE_COLORS: Record<string, Styler> = {
   retro: chalk.magentaBright,
 };
 
+// Heading accent by level (#, ##, ###+). The model writes plain markdown and never names a color —
+// the mapping from construct to color lives HERE and nowhere else, so the palette stays swappable.
+const HEADING_STYLES: readonly Styler[] = [chalk.bold.cyanBright, chalk.bold.cyan, chalk.bold.blueBright];
+
 export const theme = {
   /** Accent color for a phase; falls back to white for an unknown name. */
   phase(name: string): Styler {
@@ -34,4 +38,34 @@ export const theme = {
   danger: chalk.redBright as Styler,
   /** Emphasis for headlines / labels (task id, "Issues:"), without a color. */
   strong: chalk.bold as Styler,
+  /** The full-width horizontal rules fencing the input line (repl.ts). */
+  divider: chalk.dim as Styler,
+  /**
+   * Markdown roles. The model emits PLAIN markdown and never picks a color (see system-prompt.ts);
+   * render-markdown-line.ts maps each construct onto exactly one role below. Colors live only here,
+   * so the whole markdown look is retuned in one place. Yellow means "code" everywhere — inline and
+   * fenced alike — so the eye learns one rule.
+   */
+  md: {
+    /** `#`/`##`/`###+` — brightest at level 1, so nesting reads as depth. */
+    heading(level: number): Styler {
+      return HEADING_STYLES[Math.min(level, HEADING_STYLES.length) - 1] ?? chalk.bold;
+    },
+    /** `**bold**` / `__bold__`. */
+    bold: chalk.bold.whiteBright as Styler,
+    /** `*italic*` / `_italic_`. */
+    italic: chalk.italic as Styler,
+    /** `` `inline code` `` and the body of a fenced block — one color for code. */
+    code: chalk.yellow as Styler,
+    /** The ``` marker line opening/closing a fenced block. */
+    fence: chalk.dim as Styler,
+    /** The `•` / `1.` marker of a list item (the item's text is styled inline, not by this). */
+    bullet: chalk.cyan as Styler,
+    /** `> quoted` body text. */
+    quote: chalk.dim as Styler,
+    /** The `│` gutter drawn in place of a blockquote's `>`. */
+    quoteBar: chalk.dim as Styler,
+    /** A `---` / `***` thematic break, rendered as a drawn rule. */
+    rule: chalk.dim as Styler,
+  },
 };

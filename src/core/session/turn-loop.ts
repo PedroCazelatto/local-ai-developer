@@ -7,6 +7,7 @@
 // (SessionOrchestrator implements it), so this file stays free of Ollama/sandbox details.
 
 import type { StreamHandle, TokenCounts, ToolCall } from '../llm/index.js';
+import type { MarkdownStream } from '../ui/markdown-stream.type.js';
 import * as renderer from '../ui/renderer.js';
 import * as statusActivity from '../ui/status-activity.js';
 import { startThinking, stopThinking } from '../ui/spinner.js';
@@ -82,22 +83,21 @@ async function runTurn(ctx: TurnContext, start: () => StreamHandle): Promise<boo
   startThinking();
   const handle = start();
 
-  // Stream filtered, visible deltas incrementally. Stop the spinner + print the phase prefix on
-  // the FIRST visible delta so the spinner never interleaves with model text.
-  let shownPrefix = false;
+  // Stream filtered, visible deltas incrementally, rendered as markdown: each delta prints raw the
+  // instant it arrives, and every completed line is repainted formatted. The stream is opened on the
+  // FIRST visible delta (never before) so the spinner can't interleave with model text and a pure
+  // tool-call turn prints no orphan prefix.
+  let stream: MarkdownStream | null = null;
   for await (const delta of handle.deltas) {
     if (!delta) continue;
-    if (!shownPrefix) {
+    if (stream === null) {
       stopThinking();
-      renderer.assistantPrefix(ctx.activePhase);
-      shownPrefix = true;
+      stream = renderer.assistantStream(ctx.activePhase);
     }
-    renderer.streamDelta(delta);
+    stream.push(delta);
   }
   stopThinking(); // covers a turn with no visible prose (e.g. a pure tool-call turn)
-  if (shownPrefix) {
-    renderer.endAssistant(); // finalize the assistant block; else nothing visible was shown
-  }
+  stream?.end(); // renders a trailing line the model left unterminated; no-op if nothing streamed
 
   // The client assembled the final structured message + exact tokens across the whole stream.
   const { message, tokens } = handle.result();

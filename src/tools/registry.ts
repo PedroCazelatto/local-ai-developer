@@ -5,6 +5,7 @@
 
 import type { Tool } from '../core/llm/index.js';
 import { askSubagentTool } from './ask-subagent.js';
+import { askUserTool } from './ask-user.js';
 import { dismissSubagentTool } from './dismiss-subagent.js';
 import { editFileTool } from './edit-file.js';
 import { executeCommandTool } from './execute-command.js';
@@ -45,6 +46,11 @@ const TOOL_MODULES: readonly ToolModule[] = [
   spawnSubagentTool,
   askSubagentTool,
   dismissSubagentTool,
+  // Interactive questioning (V6/01) — a round of multiple-choice questions put straight to the user.
+  // Registered globally so the interactive phases advertise it; the orchestrator does NOT pass it to
+  // the spawned execution windows (Worker/Reviewer/Retro), which run unattended and would stall a
+  // batch waiting on a keypress. Those escalate via the Reviewer's raise_blocker instead.
+  askUserTool,
 ];
 
 /** name → module, built once with a duplicate-name guard (a dup is a build-time mistake, fail loud). */

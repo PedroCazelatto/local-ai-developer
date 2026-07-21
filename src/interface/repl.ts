@@ -155,9 +155,15 @@ export async function runRepl(orch: ReplOrchestrator): Promise<void> {
       // left to read, so end the session gracefully instead of spinning on a dead stream.
       let line: string;
       try {
+        // Fence the input line with a rule above and below so it stands out from the model's output
+        // above it. Both are printed into the normal scrollback (append-only, like everything else) —
+        // the closing rule can only be drawn once readline has echoed the submitted line, so it lands
+        // after the await, not before.
+        renderer.rule();
         const answer = rl.question('› ');
         statusBar.repaint(); // readline drew the prompt (and erased the rows) synchronously — restore them
         line = (await answer).trim();
+        renderer.rule();
       } catch {
         break;
       }

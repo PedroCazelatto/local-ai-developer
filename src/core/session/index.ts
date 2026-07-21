@@ -15,6 +15,15 @@ export { dispatchToolCall } from './dispatch.js';
 export type { ToolCallRecord, DispatchDeps } from './dispatch.js';
 export { appendAuditRow, OUTPUT_PREVIEW_LIMIT } from './audit.js';
 export { appendJsonlLine } from './append-jsonl-line.js';
+// Questions the user skipped during an ask_user round (V6/01) — durable, re-asked by /questions, and
+// delivered back to the phase that asked on its next turn.
+export {
+  saveUnansweredQuestions,
+  readPendingQuestions,
+  answerQuestion,
+  drainAnsweredQuestions,
+} from './question-store.js';
+export type { PendingQuestion, AnsweredQuestion, QuestionRow } from './question-store.type.js';
 export { appendEvent } from './events-log.js';
 export type { OrchestratorEvent, OrchestratorEventInput, OrchestratorEventType } from './events-log.type.js';
 export {

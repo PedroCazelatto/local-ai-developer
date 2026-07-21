@@ -1,7 +1,20 @@
 // Minimal system-prompt builder (ports context/builder.py's ContextBuilder). Assembles the
-// system message from the active phase's instructions + shared tool-use mechanics + a one-line
-// project state. The phase markdown says WHICH tools to reach for; this block says HOW to call
-// them and what to do with their results, kept in code so the six phase files don't each repeat it.
+// system message from the active phase's instructions + shared tool-use mechanics + how output is
+// displayed + a one-line project state. The phase markdown says WHICH tools to reach for; these
+// blocks say HOW to call them, what to do with their results, and how the reply will be rendered —
+// kept in code so the six phase files don't each repeat it.
+
+// The model writes PLAIN markdown and never names a color: the terminal renderer (theme.ts +
+// render-markdown-line.ts) owns the construct→color mapping, so the palette is retuned in one place
+// and a model that hallucinated a color could not fight it. This block only has to tell the model
+// that its markdown is really rendered — otherwise it has no reason to believe the syntax is worth
+// emitting, or might avoid it as noise.
+const OUTPUT_FORMAT_GUIDANCE = `# Your Output
+- Your replies are rendered as markdown in a color terminal, live as you type them. The syntax itself is never shown to the user: it is consumed and turned into real formatting, so use it freely — it costs the reader nothing.
+- What each construct becomes on screen: \`#\`/\`##\`/\`###\` headings turn into colored headings, \`**bold**\` into bright bold text, \`\` \`code\` \`\` and \`\`\`fenced blocks\`\`\` into colored code, \`-\` and \`1.\` lists into aligned bullets, \`>\` into a quoted aside, and \`---\` into a full-width rule.
+- Write NO raw ANSI escape codes and no color names. You do not choose colors — the terminal maps each markdown construct to its own color. A literal escape sequence would be printed as garbage.
+- Structure your replies with markdown so they scan: a heading for a new section, a list for anything enumerable, bold for the one thing that matters most, a fenced block (with its language tag) for code, commands, and file contents.
+- Keep prose in plain sentences between those structures. Formatting is for making the content readable, not for decorating every line.`;
 
 const TOOL_USE_GUIDANCE = `# Tool Use
 - When you decide to read, list, search, write, edit, or run something, emit the tool call in that same turn. Never describe or promise an action without performing it.
@@ -10,7 +23,7 @@ const TOOL_USE_GUIDANCE = `# Tool Use
 - The user never sees tool results — only you do. So when the user asked you to run a tool or to show them something (list files, read a file, search, run a command), you MUST relay what the tool returned in your very next reply. Write that reply as natural language for a person — plain sentences, and a simple markdown list when you are listing items — NEVER a JSON object, a key/value dump, or a fenced data block. Include everything that was asked for, and answer it before moving on to "what's next".
 - When you ran a tool only to inform your own reasoning and the user did not ask to see the raw output, just use the result — you need not paste it back. For long command or test logs, report the outcome and the key lines rather than the entire log.`;
 
-/** Build the system prompt for a turn: phase instructions + tool-use rules + project context. */
+/** Build the system prompt for a turn: phase instructions + tool-use + output format + project context. */
 export function buildSystemPrompt(instructions: string, projectState: string): string {
-  return `${instructions}\n\n${TOOL_USE_GUIDANCE}\n\n# Project Context\n${projectState}\n`;
+  return `${instructions}\n\n${TOOL_USE_GUIDANCE}\n\n${OUTPUT_FORMAT_GUIDANCE}\n\n# Project Context\n${projectState}\n`;
 }

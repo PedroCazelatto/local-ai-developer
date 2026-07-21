@@ -31,6 +31,9 @@ export { loadRuleTool } from './load-rule.js';
 export { spawnSubagentTool, SPAWN_SUBAGENT } from './spawn-subagent.js';
 export { askSubagentTool, ASK_SUBAGENT } from './ask-subagent.js';
 export { dismissSubagentTool, DISMISS_SUBAGENT } from './dismiss-subagent.js';
+// Interactive questioning (V6/01) — a global registry tool, but withheld from the spawned execution
+// windows by the orchestrator (they run unattended; a question would stall the batch).
+export { askUserTool, ASK_USER } from './ask-user.js';
 export { truncateHeadTail, DEFAULT_OUTPUT_LIMIT } from './truncate.js';
 // Phase-scoped (Reviewer-only, V2/01) — deliberately NOT added to the registry in registry.ts.
 export { submitVerdictTool, parseVerdict, SUBMIT_VERDICT } from './submit-verdict.js';

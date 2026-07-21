@@ -16,6 +16,7 @@ import { clearCommand } from './commands/clear.js';
 import { exitCommand } from './commands/exit.js';
 import { helpCommand } from './commands/help.js';
 import { newProjectCommand } from './commands/new-project.js';
+import { questionsCommand } from './commands/questions.js';
 import { resumeCommand } from './commands/resume.js';
 import { runCommand } from './commands/run.js';
 import { subagentsCommand } from './commands/subagents.js';
@@ -79,6 +80,7 @@ const COMMANDS: readonly Command[] = [
   subagentsCommand,
   runCommand,
   answerCommand,
+  questionsCommand,
 ];
 
 /** name → command, built once with a duplicate-name guard (a dup is a build-time mistake, fail loud). */

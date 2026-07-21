@@ -6,7 +6,7 @@
 import { buildSystemPrompt } from '../../context/index.js';
 import { PhaseFactory } from '../../phases/index.js';
 import type { Phase } from '../../phases/index.js';
-import { createToolContext, toolDefinitions } from '../../tools/index.js';
+import { ASK_USER, createToolContext, toolDefinitions } from '../../tools/index.js';
 import type { SandboxClient } from '../container/index.js';
 import { OllamaClient } from '../llm/index.js';
 import type { Message, StreamHandle, TokenCounts, Tool, ToolCall } from '../llm/index.js';
@@ -17,6 +17,7 @@ import type { SessionConfig } from './config.js';
 import { dispatchToolCall } from './dispatch.js';
 import { appendEvent } from './events-log.js';
 import { SessionMemory } from './memory.js';
+import { drainAnsweredQuestions } from './question-store.js';
 import { compactActivePhase } from './summarizer.js';
 import type { ArchiveSummary, ClearResult, PhaseLoad } from './memory-store.type.js';
 import { SubagentManager, SUBAGENT_TOOL_NAMES } from './subagents.js';
@@ -69,11 +70,15 @@ export class SessionOrchestrator implements TurnContext {
   private readonly tools: Tool[] = toolDefinitions();
 
   // The tool set handed to spawned EXECUTION windows (Worker/Reviewer/Retro): `tools` minus the three
-  // sub-agent tools, since those windows have no SubagentManager to back them. Interactive phases still
-  // get the full `tools`. Built once (the registry is static).
-  private readonly executionTools: Tool[] = this.tools.filter(
-    (tool) => !SUBAGENT_TOOL_NAMES.includes(tool.function.name ?? ''),
-  );
+  // sub-agent tools, since those windows have no SubagentManager to back them, and minus ask_user
+  // (V6/01) — those windows run unattended (the user starts a batch and walks away, CLAUDE.md), so a
+  // question would block the run on a keypress nobody is there to press. They escalate through the
+  // Reviewer's raise_blocker instead, which is asynchronous by design. Interactive phases still get
+  // the full `tools`. Built once (the registry is static).
+  private readonly executionTools: Tool[] = this.tools.filter((tool) => {
+    const name = tool.function.name ?? '';
+    return !SUBAGENT_TOOL_NAMES.includes(name) && name !== ASK_USER;
+  });
 
   // Sub-agents (V5/01) the interactive phases spawn mid-turn: in-memory only, dropped at session end.
   // Exposed to the sub-agent tools via ctx.subagents, to `/subagents`, and to the status-line count.
@@ -339,6 +344,7 @@ export class SessionOrchestrator implements TurnContext {
    */
   async beforeModelCall(): Promise<void> {
     const phase = this.phase.name;
+    this.deliverAnsweredQuestions(phase);
     if (!this.scheduledPhases.has(phase)) return;
     this.scheduledPhases.delete(phase);
     // The EXACT prompt size that tripped the failsafe — the "before" for the V5/04 summarization_fire.
@@ -353,6 +359,28 @@ export class SessionOrchestrator implements TurnContext {
     if (result !== null) {
       this.pendingSummarization.set(phase, before);
     }
+  }
+
+  /**
+   * Hand this phase any answers the user gave via `/questions` since its last call (V6/01), as one
+   * user message added just before the model sees the history. Questions the user skipped during an
+   * ask_user round are durable, so the answer usually arrives turns later — possibly after a phase
+   * swap or a restart — and this is where it rejoins the window that asked.
+   *
+   * drainAnsweredQuestions marks each answer delivered as it hands it over, so it is injected exactly
+   * once: replaying it every call would re-inject the same text and burn context on a VRAM-bound box.
+   * Called from beforeModelCall, which runs before the user's own message is added, so the answers
+   * land in the history ahead of whatever the user is asking now.
+   */
+  private deliverAnsweredQuestions(phase: string): void {
+    const answers = drainAnsweredQuestions(this.projectPath, phase);
+    if (answers.length === 0) return;
+    const body = answers.map((entry) => `Q: ${entry.question}\nA: ${entry.answer}`).join('\n\n');
+    this.memory.add(
+      'user',
+      `Answers to question(s) you asked earlier and I had not answered yet:\n\n${body}`,
+    );
+    renderer.systemMessage(`Delivered ${answers.length} saved answer(s) to ${titleCase(phase)}.`);
   }
 
   addAssistant(content: string, toolCalls?: ToolCall[]): void {
