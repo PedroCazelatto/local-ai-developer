@@ -59,11 +59,26 @@ The user is questioned about every detail; the output documents what to build, w
 
 | Phase | Produces | Notes |
 |---|---|---|
-| **Discovery** | Requirements + versioned scope, and the list of features with their interactions, grouped into one or more **Epics** | Interviews the user. Thinking about feature interactions up front is what makes an epic coherent. |
+| **Discovery** | Requirements + versioned scope, and the list of features with their interactions, grouped into one or more **Epics** | Interviews the user via `ask_user` (see *Asking the user*). Thinking about feature interactions up front is what makes an epic coherent. |
 | **Design** | Splits an epic into **Stories** (and the architecture/boundaries that hold them together) | Iterates **together with** Breakdown — design and decomposition inform each other. |
 | **Breakdown** | Splits stories into the ordered, prioritized **Task** list the execution loop consumes | Works **per-story** to balance richer context against the `num_ctx` limit. Holds the Product Owner + Sequencer responsibilities; split it back into separate phases if it grows two distinct jobs. |
 
 These phases are **non-linear** — the user can loop back (Discovery ⇄ Design ⇄ Breakdown) to revise scope, re-architect, or re-sequence at any time before triggering execution.
+
+#### Asking the user
+
+A planning phase asks through the **`ask_user`** tool, never through prose the user has to read and answer by hand. It puts a round of **up to 5 multiple-choice questions** (the bounded-rounds rule, now enforced in code) to the user in a tabbed terminal panel — one tab per question, a final **Review** tab, arrow keys to move, Enter on Review to submit. Every question carries at least 2 concrete options the model guessed at, plus a free-text choice the orchestrator always appends, so the user can never be cornered by options the model failed to imagine.
+
+- **Interactive phases only.** Discovery/Design/Breakdown get `ask_user`; the spawned execution windows (Worker/Reviewer/Retro) do **not** — they run unattended (the user starts a batch and walks away), so a question would stall the batch on a keypress nobody is there to press. Execution escalates through the Reviewer's `raise_blocker`, which is asynchronous by design.
+- **Skipping is normal, and nothing is lost.** A question the user moves past is saved durably (`.orchestrator/questions.jsonl`); `/questions` re-offers every saved question whenever the user chooses. The answer is then injected into the context of the phase that asked, on its next turn — across a phase swap or a restart. The asking phase is told plainly not to re-ask a skipped question.
+
+### Terminal output
+
+The model's replies are **rendered as markdown, live**: each delta prints raw the instant it arrives (a local model is slow enough that token-by-token *is* the feedback), and each line is repainted formatted the moment its newline lands — markdown is only decidable once a line is complete. The system prompt tells the model its markdown is really rendered, so it has a reason to emit it.
+
+**The model writes plain markdown and never names a color.** The construct→color mapping lives in the orchestrator's theme, so the palette is retuned in one place and a model that hallucinated a color cannot fight it. The model is told explicitly to emit no ANSI escapes.
+
+This does not weaken the scrollback invariant. Only the **in-progress** line is ever rewritten — it is still under the cursor and has not scrolled away — and transient widgets (the `ask_user` panel, the spinner) repaint only their own frame and then collapse into one static, copyable summary. Finished history is append-only, forever.
 
 ### Execution phases (automatic — the user triggers, then it runs)
 
@@ -221,6 +236,7 @@ In-app (terminal) — all implemented:
 - `/new-project <name> <stack>` — scaffold a new project (`node` | `python`)
 - `/run <selector>` — run backlog tasks (`next` | a task id | `all`)
 - `/answer <task-id> <text>` — resolve a raised blocker (re-queues the task)
+- `/questions` — answer the `ask_user` questions you skipped (delivered to the asking phase on its next turn)
 - `/models list | pull <name> | use <name>` — manage the active model
 - `/clear` · `/resume` — clear or restore the active phase's history
 - `/subagents` — list active sub-agents

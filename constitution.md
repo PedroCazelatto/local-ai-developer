@@ -62,19 +62,26 @@ model never reads this file. The two-doc split:
 - **Commit on the ACTIVE branch.** Whatever branch is checked out is where the work lands, `main`
   included. **Never create a branch on your own initiative** — branch only when the user explicitly
   says to. This overrides any default habit of branching off the default branch.
-- **Exception — global instruction files.** The commit rules above stop at [rules/](rules/),
-  [CLAUDE.md](CLAUDE.md), and this file: finished or not, they are never committed for the user. See
-  *Instruction integrity* below.
+- **Exception — the two governance docs.** The commit rules above stop at [CLAUDE.md](CLAUDE.md) and
+  this file: finished or not, they are never committed for the user. Everything else you touch —
+  including the phase and standards files under [rules/](rules/) — is committed like ordinary work.
+  See *Instruction integrity* below.
 
 ## Instruction integrity
 
-- The orchestrator's own instruction set — [rules/](rules/), [CLAUDE.md](CLAUDE.md), and this file —
-  **must never mutate silently.** Edits to global instruction files are **never auto-committed**:
-  warn the user that the change needs review, then let them commit it manually. (Project-repo
-  artifacts follow the auto-commit policy in [CLAUDE.md](CLAUDE.md) — this exception is only for the
-  orchestrator's own instructions.)
-- **Editing them needs no permission; committing them needs approval.** Make the edit when it is
-  warranted — do not ask first, and do not stall the work to request it. Then stop at the commit:
+- The two governance docs — [CLAUDE.md](CLAUDE.md) (the objective) and this file (the how) — **must
+  never mutate silently.** Your edits to them are **never auto-committed**: warn the user that the
+  change needs review, then let them commit it manually. The gate is deliberately narrow — this is
+  the meta layer that dictates what every other change must do, and the one place a silent edit would
+  be hardest to catch.
+- **The phase and standards files under [rules/](rules/) are NOT gated for you.** Edit them and
+  commit them like ordinary work (*Git workflow* above); the user reviews your diff the way they
+  review any commit. This is a separate rule from a different actor: when the *local model* rewrites a
+  `rules/` file at runtime (the Retro phase), the orchestrator still leaves that edit uncommitted for
+  a human to review — see [CLAUDE.md](CLAUDE.md). A confidently-wrong local model editing its own
+  instructions is not the same as you editing them.
+- **Editing the two docs needs no permission; committing them needs approval.** Make the edit when it
+  is warranted — do not ask first, and do not stall the work to request it. Then stop at the commit:
   leave the change in the working tree, say what changed and why, and let the user review and commit
   it themselves. **The gate is the commit, not the edit.** This is the one place where *Git workflow*'s
   "finishing work means committing it" does not apply — here, finishing means handing the diff over.
@@ -87,14 +94,28 @@ model never reads this file. The two-doc split:
   the code is worse than no rule: stale guidance is a defect, not a cosmetic lag. The same duty
   applies to [CLAUDE.md](CLAUDE.md) (the objective) — if a change makes either doc wrong, correcting
   the doc is part of that change, not a follow-up.
-- This does **not** relax *Instruction integrity* above: a doc edit is still a global-instruction
-  change — surfaced for the user's review and committed by them, never silently auto-committed. It is
+- This does **not** relax *Instruction integrity* above: an edit to either governance doc is still
+  review-gated — surfaced for the user and committed by them, never silently auto-committed. It is
   simply never allowed to lag behind the code it describes.
 
 ## Terminal UX
 
 - Prioritize **user experience** in the terminal interface — persistent REPL, `clack`/`chalk`/`ora`.
   The UX is part of the product, not an afterthought.
+- **Finished output is append-only and never revisited.** Scrollback + copy/paste is the priority (the
+  Rich `Live(screen=True)` TUI was abandoned precisely because it blocked copy/paste). Never take the
+  alt-buffer. Exactly two things may repaint, both of which are *live* rather than history:
+  - the **in-progress line** of a streamed reply (it is still under the cursor and has not scrolled),
+    which is rewritten once, formatted, when its newline arrives; and
+  - a **transient widget's own frame** (the `ask_user` panel, the spinner), which must erase itself and
+    leave exactly one static, copyable summary in the buffer.
+
+  Anything already scrolled is immutable. Clear rows with `ESC[2K` on rows you wrote yourself — never
+  `ESC[0J`, which erases to the end of the display and wipes the pinned status rows.
+- **The model writes plain markdown; the orchestrator owns every color.** The construct→color mapping
+  lives in `theme.ts` alone, so the palette is retuned in one place. The model is told its markdown is
+  rendered, and told to emit **no ANSI escapes** — a model must never choose a color, and a hallucinated
+  one must never be able to fight the theme.
 
 ## Testing
 
