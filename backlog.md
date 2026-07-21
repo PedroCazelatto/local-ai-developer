@@ -27,3 +27,8 @@ Pending tasks and changes for the orchestrator. Check an item off when it ships.
 - [ ] **Per-phase commits.** Give every phase the ability to commit its changes. A **subagent** must
   write the commit messages. Each commit must be **as small as possible without breaking the
   application**.
+- [ ] **Sharpen the model's thinking via model-to-model dialogue.** Add prompts/mechanism for one
+  model context to talk to another and discuss ideas — a deliberation/debate loop (e.g. a second
+  spawned window that challenges and refines the first's reasoning) so the model pressure-tests an
+  idea before committing to an answer. (One Ollama model, two context windows — per the core mental
+  model.)
