@@ -4,10 +4,12 @@ Pending tasks and changes for the orchestrator. Check an item off when it ships.
 
 ## Terminal UI / rendering
 
-- [ ] **No divider between messages; style user messages.** Stop drawing a rule between
+- [x] **No divider between messages; style user messages.** Stop drawing a rule between
   messages — separate consecutive messages with a single blank line instead. Render **user**
   messages with a light-gray background. Keep a horizontal rule directly **above and below the
-  live input line** (the area where the user is currently typing).
+  live input line** (the area where the user is currently typing). *(Chosen layout: clean history —
+  gray user messages with no rules, blank-line separated; the live input is fenced by a transient
+  top rule and a pinned rule row above the status bar.)*
 - [x] **Remove the phase-name prefix** (e.g. `discovery ›`) from the start of every assistant
   response message.
 - [ ] **Autocomplete: single option list.** When autocomplete shows its options, print the option

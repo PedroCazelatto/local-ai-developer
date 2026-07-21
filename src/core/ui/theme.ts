@@ -41,6 +41,12 @@ export const theme = {
   /** The full-width horizontal rules fencing the input line (repl.ts). */
   divider: chalk.dim as Styler,
   /**
+   * A submitted user message, echoed back into the scrollback as one static line: light-gray
+   * background with dark text so the user's turns read distinctly from the model's (repl.ts,
+   * commitUserMessage). Retune the shade here — the one place any color lives.
+   */
+  userMessage: chalk.bgAnsi256(250).black as Styler,
+  /**
    * Markdown roles. The model emits PLAIN markdown and never picks a color (see system-prompt.ts);
    * render-markdown-line.ts maps each construct onto exactly one role below. Colors live only here,
    * so the whole markdown look is retuned in one place. Yellow means "code" everywhere — inline and

@@ -1,20 +1,28 @@
-// Two pinned rows at the very bottom of the terminal: a STATUS line and, below it, a persistent
-// FOOTER hint (V5/03). They are reserved via the DECSTBM scroll region (ESC[top;bottom r) so all
-// normal output — the conversation, the prompt, streamed deltas — scrolls in the region ABOVE them
-// and never overwrites them. Crucially this is NOT the alt-buffer: the main scrollback stays intact
-// and copyable (the whole reason the old Rich Live TUI was abandoned), we just fence off two rows.
+// Three pinned rows at the very bottom of the terminal: a full-width RULE, then a STATUS line, then a
+// persistent FOOTER hint (V5/03). They are reserved via the DECSTBM scroll region (ESC[top;bottom r)
+// so all normal output — the conversation, the prompt, streamed deltas — scrolls in the region ABOVE
+// them and never overwrites them. Crucially this is NOT the alt-buffer: the main scrollback stays
+// intact and copyable (the whole reason the old Rich Live TUI was abandoned), we just fence off rows.
+//
+// The RULE row sits directly under the live input, so it reads as the line BELOW the input while the
+// user types (its other half — a transient rule ABOVE the input — is printed and erased in
+// renderer.ts). During streaming the same rule reads as a divider above the status line.
 //
 // Callers pass FULLY-STYLED text (chalk already applied): this module paints it verbatim and does NOT
 // blanket-dim, so the status line's color-coded active phase (V5/03) renders in its bright theme color
-// while the rest stays dim — the caller composes that mix.
+// while the rest stays dim — the caller composes that mix. The one exception is the rule row, which
+// this module generates itself (theme.divider at the current width) since its content is width-derived.
 //
 // Everything here is a no-op when stdout is not a TTY (piped/redirected runs) — there are no rows to
 // pin and the escapes would just corrupt the output.
 
 import { stdout } from 'node:process';
 
-/** Rows reserved at the bottom: the status line plus the footer hint below it. */
-const RESERVED = 2;
+import { terminalColumns } from './terminal-columns.js';
+import { theme } from './theme.js';
+
+/** Rows reserved at the bottom: the rule, the status line, and the footer hint below it. */
+const RESERVED = 3;
 
 /** True only between enable() and disable() on a real TTY. Guards setters/disable() against no-ops. */
 let active = false;
@@ -50,8 +58,14 @@ function paintRow(row: number, text: string): void {
   stdout.write('\x1b8'); // restore cursor
 }
 
-/** Repaint both reserved rows: the status line above the footer hint (bottom-most). */
+/** The pinned rule row directly under the input: a full-width dim divider at the current width. */
+function dividerText(): string {
+  return theme.divider('─'.repeat(terminalColumns()));
+}
+
+/** Repaint the reserved rows: the rule, then the status line, then the footer hint (bottom-most). */
 function paint(rows: number): void {
+  paintRow(rows - 2, dividerText());
   paintRow(rows - 1, statusText);
   paintRow(rows, footerText);
 }
@@ -115,6 +129,7 @@ export function disable(): void {
   const rows = terminalRows();
   stdout.write('\x1b[r'); // reset scroll region to the full screen
   if (rows !== null) {
+    stdout.write(`\x1b[${rows - 2};1H\x1b[2K`); // clear the rule row
     stdout.write(`\x1b[${rows - 1};1H\x1b[2K`); // clear the status row
     stdout.write(`\x1b[${rows};1H\x1b[2K`); // clear the footer row
   }

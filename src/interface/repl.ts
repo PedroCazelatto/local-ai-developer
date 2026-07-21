@@ -107,6 +107,10 @@ export async function runRepl(orch: ReplOrchestrator): Promise<void> {
   // an in-flight turn is bound to the active phase's history) and drives the live status ticker.
   let processing = false;
 
+  // Turns are separated by one blank line; the very first prompt follows the header's own spacing, so
+  // it skips the separator. Flipped false after the first input box is drawn.
+  let firstPrompt = true;
+
   // readline erases from the cursor to the bottom of the screen (`ESC[0J`) on every line refresh —
   // prompt draw, backspace, arrow keys, history — which wipes the pinned rows. Repaint (with fresh
   // content) after each keypress so they survive editing. setImmediate defers to after readline has
@@ -154,20 +158,26 @@ export async function runRepl(orch: ReplOrchestrator): Promise<void> {
       // A failed `rl.question` means stdin is gone (EOF / Ctrl+D / readline closed) — there is no input
       // left to read, so end the session gracefully instead of spinning on a dead stream.
       let line: string;
+      let raw = '';
       try {
-        // Fence the input line with a rule above and below so it stands out from the model's output
-        // above it. Both are printed into the normal scrollback (append-only, like everything else) —
-        // the closing rule can only be drawn once readline has echoed the submitted line, so it lands
-        // after the await, not before.
-        renderer.rule();
-        const answer = rl.question('› ');
+        // Fence the live input: a transient rule ABOVE it (erased on submit) and the pinned rule BELOW
+        // it (status-bar's reserved row). On submit the box collapses into ONE static gray user-message
+        // line — history stays clean (no rules), turns separated by a single blank line.
+        if (!firstPrompt) renderer.blankLine();
+        firstPrompt = false;
+        renderer.inputRuleTop();
+        const answer = rl.question(renderer.INPUT_PROMPT);
         statusBar.repaint(); // readline drew the prompt (and erased the rows) synchronously — restore them
-        line = (await answer).trim();
-        renderer.rule();
+        raw = await answer;
+        line = raw.trim();
       } catch {
         break;
       }
-      if (line === '') continue;
+      if (line === '') {
+        renderer.discardInput(raw); // empty submit: erase the box, add nothing to history
+        continue;
+      }
+      renderer.commitUserMessage(raw); // collapse the box into a static gray user-message line + blank
 
       // Any error from a command or a turn is SHOWN and swallowed — one bad turn (a dropped Ollama
       // stream, a tool blowup) must never kill the session. Only genuinely fatal errors that escape to
