@@ -92,7 +92,7 @@ async function runTurn(ctx: TurnContext, start: () => StreamHandle): Promise<boo
     if (!delta) continue;
     if (stream === null) {
       stopThinking();
-      stream = renderer.assistantStream(ctx.activePhase);
+      stream = renderer.assistantStream();
     }
     stream.push(delta);
   }

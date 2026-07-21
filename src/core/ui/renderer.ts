@@ -37,14 +37,14 @@ export function header(): void {
 }
 
 /**
- * Open the output sink for ONE streamed assistant turn: deltas in, markdown on screen. The colored
- * `discovery ›` attribution is the stream's prefix — it owns it because repainting the first line
- * clears the row the prefix sits on and has to restore it (see create-markdown-stream.ts).
+ * Open the output sink for ONE streamed assistant turn: deltas in, markdown on screen. The reply
+ * carries NO phase-name prefix — which phase is active is shown by the pinned status line, so the
+ * response text starts at the margin (empty prefix; see create-markdown-stream.ts).
  *
  * Call once per turn, on the FIRST visible delta, so a pure tool-call turn prints no empty header.
  */
-export function assistantStream(phase: string): MarkdownStream {
-  return createMarkdownStream(`${theme.phase(phase)(`${phase} ›`)} `);
+export function assistantStream(): MarkdownStream {
+  return createMarkdownStream('');
 }
 
 /** A dim full-width horizontal rule — fences the input line (repl.ts). */

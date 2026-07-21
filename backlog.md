@@ -8,7 +8,7 @@ Pending tasks and changes for the orchestrator. Check an item off when it ships.
   messages — separate consecutive messages with a single blank line instead. Render **user**
   messages with a light-gray background. Keep a horizontal rule directly **above and below the
   live input line** (the area where the user is currently typing).
-- [ ] **Remove the phase-name prefix** (e.g. `discovery ›`) from the start of every assistant
+- [x] **Remove the phase-name prefix** (e.g. `discovery ›`) from the start of every assistant
   response message.
 - [ ] **Autocomplete: single option list.** When autocomplete shows its options, print the option
   list **only once**, and once an option is selected remove that list from the terminal scrollback.
