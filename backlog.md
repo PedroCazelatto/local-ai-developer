@@ -100,8 +100,8 @@ Model: qwen2.5-coder:14b | Project: morse-coder
   spawned window that challenges and refines the first's reasoning) so the model pressure-tests an
   idea before committing to an answer. (One Ollama model, two context windows — per the core mental
   model.)
-- [ ] **Never render questions or menus as text — use `ask_user`.** The model sometimes prints a
+- [x] **Never render questions or menus as text — use `ask_user`.** The model sometimes prints a
   question with a fake `[ ] Yes / [ ] No` checkbox list and `───` rules in prose instead of calling
   `ask_user`. Strengthen the phase instructions (and/or system prompt) so every question to the user
   goes through `ask_user`, and the model never draws its own horizontal rules or checkbox menus.
-  (feedback)
+  (feedback) *(Added an explicit "never fake the question UI" rule to discovery/design/breakdown.)*

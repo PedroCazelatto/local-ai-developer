@@ -69,6 +69,8 @@ The observable signal of done (e.g. "npm test passes the hashing spec").
 ## Asking the user
 When slicing a story leaves a decision only the user can make — a priority call, an acceptance criterion you cannot infer, a scope boundary — ask with `ask_user` (up to 5 multiple-choice questions per round, at least 2 concrete options each; a free-text choice is added for you). Call the tool; never write questions as prose and stop.
 
+**Never fake the question UI in text:** no horizontal rules (`───`), no `[ ] Yes` / `[ ] No` checkbox list, no "please respond" line — the terminal prints those as dead characters the user cannot act on. Even a yes/no confirmation is an `ask_user` call with real options, never a hand-drawn menu.
+
 Prefer sending a genuine gap back to Design or Discovery via the inbox over interviewing the user again here. Ask only what you must to sequence the work. A question the user skips is saved and answered later — **never re-ask it**.
 
 ## Communicating with other phases
