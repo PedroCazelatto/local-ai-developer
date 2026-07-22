@@ -94,9 +94,12 @@ function eraseInputBox(raw: string): void {
  * in the append-only scrollback. Off a TTY nothing was erasable, so it just prints the summary.
  */
 export function commitUserMessage(raw: string): void {
-  const message = theme.userMessage(` ${INPUT_PROMPT}${raw.trim()} `);
+  // A FULL-WIDTH gray bar: pad the message to the terminal width so the background spans the whole
+  // row, not just the typed text. padEnd measures the visible chars (no ANSI applied yet), so the bar
+  // is exactly one row wide.
+  const bar = theme.userMessage(` ${INPUT_PROMPT}${raw.trim()}`.padEnd(terminalColumns()));
   if (stdout.isTTY) eraseInputBox(raw);
-  stdout.write(`${message}\n\n`);
+  stdout.write(`${bar}\n\n`);
 }
 
 /** An empty submit adds nothing to history — just erase the box (TTY) and move on. */

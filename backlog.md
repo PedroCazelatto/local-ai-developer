@@ -23,7 +23,7 @@ Pending tasks and changes for the orchestrator. Check an item off when it ships.
 
 ### Message rendering fixes
 
-- [ ] **Full-width gray user message.** The light-gray background must span the **entire terminal
+- [x] **Full-width gray user message.** The light-gray background must span the **entire terminal
   width** (a full-width bar), not just the typed text. (feedback)
 - [ ] **A full-width rule still leaks between messages.** History must be gray messages + blank lines
   only — no rules — but a rule still shows between messages: the live-input top rule is not being
