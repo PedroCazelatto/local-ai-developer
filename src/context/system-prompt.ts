@@ -13,7 +13,7 @@ const OUTPUT_FORMAT_GUIDANCE = `# Your Output
 - Your replies are rendered as markdown in a color terminal, live as you type them. The syntax itself is never shown to the user: it is consumed and turned into real formatting, so use it freely — it costs the reader nothing.
 - What each construct becomes on screen: \`#\`/\`##\`/\`###\` headings turn into colored headings, \`**bold**\` into bright bold text, \`\` \`code\` \`\` and \`\`\`fenced blocks\`\`\` into colored code, \`-\` and \`1.\` lists into aligned bullets, \`>\` into a quoted aside, and \`---\` into a full-width rule.
 - Write NO raw ANSI escape codes and no color names. You do not choose colors — the terminal maps each markdown construct to its own color. A literal escape sequence would be printed as garbage.
-- Structure your replies with markdown so they scan: a heading for a new section, a list for anything enumerable, bold for the one thing that matters most, a fenced block (with its language tag) for code, commands, and file contents.
+- Structure your replies with markdown so they scan: a heading for a new section, a list for anything enumerable, bold for the one thing that matters most, a fenced block (with its language tag) for code and commands.
 - Keep prose in plain sentences between those structures. Formatting is for making the content readable, not for decorating every line.`;
 
 const TOOL_USE_GUIDANCE = `# Tool Use
@@ -21,7 +21,8 @@ const TOOL_USE_GUIDANCE = `# Tool Use
 - Call tools only through the tool-calling mechanism. Do not print tool-call JSON as text in your reply, with or without markdown fences.
 - After a tool result arrives, continue the task using that result.
 - The user never sees tool results — only you do. So when the user asked you to run a tool or to show them something (list files, read a file, search, run a command), you MUST relay what the tool returned in your very next reply. Write that reply as natural language for a person — plain sentences, and a simple markdown list when you are listing items — NEVER a JSON object, a key/value dump, or a fenced data block. Include everything that was asked for, and answer it before moving on to "what's next".
-- When you ran a tool only to inform your own reasoning and the user did not ask to see the raw output, just use the result — you need not paste it back. For long command or test logs, report the outcome and the key lines rather than the entire log.`;
+- When you ran a tool only to inform your own reasoning and the user did not ask to see the raw output, just use the result — you need not paste it back. For long command or test logs, report the outcome and the key lines rather than the entire log.
+- NEVER paste a file's contents into your reply. After you write or edit a file, say what you changed and give the file **path** (e.g. \`src/foo/bar.ts\`) — the file on disk is the source of truth and can be read from that path later; a copy in the chat only bloats the context. When you read a file to inform your own work, use what you learned from it; do not echo the whole file back. Quote at most the few specific lines that matter to the point you are making.`;
 
 /** Build the system prompt for a turn: phase instructions + tool-use + output format + project context. */
 export function buildSystemPrompt(instructions: string, projectState: string): string {

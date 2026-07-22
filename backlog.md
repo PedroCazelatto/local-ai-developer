@@ -90,8 +90,10 @@ Model: qwen2.5-coder:14b | Project: morse-coder
 
 - [ ] **Let the model use internal commands.** Give the model the ability to invoke internal
   commands itself (e.g. `/swap`).
-- [ ] **Don't print file contents in chat.** Instruct the model to output only the file **path**
-  (so it can be read later), never the file's full contents.
+- [x] **Don't print file contents in chat.** Instruct the model to output only the file **path**
+  (so it can be read later), never the file's full contents. *(Shared system prompt: dropped "file
+  contents" from what to fence in OUTPUT_FORMAT_GUIDANCE, and added a TOOL_USE_GUIDANCE rule to
+  report the path, not paste contents.)*
 - [ ] **Per-phase commits.** Give every phase the ability to commit its changes. A **subagent** must
   write the commit messages. Each commit must be **as small as possible without breaking the
   application**.
