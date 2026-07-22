@@ -21,8 +21,6 @@ import { terminalColumns } from './terminal-columns.js';
 import { theme } from './theme.js';
 import { visibleWidth } from './visible-width.js';
 
-const BANNER = 'Local AI Developer  ·  /swap <phase>  ·  /exit';
-
 /** The REPL input prompt. Exported so the input-box erase math measures the SAME string readline echoes. */
 export const INPUT_PROMPT = '› ';
 
@@ -30,14 +28,6 @@ export const INPUT_PROMPT = '› ';
 export function clearScreen(): void {
   if (!process.stdout.isTTY) return; // piped/redirected: nothing to clear, escapes would corrupt output
   process.stdout.write('\x1b[2J\x1b[3J\x1b[H'); // clear screen, clear scrollback, cursor home
-}
-
-/**
- * One-time boot banner. The live session context (project · phase · model · tokens · num_ctx) lives
- * in the pinned status bar below the input — NOT here — so it never scrolls above the conversation.
- */
-export function header(): void {
-  process.stdout.write(`${theme.banner(BANNER)}\n\n`);
 }
 
 /**

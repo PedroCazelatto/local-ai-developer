@@ -1,17 +1,17 @@
-// Three pinned rows at the very bottom of the terminal: a full-width RULE, then a STATUS line, then a
-// persistent FOOTER hint (V5/03). They are reserved via the DECSTBM scroll region (ESC[top;bottom r)
-// so all normal output — the conversation, the prompt, streamed deltas — scrolls in the region ABOVE
-// them and never overwrites them. Crucially this is NOT the alt-buffer: the main scrollback stays
-// intact and copyable (the whole reason the old Rich Live TUI was abandoned), we just fence off rows.
+// Three pinned rows at the very bottom of the terminal: a full-width RULE, then TWO STATUS lines. They
+// are reserved via the DECSTBM scroll region (ESC[top;bottom r) so all normal output — the
+// conversation, the prompt, streamed deltas — scrolls in the region ABOVE them and never overwrites
+// them. Crucially this is NOT the alt-buffer: the main scrollback stays intact and copyable (the whole
+// reason the old Rich Live TUI was abandoned), we just fence off rows.
 //
 // The RULE row sits directly under the live input, so it reads as the line BELOW the input while the
 // user types (its other half — a transient rule ABOVE the input — is printed and erased in
-// renderer.ts). During streaming the same rule reads as a divider above the status line.
+// renderer.ts). During streaming the same rule reads as a divider above the status lines.
 //
 // Callers pass FULLY-STYLED text (chalk already applied): this module paints it verbatim and does NOT
-// blanket-dim, so the status line's color-coded active phase (V5/03) renders in its bright theme color
-// while the rest stays dim — the caller composes that mix. The one exception is the rule row, which
-// this module generates itself (theme.divider at the current width) since its content is width-derived.
+// blanket-dim, so status line 1's color-coded active phase renders in its bright theme color while the
+// rest stays dim — the caller composes that mix. The one exception is the rule row, which this module
+// generates itself (theme.divider at the current width) since its content is width-derived.
 //
 // Everything here is a no-op when stdout is not a TTY (piped/redirected runs) — there are no rows to
 // pin and the escapes would just corrupt the output.
@@ -21,15 +21,14 @@ import { stdout } from 'node:process';
 import { terminalColumns } from './terminal-columns.js';
 import { theme } from './theme.js';
 
-/** Rows reserved at the bottom: the rule, the status line, and the footer hint below it. */
+/** Rows reserved at the bottom: the rule, then status line 1, then status line 2. */
 const RESERVED = 3;
 
 /** True only between enable() and disable() on a real TTY. Guards setters/disable() against no-ops. */
 let active = false;
-/** Last status text handed to setStatus(), repainted after a resize so the line survives reflow. */
-let statusText = '';
-/** Last footer text handed to setFooter() (the static Shift+Tab / /swap / /help hint). */
-let footerText = '';
+/** Last status lines handed to setStatus(), repainted after a resize so they survive reflow. */
+let statusLine1 = '';
+let statusLine2 = '';
 /** Bound resize listener, kept so disable() can remove exactly the one enable() added. */
 let onResize: (() => void) | null = null;
 
@@ -63,11 +62,11 @@ function dividerText(): string {
   return theme.divider('─'.repeat(terminalColumns()));
 }
 
-/** Repaint the reserved rows: the rule, then the status line, then the footer hint (bottom-most). */
+/** Repaint the reserved rows: the rule, then status line 1, then status line 2 (bottom-most). */
 function paint(rows: number): void {
   paintRow(rows - 2, dividerText());
-  paintRow(rows - 1, statusText);
-  paintRow(rows, footerText);
+  paintRow(rows - 1, statusLine1);
+  paintRow(rows, statusLine2);
 }
 
 /**
@@ -89,24 +88,23 @@ export function enable(): void {
   applyRegion(rows);
 }
 
-/** Update the pinned STATUS line (already styled). Stored so a later resize can repaint it. No-op until enable(). */
-export function setStatus(text: string): void {
+/**
+ * Update the two pinned STATUS lines (already styled). Stored so a later resize can repaint them.
+ * No-op until enable().
+ */
+export function setStatus(line1: string, line2: string): void {
   if (!active) return;
-  statusText = text;
+  statusLine1 = line1;
+  statusLine2 = line2;
   const rows = terminalRows();
-  if (rows !== null) paintRow(rows - 1, statusText);
-}
-
-/** Update the pinned FOOTER hint (already styled). Set once at boot; stored so a resize repaints it. No-op until enable(). */
-export function setFooter(text: string): void {
-  if (!active) return;
-  footerText = text;
-  const rows = terminalRows();
-  if (rows !== null) paintRow(rows, footerText);
+  if (rows !== null) {
+    paintRow(rows - 1, statusLine1);
+    paintRow(rows, statusLine2);
+  }
 }
 
 /**
- * Repaint the current status + footer on the reserved rows without changing them. The caller uses this
+ * Repaint the current rule + status lines on the reserved rows without changing them. The caller uses this
  * to restore the rows after something erased them: Node's `readline` writes `ESC[0J`
  * (erase-to-end-of-display) on every prompt refresh, which wipes the reserved rows — DECSTBM fences
  * them off from SCROLLING but not from an explicit erase. So the REPL repaints after each prompt draw /
@@ -118,7 +116,7 @@ export function repaint(): void {
   if (rows !== null) paint(rows);
 }
 
-/** Release the reserved rows: drop the resize listener, reset the scroll region, clear both rows. */
+/** Release the reserved rows: drop the resize listener, reset the scroll region, clear all three rows. */
 export function disable(): void {
   if (!active) return;
   active = false;

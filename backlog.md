@@ -45,11 +45,11 @@ Phase: Discovery | Ctx: 0%
 Model: qwen2.5-coder:14b | Project: morse-coder
 ```
 
-- [ ] **Drop the boot banner.** Remove the one-time top banner `Local AI Developer  ·  /swap <phase>  ·
+- [x] **Drop the boot banner.** Remove the one-time top banner `Local AI Developer  ·  /swap <phase>  ·
   /exit` (`BANNER` / `renderer.header()` in [renderer.ts](src/core/ui/renderer.ts), called from
   `runRepl`). The mockup has no banner; the live session context already lives in the pinned status
   bar. *(The model-less `No model selected…` notice is separate — keep it.)*
-- [ ] **Two-line status bar, new format.** Replace the single pinned status line with **two** pinned
+- [x] **Two-line status bar, new format.** Replace the single pinned status line with **two** pinned
   lines below the input rule (see mockup):
   - Line 1: `Phase: <Name> | Ctx: N%` — phase name **Capitalized** (`Discovery`, not `discovery`),
     still painted in the phase's theme color.
@@ -60,20 +60,25 @@ Model: qwen2.5-coder:14b | Project: morse-coder
     This replaces the old `?/16384 tok` and the compact `Σ` per-phase field.
   - `|` separators (not `·`). RESERVED stays **3** (rule + status line 1 + status line 2): the old
     footer row is reused as status line 2, and the pinned rule stays directly under the live input.
-- [ ] **Remove the footer hint row + the Tab / Shift+Tab machinery.** The pinned `Tab: complete ·
+- [x] **Remove the footer hint row + the Tab / Shift+Tab machinery.** The pinned `Tab: complete ·
   Shift+Tab: cycle phase · /swap <phase>: jump · /help: commands` row is gone (its row becomes status
   line 2). **Decided: also rip out the completion and phase-cycle features themselves — they weren't
   working:** the `keypress` handler, [complete-action.ts](src/interface/complete-action.ts) +
   [complete-line.ts](src/interface/complete-line.ts), the no-op `completer`,
   `showCompletions`/`restoreFooter`/`completionsShown`, and `isTab`/`isBackTab`/`cyclePhase` in
   [repl.ts](src/interface/repl.ts). Phase switching stays via `/swap`; `/help` still lists commands.
-- [ ] **Transient activity line above the input.** Move the live activity indicator OUT of the status
+- [x] **Transient activity line above the input.** Move the live activity indicator OUT of the status
   line into a transient spinner line rendered **above the top input rule** while a turn runs. **Decided:
   it carries BOTH** `thinking (X.Xs)` **and** `running <tool> (X.Xs)` — the status line no longer shows
   any activity field, so `statusActivity` feeds this line instead. It repaints on the existing
   `STATUS_TICK_MS` ticker and collapses when the turn ends, keeping scrollback append-only.
   - **Drop the `X.Xs since last tool` variant** (feedback): the timer only ever shows thinking/tool
     elapsed time, never time-since-the-last-tool-call.
+
+*Shipped notes:* the keypress handler was kept but stripped to only the pinned-row repaint (removing it
+entirely blanks the pinned rows while typing); with the no-op completer gone, **Tab now self-inserts a
+tab character** (harmless — commands/chat split on whitespace). The ora "thinking" spinner was replaced
+by a transient `src/core/ui/activity-line.ts`; `ora` itself stays for the model-pull line only.
 
 ### Input behavior
 

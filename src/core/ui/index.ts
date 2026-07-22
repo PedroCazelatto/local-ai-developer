@@ -3,7 +3,7 @@
 export { theme } from './theme.js';
 export * as renderer from './renderer.js';
 export * as statusBar from './status-bar.js';
-export { startThinking, stopThinking } from './spinner.js';
+export * as activityLine from './activity-line.js';
 export { confirm, select, textInput } from './prompts.js';
 export type { SelectChoice } from './prompts.js';
 export { confirmKey } from './confirm-key.js';

@@ -10,7 +10,7 @@ import type { StreamHandle, TokenCounts, ToolCall } from '../llm/index.js';
 import type { MarkdownStream } from '../ui/markdown-stream.type.js';
 import * as renderer from '../ui/renderer.js';
 import * as statusActivity from '../ui/status-activity.js';
-import { startThinking, stopThinking } from '../ui/spinner.js';
+import * as activityLine from '../ui/activity-line.js';
 
 /** Exact value ported from main.py — caps the implement/continue rounds per user message. */
 export const MAX_TOOL_ROUNDS = 8;
@@ -80,7 +80,7 @@ async function runTurn(ctx: TurnContext, start: () => StreamHandle): Promise<boo
   // Run any pre-call failsafe (V4/05 summarization) BEFORE the user turn is added / the stream opens,
   // so the imminent call runs on the compacted history. A no-op for spawned windows (hook absent).
   await ctx.beforeModelCall?.();
-  startThinking();
+  activityLine.show(); // transient "thinking" line; hidden the moment visible text streams
   const handle = start();
 
   // Stream filtered, visible deltas incrementally, rendered as markdown: each delta prints raw the
@@ -91,12 +91,12 @@ async function runTurn(ctx: TurnContext, start: () => StreamHandle): Promise<boo
   for await (const delta of handle.deltas) {
     if (!delta) continue;
     if (stream === null) {
-      stopThinking();
+      activityLine.hide();
       stream = renderer.assistantStream();
     }
     stream.push(delta);
   }
-  stopThinking(); // covers a turn with no visible prose (e.g. a pure tool-call turn)
+  activityLine.hide(); // covers a turn with no visible prose (e.g. a pure tool-call turn)
   stream?.end(); // renders a trailing line the model left unterminated; no-op if nothing streamed
 
   // The client assembled the final structured message + exact tokens across the whole stream.
@@ -118,15 +118,17 @@ async function runTurn(ctx: TurnContext, start: () => StreamHandle): Promise<boo
     const name = call.function.name;
     const args = call.function.arguments;
     renderer.systemMessage(`→ tool: ${name}`);
-    // Surface the executing tool + a live elapsed timer on the status line (V5/03); always clear it
-    // when the call returns (or throws — callTool never throws, but be defensive) so the field is gone
+    // Surface the executing tool + a live elapsed timer on the transient activity line; always clear it
+    // when the call returns (or throws — callTool never throws, but be defensive) so the line is gone
     // the instant the tool finishes.
     statusActivity.toolStarted(name);
+    activityLine.show();
     try {
       const result = await ctx.callTool(name, args);
       ctx.addToolResult(name, result);
     } finally {
       statusActivity.toolEnded();
+      activityLine.hide();
     }
   }
   // A spawned window can signal it reached its terminal result during this turn's tool calls (the
