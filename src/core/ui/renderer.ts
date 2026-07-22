@@ -16,10 +16,10 @@
 import { stdout } from 'node:process';
 
 import { createMarkdownStream } from './create-markdown-stream.js';
+import { echoedRows } from './echoed-rows.js';
 import type { MarkdownStream } from './markdown-stream.type.js';
 import { terminalColumns } from './terminal-columns.js';
 import { theme } from './theme.js';
-import { visibleWidth } from './visible-width.js';
 
 /** The REPL input prompt. Exported so the input-box erase math measures the SAME string readline echoes. */
 export const INPUT_PROMPT = '› ';
@@ -57,18 +57,17 @@ export function inputRuleTop(): void {
   stdout.write(`${theme.divider('─'.repeat(terminalColumns()))}\n`);
 }
 
-/** Terminal rows the echoed input occupied (prompt + text wrapped to the width), minimum one. */
-function echoedRows(raw: string): number {
-  return Math.max(1, Math.ceil((visibleWidth(INPUT_PROMPT) + visibleWidth(raw)) / terminalColumns()));
-}
-
 /**
  * Erase the transient input box still under the cursor — the top rule plus every row the echoed input
  * wrapped onto — leaving the cursor at the box's first row, column 1. Clears with ESC[2K on rows we
  * wrote ourselves (never ESC[0J, which would wipe the pinned status rows below the scroll region).
+ *
+ * echoedRows measures the PROMPT + input together, wrapping exactly as readline does (so an exact-fill
+ * line's deferred-wrap row and wide glyphs are both counted) — that keeps `rows` matched to where
+ * readline left the cursor, so the top rule is always cleared and never leaks into scrollback.
  */
 function eraseInputBox(raw: string): void {
-  const rows = echoedRows(raw) + 1; // + the top rule
+  const rows = echoedRows(`${INPUT_PROMPT}${raw}`) + 1; // + the top rule
   stdout.write(`\x1b[${rows}A\r`); // up to the top rule's row, column 1
   for (let row = 0; row < rows; row += 1) {
     stdout.write('\x1b[2K');
