@@ -193,6 +193,18 @@ The binding rules — TypeScript conventions, `never any`, strict `tsconfig`, te
 no orchestrator tests, autonomous+logged tools — live in **[constitution.md](constitution.md)**.
 Read it before touching code.
 
+## Backlog
+
+Pending work lives as **one Markdown file per task** in [backlog/](backlog/) at the repo root — there
+is no single `backlog.md` list (it was decomposed into this folder). Each file is named with a
+descriptive kebab-case slug (e.g. `persistent-fenced-input.md`) and holds just the task: an `# H1`
+title, a `**Category:**` line, and the prose description — no frontmatter, no source tags.
+
+- **Adding a task:** create a new `backlog/<slug>.md` with the title, category, and description.
+- **Finishing a task:** when the work ships, **delete that task's file and commit the deletion in the
+  same commit as all the code the task required** — the removed backlog file is the record that the
+  feature landed.
+
 ## Repo layout
 
 > The TypeScript source lives under `src/`. The Python reference implementation has been deleted
@@ -214,6 +226,7 @@ local-ai-developer/
 ├── rules/
 │   ├── phases/             # phase instruction sets (markdown), injected on phase load
 │   └── standards/          # on-demand reference rules (markdown)
+├── backlog/                # one markdown file per pending task; delete + commit on completion
 ├── projects/               # each child is its own git repo, developed by the model
 ├── scripts/
 │   └── run.mjs             # cross-platform launcher: install / start <project> / stop
