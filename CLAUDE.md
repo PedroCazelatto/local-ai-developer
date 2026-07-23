@@ -231,6 +231,15 @@ Host (npm scripts wrapping the cross-platform `scripts/run.mjs` launcher):
 
 (The launcher also runs directly: `node scripts/run.mjs install | start <project> | stop`.)
 
+> [!IMPORTANT]
+> **Never run the full app to test a change** — `npm run start` (and `node scripts/run.mjs start`)
+> boots a live session against Ollama, which is a token-intensive process that burns a lot of tokens.
+> The only npm scripts you may run are **`npm run setup`** and **`npm run typecheck`**. To exercise
+> code, write throwaway `.ts`/`.js` files that import and drive the specific functions (this is another
+> reason for the one-function-per-file rule — units stay directly callable in isolation). See the
+> "verify via scripted live checks" approach; a terminal-grid emulator harness can replay the real
+> renderer + readline to check UI rendering without launching the app.
+
 In-app (terminal) — all implemented:
 - `/swap <phase>` — switch the active phase
 - `/new-project <name> <stack>` — scaffold a new project (`node` | `python`)
