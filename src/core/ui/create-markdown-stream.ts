@@ -17,10 +17,11 @@
 
 import { stdout } from 'node:process';
 
+import { echoedRows } from './echoed-rows.js';
 import type { MarkdownStream } from './markdown-stream.type.js';
 import { renderMarkdownLine } from './render-markdown-line.js';
 import { terminalColumns } from './terminal-columns.js';
-import { visibleWidth } from './visible-width.js';
+import { wordWrap } from './word-wrap.js';
 
 /**
  * Open a markdown stream for one assistant turn. `prefix` is the already-styled attribution
@@ -42,24 +43,25 @@ export function createMarkdownStream(prefix: string): MarkdownStream {
   /** Whether the NEXT line falls inside a ``` fence — the only state markdown carries across lines. */
   let insideFence = false;
 
-  /** How many terminal rows the raw line currently occupies, prefix included, minimum one. */
-  const rowsUsed = (): number => {
-    const base = prefixOnRow ? visibleWidth(prefix) : 0;
-    return Math.max(1, Math.ceil((base + visibleWidth(line)) / terminalColumns()));
-  };
-
   /**
    * Replace the raw line on screen with its rendered form. The cursor sits on the LAST row of the
    * raw text (which may have wrapped), so: walk up to the line's first row, blank every row it
    * occupied, then write the styled line from the top. Movement stays within rows we just wrote, so
    * the cursor never crosses a scroll margin.
+   *
+   * The styled line is word-wrapped (broken only at spaces, never mid-word) before it is written, so
+   * a long reply reads as clean prose. Code — every line INSIDE a ``` fence — is left verbatim, since
+   * its spaces are significant and must not become line breaks.
    */
   const flushLine = (): void => {
+    const wasInsideFence = insideFence; // did THIS line arrive as fenced code? (before the toggle)
     const rendered = renderMarkdownLine(line, insideFence);
     insideFence = rendered.insideFence;
     const head = prefixOnRow ? prefix : '';
     if (tty) {
-      const rows = rowsUsed();
+      // echoedRows counts the raw line's on-screen rows exactly as the terminal wrapped it (wide
+      // glyphs, exact-fill), so the blank-and-repaint clears precisely what was streamed live.
+      const rows = echoedRows(`${head}${line}`);
       if (rows > 1) stdout.write(`\x1b[${rows - 1}A`); // up to the first row of the raw line
       stdout.write('\r');
       for (let row = 0; row < rows; row += 1) {
@@ -69,7 +71,9 @@ export function createMarkdownStream(prefix: string): MarkdownStream {
       if (rows > 1) stdout.write(`\x1b[${rows - 1}A`); // back to the top of the now-blank block
       stdout.write('\r');
     }
-    stdout.write(`${head}${rendered.text}\n`);
+    const body = `${head}${rendered.text}`;
+    const outLines = tty && !wasInsideFence ? wordWrap(body, terminalColumns()) : [body];
+    stdout.write(`${outLines.join('\n')}\n`);
     prefixOnRow = false;
     line = '';
   };

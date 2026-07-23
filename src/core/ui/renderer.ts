@@ -20,9 +20,14 @@ import { echoedRows } from './echoed-rows.js';
 import type { MarkdownStream } from './markdown-stream.type.js';
 import { terminalColumns } from './terminal-columns.js';
 import { theme } from './theme.js';
+import { visibleWidth } from './visible-width.js';
+import { wordWrap } from './word-wrap.js';
 
 /** The REPL input prompt. Exported so the input-box erase math measures the SAME string readline echoes. */
 export const INPUT_PROMPT = '› ';
+
+/** Display columns the ` › ` marker occupies; continuation rows of a wrapped message align under it. */
+const USER_INDENT = 3;
 
 /** One-time boot clear: wipe the launcher's noise (screen + scrollback), home the cursor. */
 export function clearScreen(): void {
@@ -83,12 +88,18 @@ function eraseInputBox(raw: string): void {
  * in the append-only scrollback. Off a TTY nothing was erasable, so it just prints the summary.
  */
 export function commitUserMessage(raw: string): void {
-  // A FULL-WIDTH gray bar: pad the message to the terminal width so the background spans the whole
-  // row, not just the typed text. padEnd measures the visible chars (no ANSI applied yet), so the bar
-  // is exactly one row wide.
-  const bar = theme.userMessage(` ${INPUT_PROMPT}${raw.trim()}`.padEnd(terminalColumns()));
+  const cols = terminalColumns();
+  // Word-wrap the message (break only at spaces, never mid-word) under a ` › ` marker, continuation
+  // rows aligned beneath it. Each row is a FULL-WIDTH gray bar: padded by DISPLAY width (visibleWidth
+  // counts CJK/emoji as two columns) so the background spans the whole terminal row, not just the text.
+  const lines = wordWrap(raw.trim(), Math.max(1, cols - USER_INDENT));
+  const bars = lines.map((text, index) => {
+    const prefix = index === 0 ? ` ${INPUT_PROMPT}` : ' '.repeat(USER_INDENT);
+    const row = `${prefix}${text}`;
+    return theme.userMessage(row + ' '.repeat(Math.max(0, cols - visibleWidth(row))));
+  });
   if (stdout.isTTY) eraseInputBox(raw);
-  stdout.write(`${bar}\n\n`);
+  stdout.write(`${bars.join('\n')}\n\n`);
 }
 
 /** An empty submit adds nothing to history — just erase the box (TTY) and move on. */

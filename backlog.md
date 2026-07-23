@@ -26,6 +26,16 @@ Model: qwen2.5-coder:14b | Project: morse-coder
 - [ ] **Shift+Enter inserts a newline.** Let the user compose multi-line input — Shift+Enter adds a
   line break instead of submitting the message. (feedback)
 
+### Output rendering
+
+- [ ] **Keyword-driven rendering — not markdown by default.** Today every model line is rendered as
+  markdown. Change it so plain prose stays plain (still word-wrapped at spaces), and rich rendering is
+  **opt-in via fenced keywords**: a ` ```markdown ` block is rendered as markdown, and a new ` ```code `
+  (with an optional language) block is verbatim code (unwrapped). Two sides: the phase instructions
+  under [rules/](rules/) must tell the model to emit these fences, and `render-markdown-line.ts` /
+  `create-markdown-stream.ts` must switch rendering mode on them (word-wrap already skips ``` fences).
+  (feedback)
+
 ## Model behavior / instructions
 
 - [ ] **Let the model use internal commands.** Give the model the ability to invoke internal
