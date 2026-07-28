@@ -53,8 +53,11 @@ implement → test → review → fix → (loop, max 5 rounds)
 - **Worker** — a fresh window with the task definition; writes failing tests first, then implements,
   then runs the tests. **The same Worker window does the fixes** — its history accumulates every prior
   attempt plus the Reviewer's feedback, so it converges in as few rounds as possible rather than
-  starting blind each time.
-- **Reviewer** — a separate fresh window that judges the Worker's output against the task definition.
+  starting blind each time. It **cannot commit** (see *Git / commit policy*).
+- **Reviewer** — a separate fresh window that judges the Worker's output against the task definition,
+  and the only phase in the loop that commits. It may accept **part** of an attempt: it commits the
+  files it approves, and every file it leaves behind goes back to the Worker with an issue explaining
+  why. Files already accepted are named in the next fix turn so the Worker doesn't redo them.
 - **Loop control:**
   - Hard cap of **5** implement→fix rounds per task. If the work still hasn't passed review after 5
     rounds, the loop stops and **escalates to the user**.
@@ -93,9 +96,44 @@ work; it calls `inbox_post` whenever it spots a concern that belongs to another 
 
 ## Git / commit policy
 
-- **Phases auto-commit their approved changes to the project repo.** Approval points: a planning
-  phase's output when the user accepts it and moves on; a Worker's code when the Reviewer passes it.
-  Branch tooling is not needed.
+Committing is a **model-driven tool call**, not something the orchestrator does behind the model's
+back. Two tools, both host-side (the root sandbox ships no git):
+
+- `list_changes()` — every uncommitted path in the project repo, with its status code. Paths only,
+  never a diff, so a large working tree can't quietly consume `num_ctx`.
+- `commit_changes(paths, intent)` — stages **exactly** the paths named (never `git add -A`) and
+  commits them. The caller does **not** write the message: `composeCommitMessage` hands the real diff
+  of those paths to a **throwaway one-shot context** which writes it, so a phase that misdescribes its
+  own change cannot talk the log into agreeing, and the message costs the calling phase no context.
+  Any path escaping the project repo is refused — the guard that keeps a [rules/](../rules/) edit from
+  ever being committed by a model.
+
+Who may commit:
+
+- **Every phase except the Worker.** The planning phases commit their approved output at each
+  approval point. Branch tooling is not needed.
+- **The Worker never commits.** `commit_changes` is stripped from its tool definitions *and* refused
+  in its window, because a Worker that commits its own code is its own gatekeeper. It leaves work in
+  the working tree and hands everything to the Reviewer.
+- **The Reviewer is the committing authority for execution work**, and may commit **partially**: it
+  commits the files it accepts and leaves the rest. It still has no `write_file`/`edit_file` — it can
+  commit the Worker's code but never edit it.
+
+The verdict is then checked against the real repo (`verdictGitConflict`) and rejected — with one
+re-prompt — if they disagree:
+
+| Rule | Why |
+|---|---|
+| A `pass` may leave **nothing** uncommitted | The Reviewer commits what it accepts, so anything left is by definition not accepted; passing would silently drop it. |
+| A `pass` requires the task marked done | `mark_task_done` (a Reviewer-only tool, not in the registry) flips the backlog file; the Reviewer then commits it, so a closed task is always recorded in git. |
+| A `fail` must name **every** uncommitted file in an issue | Every file left behind goes back to the Worker; none of them may arrive without a reason. |
+
+A `fail` on a **clean** tree is legal and normal: everything the Worker wrote was worth keeping, but
+the task still needs work that doesn't exist yet.
+
+Because acceptance is partial, an **escalated or blocked task can still have landed commits** — the
+run/batch reports say what was accepted, and only what never passed is left in the tree (and stashed).
+
 - **Global instruction edits are the exception — never auto-committed.** When the Retro phase (or
   anything) edits a global phase file under [rules/](../rules/), it leaves the change **uncommitted**
   and **warns the user that the change must be reviewed before continuing**; the user commits it
