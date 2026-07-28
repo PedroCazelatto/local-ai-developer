@@ -28,6 +28,35 @@ The launcher also runs directly: `node scripts/run.mjs install | start <project>
 - `/subagents` — list active sub-agents
 - `/help` — list every command · `/exit` — quit
 
+These are **user commands, and the model never invokes them.** Where the model needs the same
+capability, it gets a separate **tool with its own guardrails** — a `switch_phase` tool rather than
+access to `/swap` — so the orchestrator keeps control of what a phase can actually do, and each
+capability can be narrowed independently of the command the user drives.
+
+## Composing a multi-line message
+
+**Enter** sends the message; **Shift+Enter** breaks the line instead, so a message can span as many
+lines as you like and the whole block is sent as one message when you finally press Enter. The break
+is a real character in the edit buffer, not a frozen row: backspace at the start of a line joins it to
+the one above, and the arrows walk the whole message. The same keys work in the `ask_user` panel's
+free-text answer.
+
+> [!IMPORTANT]
+> **No terminal distinguishes Shift+Enter on its own** — Enter and Shift+Enter both arrive as a
+> carriage return, so a plain Shift+Enter simply sends the message. The orchestrator reads a **bare
+> line feed** (`0x0A`) as the line break, which means Shift+Enter has to be bound to send one.
+> **Ctrl+J** already sends exactly that on every platform, and **Alt+Enter** works too — either one
+> composes a multi-line message with no configuration at all.
+
+Binding Shift+Enter, per terminal:
+
+| Terminal | Where | Binding |
+|---|---|---|
+| Windows Terminal | `settings.json` → `actions` | `{ "command": { "action": "sendInput", "input": "\n" }, "id": "User.sendNewLineInput" }` and, in `keybindings`, `{ "id": "User.sendNewLineInput", "keys": "shift+enter" }` |
+| VS Code terminal | `keybindings.json` | `{ "key": "shift+enter", "command": "workbench.action.terminal.sendSequence", "args": { "text": "\n" }, "when": "terminalFocus" }` |
+| iTerm2 | Settings → Keys → Key Bindings | Shift+↩ → *Send Hex Code* → `0x0a` |
+| kitty | `kitty.conf` | `map shift+enter send_text all \x0a` |
+
 ## Model selection
 
 **There is no default model.** A model name compiled into the orchestrator says nothing about what
