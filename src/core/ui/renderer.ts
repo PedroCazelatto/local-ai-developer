@@ -82,7 +82,7 @@ function eraseInputBox(raw: string): void {
 }
 
 /**
- * Collapse the just-submitted input box into ONE static, copyable line: the user's message on a
+ * Collapse the just-submitted input box into a static, copyable gray block: the user's message on a
  * light-gray background, then a blank line before the assistant reply. This is the transient-widget
  * pattern (constitution, Terminal UX) — the live box erases its own frame and leaves a single summary
  * in the append-only scrollback. Off a TTY nothing was erasable, so it just prints the summary.
@@ -92,7 +92,14 @@ export function commitUserMessage(raw: string): void {
   // Word-wrap the message (break only at spaces, never mid-word) under a ` › ` marker, continuation
   // rows aligned beneath it. Each row is a FULL-WIDTH gray bar: padded by DISPLAY width (visibleWidth
   // counts CJK/emoji as two columns) so the background spans the whole terminal row, not just the text.
-  const lines = wordWrap(raw.trim(), Math.max(1, cols - USER_INDENT));
+  //
+  // The breaks the user typed with Shift+Enter are structure, not overflow, so each of THEIR lines is
+  // wrapped on its own — a line break they chose can never be swallowed by refilling the paragraph,
+  // and a deliberately blank line stays a blank gray row.
+  const lines = raw
+    .trim()
+    .split('\n')
+    .flatMap((source) => wordWrap(source, Math.max(1, cols - USER_INDENT)));
   const bars = lines.map((text, index) => {
     const prefix = index === 0 ? ` ${INPUT_PROMPT}` : ' '.repeat(USER_INDENT);
     const row = `${prefix}${text}`;

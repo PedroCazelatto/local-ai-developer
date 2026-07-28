@@ -7,6 +7,7 @@
 // off and smear the panel down the screen on every keypress. Hence every variable-length string is
 // truncated to a computed budget before it is styled.
 
+import { singleLine } from './single-line.js';
 import { truncateToWidth } from './truncate-to-width.js';
 import type { QuestionPanelState } from './ask-questions.type.js';
 import { terminalColumns } from './terminal-columns.js';
@@ -80,10 +81,20 @@ function questionBody(state: QuestionPanelState, width: number): string[] {
   return [prompt, '', ...lines];
 }
 
-/** The single-line free-text editor shown after picking "Other", with a block cursor at the end. */
+/**
+ * The free-text editor shown after picking "Other", with a block cursor at the end. Shift+Enter puts
+ * real newlines in the draft, so it renders as one panel row PER typed line — the ` › ` marker on the
+ * first, the rest aligned under it. Each row is truncated independently, keeping the one-row-per-line
+ * invariant this module is built on. The draft is append-only (no arrow keys), so the cursor is always
+ * on the last row.
+ */
 function textEditor(state: QuestionPanelState, width: number): string[] {
-  const typed = truncateToWidth(state.draft, width - 4);
-  return [`${INDENT}${theme.meta('›')} ${typed}${theme.md.bullet('▏')}`];
+  const typed = state.draft.split('\n');
+  return typed.map((source, index) => {
+    const marker = index === 0 ? theme.meta('›') : ' ';
+    const caret = index === typed.length - 1 ? theme.md.bullet('▏') : '';
+    return `${INDENT}${marker} ${truncateToWidth(source, width - 4)}${caret}`;
+  });
 }
 
 /** The Review tab: every question with the answer that will be submitted for it. */
@@ -91,8 +102,10 @@ function reviewBody(state: QuestionPanelState, width: number): string[] {
   const lines: string[] = [];
   state.questions.forEach((question, index) => {
     lines.push(`${INDENT}${theme.meta(`${index + 1}.`)} ${truncateToWidth(question.question, width - 5)}`);
-    const answer = state.answers[index];
-    const shown = truncateToWidth(answer ?? UNANSWERED, width - 7);
+    const answer = state.answers[index] ?? null; // an index past the end reads as unanswered, not as answered
+    // singleLine first: a multi-line free-text answer must be flattened before it is measured, or the
+    // newline survives truncation and breaks this module's one-row-per-line guarantee.
+    const shown = truncateToWidth(answer === null ? UNANSWERED : singleLine(answer), width - 7);
     lines.push(`${INDENT}   ${answer === null ? theme.meta(shown) : theme.success(`→ ${shown}`)}`);
   });
   return lines;
@@ -105,7 +118,7 @@ function hint(state: QuestionPanelState, isReview: boolean, width: number): stri
   const onFreeText =
     !isReview && state.mode === 'select' && options !== undefined && state.cursor === options.length - 1;
   const keys = state.mode === 'text'
-    ? 'enter save · esc back to the options'
+    ? 'enter save · shift+enter newline · esc back to the options'
     : isReview
       ? 'enter submit · ←→ tab · esc close (unanswered are saved)'
       : onFreeText

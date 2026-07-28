@@ -26,6 +26,7 @@ import * as renderer from '../core/ui/renderer.js';
 import * as statusActivity from '../core/ui/status-activity.js';
 import * as statusBar from '../core/ui/status-bar.js';
 import * as activityLine from '../core/ui/activity-line.js';
+import { bindNewlineKey } from '../core/ui/bind-newline-key.js';
 import { theme } from '../core/ui/theme.js';
 import { getCommand } from './command-registry.js';
 
@@ -89,6 +90,11 @@ export async function runRepl(orch: ReplOrchestrator): Promise<void> {
   }
   const rl = createInterface({ input: stdin, output: stdout });
 
+  // Multi-line composition: hand Shift+Enter (a bare LF) to the edit buffer instead of letting
+  // readline submit on it, so the message keeps growing until Enter (a CR) sends the whole thing.
+  // Must run before the status listener below — it replaces readline's keypress listener with its own.
+  const unbindNewlineKey = bindNewlineKey(rl, stdin);
+
   // True only while a command / chat turn is being handled — drives the live status ticker.
   let processing = false;
 
@@ -145,8 +151,9 @@ export async function runRepl(orch: ReplOrchestrator): Promise<void> {
       let raw = '';
       try {
         // Fence the live input: a transient rule ABOVE it (erased on submit) and the pinned rule BELOW
-        // it (status-bar's reserved row). On submit the box collapses into ONE static gray user-message
-        // line — history stays clean (no rules), turns separated by a single blank line.
+        // it (status-bar's reserved row). On submit the box collapses into a static gray user-message
+        // block — history stays clean (no rules), turns separated by a single blank line. The box grows
+        // downward as Shift+Enter adds lines; the erase measures the wrapped rows, so it all comes back.
         if (!firstPrompt) renderer.blankLine();
         firstPrompt = false;
         renderer.inputRuleTop();
@@ -186,6 +193,7 @@ export async function runRepl(orch: ReplOrchestrator): Promise<void> {
   } finally {
     activityLine.hide();
     stopTicker();
+    unbindNewlineKey(); // give readline its own keypress listener back before the interface closes
     if (stdin.isTTY) stdin.removeListener('keypress', onKeypress);
     statusBar.disable(); // release the reserved rows and restore normal scrolling
     rl.close();

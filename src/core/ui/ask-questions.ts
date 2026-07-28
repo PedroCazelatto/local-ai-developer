@@ -25,7 +25,9 @@ import { emitKeypressEvents } from 'node:readline';
 import type { Key } from 'node:readline';
 
 import type { AskOutcome, AskQuestion, QuestionPanelMode } from './ask-questions.type.js';
+import { isNewlineKey } from './is-newline-key.js';
 import { renderQuestionPanel } from './render-question-panel.js';
+import { singleLine } from './single-line.js';
 import { terminalColumns } from './terminal-columns.js';
 import { truncateToWidth } from './truncate-to-width.js';
 import { theme } from './theme.js';
@@ -135,6 +137,14 @@ export async function askQuestions(phase: string, questions: readonly AskQuestio
       const onKey: KeypressListener = (str, key) => {
         if (key === undefined) return;
         if (key.ctrl === true && key.name === 'c') return finish();
+        // Shift+Enter (a bare LF) composes a multi-line free-text answer, the same as at the REPL
+        // prompt. It is claimed BEFORE the return/enter handlers below, which would otherwise read the
+        // LF as a submit. On the options there is nothing to type into, so it does nothing at all.
+        if (isNewlineKey(key)) {
+          if (mode !== 'text') return;
+          draft += '\n';
+          return draw();
+        }
 
         if (mode === 'text') {
           if (key.name === 'escape') {
@@ -217,7 +227,9 @@ function writeTranscript(phase: string, questions: readonly AskQuestion[], answe
     if (answer === undefined || answer === null) {
       stdout.write(`     ${theme.meta(truncateToWidth('saved — answer it later with /questions', width - 6))}\n`);
     } else {
-      stdout.write(`     ${theme.success(`→ ${truncateToWidth(answer, width - 8)}`)}\n`);
+      // singleLine: this is a one-row summary, so a multi-line answer is flattened before measuring —
+      // a surviving newline would both mis-measure the truncation and break the two-rows-per-question shape.
+      stdout.write(`     ${theme.success(`→ ${truncateToWidth(singleLine(answer), width - 8)}`)}\n`);
     }
   });
 }
