@@ -1,9 +1,11 @@
 // The V3/05 unattended batch driver — "kick off a batch and walk away." It walks the selected backlog
 // tasks STRICTLY SEQUENTIALLY (no parallelism — a 3060 holds one window at a time; a hard constraint, not
 // a perf choice), routing each task's V3/01 loop outcome without a human in the inner loop:
-//   - passed    → already auto-committed (V2/03); record + continue.
-//   - escalated → uncommitted; stash the failed attempt (preserved for inspection); record + continue.
-//   - blocked   → uncommitted; stash the attempt (Retro reads it later on /answer); record + continue.
+//   - passed    → the Reviewer already committed all of it; record + continue.
+//   - escalated → stash whatever is LEFT (preserved for inspection); record + continue.
+//   - blocked   → stash what is left (Retro reads it later on /answer); record + continue.
+// A non-pass is no longer "uncommitted": the Reviewer accepts files partially, so an earlier round may
+// have landed some of the work — each bucket carries the SHAs that did.
 // A blocker or an escalation is a PER-TASK result, never a batch failure — the whole value of an overnight
 // run is that one ambiguous task doesn't waste the other eleven hours. The batch aborts ONLY on a genuine
 // infra fault (Ollama down, sandbox unreachable) or a pre-flight refusal, and even then it persists a
@@ -95,7 +97,8 @@ export async function runBatch(
     let result: TaskLoopResult;
     try {
       // runTask: the injected V3/01 loop for ONE task (persistent Worker ≤5 rounds, fresh Reviewer each
-      // round, auto-commit on pass). A throw here is a genuine infra fault, not a task-level failure.
+      // round, the Reviewer commits what it accepts). A throw here is a genuine infra fault, not a
+      // task-level failure.
       result = await deps.runTask(task, position);
     } catch (err) {
       abortedReason = `infrastructure fault on ${id}: ${err instanceof Error ? err.message : String(err)}`;
@@ -137,17 +140,22 @@ function preflightRefusal(projectPath: string): string | undefined {
 }
 
 /**
- * Route one task's terminal outcome into the summary buckets. `passed` is already committed (V2/03); a
- * non-pass stashes its attempt so the tree is left clean for the next task — the Worker never reuses the
- * stash (a fresh Worker redoes the task), it exists for Retro (blocked) / inspection (escalated).
+ * Route one task's terminal outcome into the summary buckets. A non-pass stashes whatever is LEFT in
+ * the tree so it is clean for the next task — the Worker never reuses the stash (a fresh Worker redoes
+ * the task), it exists for Retro (blocked) / inspection (escalated). Note a non-pass can still have
+ * committed work: the Reviewer accepts files partially, so `commits` is carried on every bucket.
  */
 function routeOutcome(
   projectPath: string,
   result: TaskLoopResult,
   buckets: { passed: BatchPassed[]; escalated: BatchEscalated[]; blocked: BatchBlocked[] },
 ): void {
+  // A commit with no sha (git reported none) contributes nothing to report — drop it rather than
+  // invent a placeholder the user could mistake for a real ref.
+  const commits = result.commits.map((commit) => commit.sha).filter((sha): sha is string => sha !== null);
+
   if (result.outcome === 'passed') {
-    buckets.passed.push({ taskId: result.taskId, commit: result.commit ?? null, rounds: result.rounds });
+    buckets.passed.push({ taskId: result.taskId, commits, rounds: result.rounds });
     return;
   }
   if (result.outcome === 'blocked') {
@@ -156,6 +164,7 @@ function routeOutcome(
       taskId: result.taskId,
       blockerId: result.blockerId ?? null,
       question: result.question ?? '',
+      commits,
       stashRef,
     });
     return;
@@ -166,6 +175,7 @@ function routeOutcome(
     taskId: result.taskId,
     rounds: result.rounds,
     lastFeedback: result.lastFeedback ?? '',
+    commits,
     stashRef,
   });
 }

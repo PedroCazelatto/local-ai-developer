@@ -2,9 +2,15 @@
 // Mirrors worker-runner.ts: an empty messages array seeded with the Reviewer system prompt
 // (rules/phases/reviewer.md via loadPhasePrompt) + a user message carrying the task, the Worker's
 // change summary, the changed files, and the test results. It runs the SAME tool-dispatch loop, but
-// with a READ-MOSTLY tool allowlist (no write_file/edit_file/commit) PLUS the phase-scoped
-// submit_verdict tool. When the Reviewer calls submit_verdict, the window captures + validates the
-// ReviewVerdict, ends the turn (via TurnContext.isComplete), and is DISCARDED.
+// with a READ-MOSTLY tool allowlist (no write_file/edit_file) PLUS the phase-scoped submit_verdict,
+// mark_task_done and raise_blocker tools. When the Reviewer calls submit_verdict, the window captures
+// + validates the ReviewVerdict, ends the turn (via TurnContext.isComplete), and is DISCARDED.
+//
+// The Reviewer is the ONLY execution phase that commits. It may commit PARTIALLY — accept some of the
+// Worker's files and leave the rest — and every file it leaves goes back to the Worker with an issue
+// explaining why (enforced by verdictGitConflict, not merely asked for in the prompt). Its verdict is
+// therefore checked against the real repo state before it is accepted: a "pass" must leave a clean
+// tree and a task marked done; a "fail" must explain every file still sitting in the working tree.
 //
 // Isolation is the whole point: the window never sees the Worker's history, so it cannot rationalize
 // the Worker's own work (CLAUDE.md, Memory model — the Reviewer is a separate fresh window).
@@ -16,20 +22,26 @@
 import { buildSystemPrompt, loadPhasePrompt } from '../../context/index.js';
 import { createToolContext } from '../../tools/index.js';
 import { toolError } from '../../tools/index.js';
+import { COMMIT_CHANGES } from '../../tools/commit-changes.js';
+import { LIST_CHANGES } from '../../tools/list-changes.js';
+import { MARK_TASK_DONE, markTaskDoneTool } from '../../tools/mark-task-done.js';
 import { RAISE_BLOCKER, raiseBlockerTool, validateBlockerRequest } from '../../tools/raise-blocker.js';
 import { SUBMIT_VERDICT, parseVerdict, submitVerdictTool } from '../../tools/submit-verdict.js';
 import type { SandboxClient } from '../container/index.js';
 import type { OllamaClient, Message, StreamHandle, TokenCounts, Tool, ToolCall } from '../llm/index.js';
 import { addTokenCounts } from './add-token-counts.js';
 import { appendAuditRow } from './audit.js';
+import { BACKLOG_DIRNAME, setTaskStatus } from './backlog.js';
 import { raiseBlocker } from './blocker-store.js';
 import type { RaisedBlocker } from './blocker-store.type.js';
 import type { ToolCallRecord } from './dispatch.js';
 import { dispatchToolCall } from './dispatch.js';
+import { listChangedPaths } from './project-git.js';
 import type { ReviewVerdict } from './review-types.js';
 import { processMessage } from './turn-loop.js';
 import type { TurnContext } from './turn-loop.js';
 import type { Task } from './types.js';
+import { verdictGitConflict } from './verdict-git-conflict.js';
 
 // The Reviewer inspects (a few reads + maybe a test re-run) then submits — lighter than the Worker's
 // test-first implement loop, but give headroom for reading several files before the verdict.
@@ -39,13 +51,16 @@ const REVIEWER_MAX_ROUNDS = 16;
 const MAX_VERDICT_ATTEMPTS = 2;
 
 /**
- * The Reviewer's read-mostly tool allowlist. It judges — it never mutates or commits, so it gets no
- * write_file/edit_file/commit tool. execute_command is read-mostly by nature (root sandbox at
- * /workspace) and allowed for inspection; the prompt steers it toward reads, not mutation.
+ * The Reviewer's tool allowlist: read-mostly for CODE, plus the git tools. It still gets no
+ * write_file/edit_file — it judges the Worker's code and must never be able to quietly patch it and
+ * then pass its own edit. execute_command is read-mostly by nature (root sandbox at /workspace) and
+ * allowed for inspection; the prompt steers it toward reads, not mutation.
  * search_rules/load_rule (V4/02) let the Reviewer resolve a layering/testing/naming question to a
  * standard and load its body to judge + cite against, without the catalog ever entering context. The
  * cross-phase inbox tools (V3/04) are the one deliberate write channel: the Reviewer already signalled
  * other phases via the shared channel (was AGENT_NOTES.md) — the inbox is its structured replacement.
+ * list_changes/commit_changes make the Reviewer the committing authority for execution work: it is the
+ * gatekeeper, so it — not the Worker — is what stands between written code and the git history.
  */
 export const REVIEWER_TOOL_NAMES: readonly string[] = [
   'read_file',
@@ -59,6 +74,9 @@ export const REVIEWER_TOOL_NAMES: readonly string[] = [
   'inbox_read',
   'inbox_post',
   'inbox_resolve',
+  // Project git — see what the Worker left, then commit exactly the files this review accepts.
+  LIST_CHANGES,
+  COMMIT_CHANGES,
 ];
 
 export interface ReviewerDeps {
@@ -98,6 +116,19 @@ export interface ReviewerOutcome {
   readonly tokensTotal: TokenCounts;
   /** Present INSTEAD of a verdict when the Reviewer raised a blocker (V3/02); already persisted. */
   readonly blocker?: RaisedBlocker;
+  /**
+   * Commits this Reviewer made, in order. A `pass` commits everything; a `fail` may still have
+   * committed the files it accepted (partial acceptance), so these survive the round either way.
+   */
+  readonly commits: readonly ReviewerCommit[];
+}
+
+/** One commit the Reviewer made during this review — recorded as it happens, for the UI and the Worker. */
+export interface ReviewerCommit {
+  /** Short SHA, or null when git reported none. */
+  readonly sha: string | null;
+  /** Project-relative paths in that commit. */
+  readonly files: readonly string[];
 }
 
 /** The Reviewer ended without a usable verdict (never submitted, or malformed past the re-prompt). */
@@ -132,6 +163,10 @@ class ReviewerWindow implements TurnContext {
   private failure: string | null = null;
   /** How many times submit_verdict was called with an invalid payload. */
   private verdictAttempts = 0;
+  /** Commits this Reviewer made, in order — captured from each successful commit_changes call. */
+  private readonly commitsMade: ReviewerCommit[] = [];
+  /** True once mark_task_done flipped the task under review to `done`; required before a `pass`. */
+  private taskMarkedDone = false;
 
   constructor(
     private readonly deps: ReviewerDeps,
@@ -145,9 +180,10 @@ class ReviewerWindow implements TurnContext {
       const name = tool.function.name;
       return name !== undefined && REVIEWER_TOOL_NAMES.includes(name);
     });
-    // submit_verdict (the normal exit) + raise_blocker (the halt exit) are BOTH phase-scoped here and
-    // never in the global registry — so the Worker's tool list can't contain either.
-    this.reviewerTools = [...allowed, submitVerdictTool, raiseBlockerTool];
+    // submit_verdict (the normal exit), raise_blocker (the halt exit) and mark_task_done (closing the
+    // task under review) are ALL phase-scoped here and never in the global registry — so the Worker's
+    // tool list can't contain any of them.
+    this.reviewerTools = [...allowed, submitVerdictTool, raiseBlockerTool, markTaskDoneTool];
   }
 
   /** The validated verdict, or null if the Reviewer never produced a usable one. */
@@ -158,6 +194,11 @@ class ReviewerWindow implements TurnContext {
   /** The blocker the Reviewer raised (V3/02), or null if it judged normally. */
   get blocker(): RaisedBlocker | null {
     return this.blockerRaised;
+  }
+
+  /** Every commit this Reviewer made, in order — kept even when the verdict is a fail (partial accept). */
+  get commits(): readonly ReviewerCommit[] {
+    return this.commitsMade;
   }
 
   /** Why the Reviewer failed to produce a verdict (set only on the give-up path). */
@@ -214,49 +255,120 @@ class ReviewerWindow implements TurnContext {
     if (name === RAISE_BLOCKER) {
       return this.captureBlocker(args);
     }
+    if (name === MARK_TASK_DONE) {
+      return this.captureTaskDone(args);
+    }
     if (REVIEWER_TOOL_NAMES.includes(name)) {
       const ctx = createToolContext({
         projectName: this.deps.projectName,
         projectPath: this.deps.projectPath,
         sandbox: this.deps.sandbox,
         phase: 'reviewer',
-        llm: this.deps.llm, // backs ctx.oneShot for search_rules (V4/02)
+        llm: this.deps.llm, // backs ctx.oneShot for search_rules (V4/02) and the commit-message writer
       });
-      return dispatchToolCall(ctx, name, args, {
+      const result = await dispatchToolCall(ctx, name, args, {
         onToolCall: (record) => appendAuditRow(this.deps.projectPath, record),
       });
+      // Remember what this review actually landed, so the loop can report it and the next Worker turn
+      // can be told which of its files were accepted. Read back from the tool's own result, not from
+      // the arguments — the model's requested paths are not necessarily what git committed.
+      if (name === COMMIT_CHANGES) this.recordCommit(result);
+      return result;
     }
-    // A mutating / commit / unknown tool — refuse (recoverable + audited). The Reviewer judges; it
-    // does not modify or commit, so these are never wired into its tool list in the first place.
+    // A file-writing / unknown tool — refuse (recoverable + audited). The Reviewer commits, but it
+    // never edits: these are never wired into its tool list in the first place.
     return this.refuse(name, args);
   }
 
-  /** Validate the submit_verdict payload; capture on success, re-prompt once, then give up. */
+  /** Capture a successful commit_changes result; a failed or unparseable one records nothing. */
+  private recordCommit(result: string): void {
+    try {
+      const parsed: unknown = JSON.parse(result);
+      if (typeof parsed !== 'object' || parsed === null) return;
+      const record = parsed as Record<string, unknown>;
+      if (record['committed'] !== true) return;
+      const files = Array.isArray(record['files']) ? record['files'].filter((f): f is string => typeof f === 'string') : [];
+      this.commitsMade.push({ sha: typeof record['sha'] === 'string' ? record['sha'] : null, files });
+    } catch {
+      // The tool returned something other than JSON (only reachable if its contract changes) — the
+      // commit itself still stands; we simply have nothing structured to report for it.
+    }
+  }
+
+  /**
+   * Flip the task under review to `status: done` in its backlog file (V2/03's setTaskStatus). The flip
+   * is a working-tree edit, NOT a commit: the Reviewer must then commit the backlog file itself, and a
+   * `pass` is refused while that file is still uncommitted — so a task can never be closed in the file
+   * without the git history recording it. Idempotent; takes no arguments so it can only ever close the
+   * task this window was handed.
+   */
+  private captureTaskDone(args: Record<string, unknown>): string {
+    const start = performance.now();
+    const backlogFile = `${BACKLOG_DIRNAME}/${this.task.id}.md`;
+    try {
+      setTaskStatus(this.deps.projectPath, this.task.id, 'done');
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      const output = JSON.stringify({ error: `could not mark '${this.task.id}' done: ${message}` });
+      this.audit(MARK_TASK_DONE, args, -1, output, message, start);
+      return output;
+    }
+    this.taskMarkedDone = true;
+    const output = JSON.stringify({
+      ok: true,
+      task: this.task.id,
+      status: 'done',
+      commit_next: backlogFile,
+      note: `Now commit ${backlogFile} with commit_changes, then submit your verdict.`,
+    });
+    this.audit(MARK_TASK_DONE, args, 0, output, null, start);
+    return output;
+  }
+
+  /**
+   * Validate the submit_verdict payload; capture on success, re-prompt once, then give up. Validation
+   * has TWO layers: parseVerdict checks the payload's own shape/consistency, then verdictGitConflict
+   * checks it against the real repo — a pass may not leave uncommitted work or an unclosed task, and a
+   * fail must carry an issue for every file it is handing back. Both rejections ride the same single
+   * re-prompt, so a confused Reviewer cannot spin here.
+   */
   private captureVerdict(args: Record<string, unknown>): string {
     const start = performance.now();
     const parsed = parseVerdict(args);
-    if (parsed.ok) {
+    // listChangedPaths: what is STILL uncommitted after this Reviewer's own commits — the files it is
+    // sending back to the Worker, by definition of having chosen not to commit them.
+    const problem = parsed.ok
+      ? verdictGitConflict({
+          verdict: parsed.verdict,
+          outstanding: listChangedPaths(this.deps.projectPath).files,
+          taskMarkedDone: this.taskMarkedDone,
+          taskId: this.task.id,
+        })
+      : parsed.error;
+
+    if (parsed.ok && problem === null) {
       this.verdict = parsed.verdict;
       const output = `Verdict recorded: ${parsed.verdict.result} — ${parsed.verdict.issues.length} issue(s).`;
       this.audit(SUBMIT_VERDICT, args, 0, output, null, start);
       return output;
     }
 
+    const reason = problem ?? 'invalid verdict.';
     this.verdictAttempts += 1;
     if (this.verdictAttempts >= MAX_VERDICT_ATTEMPTS) {
       // Re-prompt already spent — surface failure to the user (V2/02 catches ReviewerVerdictError).
-      this.failure = parsed.error;
-      const output = `Verdict rejected again: ${parsed.error}`;
-      this.audit(SUBMIT_VERDICT, args, -1, output, parsed.error, start);
+      this.failure = reason;
+      const output = `Verdict rejected again: ${reason}`;
+      this.audit(SUBMIT_VERDICT, args, -1, output, reason, start);
       return output;
     }
-    // First invalid verdict → recoverable error so the model fixes the fields and re-submits once.
+    // First invalid verdict → recoverable error so the model fixes it and re-submits once.
     const err = toolError(
-      `Invalid verdict: ${parsed.error}`,
-      'Fix the fields and call submit_verdict again with a valid, consistent verdict.',
+      `Invalid verdict: ${reason}`,
+      'Fix it and call submit_verdict again — commit what you accept, and give an issue for every file you do not.',
     );
     const output = typeof err.content === 'string' ? err.content : JSON.stringify(err.content);
-    this.audit(SUBMIT_VERDICT, args, err.exitStatus ?? -1, output, err.error ?? parsed.error, start);
+    this.audit(SUBMIT_VERDICT, args, err.exitStatus ?? -1, output, err.error ?? reason, start);
     return output;
   }
 
@@ -293,8 +405,9 @@ class ReviewerWindow implements TurnContext {
   /** Refuse a tool the Reviewer must not use, as a recoverable error the model can read and adapt to. */
   private refuse(name: string, args: Record<string, unknown>): string {
     const err = toolError(
-      `tool '${name}' is not available to the Reviewer in this phase — it judges (read-only); it does not modify or commit.`,
-      `Inspect with read_file / search_in_files / list_files / run_in_project / execute_command, then call ${SUBMIT_VERDICT}.`,
+      `tool '${name}' is not available to the Reviewer — it judges and commits, but it never edits the Worker's files.`,
+      `Inspect with read_file / search_in_files / list_files / run_in_project / execute_command, commit what you ` +
+        `accept with ${COMMIT_CHANGES}, then call ${SUBMIT_VERDICT} with an issue for every file you did not commit.`,
     );
     const output = typeof err.content === 'string' ? err.content : JSON.stringify(err.content);
     this.audit(name, args, err.exitStatus ?? -1, output, err.error ?? `tool '${name}' not available`, performance.now());
@@ -329,7 +442,7 @@ function buildReviewerSeed(input: ReviewerInput): string {
   const { task, workerSummary, changedFiles, testResults } = input;
   const changed = changedFiles.trim()
     ? `\n${changedFiles.trim()}`
-    : ' — not captured; inspect the working tree yourself with list_files / read_file / execute_command (git).';
+    : ' — not captured; inspect the working tree yourself with list_changes / list_files / read_file.';
   const tests = testResults.trim()
     ? `\n${testResults.trim()}`
     : ' — not captured; re-run the tests yourself with run_in_project before deciding.';
@@ -351,8 +464,17 @@ ${workerSummary.trim() || '(the Worker left no summary)'}
 How to review:
 - Do NOT trust the summary alone — read the changed files and the tests, and reason about correctness + edge cases.
 - When in doubt, re-run the tests/build with run_in_project rather than trusting the transcript.
-- You have READ/INSPECT tools only (read_file, search_in_files, list_files, run_in_project, execute_command). You cannot edit or commit — you judge.
-- When done, call ${SUBMIT_VERDICT} EXACTLY ONCE. result "pass" only if BOTH axes pass; any blocker/major issue means "fail"; every issue must be concrete and name the offending file + fix direction. Do not call any tool after ${SUBMIT_VERDICT}.
+- You inspect with read_file, search_in_files, list_files, run_in_project and execute_command. You CANNOT edit files — the Worker does that.
+- You are the one who commits. The Worker cannot commit anything, so nothing reaches the project history unless you put it there.
+
+Committing this review:
+- Call ${LIST_CHANGES} to see every uncommitted file, then ${COMMIT_CHANGES} to commit the ones you accept. You may commit PARTIALLY: take the files that are right and leave the rest.
+- Keep each commit as small as it can be without breaking the project — commit one coherent change at a time, not the whole tree in one call.
+- EVERY file you leave uncommitted goes back to the Worker, so every one of them needs an issue naming it and saying what to fix. A verdict that leaves a file unexplained is rejected.
+- If the task is complete: call ${MARK_TASK_DONE}, commit the backlog file it changes, and make sure NOTHING is left uncommitted before you pass.
+
+- When done, call ${SUBMIT_VERDICT} EXACTLY ONCE. result "pass" only if BOTH axes pass AND you committed everything AND the task is marked done; any blocker/major issue means "fail"; every issue must be concrete and name the offending file + fix direction. Do not call any tool after ${SUBMIT_VERDICT}.
+- A "fail" with an empty working tree is fine and normal: it means everything the Worker wrote was good, but the task still needs work that does not exist yet. Say what is missing in your issues.
 - If the TASK ITSELF is unjudgeable — ambiguous, under-specified, self-contradictory, or conflicting with the architecture — call ${RAISE_BLOCKER} with a precise question INSTEAD of a verdict, immediately. That is for a broken task, not for code that is merely wrong (a wrong-code case is a "fail" verdict with fix feedback).`;
 }
 
@@ -370,7 +492,9 @@ export async function runReviewerTask(deps: ReviewerDeps, input: ReviewerInput):
   // problem, not the code. Return it INSTEAD of a verdict (already persisted) so the loop goes blocked.
   const blocker = window.blocker;
   if (blocker !== null) {
-    return { blocker, tokens: window.tokens, tokensTotal: window.tokensTotal };
+    // Any commit it made before halting still stands — a blocker is "this task is unjudgeable", not
+    // "undo what was already accepted", and the orchestrator never rewrites history.
+    return { blocker, tokens: window.tokens, tokensTotal: window.tokensTotal, commits: window.commits };
   }
 
   const verdict = window.result;
@@ -380,5 +504,5 @@ export async function runReviewerTask(deps: ReviewerDeps, input: ReviewerInput):
         `The Reviewer ended after ${REVIEWER_MAX_ROUNDS} rounds without calling ${SUBMIT_VERDICT} with a valid verdict.`,
     );
   }
-  return { verdict, tokens: window.tokens, tokensTotal: window.tokensTotal };
+  return { verdict, tokens: window.tokens, tokensTotal: window.tokensTotal, commits: window.commits };
 }

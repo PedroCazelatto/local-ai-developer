@@ -8,19 +8,25 @@ import type { TokenCounts } from '../llm/index.js';
 import type { TaskLoopResult } from './run-task-loop.type.js';
 import type { Task } from './types.js';
 
-/** A task that passed review and was auto-committed (V2/03). */
+/** A task that passed review — the Reviewer committed every file and marked it done. */
 export interface BatchPassed {
   readonly taskId: string;
-  /** Short commit SHA, or null if git reported none. */
-  readonly commit: string | null;
+  /** Short SHAs the Reviewer landed, oldest first; empty if git reported none. */
+  readonly commits: readonly string[];
   readonly rounds: number;
 }
 
-/** A task that failed every round — uncommitted; its attempt stashed for the user to inspect. */
+/**
+ * A task that failed every round; its remaining attempt stashed for the user to inspect. NOT
+ * necessarily uncommitted: the Reviewer commits partially, so earlier rounds may have accepted some
+ * files — `commits` is what landed before the loop ran out of rounds.
+ */
 export interface BatchEscalated {
   readonly taskId: string;
   readonly rounds: number;
   readonly lastFeedback: string;
+  /** Short SHAs the Reviewer accepted along the way, oldest first; empty when nothing landed. */
+  readonly commits: readonly string[];
   /** Stable `git stash` label of the preserved attempt, or null if there was nothing to stash. */
   readonly stashRef: string | null;
 }
@@ -30,6 +36,8 @@ export interface BatchBlocked {
   readonly taskId: string;
   readonly blockerId: string | null;
   readonly question: string;
+  /** Short SHAs the Reviewer had already accepted before it halted; empty when nothing landed. */
+  readonly commits: readonly string[];
   /** Stable `git stash` label of the attempt Retro will inspect, or null if there was nothing to stash. */
   readonly stashRef: string | null;
 }
@@ -73,7 +81,7 @@ export interface BatchPosition {
  */
 export interface BatchDeps {
   readonly projectPath: string;
-  // runTask: run ONE eligible task through the V3/01 implement→test→review→fix loop; auto-commits on pass.
+  // runTask: run ONE eligible task through the V3/01 implement→test→review→fix loop; the Reviewer commits.
   runTask(task: Task, position: BatchPosition): Promise<TaskLoopResult>;
 }
 

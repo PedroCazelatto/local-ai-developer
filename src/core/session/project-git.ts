@@ -14,11 +14,15 @@ import { truncateHeadTail } from '../../tools/truncate.js';
 /** Char budget for the diff fed to the Reviewer — bounded so a huge change can't blow past num_ctx. */
 export const REVIEW_DIFF_BUDGET = 12_000;
 
-export interface ChangedFiles {
+/** The uncommitted-file set on its own — no diff body, so listing costs nothing to assemble. */
+export interface ChangedPaths {
   /** `git status --porcelain` (the changed-file list). "" when the tree is clean. */
   readonly status: string;
   /** Project-relative paths of every changed / untracked file — the set staged on accept. */
   readonly files: string[];
+}
+
+export interface ChangedFiles extends ChangedPaths {
   /** Bounded diff body (tracked changes + new-file contents), truncated to REVIEW_DIFF_BUDGET. */
   readonly diff: string;
   /** True when the diff was truncated to fit the budget. */
@@ -149,6 +153,41 @@ export function captureChangedFiles(projectPath: string, budget: number = REVIEW
   const combined = [trackedDiff, ...newFiles].filter((s) => s !== '').join('\n\n');
   const diff = truncateHeadTail(combined, budget);
   return { status, files, diff, truncated: diff.length !== combined.length };
+}
+
+/**
+ * The uncommitted-file set with NO diff body — what `list_changes` shows a phase, and what the
+ * Reviewer window re-reads after each of its partial commits to know what is still outstanding.
+ * Same porcelain parse as captureChangedFiles, without reading any file content.
+ */
+export function listChangedPaths(projectPath: string): ChangedPaths {
+  const status = runGit(projectPath, ['status', '--porcelain', '-uall']).stdout.replace(/\s+$/, '');
+  const files = status
+    .split('\n')
+    .filter((l) => l.trim() !== '')
+    .map(porcelainPath)
+    .filter((p) => p !== '');
+  return { status, files };
+}
+
+/**
+ * Bounded diff of EXACTLY `paths` — tracked edits via `git diff HEAD -- <paths>` plus the bodies of
+ * any new (untracked) files among them, which `git diff` omits. This is what the commit-message
+ * writer reads: the real change, never the committing phase's description of it. Mirrors
+ * captureChangedFiles, but pathspec-scoped so a partial commit's message describes only its own files.
+ */
+export function diffPaths(projectPath: string, paths: readonly string[], budget: number = REVIEW_DIFF_BUDGET): string {
+  if (paths.length === 0) return '';
+  const statusLines = runGit(projectPath, ['status', '--porcelain', '-uall', '--', ...paths]).stdout
+    .split('\n')
+    .filter((l) => l.trim() !== '');
+  const untracked = statusLines.filter((l) => l.startsWith('??')).map(porcelainPath).filter((p) => p !== '');
+
+  const hasHead = runGit(projectPath, ['rev-parse', '--verify', 'HEAD']).ok;
+  const trackedDiff = hasHead ? runGit(projectPath, ['--no-pager', 'diff', 'HEAD', '--', ...paths]).stdout.trim() : '';
+  const newFiles = untracked.map((p) => renderNewFile(projectPath, p)).filter((s) => s !== '');
+
+  return truncateHeadTail([trackedDiff, ...newFiles].filter((s) => s !== '').join('\n\n'), budget);
 }
 
 /**

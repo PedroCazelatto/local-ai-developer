@@ -1,14 +1,16 @@
 // /run <selector> (V1/10 trigger → V3/01 loop → V3/05 batch). Runs backlog tasks SEQUENTIALLY (no
 // parallelism); each task goes through the bounded implement→test→review→fix loop (runTaskLoop): a
-// PERSISTENT Worker window across up to 5 rounds, a FRESH Reviewer each round, AUTO-COMMIT on a pass,
-// escalate after 5 with nothing committed. The user is pulled in only on an escalation or a blocker.
+// PERSISTENT Worker window across up to 5 rounds, and a FRESH Reviewer each round which COMMITS the files
+// it accepts (possibly only some of them), escalating after 5 without a pass. The user is pulled in only
+// on an escalation or a blocker.
 //
 // Selector → dispatch:
 //   - a single task (`next`, or one explicit id) runs one runTaskLoop directly (this file).
 //   - a batch (`all`, or a comma list of 2+ ids) runs UNATTENDED via runBatch (V3/05): sequential,
 //     queues escalations/blockers without aborting, prints + persists an end-of-batch summary.
-// A non-passing single task stashes its failed attempt (kept for a later /answer→Retro, or inspection)
-// and leaves the tree clean — the Worker never reuses it; a fresh Worker redoes the task from scratch.
+// A non-passing single task stashes whatever is LEFT of its attempt (kept for a later /answer→Retro, or
+// inspection) and leaves the tree clean — the Worker never reuses it; a fresh Worker redoes the task from
+// scratch. Files a Reviewer accepted along the way are already committed and are not part of the stash.
 
 import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
@@ -44,7 +46,7 @@ import type { Command, CompletionContext } from '../command-registry.js';
 export interface RunOrchestrator {
   readonly project: string;
   readonly projectPath: string;
-  // runTaskLoop: the V3/01 implement→test→review→fix controller for one task; auto-commits on pass.
+  // runTaskLoop: the V3/01 implement→test→review→fix controller for one task; the Reviewer commits.
   runTaskLoop(task: Task, specSlice: string, reporter: TaskLoopReporter): Promise<TaskLoopResult>;
 }
 
@@ -130,9 +132,14 @@ function tokenCostLine(tokens: TokenCounts): string {
 /** Render one task's terminal outcome: passed (committed), blocked (question), or escalated (feedback). */
 function renderOutcome(result: TaskLoopResult): void {
   const cost = tokenCostLine(result.tokens);
+  // The Reviewer commits in pieces, so a task normally lands several SHAs; drop any the git call
+  // reported no sha for rather than printing a placeholder that looks like a ref.
+  const shas = result.commits.map((commit) => commit.sha).filter((sha): sha is string => sha !== null);
+  const committed = shas.length === 0 ? '(no sha)' : shas.join(', ');
+
   if (result.outcome === 'passed') {
     renderer.systemMessage(
-      `✓ ${result.taskId} PASSED in ${result.rounds} round(s) — committed ${result.commit ?? '(no sha)'} + marked done · ${cost}`,
+      `✓ ${result.taskId} PASSED in ${result.rounds} round(s) — committed ${committed} + marked done · ${cost}`,
     );
     return;
   }
@@ -143,10 +150,14 @@ function renderOutcome(result: TaskLoopResult): void {
     );
     return;
   }
-  // escalated — 5 rounds with no pass (or an empty diff / no verdict). Nothing was committed.
+  // escalated — 5 rounds with no pass (or an empty diff / no verdict). Partial acceptance means some
+  // of it may already be committed; only what never passed is still in the working tree.
   renderer.errorLine(
-    `⚠ ${result.taskId} ESCALATED after ${result.rounds} round(s) without a pass — left uncommitted.`,
+    `⚠ ${result.taskId} ESCALATED after ${result.rounds} round(s) without a pass — the rest is left uncommitted.`,
   );
+  if (shas.length > 0) {
+    renderer.systemMessage(`The Reviewer did accept part of it along the way: ${committed}`);
+  }
   if (result.lastFeedback !== undefined && result.lastFeedback.trim() !== '') {
     renderer.systemMessage(`Last Reviewer feedback:\n${result.lastFeedback.trim()}`);
   }
@@ -181,7 +192,7 @@ async function runOneTask(orch: RunOrchestrator, task: Task): Promise<TaskLoopRe
   const specSlice = buildSpecSlice(orch.projectPath, task);
   let result: TaskLoopResult;
   try {
-    // runTaskLoop: persistent Worker across ≤5 rounds, fresh Reviewer each round, auto-commit on pass.
+    // runTaskLoop: persistent Worker across ≤5 rounds, fresh Reviewer each round which commits what it accepts.
     result = await orch.runTaskLoop(task, specSlice, buildReporter(task));
   } catch (err) {
     renderer.errorLine(`Task loop failed on ${task.id}: ${messageOf(err)}. Left uncommitted.`);
@@ -285,7 +296,7 @@ function completeRun(ctx: CompletionContext): string[] {
 export const runCommand: Command = {
   name: 'run',
   group: 'execution',
-  description: 'Run backlog tasks through the implement→test→review→fix loop (auto-commits each pass)',
+  description: 'Run backlog tasks through the implement→test→review→fix loop (the Reviewer commits what it accepts)',
   usage: '/run [next | all | <task-id>[,<id>…]]',
   complete: completeRun,
   run: (ctx) => dispatchRun(ctx.args, ctx.orch),

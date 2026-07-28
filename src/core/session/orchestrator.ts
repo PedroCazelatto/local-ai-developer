@@ -247,7 +247,7 @@ export class SessionOrchestrator implements TurnContext {
 
   /**
    * Run the bounded implement→test→review→fix loop (V3/01) for one backlog task: a persistent Worker
-   * window across rounds, a FRESH Reviewer each round, auto-commit on a `pass`, escalate after the
+   * window across rounds, a FRESH Reviewer each round which commits what it accepts, escalate after the
    * hard cap of 5 rounds. Windows are isolated from every phase history and from each other. This
    * just binds the session's infra deps; the caller supplies the reporter (UI is injected, not
    * hard-wired). Never touches the active phase's history.

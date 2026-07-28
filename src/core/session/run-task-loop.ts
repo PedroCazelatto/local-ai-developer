@@ -1,20 +1,24 @@
 // The V3/01 implement→test→review→fix controller — the choke point the rest of V3 hangs off. For
 // ONE task it runs a bounded loop: the Worker window is created ONCE and reused across every round
 // (its history accumulates each attempt + the Reviewer's feedback, so it converges instead of
-// starting blind); the Reviewer gets a FRESH window each round (no cross-round leakage). A `pass`
-// auto-commits and ends the loop; a `fail` carries the feedback into the next Worker turn; after
-// MAX_ROUNDS with no pass the loop escalates to the user, committing nothing. The `blocked` branch
-// (V3/02) short-circuits the moment the Reviewer raises a blocker. UI is injected via a reporter
-// (dependency inversion) so this stays pure orchestration.
+// starting blind); the Reviewer gets a FRESH window each round (no cross-round leakage). A `fail`
+// carries the feedback into the next Worker turn; after MAX_ROUNDS with no pass the loop escalates to
+// the user. The `blocked` branch (V3/02) short-circuits the moment the Reviewer raises a blocker. UI
+// is injected via a reporter (dependency inversion) so this stays pure orchestration.
+//
+// Committing is NOT this loop's job. The Reviewer owns it: it commits the files it accepts (possibly
+// only some of them) with commit_changes and marks the task done with mark_task_done, and its verdict
+// is refused unless the repo agrees. So a round can land commits even when the verdict is a fail, and
+// a `pass` is proof the tree was already clean — the loop just reports what the Reviewer committed.
 
 import type { TokenCounts } from '../llm/index.js';
 import { addTokenCounts } from './add-token-counts.js';
 import { setTaskStatus } from './backlog.js';
 import { buildWorkerFixMessage } from './build-worker-fix-message.js';
-import { commitPassedTask } from './commit-passed-task.js';
 import { formatReviewFeedback } from './format-review-feedback.js';
 import { captureChangedFiles } from './project-git.js';
 import { ReviewerVerdictError, runReviewerTask } from './reviewer-runner.js';
+import type { ReviewerCommit } from './reviewer-runner.js';
 import type { TaskLoopDeps, TaskLoopReporter, TaskLoopResult } from './run-task-loop.type.js';
 import { processMessage } from './turn-loop.js';
 import type { Task } from './types.js';
@@ -23,14 +27,15 @@ import { buildWorkerSeed, WORKER_MAX_ROUNDS, WorkerWindow } from './worker-runne
 /** Hard cap on implement→fix rounds per task — a ceiling, not a target (CLAUDE.md). Assert exactly 5. */
 export const MAX_ROUNDS = 5;
 
-/** Run one task through the bounded fix loop; auto-commits on pass, escalates after MAX_ROUNDS. */
+/** Run one task through the bounded fix loop; the Reviewer commits, and it escalates after MAX_ROUNDS. */
 export async function runTaskLoop(
   deps: TaskLoopDeps,
   task: Task,
   specSlice: string,
   reporter: TaskLoopReporter,
 ): Promise<TaskLoopResult> {
-  // Mark the task in-flight; it is recorded as `done` only when a pass commits (commitPassedTask).
+  // Mark the task in-flight. It becomes `done` only when the Reviewer calls mark_task_done and commits
+  // the backlog file — a pass is refused otherwise, so the flip is always recorded in git.
   setTaskStatus(deps.projectPath, task.id, 'in_progress');
 
   // ONE persistent Worker window for the WHOLE loop — never reset between rounds (the load-bearing
@@ -42,7 +47,12 @@ export async function runTaskLoop(
   // reported tokens are the exact sum of every Worker + Reviewer turn (constitution: never estimated).
   let reviewerTokens: TokenCounts = { promptTokens: 0, evalTokens: 0 };
   let lastFeedback = '';
+  /** Files the previous round's Reviewer committed — named in the next fix turn so they aren't redone. */
+  let lastAccepted: readonly string[] = [];
   let round = 0;
+  // Every commit the Reviewer landed across ALL rounds. Partial acceptance means these accumulate even
+  // on rounds that failed, and they are reported on every exit path — the work is in git either way.
+  const commits: ReviewerCommit[] = [];
 
   try {
     for (round = 1; round <= MAX_ROUNDS; round += 1) {
@@ -51,12 +61,12 @@ export async function runTaskLoop(
       // Round 1 seeds the task; later rounds append the prior Reviewer feedback as the next user turn
       // on the SAME window (no reset). buildWorkerSeed / buildWorkerFixMessage assemble those turns;
       // processMessage runs the Worker's tool-dispatch loop to completion on its own history.
-      const message = round === 1 ? buildWorkerSeed(task, specSlice) : buildWorkerFixMessage(lastFeedback);
+      const message = round === 1 ? buildWorkerSeed(task, specSlice) : buildWorkerFixMessage(lastFeedback, lastAccepted);
       await processMessage(worker, message, WORKER_MAX_ROUNDS);
 
-      // captureChangedFiles: host `git status`/`diff` of everything since the last commit (cumulative
-      // across rounds, since nothing commits mid-loop). No diff ⇒ nothing to review — re-looping a
-      // Worker that produced nothing won't converge, so escalate for a human to inspect.
+      // captureChangedFiles: host `git status`/`diff` of everything since the last commit — i.e. exactly
+      // what this round left over, since a prior round's Reviewer committed whatever it accepted. No diff
+      // ⇒ nothing to review — re-looping a Worker that produced nothing won't converge, so escalate.
       const changed = captureChangedFiles(deps.projectPath);
       if (changed.files.length === 0) {
         setTaskStatus(deps.projectPath, task.id, 'pending');
@@ -65,6 +75,7 @@ export async function runTaskLoop(
           outcome: 'escalated',
           rounds: round,
           lastFeedback: 'The Worker produced no file changes — there is nothing to review.',
+          commits,
           tokens: addTokenCounts(reviewerTokens, worker.tokens),
         };
       }
@@ -80,11 +91,15 @@ export async function runTaskLoop(
         testResults: worker.lastTestRun ?? '',
       });
       reviewerTokens = addTokenCounts(reviewerTokens, outcome.tokensTotal);
+      // Whatever this Reviewer committed is already in git — record it before branching, so a blocked
+      // or escalated exit still reports the work that landed.
+      commits.push(...outcome.commits);
+      const committedThisRound = outcome.commits.flatMap((commit) => [...commit.files]);
 
       // Blocker short-circuit (V3/02): the Reviewer raised a blocker INSTEAD of a verdict — the task
-      // itself is unjudgeable. Halt immediately, BEFORE any verdict handling or fix round, committing
-      // nothing. The `raised` row is already durable (the Reviewer window persisted it); the /run
-      // scheduler reverts the tree and moves on to other runnable tasks.
+      // itself is unjudgeable. Halt immediately, BEFORE any verdict handling or fix round. Anything the
+      // Reviewer accepted before halting stays committed. The `raised` row is already durable (the
+      // Reviewer window persisted it); the /run scheduler stashes the rest and moves on.
       if (outcome.blocker) {
         setTaskStatus(deps.projectPath, task.id, 'blocked');
         return {
@@ -93,6 +108,7 @@ export async function runTaskLoop(
           rounds: round,
           question: outcome.blocker.question,
           blockerId: outcome.blocker.id,
+          commits,
           tokens: addTokenCounts(reviewerTokens, worker.tokens),
         };
       }
@@ -108,30 +124,35 @@ export async function runTaskLoop(
           outcome: 'escalated',
           rounds: round,
           lastFeedback: 'The Reviewer returned neither a verdict nor a blocker.',
+          commits,
           tokens: addTokenCounts(reviewerTokens, worker.tokens),
         };
       }
       reporter.verdictReady(verdict, changed.files.length, outcome.tokens);
 
       if (verdict.result === 'pass') {
-        // commitPassedTask: flip status→done, stage the reviewed set + backlog file, commit (V2/03).
-        const commit = commitPassedTask(deps.projectPath, task, verdict, changed.files);
+        // Nothing to commit here: a pass is only accepted once the Reviewer has committed everything
+        // AND marked the task done (verdictGitConflict enforces both against the real repo), so the
+        // tree is already clean and the backlog file already says `done` in the git history.
         return {
           taskId: task.id,
           outcome: 'passed',
           rounds: round,
-          commit,
+          commits,
           tokens: addTokenCounts(reviewerTokens, worker.tokens),
         };
       }
 
       // fail → carry the Reviewer's feedback into the next Worker turn (and out, if this was round 5).
+      // The next turn also names what this round accepted, so the Worker doesn't redo committed files.
       lastFeedback = formatReviewFeedback(verdict);
+      lastAccepted = committedThisRound;
     }
   } catch (err) {
-    // Any mid-loop failure commits nothing; revert to pending so the task stays runnable. A Reviewer
-    // that never produced a usable verdict is a reason to escalate to a human, not a crash; anything
-    // else (a dropped Ollama stream) propagates for the caller to surface.
+    // Revert to pending so the task stays runnable. Anything a Reviewer already committed STAYS
+    // committed — the orchestrator never rewrites project history — so `commits` still reports it. A
+    // Reviewer that never produced a usable verdict is a reason to escalate to a human, not a crash;
+    // anything else (a dropped Ollama stream) propagates for the caller to surface.
     setTaskStatus(deps.projectPath, task.id, 'pending');
     if (err instanceof ReviewerVerdictError) {
       return {
@@ -139,19 +160,22 @@ export async function runTaskLoop(
         outcome: 'escalated',
         rounds: round,
         lastFeedback: err.message,
+        commits,
         tokens: addTokenCounts(reviewerTokens, worker.tokens),
       };
     }
     throw err;
   }
 
-  // MAX_ROUNDS elapsed with no pass — escalate with the last Reviewer feedback; nothing committed.
+  // MAX_ROUNDS elapsed with no pass — escalate with the last Reviewer feedback. Whatever the Reviewers
+  // accepted along the way is already committed; what is left in the tree is what never passed.
   setTaskStatus(deps.projectPath, task.id, 'pending');
   return {
     taskId: task.id,
     outcome: 'escalated',
     rounds: MAX_ROUNDS,
     lastFeedback,
+    commits,
     tokens: addTokenCounts(reviewerTokens, worker.tokens),
   };
 }

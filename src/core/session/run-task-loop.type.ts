@@ -4,13 +4,17 @@
 import type { SandboxClient } from '../container/index.js';
 import type { OllamaClient, TokenCounts, Tool } from '../llm/index.js';
 import type { ReviewVerdict } from './review-types.js';
+import type { ReviewerCommit } from './reviewer-runner.js';
 
 /**
  * How one task's loop ended:
- * - `passed`    — a Reviewer `pass`; the work was auto-committed (V2/03); loop over.
+ * - `passed`    — a Reviewer `pass`; everything was committed and the task marked done; loop over.
  * - `escalated` — MAX_ROUNDS elapsed with no pass (or the Worker changed nothing / the Reviewer
- *                 produced no verdict); nothing committed, surfaced to the user with the last feedback.
- * - `blocked`   — the Reviewer raised a blocker (V3/02); loop halted mid-round, nothing committed.
+ *                 produced no verdict); surfaced to the user with the last feedback.
+ * - `blocked`   — the Reviewer raised a blocker (V3/02); loop halted mid-round.
+ *
+ * `escalated` and `blocked` no longer imply "nothing committed": the Reviewer commits partially, so
+ * files it accepted in an earlier round are already in git. `commits` is what actually landed.
  */
 export type TaskLoopOutcome = 'passed' | 'escalated' | 'blocked';
 
@@ -29,8 +33,12 @@ export interface TaskLoopResult {
   readonly outcome: TaskLoopOutcome;
   /** Rounds actually run, 1..MAX_ROUNDS. */
   readonly rounds: number;
-  /** Short commit SHA — present only when outcome === "passed" (may be undefined if git reported none). */
-  readonly commit?: string;
+  /**
+   * Every commit the Reviewer made across all rounds, in order — empty when it accepted nothing.
+   * Present on EVERY outcome: partial acceptance means an escalated or blocked task can still have
+   * landed work.
+   */
+  readonly commits: readonly ReviewerCommit[];
   /** The Reviewer's blocker question — present only when outcome === "blocked" (V3/02). */
   readonly question?: string;
   /** The persisted blocker id (`${taskId}#${n}`) — present only when outcome === "blocked" (V3/02). */

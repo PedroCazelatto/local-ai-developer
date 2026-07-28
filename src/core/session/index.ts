@@ -43,7 +43,9 @@ export { TASK_STATUSES } from './types.js';
 export { runWorkerTask } from './worker-runner.js';
 export type { WorkerDeps, WorkerResult } from './worker-runner.js';
 export { runReviewerTask, ReviewerVerdictError, REVIEWER_TOOL_NAMES } from './reviewer-runner.js';
-export type { ReviewerDeps, ReviewerInput, ReviewerOutcome } from './reviewer-runner.js';
+export type { ReviewerDeps, ReviewerInput, ReviewerOutcome, ReviewerCommit } from './reviewer-runner.js';
+export { verdictGitConflict } from './verdict-git-conflict.js';
+export type { VerdictGitState } from './verdict-git-conflict.type.js';
 export { runTaskLoop, MAX_ROUNDS } from './run-task-loop.js';
 export type { TaskLoopResult, TaskLoopOutcome, TaskLoopDeps, TaskLoopReporter } from './run-task-loop.type.js';
 export type { ReviewVerdict, ReviewIssue, Severity, ReviewDecision } from './review-types.js';
@@ -51,13 +53,15 @@ export { SEVERITIES } from './review-types.js';
 export {
   isWorkingTreeDirty,
   captureChangedFiles,
+  listChangedPaths,
+  diffPaths,
   commitPaths,
   stashTaskAttempt,
   readTaskStashDiff,
   dropTaskStash,
   REVIEW_DIFF_BUDGET,
 } from './project-git.js';
-export type { ChangedFiles, CommitResult } from './project-git.js';
+export type { ChangedFiles, ChangedPaths, CommitResult } from './project-git.js';
 export { runBatch, batchSummaryFileName, BATCHES_DIRNAME } from './batch.js';
 export type {
   BatchSummary,
@@ -74,8 +78,6 @@ export { raiseBlocker, resolveBlocker, openBlockerForTask, readBlockerRows } fro
 export type { RaisedBlocker, ResolvedBlocker, BlockerRow } from './blocker-store.type.js';
 export { spawnRetro, RetroError } from './retro-runner.js';
 export type { RetroInput, RetroResult, RetroScope, RetroDeps, RetroSubmission } from './retro-runner.type.js';
-export { buildCommitMessage } from './commit-message.js';
-export type { CommitMessageInput } from './commit-message.js';
 export { SubagentManager, SUBAGENT_TOOL_NAMES, SUBAGENT_SHORT_ID_LEN } from './subagents.js';
 export type {
   SubagentInfo,

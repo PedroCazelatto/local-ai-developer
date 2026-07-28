@@ -1,0 +1,79 @@
+// Commit-message authorship for commit_changes (backlog: per-phase commits). The phase that commits
+// NEVER writes its own message: the message is written by a SUB-AGENT in the project's own sense of the
+// word — a fresh, empty messages array with a one-shot system prompt, run against the same Ollama and
+// then discarded (ctx.oneShot). Two reasons this is the mechanism rather than the SubagentManager:
+// oneShot exists in EVERY context (the Reviewer window has no manager), and its turns never enter any
+// phase's memory, so a message-writing round trip costs the committing phase nothing.
+//
+// The writer is shown the REAL diff, not the phase's description of it — a phase that misdescribes its
+// own change cannot talk the log into agreeing. The phase's `intent` rides along only as the "why".
+
+import type { Message } from '../core/llm/index.js';
+import type { ComposeCommitMessageInput } from './compose-commit-message.type.js';
+
+/** Subject-line ceiling; the writer is asked for ≤72 and anything longer is hard-truncated. */
+const SUBJECT_LIMIT = 72;
+
+// No author/co-author trailer and no human name may ever reach a commit message (constitution: the
+// user's name is never written into any file). The prompt forbids it AND stripTrailers drops any the
+// model invents anyway — a confidently-wrong local model must not be able to sign a commit.
+const SYSTEM_PROMPT = `You write git commit messages. You are given the real diff of a change and a one-line statement of why it was made. Reply with the commit message and NOTHING else.
+
+Rules:
+- Conventional Commits: "<type>(<scope>): <subject>", type one of feat, fix, docs, refactor, test, chore.
+- Subject: imperative mood, lower case, no trailing period, at most ${SUBJECT_LIMIT} characters.
+- Optionally add ONE blank line then a body of at most 3 short lines explaining WHY, not what.
+- Describe only what the diff actually shows. Never invent a change that is not there.
+- Never add Signed-off-by, Co-authored-by, Author, or any other trailer. Never name a person.
+- No markdown, no code fences, no quotes around the message, no preamble such as "Here is".`;
+
+/** Drop fences/quotes/preamble a local model wraps its answer in, leaving the bare message. */
+function unwrap(raw: string): string {
+  let text = raw.trim();
+  // A fenced block (```/```text/```git) — take its contents.
+  const fenced = /^```[a-z]*\n([\s\S]*?)\n?```$/i.exec(text);
+  if (fenced?.[1] !== undefined) text = fenced[1].trim();
+  // A whole-message wrapping quote pair.
+  const quoted = /^"([\s\S]*)"$/.exec(text) ?? /^'([\s\S]*)'$/.exec(text);
+  if (quoted?.[1] !== undefined) text = quoted[1].trim();
+  return text;
+}
+
+/** Remove any attribution trailer the writer invented, whatever the prompt said. */
+function stripTrailers(lines: string[]): string[] {
+  return lines.filter((line) => !/^\s*(signed-off-by|co-authored-by|authored-by|author|committer)\s*:/i.test(line));
+}
+
+/**
+ * Ask the throwaway context for this commit's message, then normalize it into something git can take:
+ * unwrap the model's packaging, drop attribution trailers, cap the subject, and collapse the body.
+ * Falls back to a plain `chore:` line built from the intent when the model returns nothing usable —
+ * a commit is never blocked on the message writer, and the fallback is honestly generic rather than a
+ * fabricated description of a diff nobody read.
+ */
+export async function composeCommitMessage(input: ComposeCommitMessageInput): Promise<string> {
+  const intent = input.intent.trim();
+  const evidence =
+    input.diff.trim() === ''
+      ? `Files in this commit:\n${input.paths.join('\n')}\n\n(No textual diff — the change may be a deletion or a binary file.)`
+      : `Files in this commit:\n${input.paths.join('\n')}\n\nDiff:\n${input.diff}`;
+
+  const messages: Message[] = [
+    { role: 'system', content: SYSTEM_PROMPT },
+    { role: 'user', content: `Why this change was made: ${intent}\n\n${evidence}` },
+  ];
+
+  // oneShot: one fresh call to the session model with NO history and NO tools; its turns are never
+  // appended to any phase's memory, so this costs the committing phase nothing but wall-clock.
+  const { content } = await input.oneShot(messages);
+  const lines = stripTrailers(unwrap(content).split(/\r?\n/)).map((line) => line.trimEnd());
+
+  const subjectIndex = lines.findIndex((line) => line.trim() !== '');
+  if (subjectIndex === -1) {
+    return `chore: ${intent.slice(0, SUBJECT_LIMIT - 'chore: '.length)}`;
+  }
+
+  const subject = (lines[subjectIndex] ?? '').trim().slice(0, SUBJECT_LIMIT);
+  const body = lines.slice(subjectIndex + 1).join('\n').trim();
+  return body === '' ? subject : `${subject}\n\n${body}`;
+}

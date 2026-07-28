@@ -6,12 +6,14 @@
 import type { Tool } from '../core/llm/index.js';
 import { askSubagentTool } from './ask-subagent.js';
 import { askUserTool } from './ask-user.js';
+import { commitChangesTool } from './commit-changes.js';
 import { dismissSubagentTool } from './dismiss-subagent.js';
 import { editFileTool } from './edit-file.js';
 import { executeCommandTool } from './execute-command.js';
 import { inboxPostTool } from './inbox-post.js';
 import { inboxReadTool } from './inbox-read.js';
 import { inboxResolveTool } from './inbox-resolve.js';
+import { listChangesTool } from './list-changes.js';
 import { listFilesTool } from './list-files.js';
 import { loadRuleTool } from './load-rule.js';
 import { readFileTool } from './read-file.js';
@@ -32,6 +34,11 @@ const TOOL_MODULES: readonly ToolModule[] = [
   searchInFilesTool,
   executeCommandTool,
   runInProjectTool,
+  // Project git — see the uncommitted set, then commit exactly what you name, with the message written
+  // by a throwaway one-shot context. Registered globally so every phase can commit its own approved
+  // work; the Worker window strips commit_changes out (it hands everything to the Reviewer instead).
+  listChangesTool,
+  commitChangesTool,
   // Cross-phase inbox (V3/04) — the AGENT_NOTES.md replacement; global (every phase reads/posts).
   inboxReadTool,
   inboxPostTool,

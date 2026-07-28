@@ -60,7 +60,7 @@ export interface ReplOrchestrator {
   listSubagents(): SubagentInfo[];
   /** Run the full turn loop for a chat message (streams output + dispatches tools). */
   processMessage(userInput: string): Promise<void>;
-  /** Run the V3/01 implement→test→review→fix loop for a backlog task (auto-commits on pass). */
+  /** Run the V3/01 implement→test→review→fix loop for a backlog task (the Reviewer commits). */
   runTaskLoop(task: Task, specSlice: string, reporter: TaskLoopReporter): Promise<TaskLoopResult>;
   /** Spawn the V3/03 Retro window after a blocker is answered (patches the one right file). */
   spawnRetro(input: RetroInput): Promise<RetroResult>;

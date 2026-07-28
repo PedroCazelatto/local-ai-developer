@@ -6,11 +6,13 @@
 
 import { buildSystemPrompt, loadPhasePrompt } from '../../context/index.js';
 import { createToolContext } from '../../tools/index.js';
-import { truncateHeadTail } from '../../tools/index.js';
+import { toolError, truncateHeadTail } from '../../tools/index.js';
+import { COMMIT_CHANGES } from '../../tools/commit-changes.js';
 import type { SandboxClient } from '../container/index.js';
 import type { OllamaClient, Message, StreamHandle, TokenCounts, Tool, ToolCall } from '../llm/index.js';
 import { addTokenCounts } from './add-token-counts.js';
 import { appendAuditRow } from './audit.js';
+import type { ToolCallRecord } from './dispatch.js';
 import { dispatchToolCall } from './dispatch.js';
 import { processMessage } from './turn-loop.js';
 import type { TurnContext } from './turn-loop.js';
@@ -58,11 +60,18 @@ export class WorkerWindow implements TurnContext {
   lastTestRun: string | null = null;
   /** Running EXACT sum of every turn's tokens (a null metric poisons the sum — never estimated). */
   private tokenSum: TokenCounts = { promptTokens: 0, evalTokens: 0 };
+  /** The registry tool set MINUS commit_changes — the Worker never commits (see callTool). */
+  private readonly workerTools: Tool[];
 
   constructor(private readonly deps: WorkerDeps) {
     // The window builds its own system prompt from rules/phases/worker.md (V1/01), read fresh here.
     const systemPrompt = buildSystemPrompt(loadPhasePrompt('worker'), `Project: ${deps.projectName}`);
     this.messages = [{ role: 'system', content: systemPrompt }];
+    // The Worker is the ONE phase that cannot commit: a Worker that commits its own code is its own
+    // gatekeeper. It hands everything to the Reviewer, which commits what it accepts and returns the
+    // rest with notes. Stripped from the definitions so it cannot see the tool at all, AND refused in
+    // callTool — the registry is global, so the definition list is the only thing keeping it away.
+    this.workerTools = deps.tools.filter((tool) => tool.function.name !== COMMIT_CHANGES);
   }
 
   /** EXACT summed tokens across every turn of this window's whole life (all fix rounds). */
@@ -72,11 +81,11 @@ export class WorkerWindow implements TurnContext {
 
   streamAsk(userInput: string): StreamHandle {
     this.messages.push({ role: 'user', content: userInput });
-    return this.deps.llm.stream(this.messages, this.deps.tools);
+    return this.deps.llm.stream(this.messages, this.workerTools);
   }
 
   streamContinue(): StreamHandle {
-    return this.deps.llm.stream(this.messages, this.deps.tools);
+    return this.deps.llm.stream(this.messages, this.workerTools);
   }
 
   onTokens(tokens: TokenCounts): void {
@@ -99,6 +108,12 @@ export class WorkerWindow implements TurnContext {
   }
 
   async callTool(name: string, args: Record<string, unknown>): Promise<string> {
+    // commit_changes is a global registry tool, so the dispatcher WOULD run it if asked. Refuse it
+    // here (recoverable + audited) rather than relying on it being absent from the definitions: a
+    // model that recovers a tool call from bare JSON can name a tool it was never offered.
+    if (name === COMMIT_CHANGES) {
+      return this.refuseCommit(name, args);
+    }
     const ctx = createToolContext({
       projectName: this.deps.projectName,
       projectPath: this.deps.projectPath,
@@ -115,6 +130,28 @@ export class WorkerWindow implements TurnContext {
       this.lastTestRun = `$ ${command}\n${truncateHeadTail(result, TEST_RUN_CAPTURE_LIMIT)}`;
     }
     return result;
+  }
+
+  /** Tell the Worker to route the commit through the Reviewer, and audit the attempt. */
+  private refuseCommit(name: string, args: Record<string, unknown>): string {
+    const message = 'the Worker cannot commit — the Reviewer commits the work it accepts.';
+    const err = toolError(
+      message,
+      'Finish the code and end with your SUMMARY. The Reviewer commits every file it accepts and returns the rest to you with notes.',
+    );
+    const output = typeof err.content === 'string' ? err.content : JSON.stringify(err.content);
+    const record: ToolCallRecord = {
+      ts: new Date().toISOString(),
+      phase: 'worker',
+      tool: name,
+      args,
+      exitStatus: -1,
+      durationMs: 0,
+      output,
+      error: message,
+    };
+    appendAuditRow(this.deps.projectPath, record);
+    return output;
   }
 }
 
@@ -134,6 +171,7 @@ Rules for this task:
 - Write FAILING tests first, then the minimum code to pass them.
 - Run tests/builds/installs with run_in_project (the project's own container); use execute_command for plain shell. Never touch the host.
 - Write and edit files with write_file / edit_file.
+- You do NOT commit. Leave your work in the working tree — the Reviewer commits every file it accepts and hands the rest back to you with notes.
 - When finished, end with a plain-text SUMMARY for the user: files touched, tests added, assumptions made, and anything surprising. Do not call a tool in that final turn.`;
 }
 

@@ -17,6 +17,11 @@ function firstLine(text: string, max = 120): string {
   return line.length > max ? `${line.slice(0, max - 1)}…` : line;
 }
 
+/** The SHAs a task landed, as one line. A Reviewer commits in small pieces, so this is usually several. */
+function describeCommits(commits: readonly string[]): string {
+  return commits.length === 0 ? '(no sha)' : commits.join(', ');
+}
+
 /** Exact token line — never a length estimate; says "not reported" when a metric was omitted (constitution). */
 function tokenLine(summary: BatchSummary): string {
   const prompt = summary.tokens.promptTokens === null ? 'not reported' : String(summary.tokens.promptTokens);
@@ -43,15 +48,18 @@ export function renderBatchSummary(summary: BatchSummary): void {
     write('');
     write(theme.strong('Passed (committed):'));
     for (const p of summary.passed) {
-      write(theme.success(`  ✓ ${p.taskId} — ${p.commit ?? '(no sha)'} · ${p.rounds} round(s)`));
+      write(theme.success(`  ✓ ${p.taskId} — ${describeCommits(p.commits)} · ${p.rounds} round(s)`));
     }
   }
 
   if (summary.escalated.length > 0) {
     write('');
-    write(theme.strong('Escalated (uncommitted — attempt stashed for you to inspect):'));
+    write(theme.strong('Escalated (rest of the attempt stashed for you to inspect):'));
     for (const e of summary.escalated) {
       write(theme.danger(`  ⚠ ${e.taskId} — ${e.rounds} round(s) · stash: ${e.stashRef ?? '(nothing to stash)'}`));
+      // The Reviewer accepts files partially, so an escalated task may still have landed work — say
+      // what it kept, or the user goes looking for a clean tree that isn't there.
+      if (e.commits.length > 0) write(theme.meta(`      partially accepted: ${describeCommits(e.commits)}`));
       if (e.lastFeedback.trim() !== '') write(theme.meta(`      last feedback: ${firstLine(e.lastFeedback)}`));
     }
   }
@@ -61,6 +69,7 @@ export function renderBatchSummary(summary: BatchSummary): void {
     write(theme.strong('Blocked (awaiting your /answer — attempt stashed for Retro):'));
     for (const b of summary.blocked) {
       write(theme.danger(`  ⛔ ${b.taskId} — ${b.blockerId ?? b.taskId} · stash: ${b.stashRef ?? '(nothing to stash)'}`));
+      if (b.commits.length > 0) write(theme.meta(`      partially accepted: ${describeCommits(b.commits)}`));
       if (b.question.trim() !== '') write(theme.meta(`      Q: ${firstLine(b.question)}`));
       write(theme.meta(`      answer with: /answer ${b.taskId} <your answer>`));
     }
