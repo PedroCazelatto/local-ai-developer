@@ -1,315 +1,50 @@
 # CLAUDE.md
 
-Guidance for Claude Code when working in this repo. This file is for you (Claude Code) as an advisor helping the user build the orchestrator. It is **not** consumed by the local Ollama model — that model gets its instructions from [rules/](rules/).
+Index for Claude Code working in this repo. This file is **not** consumed by the local Ollama model —
+that model gets its instructions from [rules/](rules/).
 
-> [!IMPORTANT]
-> **Read [constitution.md](constitution.md) before writing or changing any code, every session.**
-> It holds the binding engineering constraints (TypeScript conventions, `never any`, exact token
-> counts, tool logging, instruction integrity). The docs divide as: **CLAUDE.md = the objective**
-> (what we're building and why) and **[constitution.md](constitution.md) = the how** (the quality
-> bar every change must clear).
+A **TypeScript/Node CLI** that orchestrates a locally-run Ollama model to autonomously develop code
+projects, on one RTX 3060, with no cloud spend.
 
 ## Prime directive: do not assume, ask
 
-This project's requirements live mostly in the user's head. When a task is ambiguous, **ask clarifying questions instead of guessing**. Even small decisions (tool signatures, file layout, naming, what a phase means) should be confirmed if not already documented here or obvious from the code.
-
-**The rule is absolute: if you have any doubt, ask. If a decision is not already specified in documentation — CLAUDE.md, [constitution.md](constitution.md), or the code — you must ask the user before acting. Never fill a gap with an assumption.** A missing decision is a question for the user, not a default for you to pick.
-
-Corollary: if you learn a new product requirement during a conversation, propose adding it to this file.
-
-## What this project is
-
-> **Platform: TypeScript/Node.**
-
-A **TypeScript/Node CLI** that orchestrates a **locally-run** Ollama model to autonomously develop code projects. The user's goals:
-
-- Learn prompt engineering, AI interaction isolation, and planning by building the orchestrator themselves.
-- Practice planning skills by driving the interactive planning phases and reviewing execution output.
-- Run everything on a local RTX 3060 — no cloud spend.
-- Ship this repo as a public learning artifact, used only by the author.
-
-### Non-goals
-
-- Not a VSCode/Cursor replacement.
-- Not a "vibe coding" tool.
-- No backend/frontend deployment for the orchestrator itself.
-- No multi-user support.
-- ~~No cross-platform support yet (Windows-first until it works flawlessly).~~ **Superseded (2026-07-13):** the orchestrator must stay **OS-agnostic** — it runs on Windows, macOS, and Linux from a single Node entrypoint (`scripts/run.mjs`, not a PowerShell script), and the `src/` code carries no OS-specific assumptions (paths via `path`/`os.homedir()`, dual line-ending handling). Windows remains the primary test bed.
-- **No parallelism.** Phases run **one at a time**, sequentially. The intended way to scale is to start a batch and let it run unattended (e.g. overnight), not to run windows concurrently. (A 3060's VRAM wouldn't comfortably hold parallel slots anyway.)
-
-## Core mental model: one model, many context windows
-
-There is exactly **one** local Ollama model. Everything else is context windows.
-
-- Ollama's chat API is **stateless**. The model knows only what is in the `messages` array you send it on a given call — there is no hidden server-side memory. "Memory" = the orchestrator replaying the accumulated history every call (`OllamaClient.chat`/`stream` in [src/core/llm/client.ts](src/core/llm/client.ts)). `num_ctx` (`OLLAMA_NUM_CTX`) is a hard token ceiling; exceed it and Ollama silently drops the oldest tokens.
-- A **"subagent" is not a new model** — it is a fresh, empty `messages` array with a one-shot system prompt + a single task, run against the same Ollama, then discarded. Isolation is just a separate list.
-- A **phase** is the unit of work and the unit of instruction. Each phase has an instruction set (its markdown under [rules/](rules/)) that configures the window it runs in. Elsewhere these are called "skills" or "personas" — in this project the single word is **phase**.
-
-So the design is not "personas vs. skills." It is: **which phases the user drives interactively, and which the orchestrator spawns automatically.**
-
-## How a session works
-
-`node scripts/run.mjs start <project-name>` boots the orchestrator locked to one project. Switching projects requires restarting the orchestrator process. All planning artifacts a project produces live **inside the project repo**, not in the orchestrator repo — each project carries its own agent files.
-
-Work is organized into **phases**. A phase is an instruction set loaded into a context window. The planning phases are interactive (the user drives them); the execution phases are spawned automatically once the user triggers them.
-
-### Planning phases (interactive — the user drives, loops freely)
-
-The user is questioned about every detail; the output documents what to build, what *not* to build, and what is deferred to v2/v3. A seed "idea" is almost always a bundle of features, so planning decomposes it through a Scrum-style hierarchy: **Idea → Epics → Stories → Tasks.**
-
-| Phase | Produces | Notes |
-|---|---|---|
-| **Discovery** | Requirements + versioned scope, and the list of features with their interactions, grouped into one or more **Epics** | Interviews the user via `ask_user` (see *Asking the user*). Thinking about feature interactions up front is what makes an epic coherent. |
-| **Design** | Splits an epic into **Stories** (and the architecture/boundaries that hold them together) | Iterates **together with** Breakdown — design and decomposition inform each other. |
-| **Breakdown** | Splits stories into the ordered, prioritized **Task** list the execution loop consumes | Works **per-story** to balance richer context against the `num_ctx` limit. Holds the Product Owner + Sequencer responsibilities; split it back into separate phases if it grows two distinct jobs. |
-
-These phases are **non-linear** — the user can loop back (Discovery ⇄ Design ⇄ Breakdown) to revise scope, re-architect, or re-sequence at any time before triggering execution.
-
-#### Asking the user
-
-A planning phase asks through the **`ask_user`** tool, never through prose the user has to read and answer by hand. It puts a round of **up to 5 multiple-choice questions** (the bounded-rounds rule, now enforced in code) to the user in a tabbed terminal panel — one tab per question, a final **Review** tab, arrow keys to move, Enter on Review to submit. Every question carries at least 2 concrete options the model guessed at, plus a free-text choice the orchestrator always appends, so the user can never be cornered by options the model failed to imagine.
-
-- **Interactive phases only.** Discovery/Design/Breakdown get `ask_user`; the spawned execution windows (Worker/Reviewer/Retro) do **not** — they run unattended (the user starts a batch and walks away), so a question would stall the batch on a keypress nobody is there to press. Execution escalates through the Reviewer's `raise_blocker`, which is asynchronous by design.
-- **Skipping is normal, and nothing is lost.** A question the user moves past is saved durably (`.orchestrator/questions.jsonl`); `/questions` re-offers every saved question whenever the user chooses. The answer is then injected into the context of the phase that asked, on its next turn — across a phase swap or a restart. The asking phase is told plainly not to re-ask a skipped question.
-
-### Terminal output
-
-The model's replies are **rendered as markdown, live**: each delta prints raw the instant it arrives (a local model is slow enough that token-by-token *is* the feedback), and each line is repainted formatted the moment its newline lands — markdown is only decidable once a line is complete. The system prompt tells the model its markdown is really rendered, so it has a reason to emit it.
-
-**The model writes plain markdown and never names a color.** The construct→color mapping lives in the orchestrator's theme, so the palette is retuned in one place and a model that hallucinated a color cannot fight it. The model is told explicitly to emit no ANSI escapes.
-
-This does not weaken the scrollback invariant. Only the **in-progress** line is ever rewritten — it is still under the cursor and has not scrolled away — and transient widgets (the `ask_user` panel, the spinner) repaint only their own frame and then collapse into one static, copyable summary. Finished history is append-only, forever.
-
-### Execution phases (automatic — the user triggers, then it runs)
-
-The user starts execution explicitly and chooses the batch: **one task, some tasks, or all tasks** (then walks away — see no-parallelism note; tasks run sequentially). For each task the orchestrator spawns fresh windows and runs:
-
-```
-implement → test → review → fix → (loop, max 5 rounds)
-```
-
-- **Worker** — a fresh window with the task definition; writes failing tests first, then implements, then runs the tests. **The same Worker window does the fixes** — its history accumulates every prior attempt plus the Reviewer's feedback, so it should converge in as few rounds as possible rather than starting blind each time.
-- **Reviewer** — a separate fresh window that judges the Worker's output against the task definition.
-- **Loop control:**
-  - Hard cap of **5** implement→fix rounds per task. If the work still hasn't passed review after 5 rounds, the loop stops and **escalates to the user**.
-  - **Only the Reviewer can call `raise_blocker(question)`.** The Worker cannot — making the Reviewer the sole gatekeeper is deliberate (a local model is more often confidently-wrong than self-aware, so self-reported confusion from the Worker isn't trustworthy).
-  - The Reviewer calls `raise_blocker` **immediately** when it hits genuine confusion — an ambiguous, under-specified, or self-contradictory task definition. The loop halts at once and surfaces the question to the user; nothing proceeds until the user answers.
-
-### Retro phase (automatic — fires after the user resolves a blocker)
-
-When the user answers a blocker, the orchestrator spawns a **Retro** window with `{the task, the misunderstanding, the user's answer}`. It diagnoses *what* went wrong and *where*, then patches the correct file so the mistake does not recur:
-
-- **Systemic** — something that *should* have been caught during Discovery/Design/Review → edit the **global** phase instruction file under [rules/](rules/).
-- **Task-specific** — a one-off gap in this task's definition → edit the **project** doc only.
-
-### Git / commit policy
-
-- **Phases auto-commit their approved changes to the project repo.** Approval points: a planning phase's output when the user accepts it and moves on; a Worker's code when the Reviewer passes it. This requires a commit tool (the old "no commit tools yet" rule is superseded for project repos). Branch tooling is still not needed.
-- **Global instruction edits are the exception — never auto-committed.** When the Retro phase (or anything) edits a global phase file under [rules/](rules/), it leaves the change **uncommitted** and **warns the user that the change must be reviewed before continuing**, then the user commits it manually. The orchestrator's own instruction set must never mutate silently.
-
-### Inter-phase communication: `AGENT_NOTES.md` *(superseded by the V3 inbox)*
-
-> **Superseded:** the structured cross-phase **inbox** (`inbox_post`/`inbox_read`/`inbox_resolve`,
-> append-only JSONL under `src/tools/` + `src/core/session/inbox-store.ts`) replaces this
-> markdown-file mechanism. The description below is retained as the conceptual model for *why*
-> cross-phase signaling exists.
-
-Because each window has its **own isolated history** and never sees another phase's turns, cross-phase signals need a file on disk. The convention is a shared file in the **project repo root** (sibling of `PRODUCT_SPEC.md`):
-
-```
-# Agent Notes
-
-## To: Discovery
-## To: Design
-## To: Breakdown
-## To: Worker
-## To: Reviewer
-```
-
-Each section is that phase's inbox. Protocol:
-- **Phase start:** the active phase reads its own `## To: <Phase>` section and addresses every `[OPEN]` item before starting new work.
-- **During a phase:** when a phase spots a concern that belongs to another phase, it appends `- [OPEN] YYYY-MM-DD <phase>: <concise description>` to that phase's section.
-- **Resolution:** flip `[OPEN]` → `[RESOLVED]` with a one-line note. Never edit another phase's open items except to mark them resolved.
-
-Whether the orchestrator auto-creates this file on session start or Discovery creates it is still open (see below).
-
-## Memory model
-
-Each phase has its **own isolated message history**. Switching phases saves the active history and loads the target's — no cross-phase leakage, no auto-clear. The user owns the decision to wipe history. Spawned execution windows (Worker/Reviewer/Retro) start from an **empty** history and are discarded after their task — except the Worker, whose history persists *across the fix loop* (so it remembers prior attempts and Reviewer feedback) and is then discarded when the task closes.
-
-- **Manual clear:** `/clear` wipes only the active phase's history.
-- **Token-threshold failsafe:** when a phase's history crosses a configured token threshold, the orchestrator summarizes the oldest turns and replaces them with a single summary entry. This is a safety valve against VRAM exhaustion, not normal operation.
-- **Per-project persistence:** each project keeps its own per-phase memory so the model always knows where it stopped. Persistence lives with the project repo.
-- **Documentation files** (rules, plans, specs) exist for one-time reference or human reading — not loaded into every prompt.
-
-Minimize persistent context to save tokens (local inference is VRAM-bound). Cross-phase communication goes through the cross-phase inbox (V3; supersedes `AGENT_NOTES.md`), not memory.
-
-The summarization trigger keys off exact token counts from Ollama, never estimates — this is a VRAM-safety invariant; see [constitution.md](constitution.md).
-
-## Rules loading
-
-Rules are all Markdown, under [rules/](rules/), and are **global** (projects are agnostic to the orchestrator and do not override rules).
-
-Two folders:
-- **Phases** ([rules/phases/](rules/phases/)): the phase instruction sets, injected automatically when a phase is loaded. A file contains the phase definition *and* the workflow it owns. The six files are `discovery.md`, `design.md`, `breakdown.md`, `worker.md`, `reviewer.md`, `retro.md`.
-- **Standards** ([rules/standards/](rules/standards/)): loaded on demand via tool call. Intended to grow freely.
-
-### Retrieval: LLM-delegated search
-
-To keep the main context lean, the standards catalog is **not** in the system prompt. Two tools:
-
-1. `search_rules(intent: str)` — the model describes what it needs. The orchestrator spawns a **fresh, throwaway LLM context** (not added to session memory) that receives the full `{name, description}` catalog plus the intent, and returns the matching rule name(s). The main context never sees the catalog.
-2. `load_rule(name: str)` — returns the full markdown content of the named rule. The model calls this after `search_rules` resolves.
-
-This splits the cost: search-time context holds the catalog once per call and is discarded; main context only holds the file the model actually chose to load.
-
-The phase files (written for the new model — Breakdown merges the old Product Owner + Sequencer; Reviewer covers both behavior **and** standards/conventions):
-- [rules/phases/discovery.md](rules/phases/discovery.md)
-- [rules/phases/design.md](rules/phases/design.md)
-- [rules/phases/breakdown.md](rules/phases/breakdown.md)
-- [rules/phases/worker.md](rules/phases/worker.md)
-- [rules/phases/reviewer.md](rules/phases/reviewer.md)
-- [rules/phases/retro.md](rules/phases/retro.md)
-
-Standards:
-- [rules/standards/clean_architecture.md](rules/standards/clean_architecture.md)
-- [rules/standards/hexagonal_ddd_manifesto.md](rules/standards/hexagonal_ddd_manifesto.md)
-
-## Sandboxing & tools
-
-Two-tier Docker model. **Hard rule: the model touches only Docker, never the host filesystem.** Every command it runs and every file it edits happens inside a container; the orchestrator is the only host-side process. **Containers have controlled internet** (so projects can `npm i`, `pip install`, etc.) — hardened per the dockerode model: rootless user, CPU/RAM caps, disposable lifecycle.
-
-- **Root sandbox** ([docker-compose.yml](docker-compose.yml)): one long-lived container named `ai_sandbox`. It mounts **only the active project** at `/workspace` — `./projects/${ACTIVE_PROJECT}:/workspace`, where the launcher (`scripts/run.mjs`) sets `ACTIVE_PROJECT` from the session's project arg. Other projects and the host filesystem are therefore **not mounted at all**, so the model cannot reach them no matter how a command is written (`..`, `$(...)`, variables, symlinks). `/workspace` IS the project root; `execute_command` runs there. It runs **plain shell commands** (file operations, navigation, piping) without giving the model host access.
-- **Per-project sandbox**: each project folder carries its own `docker-compose.yml` declaring a `runner` service with the language toolchain (Python, Node, Rust, etc.) and network access. The execution loop's **test/build/install steps** run against this container via the **host-dispatched `run_in_project` tool** (decided — no docker socket inside `ai_sandbox`). It runs in Docker, never on the host.
-
-Other ground rules:
-
-- The local Ollama model runs on GPU/VRAM on the host (Docker is CPU-focused and cannot host it).
-- Tools run **autonomously** and **every call is logged**, and the tool set is grown **on demand** — see [constitution.md](constitution.md). The tools live under [src/tools/](src/tools/) — one model-callable tool per file.
-
-## Code conventions (for the orchestrator itself)
-
-The binding rules — TypeScript conventions, `never any`, strict `tsconfig`, terminal-UX priority,
-no orchestrator tests, autonomous+logged tools — live in **[constitution.md](constitution.md)**.
-Read it before touching code.
-
-## Backlog
-
-Pending work lives as **one Markdown file per task** in [backlog/](backlog/) at the repo root — there
-is no single `backlog.md` list (it was decomposed into this folder). Each file is named with a
-descriptive kebab-case slug (e.g. `persistent-fenced-input.md`) and holds just the task: an `# H1`
-title, a `**Category:**` line, and the prose description — no frontmatter, no source tags.
-
-- **Adding a task:** create a new `backlog/<slug>.md` with the title, category, and description.
-- **Finishing a task:** when the work ships, **delete that task's file and commit the deletion in the
-  same commit as all the code the task required** — the removed backlog file is the record that the
-  feature landed.
-
-## Repo layout
-
-> The TypeScript source lives under `src/`. The Python reference implementation has been deleted
-> (parity reached, all planned versions shipped).
-
-```
-local-ai-developer/
-├── src/
-│   ├── index.ts            # CLI entry; boots the session
-│   ├── core/
-│   │   ├── session/        # orchestrator, memory, batch, backlog, inbox, blocker, retro, reviewer, worker, subagents
-│   │   ├── container/      # Docker sandbox + per-project runner (dockerode)
-│   │   ├── llm/            # Ollama client, one-shot throwaway calls, stream filter, json repair
-│   │   └── ui/             # renderer, status bar, theme, prompts, spinner
-│   ├── phases/             # phase abstraction + factory
-│   ├── context/            # system/phase prompt + standards catalog loaders
-│   ├── interface/          # REPL, command registry, /commands
-│   └── tools/              # actions — each file is a model-callable tool
-├── rules/
-│   ├── phases/             # phase instruction sets (markdown), injected on phase load
-│   └── standards/          # on-demand reference rules (markdown)
-├── backlog/                # one markdown file per pending task; delete + commit on completion
-├── projects/               # each child is its own git repo, developed by the model
-├── scripts/
-│   └── run.mjs             # cross-platform launcher: install / start <project> / stop
-└── docker-compose.yml
-```
-
-The [README.md](README.md) is being rewritten by the user to match this phase-based model — do not edit it without being asked; validate it when requested.
-
-## Commands (as of today)
-
-Host (npm scripts wrapping the cross-platform `scripts/run.mjs` launcher):
-- `npm run setup` — install Node deps and pull the sandbox image
-- `npm run start -- <project-name>` — start a session for a project
-- `npm run stop` — shut down Docker
-
-(The launcher also runs directly: `node scripts/run.mjs install | start <project> | stop`.)
+This project's requirements live mostly in the user's head. **If you have any doubt, ask.** If a
+decision is not already specified — here, in the docs below, in [constitution.md](constitution.md),
+or in the code — you must ask the user before acting. Never fill a gap with an assumption. A missing
+decision is a question for the user, not a default for you to pick. This covers small decisions too:
+tool signatures, file layout, naming, what a phase means.
+
+Corollary: when you learn a new product requirement in conversation, propose adding it to the doc
+that owns the topic.
+
+## Working rules
 
 > [!IMPORTANT]
-> **Never run the full app to test a change** — `npm run start` (and `node scripts/run.mjs start`)
-> boots a live session against Ollama, which is a token-intensive process that burns a lot of tokens.
-> The only npm scripts you may run are **`npm run setup`** and **`npm run typecheck`**. To exercise
-> code, write throwaway `.ts`/`.js` files that import and drive the specific functions (this is another
-> reason for the one-function-per-file rule — units stay directly callable in isolation). See the
-> "verify via scripted live checks" approach; a terminal-grid emulator harness can replay the real
-> renderer + readline to check UI rendering without launching the app.
+> **Never run the full app to test a change.** `npm run start` (and `node scripts/run.mjs start`)
+> boots a live session against Ollama and burns a large number of tokens. The only npm scripts you
+> may run are **`npm run setup`** and **`npm run typecheck`**.
 
-In-app (terminal) — all implemented:
-- `/swap <phase>` — switch the active phase
-- `/new-project <name> <stack>` — scaffold a new project (`node` | `python`)
-- `/run <selector>` — run backlog tasks (`next` | a task id | `all`)
-- `/answer <task-id> <text>` — resolve a raised blocker (re-queues the task)
-- `/questions` — answer the `ask_user` questions you skipped (delivered to the asking phase on its next turn)
-- `/models list | pull <name> | use <name>` — manage the active model
-- `/clear` · `/resume` — clear or restore the active phase's history
-- `/subagents` — list active sub-agents
-- `/help` — list every command · `/exit` — quit
+- **Verify by driving code directly.** Write throwaway `.ts`/`.js` files that import and call the
+  specific functions — another reason for the one-function-per-file rule: units stay callable in
+  isolation. For rendering changes, replay the real renderer + readline through a terminal-grid
+  emulator harness instead of launching the app.
+- **Read [constitution.md](constitution.md) before writing or changing any code, every session.**
+- **Do not edit [README.md](README.md)** unless asked; validate it when requested.
+- **Keep these docs current.** If a change makes a doc wrong, fixing the doc is part of that change.
+  Edits to this file, [constitution.md](constitution.md), and anything under [docs/](docs/) are
+  **never auto-committed** — hand the diff to the user (see *Instruction integrity* in the
+  constitution).
 
-## Model selection
+## Documentation index
 
-**There is no default model.** A model name compiled into the orchestrator says nothing about what the
-user has actually pulled — a hard-coded default locks a fresh install to a model that isn't there, and
-every turn fails. The **installed set is the only ground truth**, so boot asks the Ollama daemon and
-picks from what exists ([src/core/session/resolve-boot-model.ts](src/core/session/resolve-boot-model.ts)):
-
-1. `state.json`'s `activeModel`, **if it is installed** — the user's own explicit choice always wins.
-2. `state.json`'s `activeModel`, **if it is not installed** — offer to re-pull it (single-keypress y/n).
-3. Otherwise — the **smallest installed model**. VRAM is the binding constraint, so an unattended boot
-   lands on the model most likely to fit.
-4. **Nothing installed at all** — offer to pull `SUGGESTED_MODEL`, which exists *only* as this download
-   suggestion for a fresh machine and is never a value the session silently boots on.
-5. **Every offer declined** — no model. This is a valid session, not an error: the REPL still boots (so
-   the user can `/models pull`), the status line reads `no model`, and a turn fails with an actionable
-   "pull one" line instead of an Ollama 404.
-
-A declined pull is never chased with a second offer for a different model — **one ask per boot**.
-
-Only an explicit `/models use` writes `state.json`, so an inferred boot pick never overwrites a stated
-choice. **An unreachable Ollama daemon is fatal at boot** — like a missing Docker daemon: boot needs the
-installed list to decide anything, and a session without Ollama can do nothing at all.
-
-## Environment
-
-- [.env.example](.env.example) currently only sets `OLLAMA_NUM_CTX`. The model name has **moved to the UI**
-  (`/models`, persisted to `state.json` — see [Model selection](#model-selection)) and is deliberately not
-  an env var; the active phase will eventually follow.
-
-## Open questions / not yet decided
-
-Track these here as they come up so future-you knows what's still fuzzy.
-
-**Opened by the 2026-06-21 pivot:**
-
-- ~~**TS build/run tooling:**~~ **Resolved:** `tsx` runs the dev loop and `tsc` typechecks/builds (`package.json`); the old `run.ps1` is replaced by a cross-platform **Node launcher** (`scripts/run.mjs`) that shells out to `npm`/`docker compose`, keeping the entrypoint OS-agnostic.
-- **Sandbox network hardness:** open egress vs. an allowlist/registry proxy; persistent root sandbox vs. ephemeral `--rm`-per-command containers.
-
-**Carried forward:**
-
-- Whether more project stacks beyond `node` / `python` are worth scaffolding (add on demand).
-- Memory summarization trigger thresholds and who decides (orchestrator heuristic vs. model self-report).
-- Which LLM (and which context size) powers the `search_rules` / summarization throwaway context — same local model, or a smaller/faster one?
-- Whether the orchestrator should auto-initialize project artifacts on session start, or leave creation to the scaffold/Discovery phase.
-
-**Resolved by the pivot (kept for the record):**
-
-- *Project-runtime dispatch:* a dedicated **host-dispatched `run_in_project` tool** against the project's own networked container (no docker socket in the sandbox). See V1.
-- *Persona→phase code sweep:* moot — the TS rewrite uses **phase** terminology natively, with no legacy "persona"/"role" identifiers to rename.
+| Doc | Read it when you need |
+|---|---|
+| [constitution.md](constitution.md) | **The quality bar for code.** TypeScript conventions, `never any`, one function per file, exact token counts, tool logging, git workflow, terminal-UX invariants, instruction integrity. |
+| [docs/product.md](docs/product.md) | What the project is and is not — goals, non-goals, no parallelism, OS-agnostic reach, how terminal output renders. |
+| [docs/mental-model.md](docs/mental-model.md) | One model, many context windows — stateless chat API, what a "subagent" really is, what a phase is, and the memory model (per-phase history, `/clear`, summarization failsafe). |
+| [docs/phases.md](docs/phases.md) | How a session works — planning phases (Discovery/Design/Breakdown) and `ask_user`, the execution loop (Worker/Reviewer, 5-round cap, `raise_blocker`), Retro, the cross-phase inbox, git/commit policy. |
+| [docs/rules-loading.md](docs/rules-loading.md) | The [rules/](rules/) folders and how the model retrieves standards — `search_rules` / `load_rule` and the throwaway search context. |
+| [docs/sandboxing.md](docs/sandboxing.md) | The two-tier Docker model — `ai_sandbox`, per-project `runner`, `execute_command` vs. `run_in_project`, tool ground rules. |
+| [docs/repo-layout.md](docs/repo-layout.md) | Where code lives, plus the [backlog/](backlog/) convention (one file per task; delete it in the commit that ships the work). |
+| [docs/cli.md](docs/cli.md) | Host and in-app commands, model selection at boot, environment variables. |
+| [docs/open-questions.md](docs/open-questions.md) | What is still undecided — check before assuming a default. |

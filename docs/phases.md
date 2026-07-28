@@ -1,0 +1,102 @@
+# Phases and how a session works
+
+`node scripts/run.mjs start <project-name>` boots the orchestrator locked to one project. Switching
+projects requires restarting the orchestrator process. All planning artifacts a project produces live
+**inside the project repo**, not in the orchestrator repo — each project carries its own agent files.
+
+Work is organized into **phases**: an instruction set loaded into a context window (see
+[mental-model.md](mental-model.md)). Planning phases are interactive — the user drives them.
+Execution phases are spawned automatically once the user triggers a batch.
+
+## Planning phases (interactive — the user drives, loops freely)
+
+The user is questioned about every detail; the output documents what to build, what *not* to build,
+and what is deferred to later versions. A seed "idea" is almost always a bundle of features, so
+planning decomposes it through a Scrum-style hierarchy: **Idea → Epics → Stories → Tasks.**
+
+| Phase | Produces | Notes |
+|---|---|---|
+| **Discovery** | Requirements + versioned scope, and the list of features with their interactions, grouped into one or more **Epics** | Interviews the user via `ask_user`. Thinking about feature interactions up front is what makes an epic coherent. |
+| **Design** | Splits an epic into **Stories** (and the architecture/boundaries that hold them together) | Iterates **together with** Breakdown — design and decomposition inform each other. |
+| **Breakdown** | Splits stories into the ordered, prioritized **Task** list the execution loop consumes | Works **per-story** to balance richer context against the `num_ctx` limit. Holds the Product Owner + Sequencer responsibilities; split it back into separate phases if it grows two distinct jobs. |
+
+These phases are **non-linear** — the user can loop back (Discovery ⇄ Design ⇄ Breakdown) to revise
+scope, re-architect, or re-sequence at any time before triggering execution.
+
+### Asking the user
+
+A planning phase asks through the **`ask_user`** tool, never through prose the user has to read and
+answer by hand. It puts a round of **up to 5 multiple-choice questions** (bounded rounds, enforced in
+code) to the user in a tabbed terminal panel — one tab per question, a final **Review** tab, arrow
+keys to move, Enter on Review to submit. Every question carries at least 2 concrete options the model
+guessed at, plus a free-text choice the orchestrator always appends, so the user can never be
+cornered by options the model failed to imagine.
+
+- **Interactive phases only.** Discovery/Design/Breakdown get `ask_user`; the spawned execution
+  windows (Worker/Reviewer/Retro) do **not** — they run unattended (the user starts a batch and walks
+  away), so a question would stall the batch on a keypress nobody is there to press. Execution
+  escalates through the Reviewer's `raise_blocker`, which is asynchronous by design.
+- **Skipping is normal, and nothing is lost.** A question the user moves past is saved durably
+  (`.orchestrator/questions.jsonl`); `/questions` re-offers every saved question whenever the user
+  chooses. The answer is injected into the context of the phase that asked, on its next turn — across
+  a phase swap or a restart. The asking phase is told plainly not to re-ask a skipped question.
+
+## Execution phases (automatic — the user triggers, then it runs)
+
+The user starts execution explicitly and chooses the batch: **one task, some tasks, or all tasks**,
+then walks away. Tasks run sequentially. For each task the orchestrator spawns fresh windows and runs:
+
+```
+implement → test → review → fix → (loop, max 5 rounds)
+```
+
+- **Worker** — a fresh window with the task definition; writes failing tests first, then implements,
+  then runs the tests. **The same Worker window does the fixes** — its history accumulates every prior
+  attempt plus the Reviewer's feedback, so it converges in as few rounds as possible rather than
+  starting blind each time.
+- **Reviewer** — a separate fresh window that judges the Worker's output against the task definition.
+- **Loop control:**
+  - Hard cap of **5** implement→fix rounds per task. If the work still hasn't passed review after 5
+    rounds, the loop stops and **escalates to the user**.
+  - **Only the Reviewer can call `raise_blocker(question)`.** The Worker cannot — making the Reviewer
+    the sole gatekeeper is deliberate: a local model is more often confidently-wrong than self-aware,
+    so self-reported confusion from the Worker isn't trustworthy.
+  - The Reviewer calls `raise_blocker` **immediately** on genuine confusion — an ambiguous,
+    under-specified, or self-contradictory task definition. The loop halts at once and surfaces the
+    question to the user; nothing proceeds until the user answers.
+
+## Retro phase (automatic — fires after the user resolves a blocker)
+
+When the user answers a blocker, the orchestrator spawns a **Retro** window with `{the task, the
+misunderstanding, the user's answer}`. It diagnoses *what* went wrong and *where*, then patches the
+correct file so the mistake does not recur:
+
+- **Systemic** — something that *should* have been caught during Discovery/Design/Review → edit the
+  **global** phase instruction file under [rules/](../rules/).
+- **Task-specific** — a one-off gap in this task's definition → edit the **project** doc only.
+
+## Cross-phase communication: the inbox
+
+Each window has its **own isolated history** and never sees another phase's turns, so cross-phase
+signals go through a durable, append-only inbox (`src/core/session/inbox-store.ts`, one JSONL file per
+recipient phase) exposed as three tools:
+
+- `inbox_post(to, body)` — post a concern to another phase's inbox. The sender is the active phase;
+  the model never names itself. `to` is validated against the closed six-phase set.
+- `inbox_read(status)` — read **your own** inbox (recipient derived from the active phase).
+  `"open"` (default) returns unresolved items; `"all"` returns full history.
+- `inbox_resolve(id, note)` — close an item with a one-line note. Any phase may resolve an item it
+  did not receive; the resolver is recorded distinctly from the recipient.
+
+Protocol: a phase calls `inbox_read` at phase start and addresses every open item before starting new
+work; it calls `inbox_post` whenever it spots a concern that belongs to another phase.
+
+## Git / commit policy
+
+- **Phases auto-commit their approved changes to the project repo.** Approval points: a planning
+  phase's output when the user accepts it and moves on; a Worker's code when the Reviewer passes it.
+  Branch tooling is not needed.
+- **Global instruction edits are the exception — never auto-committed.** When the Retro phase (or
+  anything) edits a global phase file under [rules/](../rules/), it leaves the change **uncommitted**
+  and **warns the user that the change must be reviewed before continuing**; the user commits it
+  manually. The orchestrator's own instruction set must never mutate silently.

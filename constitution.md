@@ -9,15 +9,16 @@ editing this file first.
 
 Scope note: this governs the **orchestrator's own TypeScript code**. The *local Ollama model's*
 code-quality standards are a different thing and live in [rules/standards/](rules/standards/); the
-model never reads this file. The two-doc split:
+model never reads this file. The split:
 
-- **[CLAUDE.md](CLAUDE.md)** — the *objective*: what we're building and why.
-- **constitution.md** (this file) — the *how*: the quality bar every change must clear.
+- **[CLAUDE.md](CLAUDE.md)** — the index: the prime directive, the working rules, and links to the
+  [docs/](docs/) files that describe *what* the project is and how it behaves.
+- **constitution.md** (this file) — the *how*: the quality bar every change must clear. Code
+  practices and implementation rules only; product description belongs in [docs/](docs/).
 
 ## Language & style
 
-- **TypeScript on Node** (latest LTS), `npm` with [package.json](package.json). The Python code is
-  **reference-only** and is deleted at parity — **never add new Python**.
+- **TypeScript on Node** (latest LTS), `npm` with [package.json](package.json).
 - **Naming:** `camelCase` for values/functions, `PascalCase` for types/classes, **kebab-case** file
   names.
 - **Strict `tsconfig`** (`strict: true`).
@@ -62,29 +63,30 @@ model never reads this file. The two-doc split:
 - **Commit on the ACTIVE branch.** Whatever branch is checked out is where the work lands, `main`
   included. **Never create a branch on your own initiative** — branch only when the user explicitly
   says to. This overrides any default habit of branching off the default branch.
-- **Exception — the two governance docs.** The commit rules above stop at [CLAUDE.md](CLAUDE.md) and
-  this file: finished or not, they are never committed for the user. Everything else you touch —
-  including the phase and standards files under [rules/](rules/) — is committed like ordinary work.
-  See *Instruction integrity* below.
+- **Exception — the governance docs.** The commit rules above stop at [CLAUDE.md](CLAUDE.md), this
+  file, and everything under [docs/](docs/): finished or not, they are never committed for the user.
+  Everything else you touch — including the phase and standards files under [rules/](rules/) — is
+  committed like ordinary work. See *Instruction integrity* below.
 
 ## Instruction integrity
 
-- The two governance docs — [CLAUDE.md](CLAUDE.md) (the objective) and this file (the how) — **must
-  never mutate silently.** Your edits to them are **never auto-committed**: warn the user that the
-  change needs review, then let them commit it manually. The gate is deliberately narrow — this is
-  the meta layer that dictates what every other change must do, and the one place a silent edit would
-  be hardest to catch.
+- The governance docs — [CLAUDE.md](CLAUDE.md) (the index), this file (the how), and every file under
+  [docs/](docs/) (what the project is) — **must never mutate silently.** Your edits to them are
+  **never auto-committed**: warn the user that the change needs review, then let them commit it
+  manually. This is the meta layer that dictates what every other change must do, and the one place a
+  silent edit would be hardest to catch.
 - **The phase and standards files under [rules/](rules/) are NOT gated for you.** Edit them and
   commit them like ordinary work (*Git workflow* above); the user reviews your diff the way they
   review any commit. This is a separate rule from a different actor: when the *local model* rewrites a
   `rules/` file at runtime (the Retro phase), the orchestrator still leaves that edit uncommitted for
-  a human to review — see [CLAUDE.md](CLAUDE.md). A confidently-wrong local model editing its own
-  instructions is not the same as you editing them.
-- **Editing the two docs needs no permission; committing them needs approval.** Make the edit when it
-  is warranted — do not ask first, and do not stall the work to request it. Then stop at the commit:
-  leave the change in the working tree, say what changed and why, and let the user review and commit
-  it themselves. **The gate is the commit, not the edit.** This is the one place where *Git workflow*'s
-  "finishing work means committing it" does not apply — here, finishing means handing the diff over.
+  a human to review — see [docs/phases.md](docs/phases.md). A confidently-wrong local model editing
+  its own instructions is not the same as you editing them.
+- **Editing a governance doc needs no permission; committing it needs approval.** Make the edit when
+  it is warranted — do not ask first, and do not stall the work to request it. Then stop at the
+  commit: leave the change in the working tree, say what changed and why, and let the user review and
+  commit it themselves. **The gate is the commit, not the edit.** This is the one place where *Git
+  workflow*'s "finishing work means committing it" does not apply — here, finishing means handing the
+  diff over.
 
 ## Documentation currency
 
@@ -92,9 +94,9 @@ model never reads this file. The two-doc split:
   information.** Any commit that changes a rule, convention, invariant, file-layout assumption, or
   workflow described here updates this file **in that same commit**. A rule that no longer matches
   the code is worse than no rule: stale guidance is a defect, not a cosmetic lag. The same duty
-  applies to [CLAUDE.md](CLAUDE.md) (the objective) — if a change makes either doc wrong, correcting
-  the doc is part of that change, not a follow-up.
-- This does **not** relax *Instruction integrity* above: an edit to either governance doc is still
+  applies to [CLAUDE.md](CLAUDE.md) and the [docs/](docs/) files it indexes — if a change makes a doc
+  wrong, correcting it is part of that change, not a follow-up.
+- This does **not** relax *Instruction integrity* above: an edit to any governance doc is still
   review-gated — surfaced for the user and committed by them, never silently auto-committed. It is
   simply never allowed to lag behind the code it describes.
 
@@ -126,5 +128,5 @@ model never reads this file. The two-doc split:
 ## Repo hygiene
 
 - **Never write the user's name into any file** in this repo.
-- When a design choice isn't covered here, in [CLAUDE.md](CLAUDE.md), or in the code, **do not
-  assume — ask.**
+- When a design choice isn't covered here, in the docs indexed by [CLAUDE.md](CLAUDE.md), or in the
+  code, **do not assume — ask.**
