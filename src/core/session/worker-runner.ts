@@ -5,6 +5,7 @@
 // cross-task carryover (V1 has no persisting fix loop; that's V3).
 
 import { buildSystemPrompt, loadPhasePrompt } from '../../context/index.js';
+import { resolvePhaseTools } from '../../phases/index.js';
 import { createToolContext } from '../../tools/index.js';
 import { toolError, truncateHeadTail } from '../../tools/index.js';
 import { COMMIT_CHANGES } from '../../tools/commit-changes.js';
@@ -25,7 +26,6 @@ export const WORKER_MAX_ROUNDS = 24;
 
 export interface WorkerDeps {
   readonly llm: OllamaClient;
-  readonly tools: Tool[];
   readonly sandbox: SandboxClient;
   readonly projectName: string;
   readonly projectPath: string;
@@ -60,7 +60,7 @@ export class WorkerWindow implements TurnContext {
   lastTestRun: string | null = null;
   /** Running EXACT sum of every turn's tokens (a null metric poisons the sum — never estimated). */
   private tokenSum: TokenCounts = { promptTokens: 0, evalTokens: 0 };
-  /** The registry tool set MINUS commit_changes — the Worker never commits (see callTool). */
+  /** The Worker's allowlist from phase-tool-names.ts — notably without commit_changes (see callTool). */
   private readonly workerTools: Tool[];
 
   constructor(private readonly deps: WorkerDeps) {
@@ -69,9 +69,9 @@ export class WorkerWindow implements TurnContext {
     this.messages = [{ role: 'system', content: systemPrompt }];
     // The Worker is the ONE phase that cannot commit: a Worker that commits its own code is its own
     // gatekeeper. It hands everything to the Reviewer, which commits what it accepts and returns the
-    // rest with notes. Stripped from the definitions so it cannot see the tool at all, AND refused in
-    // callTool — the registry is global, so the definition list is the only thing keeping it away.
-    this.workerTools = deps.tools.filter((tool) => tool.function.name !== COMMIT_CHANGES);
+    // rest with notes. WORKER_TOOL_NAMES omits commit_changes so it cannot see the tool at all, AND
+    // callTool refuses it — the registry is global, so the definition list is what keeps it away.
+    this.workerTools = resolvePhaseTools('worker');
   }
 
   /** EXACT summed tokens across every turn of this window's whole life (all fix rounds). */

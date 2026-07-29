@@ -5,6 +5,7 @@
 // with a typed error naming the expected path.
 
 import { availablePhaseNames, loadPhasePrompt } from '../context/phase-prompt.js';
+import { PHASE_TOOL_NAMES } from './phase-tool-names.js';
 import type { Phase } from './phase.js';
 
 export class PhaseFactory {
@@ -19,9 +20,21 @@ export class PhaseFactory {
    * file is missing (the REPL turns this into a recoverable /swap line; boot turns it into a fatal
    * error). Called on every activation (constructor + /swap), so edits to a phase file are picked
    * up on the next swap without restarting.
+   *
+   * Also attaches the phase's tool allowlist from phase-tool-names.ts. A phase file with no array
+   * throws here — at ACTIVATION, the same seam where a missing markdown file surfaces, so /swap
+   * renders it as a recoverable line instead of a turn failing mid-stream.
    */
   static get(name: string): Phase {
     const normalized = name.trim().toLowerCase();
-    return { name: normalized, instructions: loadPhasePrompt(normalized), tools: [] };
+    const instructions = loadPhasePrompt(normalized);
+    const tools = PHASE_TOOL_NAMES[normalized];
+    if (tools === undefined) {
+      throw new Error(
+        `Phase '${normalized}' has no tool list. Add its array to src/phases/phase-tool-names.ts. ` +
+          `Phases with one: ${Object.keys(PHASE_TOOL_NAMES).join(', ')}.`,
+      );
+    }
+    return { name: normalized, instructions, tools };
   }
 }

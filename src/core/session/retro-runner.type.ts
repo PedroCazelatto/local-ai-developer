@@ -6,7 +6,7 @@
 // edited path (the orchestrator's path guard), never from the model's self-declared scope.
 
 import type { SandboxClient } from '../container/index.js';
-import type { OllamaClient, TokenCounts, Tool } from '../llm/index.js';
+import type { OllamaClient, TokenCounts } from '../llm/index.js';
 import type { Task } from './types.js';
 
 /** Where the fix belongs — decided by the resolved edited-file path, not the model's claim. */
@@ -58,8 +58,6 @@ export interface RetroResult {
 /** The session infrastructure the Retro window binds to (supplied by the orchestrator). */
 export interface RetroDeps {
   readonly llm: OllamaClient;
-  /** The full registry tool set (toolDefinitions()); filtered here to the project read/edit subset. */
-  readonly tools: Tool[];
   readonly sandbox: SandboxClient;
   readonly projectName: string;
   readonly projectPath: string;

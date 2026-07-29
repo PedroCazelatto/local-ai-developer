@@ -8,9 +8,10 @@ export interface Phase {
   /** Full markdown of rules/phases/<name>.md (was Agent.persona, which held the file text). */
   readonly instructions: string;
   /**
-   * Tool names available to this phase. Empty for Foundation and NOT gated in code — a phase is
-   * told which tools to reach for in its markdown, not whitelisted here (CLAUDE.md). Real tool
-   * definitions are wired in V1.
+   * Tool names available to this phase — its array from phase-tool-names.ts, resolved by the factory.
+   * This IS the gate: resolvePhaseTools turns these names into the definitions sent to Ollama, so a
+   * name absent here is a tool the phase never sees. The phase markdown still steers *which* tool to
+   * reach for and when; this decides what is reachable at all.
    */
-  readonly tools: string[];
+  readonly tools: readonly string[];
 }

@@ -4,9 +4,9 @@
 // tool-dispatch turn loop (turn-loop.ts) and exposes the small surface the REPL (05) needs.
 
 import { buildSystemPrompt } from '../../context/index.js';
-import { PhaseFactory } from '../../phases/index.js';
+import { PhaseFactory, resolvePhaseTools } from '../../phases/index.js';
 import type { Phase } from '../../phases/index.js';
-import { ASK_USER, createToolContext, toolDefinitions } from '../../tools/index.js';
+import { createToolContext, toolDefinitions } from '../../tools/index.js';
 import type { SandboxClient } from '../container/index.js';
 import { OllamaClient } from '../llm/index.js';
 import type { Message, StreamHandle, TokenCounts, Tool, ToolCall } from '../llm/index.js';
@@ -20,7 +20,7 @@ import { SessionMemory } from './memory.js';
 import { drainAnsweredQuestions } from './question-store.js';
 import { compactActivePhase } from './summarizer.js';
 import type { ArchiveSummary, ClearResult, PhaseLoad } from './memory-store.type.js';
-import { SubagentManager, SUBAGENT_TOOL_NAMES } from './subagents.js';
+import { SubagentManager } from './subagents.js';
 import type { SubagentInfo } from './subagents.type.js';
 import { processMessage as processTurns } from './turn-loop.js';
 import type { TurnContext } from './turn-loop.js';
@@ -65,20 +65,11 @@ export class SessionOrchestrator implements TurnContext {
   // next call's exact prompt count as "after", then clears the entry.
   private readonly pendingSummarization = new Map<string, number | null>();
 
-  // The full tool set from the registry (V1/02), sent on every call for every phase — no per-phase
-  // gating. Built once; the registry is static. Includes the three sub-agent tools (V5/01).
+  // The full registry tool set (V1/02), built once — the registry is static. Handed to the
+  // SubagentManager, which filters the three sub-agent tools out of each sub-agent's own defs. A
+  // sub-agent is not a phase, so it has no array in phase-tool-names.ts; every PHASE gets its tools
+  // from resolvePhaseTools instead (see activeTools below and each runner's constructor).
   private readonly tools: Tool[] = toolDefinitions();
-
-  // The tool set handed to spawned EXECUTION windows (Worker/Reviewer/Retro): `tools` minus the three
-  // sub-agent tools, since those windows have no SubagentManager to back them, and minus ask_user
-  // (V6/01) — those windows run unattended (the user starts a batch and walks away, CLAUDE.md), so a
-  // question would block the run on a keypress nobody is there to press. They escalate through the
-  // Reviewer's raise_blocker instead, which is asynchronous by design. Interactive phases still get
-  // the full `tools`. Built once (the registry is static).
-  private readonly executionTools: Tool[] = this.tools.filter((tool) => {
-    const name = tool.function.name ?? '';
-    return !SUBAGENT_TOOL_NAMES.includes(name) && name !== ASK_USER;
-  });
 
   // Sub-agents (V5/01) the interactive phases spawn mid-turn: in-memory only, dropped at session end.
   // Exposed to the sub-agent tools via ctx.subagents, to `/subagents`, and to the status-line count.
@@ -256,7 +247,6 @@ export class SessionOrchestrator implements TurnContext {
     return runTaskLoop(
       {
         llm: this.llm,
-        tools: this.executionTools, // spawned windows don't get the sub-agent tools (no manager backs them)
         sandbox: this.sandbox,
         projectName: this.project,
         projectPath: this.projectPath,
@@ -279,7 +269,6 @@ export class SessionOrchestrator implements TurnContext {
     return spawnRetroWindow(
       {
         llm: this.llm,
-        tools: this.executionTools, // spawned windows don't get the sub-agent tools (no manager backs them)
         sandbox: this.sandbox,
         projectName: this.project,
         projectPath: this.projectPath,
@@ -292,11 +281,23 @@ export class SessionOrchestrator implements TurnContext {
 
   streamAsk(userInput: string): StreamHandle {
     this.memory.add('user', userInput);
-    return this.llm.stream(this.buildMessages(), this.tools);
+    return this.llm.stream(this.buildMessages(), this.activeTools());
   }
 
   streamContinue(): StreamHandle {
-    return this.llm.stream(this.buildMessages(), this.tools);
+    return this.llm.stream(this.buildMessages(), this.activeTools());
+  }
+
+  /**
+   * The active phase's tool definitions (phase-tool-names.ts). Resolved per call rather than cached:
+   * /swap changes the phase between turns, and the resolve is a filter over ~18 static entries.
+   * `registryOnly` because this path dispatches through the shared dispatcher (dispatch.ts → getTool),
+   * which cannot serve a phase-scoped tool — so swapping the active phase to reviewer/retro offers
+   * their registry tools and withholds submit_verdict/submit_retro, which only their own spawned
+   * windows can answer.
+   */
+  private activeTools(): Tool[] {
+    return resolvePhaseTools(this.phase.name, { registryOnly: true });
   }
 
   onTokens(tokens: TokenCounts): void {

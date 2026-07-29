@@ -1,7 +1,8 @@
 // Tool registry (V1/02). A STATIC list of every ToolModule (explicit imports the build can check —
 // no runtime fs scan). Duplicate names are rejected loudly at load. `toolDefinitions()` builds the
-// Ollama `tools` array sent on EVERY chat/stream call for EVERY phase — there is no per-phase tool
-// whitelist (the phase markdown steers which tools to use; the orchestrator never gates access).
+// FULL Ollama `tools` array, which is no longer handed to a phase as-is: phases/phase-tool-names.ts
+// holds one allowlist per phase and phases/resolve-phase-tools.ts narrows this set down to it.
+// Registering a tool here makes it AVAILABLE; a phase sees it only once its own array names it.
 
 import type { Tool } from '../core/llm/index.js';
 import { askSubagentTool } from './ask-subagent.js';

@@ -2,7 +2,7 @@
 // beside the function they serve (constitution: types live in a sibling file, never inline).
 
 import type { SandboxClient } from '../container/index.js';
-import type { OllamaClient, TokenCounts, Tool } from '../llm/index.js';
+import type { OllamaClient, TokenCounts } from '../llm/index.js';
 import type { ReviewVerdict } from './review-types.js';
 import type { ReviewerCommit } from './reviewer-runner.js';
 
@@ -21,7 +21,6 @@ export type TaskLoopOutcome = 'passed' | 'escalated' | 'blocked';
 /** The session infrastructure the loop binds a Worker/Reviewer window to (supplied by the orchestrator). */
 export interface TaskLoopDeps {
   readonly llm: OllamaClient;
-  readonly tools: Tool[];
   readonly sandbox: SandboxClient;
   readonly projectName: string;
   readonly projectPath: string;

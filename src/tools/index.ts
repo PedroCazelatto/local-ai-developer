@@ -1,6 +1,7 @@
 // tools/ — model-callable actions + the registry/dispatch spine (V1/02). Each tool is a ToolModule
-// dropped into this dir and listed in registry.ts; every phase gets every tool. read_file is the
-// first (V1/03 adds the rest of the file tools, V1/04/05 the shell/container tools).
+// dropped into this dir and listed in registry.ts; which phases may call it is set by the arrays in
+// phases/phase-tool-names.ts. read_file is the first (V1/03 adds the rest of the file tools,
+// V1/04/05 the shell/container tools).
 export type {
   ToolModule,
   ToolContext,

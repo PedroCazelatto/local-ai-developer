@@ -20,10 +20,11 @@
 import path from 'node:path';
 
 import { availablePhaseNames, buildSystemPrompt, loadPhasePrompt, phasePromptPath, PHASES_DIR } from '../../context/index.js';
+import { PHASE_SCOPED_TOOL_NAMES, RETRO_TOOL_NAMES, resolvePhaseTools } from '../../phases/index.js';
 import { createToolContext, resolveInProject, toolError } from '../../tools/index.js';
-import { applyPhaseRuleEdit, EDIT_PHASE_RULE, editPhaseRuleTool } from '../../tools/edit-phase-rule.js';
-import { READ_PHASE_RULE, readPhaseRule, readPhaseRuleTool } from '../../tools/read-phase-rule.js';
-import { parseRetroSubmission, SUBMIT_RETRO, submitRetroTool } from '../../tools/submit-retro.js';
+import { applyPhaseRuleEdit, EDIT_PHASE_RULE } from '../../tools/edit-phase-rule.js';
+import { READ_PHASE_RULE, readPhaseRule } from '../../tools/read-phase-rule.js';
+import { parseRetroSubmission, SUBMIT_RETRO } from '../../tools/submit-retro.js';
 import type { Message, StreamHandle, TokenCounts, Tool, ToolCall } from '../llm/index.js';
 import { addTokenCounts } from './add-token-counts.js';
 import { appendAuditRow } from './audit.js';
@@ -43,15 +44,12 @@ const RETRO_MAX_ROUNDS = 16;
 // edit, and signal other phases via the cross-phase inbox (V3/04). No write_file (Retro makes the
 // SMALLEST edit, not a rewrite), no shell/container tools. The inbox tools neither read nor touch the
 // single-file edit lock — they go through the read/inbox dispatch branch below.
-const RETRO_PROJECT_TOOL_NAMES: readonly string[] = [
-  'read_file',
-  'list_files',
-  'search_in_files',
-  'edit_file',
-  'inbox_read',
-  'inbox_post',
-  'inbox_resolve',
-];
+// The registry tools Retro may dispatch — its array from phase-tool-names.ts minus the phase-scoped
+// tools this window answers itself (read_phase_rule / edit_phase_rule / submit_retro). callTool routes
+// on this; the definitions sent to the model come from resolvePhaseTools('retro'), one shared array.
+const RETRO_PROJECT_TOOL_NAMES: readonly string[] = RETRO_TOOL_NAMES.filter(
+  (name) => !PHASE_SCOPED_TOOL_NAMES.includes(name),
+);
 
 /** The project-scoped edit tool whose success locks the window's single-file target. */
 const PROJECT_EDIT_TOOL = 'edit_file';
@@ -109,13 +107,10 @@ class RetroWindow implements TurnContext {
     systemPrompt: string,
   ) {
     this.messages = [{ role: 'system', content: systemPrompt }];
-    const project = deps.tools.filter((tool) => {
-      const name = tool.function.name;
-      return name !== undefined && RETRO_PROJECT_TOOL_NAMES.includes(name);
-    });
-    // The rules-scoped tools + submit_retro are phase-scoped here and never in the global registry — so
-    // no other phase (or the Worker's tool list) can reach rules/phases/ or end a Retro.
-    this.retroTools = [...project, readPhaseRuleTool, editPhaseRuleTool, submitRetroTool];
+    // One array covers both halves: the project read/edit + inbox tools AND the phase-scoped trio. The
+    // rules-scoped pair and submit_retro are never in the global registry — so no other phase (nor the
+    // Worker's tool list) can reach rules/phases/ or end a Retro.
+    this.retroTools = resolvePhaseTools('retro');
   }
 
   /** Absolute path of the single file Retro patched, or null if it never made a successful edit. */

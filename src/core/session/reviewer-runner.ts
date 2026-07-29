@@ -20,13 +20,14 @@
 // surfaces the verdict + exact tokens.
 
 import { buildSystemPrompt, loadPhasePrompt } from '../../context/index.js';
+import { PHASE_SCOPED_TOOL_NAMES, REVIEWER_TOOL_NAMES, resolvePhaseTools } from '../../phases/index.js';
 import { createToolContext } from '../../tools/index.js';
 import { toolError } from '../../tools/index.js';
 import { COMMIT_CHANGES } from '../../tools/commit-changes.js';
 import { LIST_CHANGES } from '../../tools/list-changes.js';
-import { MARK_TASK_DONE, markTaskDoneTool } from '../../tools/mark-task-done.js';
-import { RAISE_BLOCKER, raiseBlockerTool, validateBlockerRequest } from '../../tools/raise-blocker.js';
-import { SUBMIT_VERDICT, parseVerdict, submitVerdictTool } from '../../tools/submit-verdict.js';
+import { MARK_TASK_DONE } from '../../tools/mark-task-done.js';
+import { RAISE_BLOCKER, validateBlockerRequest } from '../../tools/raise-blocker.js';
+import { SUBMIT_VERDICT, parseVerdict } from '../../tools/submit-verdict.js';
 import type { SandboxClient } from '../container/index.js';
 import type { OllamaClient, Message, StreamHandle, TokenCounts, Tool, ToolCall } from '../llm/index.js';
 import { addTokenCounts } from './add-token-counts.js';
@@ -51,38 +52,17 @@ const REVIEWER_MAX_ROUNDS = 16;
 const MAX_VERDICT_ATTEMPTS = 2;
 
 /**
- * The Reviewer's tool allowlist: read-mostly for CODE, plus the git tools. It still gets no
- * write_file/edit_file — it judges the Worker's code and must never be able to quietly patch it and
- * then pass its own edit. execute_command is read-mostly by nature (root sandbox at /workspace) and
- * allowed for inspection; the prompt steers it toward reads, not mutation.
- * search_rules/load_rule (V4/02) let the Reviewer resolve a layering/testing/naming question to a
- * standard and load its body to judge + cite against, without the catalog ever entering context. The
- * cross-phase inbox tools (V3/04) are the one deliberate write channel: the Reviewer already signalled
- * other phases via the shared channel (was AGENT_NOTES.md) — the inbox is its structured replacement.
- * list_changes/commit_changes make the Reviewer the committing authority for execution work: it is the
- * gatekeeper, so it — not the Worker — is what stands between written code and the git history.
+ * The registry tools the Reviewer may dispatch — its array from phase-tool-names.ts minus the
+ * phase-scoped exits this window answers itself (submit_verdict / raise_blocker / mark_task_done).
+ * Used by callTool to decide what goes to the shared dispatcher; the definitions sent to the model
+ * come from resolvePhaseTools('reviewer'), so both sides read the same one array.
  */
-export const REVIEWER_TOOL_NAMES: readonly string[] = [
-  'read_file',
-  'search_in_files',
-  'list_files',
-  'run_in_project',
-  'execute_command',
-  // Standards retrieval (V4/02) — cite a standard while judging Worker code (the V4 exit criterion).
-  'search_rules',
-  'load_rule',
-  'inbox_read',
-  'inbox_post',
-  'inbox_resolve',
-  // Project git — see what the Worker left, then commit exactly the files this review accepts.
-  LIST_CHANGES,
-  COMMIT_CHANGES,
-];
+const REVIEWER_DISPATCHABLE: readonly string[] = REVIEWER_TOOL_NAMES.filter(
+  (name) => !PHASE_SCOPED_TOOL_NAMES.includes(name),
+);
 
 export interface ReviewerDeps {
   readonly llm: OllamaClient;
-  /** The full registry tool set (toolDefinitions()); filtered here to read-mostly + submit_verdict. */
-  readonly tools: Tool[];
   readonly sandbox: SandboxClient;
   readonly projectName: string;
   readonly projectPath: string;
@@ -176,14 +156,10 @@ class ReviewerWindow implements TurnContext {
     private readonly round: number,
   ) {
     this.messages = [{ role: 'system', content: systemPrompt }];
-    const allowed = deps.tools.filter((tool) => {
-      const name = tool.function.name;
-      return name !== undefined && REVIEWER_TOOL_NAMES.includes(name);
-    });
-    // submit_verdict (the normal exit), raise_blocker (the halt exit) and mark_task_done (closing the
-    // task under review) are ALL phase-scoped here and never in the global registry — so the Worker's
-    // tool list can't contain any of them.
-    this.reviewerTools = [...allowed, submitVerdictTool, raiseBlockerTool, markTaskDoneTool];
+    // One array covers both halves: the read-mostly registry tools AND the three phase-scoped exits —
+    // submit_verdict (the normal exit), raise_blocker (the halt exit), mark_task_done (closing the task
+    // under review). Those three are never in the global registry, so no other phase's list can hold them.
+    this.reviewerTools = resolvePhaseTools('reviewer');
   }
 
   /** The validated verdict, or null if the Reviewer never produced a usable one. */
@@ -258,7 +234,7 @@ class ReviewerWindow implements TurnContext {
     if (name === MARK_TASK_DONE) {
       return this.captureTaskDone(args);
     }
-    if (REVIEWER_TOOL_NAMES.includes(name)) {
+    if (REVIEWER_DISPATCHABLE.includes(name)) {
       const ctx = createToolContext({
         projectName: this.deps.projectName,
         projectPath: this.deps.projectPath,

@@ -1,7 +1,8 @@
 // Tool types (V1/02). One vocabulary for every model-callable action: the module shape the
 // registry discovers, the context a tool runs against, and the result/error contract the
-// dispatcher understands. Every phase gets every tool (no per-phase gating — the phase markdown
-// steers usage, code does not); the dispatcher is the single choke point where calls are
+// dispatcher understands. Which tools a phase may call is decided by its array in
+// phases/phase-tool-names.ts (the markdown steers WHEN to reach for one, the array decides whether
+// it is reachable at all); the dispatcher is the single choke point where calls are
 // validated, executed, audited (V1/06), and turned into a `tool` message the model reads.
 
 import type { SandboxClient } from '../core/container/index.js';
