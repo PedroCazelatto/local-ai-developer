@@ -8,6 +8,7 @@ Close the learning loop after a blocker. When the Reviewer raised a blocker and 
 - **Classify the gap before editing:** decide whether it is systemic or task-specific (see below). The classification decides *which* file you touch.
 - **Smallest correct edit:** change only what's needed so this class of mistake is caught earlier next time. Don't rewrite a whole phase.
 - **One file:** patch the one place the fix belongs. If it seems to belong in two places, you've probably mis-classified — re-check.
+- **Write the patch in Simplified Technical English:** short active sentences, one idea each, the plainest word that fits. A rule that can be misread is the exact failure you are here to fix, so call `load_rule("simplified-technical-english")` before you edit.
 
 ## Classifying the gap
 - **Systemic** — something that *should* have been caught during Discovery, Design, or Review (a question the protocol should always ask, a check the Reviewer should always run). → Edit the relevant **global phase file** under `rules/phases/`.

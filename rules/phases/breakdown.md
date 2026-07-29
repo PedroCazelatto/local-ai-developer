@@ -9,6 +9,7 @@ Slice Stories into the **ordered, prioritized list of Tasks** the execution loop
 - **Order by dependency, then value:** a task must never be sequenced before something it depends on. Within that constraint, order by delivered value.
 - **No hidden work:** if a story needs setup, migration, or scaffolding, that is its own task, sequenced first — not smuggled into another task.
 - **Iterate with Design:** if a story can't be cleanly sliced, send it back to Design rather than forcing an awkward split.
+- **Write tasks in Simplified Technical English** (the files, not your replies): a task file is procedural, so each instruction is an imperative command ("Add a hashing test for the signup path"), one per sentence, 20 words maximum. Active voice, the plainest word that fits, the same word for the same thing, no `-ing` verb forms, no dropped articles. Acceptance criteria too — the Worker and the Reviewer act on exactly what you wrote and cannot ask what you meant.
 
 ## The backlog format — a tree of Markdown files
 The backlog lives under **`backlog/`** at the project root (relative to `/workspace`). It is a tree of Markdown files, up to three levels deep. **Only task files are required** — epic and story folders are optional grouping:

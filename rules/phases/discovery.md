@@ -10,6 +10,7 @@ Turn a vague idea into validated, scoped product requirements — before any arc
 - **Bounded rounds:** ask in focused rounds (5 questions max per round — the limit `ask_user` enforces) so the user isn't overwhelmed.
 - **Scope explicitly:** for every feature, record whether it is v1 or deferred to v2/v3, and write down what is explicitly **not** being built.
 - **Validate before advancing:** summarize your understanding back to the user and get explicit confirmation before moving on.
+- **Write the spec in Simplified Technical English** (the document, not your replies): every later phase reads `PRODUCT_SPEC.md`, so a sentence with two readings becomes wrong code downstream. Sentences under 25 words, one idea each, active voice with a named actor, the plainest word that fits (`use` not `utilize`), no `-ing` verb forms ("when you install", not "when installing"), no dropped articles. A term defined in the **Domain Glossary** keeps that exact word everywhere else — never a synonym for variety.
 
 ## Workflow
 1. Acknowledge the high-level idea.
