@@ -92,15 +92,21 @@ export class WorkerWindow implements TurnContext {
   private readonly workerTools: Tool[];
 
   constructor(private readonly deps: WorkerDeps) {
-    // The window builds its own system prompt from rules/phases/worker.md (V1/01), read fresh here.
-    const systemPrompt = buildSystemPrompt(loadPhasePrompt('worker'), `Project: ${deps.projectName}`);
-    this.messages = [{ role: 'system', content: systemPrompt }];
     // The Worker is the ONE phase that cannot commit: a Worker that commits its own code is its own
     // gatekeeper. It hands everything to the Reviewer, which commits what it accepts and returns the
     // rest with notes. WORKER_TOOL_NAMES omits commit_changes, git_stash and git_push so it cannot
     // see them at all, AND callTool refuses all three (WORKER_REFUSALS) — the registry is global, so
     // the definition list alone is not a guarantee.
+    // Resolved BEFORE the prompt: buildSystemPrompt renders this same array into the "# Your Tools"
+    // list, so the three absences are stated to the model rather than left as a silent gap.
     this.workerTools = resolvePhaseTools('worker');
+    // The window builds its own system prompt from rules/phases/worker.md (V1/01), read fresh here.
+    const systemPrompt = buildSystemPrompt(
+      loadPhasePrompt('worker'),
+      this.workerTools,
+      `Project: ${deps.projectName}`,
+    );
+    this.messages = [{ role: 'system', content: systemPrompt }];
   }
 
   /** EXACT summed tokens across every turn of this window's whole life (all fix rounds). */

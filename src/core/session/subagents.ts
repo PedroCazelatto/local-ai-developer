@@ -14,6 +14,7 @@ import { ASK_SUBAGENT } from '../../tools/ask-subagent.js';
 import { DISMISS_SUBAGENT } from '../../tools/dismiss-subagent.js';
 import { SPAWN_SUBAGENT } from '../../tools/spawn-subagent.js';
 import { createToolContext } from '../../tools/index.js';
+import { resolvePhaseTools } from '../../phases/index.js';
 import type { Message, TokenCounts, Tool } from '../llm/index.js';
 import * as renderer from '../ui/renderer.js';
 import { addTokenCounts } from './add-token-counts.js';
@@ -42,13 +43,29 @@ const SUBAGENT_MAX_ROUNDS = 12;
 
 export class SubagentManager implements SubagentHandle {
   private readonly agents = new Map<string, SubagentState>();
-  /** The master's tool set MINUS the three sub-agent tools — computed ONCE, shared by every sub-agent. */
-  private readonly subagentTools: Tool[];
 
-  constructor(private readonly deps: SubagentDeps) {
-    // No nesting, verified by construction: if the tools are absent from a sub-agent's definitions, it
-    // can't call them (defense beyond ctx.subagents being undefined in a sub-agent's own dispatch).
-    this.subagentTools = deps.tools.filter((tool) => !SUBAGENT_TOOL_NAMES.includes(tool.function.name ?? ''));
+  constructor(private readonly deps: SubagentDeps) {}
+
+  /**
+   * The tool defs for a sub-agent of `masterPhase`: that phase's OWN allowlist minus the three
+   * sub-agent tools. Resolved per spawn, not once in the constructor — the master phase changes with
+   * /swap, and this tool set is the master's, so a single set computed at construction would be the
+   * wrong one for every phase but the first.
+   *
+   * Inheriting the MASTER'S array (not the full registry) is what makes the phase gate hold: a
+   * sub-agent that got the whole registry would be a way to reach tools its master cannot call —
+   * Discovery has no shell, so its sub-agent must not have one either. `registryOnly` because a
+   * sub-agent dispatches through the shared registry-backed dispatcher, which cannot serve a
+   * phase-scoped tool (it would answer "unknown tool").
+   */
+  private toolsForMaster(masterPhase: string): Tool[] {
+    // resolvePhaseTools: the phase's names from phase-tool-names.ts turned into Tool definitions,
+    // throwing a typed PhaseToolsError on an unknown phase or an unknown tool name.
+    return resolvePhaseTools(masterPhase, { registryOnly: true }).filter(
+      // No nesting, verified by construction: absent definitions mean it cannot call them at all
+      // (defense beyond ctx.subagents being undefined in a sub-agent's own dispatch).
+      (tool) => !SUBAGENT_TOOL_NAMES.includes(tool.function.name ?? ''),
+    );
   }
 
   get count(): number {
@@ -69,7 +86,7 @@ export class SubagentManager implements SubagentHandle {
       numCtx: this.deps.numCtx,
       // Seeded ONLY with the master's brief + task — never the master's history (isolation).
       messages: [{ role: 'system', content: initialContext }],
-      toolDefs: this.subagentTools,
+      toolDefs: this.toolsForMaster(masterPhase),
       masterPhase,
       createdAt: Date.now(),
       promptTokens: 0,

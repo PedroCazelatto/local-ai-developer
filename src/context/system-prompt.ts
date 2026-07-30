@@ -1,8 +1,12 @@
 // Minimal system-prompt builder (ports context/builder.py's ContextBuilder). Assembles the
-// system message from the active phase's instructions + shared tool-use mechanics + how output is
-// displayed + a one-line project state. The phase markdown says WHICH tools to reach for; these
-// blocks say HOW to call them, what to do with their results, and how the reply will be rendered —
-// kept in code so the six phase files don't each repeat it.
+// system message from the active phase's instructions + the tools that phase actually holds +
+// shared tool-use mechanics + how output is displayed + a one-line project state. The phase
+// markdown says WHICH tools to reach for; these blocks say WHAT exists, HOW to call them, what to
+// do with their results, and how the reply will be rendered — kept in code so the six phase files
+// don't each repeat it.
+
+import type { Tool } from '../core/llm/index.js';
+import { buildToolSection } from './build-tool-section.js';
 
 // The model writes PLAIN markdown and never names a color: the terminal renderer (theme.ts +
 // render-markdown-line.ts) owns the construct→color mapping, so the palette is retuned in one place
@@ -24,7 +28,20 @@ const TOOL_USE_GUIDANCE = `# Tool Use
 - When you ran a tool only to inform your own reasoning and the user did not ask to see the raw output, just use the result — you need not paste it back. For long command or test logs, report the outcome and the key lines rather than the entire log.
 - NEVER paste a file's contents into your reply. After you write or edit a file, say what you changed and give the file **path** (e.g. \`src/foo/bar.ts\`) — the file on disk is the source of truth and can be read from that path later; a copy in the chat only bloats the context. When you read a file to inform your own work, use what you learned from it; do not echo the whole file back. Quote at most the few specific lines that matter to the point you are making.`;
 
-/** Build the system prompt for a turn: phase instructions + tool-use + output format + project context. */
-export function buildSystemPrompt(instructions: string, projectState: string): string {
-  return `${instructions}\n\n${TOOL_USE_GUIDANCE}\n\n${OUTPUT_FORMAT_GUIDANCE}\n\n# Project Context\n${projectState}\n`;
+/**
+ * Build the system prompt for a turn: phase instructions + the tool inventory + tool-use + output
+ * format + project context.
+ *
+ * `tools` MUST be the very array this window sends to Ollama on the same call. buildToolSection
+ * renders it into the closed "# Your Tools" list, so the prompt can never advertise a surface the
+ * model does not hold — the drift the phase files' hand-written inventories kept reintroducing.
+ * The inventory sits BEFORE the mechanics block: what exists, then how to call it.
+ */
+export function buildSystemPrompt(
+  instructions: string,
+  tools: readonly Tool[],
+  projectState: string,
+): string {
+  const toolSection = buildToolSection(tools);
+  return `${instructions}\n\n${toolSection}\n\n${TOOL_USE_GUIDANCE}\n\n${OUTPUT_FORMAT_GUIDANCE}\n\n# Project Context\n${projectState}\n`;
 }

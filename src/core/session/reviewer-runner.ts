@@ -460,7 +460,14 @@ Committing this review:
  * when this resolves. Throws ReviewerVerdictError if the Reviewer never produced a usable verdict.
  */
 export async function runReviewerTask(deps: ReviewerDeps, input: ReviewerInput): Promise<ReviewerOutcome> {
-  const systemPrompt = buildSystemPrompt(loadPhasePrompt('reviewer'), `Project: ${deps.projectName}`);
+  // resolvePhaseTools is pure over a static registry, so this resolve and the window's own (which
+  // feeds Ollama) return the same array — the prompt's "# Your Tools" list names submit_verdict,
+  // raise_blocker and mark_task_done alongside the registry tools, exactly as the window sends them.
+  const systemPrompt = buildSystemPrompt(
+    loadPhasePrompt('reviewer'),
+    resolvePhaseTools('reviewer'),
+    `Project: ${deps.projectName}`,
+  );
   const window = new ReviewerWindow(deps, systemPrompt, input.task, input.round);
   await processMessage(window, buildReviewerSeed(input), REVIEWER_MAX_ROUNDS);
 

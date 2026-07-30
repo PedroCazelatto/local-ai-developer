@@ -29,9 +29,14 @@ export const PHASE_SCOPED_TOOL_NAMES: readonly string[] = [
 
 /**
  * Discovery — the interview. Writes PRODUCT_SPEC.md, commits each validated section, and asks the
- * user through ask_user. Keeps execute_command/run_in_project: the planning phases have always had
- * them, and which commands (if any) deserve blocking is still an open question — see
- * backlog/planning-phase-tool-lists.md. Removing them now would be a guess.
+ * user through ask_user.
+ *
+ * NO SHELL. `execute_command` and `run_in_project` are deliberately absent from all three planning
+ * phases: planning writes documents, and read_file/list_files/search_in_files already cover every
+ * inspection a spec or a backlog needs. A build or a test run during an interview spends the VRAM
+ * budget on work the execution loop exists to do. This follows the constitution's "grow the tool set
+ * on demand" — the day a planning phase demonstrably needs a command, it gets one back, with the
+ * reason recorded here.
  */
 export const DISCOVERY_TOOL_NAMES: readonly string[] = [
   'read_file',
@@ -39,8 +44,6 @@ export const DISCOVERY_TOOL_NAMES: readonly string[] = [
   'edit_file',
   'list_files',
   'search_in_files',
-  'execute_command',
-  'run_in_project',
   'list_changes',
   'commit_changes',
   'git_stash',
@@ -58,15 +61,13 @@ export const DISCOVERY_TOOL_NAMES: readonly string[] = [
   'ask_user',
 ];
 
-/** Design — architecture + stories into PRODUCT_SPEC.md. Same surface as Discovery. */
+/** Design — architecture + stories into PRODUCT_SPEC.md. Same surface as Discovery, no shell. */
 export const DESIGN_TOOL_NAMES: readonly string[] = [
   'read_file',
   'write_file',
   'edit_file',
   'list_files',
   'search_in_files',
-  'execute_command',
-  'run_in_project',
   'list_changes',
   'commit_changes',
   'git_stash',
@@ -84,15 +85,13 @@ export const DESIGN_TOOL_NAMES: readonly string[] = [
   'ask_user',
 ];
 
-/** Breakdown — slices stories into the backlog task tree. Same surface as Discovery. */
+/** Breakdown — slices stories into the backlog task tree. Same surface as Discovery, no shell. */
 export const BREAKDOWN_TOOL_NAMES: readonly string[] = [
   'read_file',
   'write_file',
   'edit_file',
   'list_files',
   'search_in_files',
-  'execute_command',
-  'run_in_project',
   'list_changes',
   'commit_changes',
   'git_stash',

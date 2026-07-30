@@ -6,7 +6,7 @@
 import { buildSystemPrompt } from '../../context/index.js';
 import { PhaseFactory, resolvePhaseTools } from '../../phases/index.js';
 import type { Phase } from '../../phases/index.js';
-import { createToolContext, toolDefinitions } from '../../tools/index.js';
+import { createToolContext } from '../../tools/index.js';
 import type { SandboxClient } from '../container/index.js';
 import { OllamaClient } from '../llm/index.js';
 import type { Message, StreamHandle, TokenCounts, Tool, ToolCall } from '../llm/index.js';
@@ -65,12 +65,6 @@ export class SessionOrchestrator implements TurnContext {
   // next call's exact prompt count as "after", then clears the entry.
   private readonly pendingSummarization = new Map<string, number | null>();
 
-  // The full registry tool set (V1/02), built once — the registry is static. Handed to the
-  // SubagentManager, which filters the three sub-agent tools out of each sub-agent's own defs. A
-  // sub-agent is not a phase, so it has no array in phase-tool-names.ts; every PHASE gets its tools
-  // from resolvePhaseTools instead (see activeTools below and each runner's constructor).
-  private readonly tools: Tool[] = toolDefinitions();
-
   // Sub-agents (V5/01) the interactive phases spawn mid-turn: in-memory only, dropped at session end.
   // Exposed to the sub-agent tools via ctx.subagents, to `/subagents`, and to the status-line count.
   private readonly subagents: SubagentManager;
@@ -90,12 +84,12 @@ export class SessionOrchestrator implements TurnContext {
     // On a restart that restores persisted turns, emit a V5/04 memory_load carrying the exact restored
     // prompt_eval_count (a fresh project with no history emits nothing — emitMemoryLoad guards on turns).
     this.emitMemoryLoad(this.memory.activatePhase(this.phase.name));
-    // The manager gets the FULL tool set and filters the three sub-agent tools out of each sub-agent's
-    // own defs (no nesting). num_ctx is the session's; the live model is read from `llm` at spawn (V5/02 —
-    // every window shares the one live model, which only ever changes between turns).
+    // The manager resolves each sub-agent's tools from ITS MASTER PHASE's allowlist at spawn (minus the
+    // three sub-agent tools, so no nesting) — a sub-agent never gets the full registry, which would be a
+    // way around its master's gate. num_ctx is the session's; the live model is read from `llm` at spawn
+    // (V5/02 — every window shares the one live model, which only ever changes between turns).
     this.subagents = new SubagentManager({
       llm: this.llm,
-      tools: this.tools,
       sandbox: this.sandbox,
       projectName: this.project,
       projectPath: this.projectPath,
@@ -418,7 +412,14 @@ export class SessionOrchestrator implements TurnContext {
 
   /** System prompt (from the ACTIVE phase's instructions + project state) then that phase's history. */
   private buildMessages(): Message[] {
-    const system = buildSystemPrompt(this.phase.instructions, `Project: ${this.project}`);
+    // Same activeTools() call the stream uses, so the prompt's "# Your Tools" list is exactly the
+    // surface this turn sends — including the registryOnly narrowing when the user swaps the active
+    // phase to reviewer/retro, whose phase-scoped tools this path cannot serve.
+    const system = buildSystemPrompt(
+      this.phase.instructions,
+      this.activeTools(),
+      `Project: ${this.project}`,
+    );
     return [{ role: 'system', content: system }, ...this.memory.history];
   }
 }

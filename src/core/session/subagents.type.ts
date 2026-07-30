@@ -22,7 +22,11 @@ export interface SubagentState {
   readonly numCtx: number;
   /** Its OWN isolated history: the system brief + the task + every turn since. Never the master's history. */
   readonly messages: Message[];
-  /** The master's tool set MINUS the three sub-agent tools — no nested sub-agents (verified by construction). */
+  /**
+   * The MASTER PHASE's own allowlist minus the three sub-agent tools — never the full registry, so a
+   * sub-agent can never reach a tool its master is gated out of. No nested sub-agents, verified by
+   * construction. Resolved at spawn from the master phase (SubagentManager.toolsForMaster).
+   */
   readonly toolDefs: Tool[];
   /** The phase that spawned it — stamped as `phase` on every audit row for this sub-agent's tool calls. */
   readonly masterPhase: string;
@@ -37,8 +41,6 @@ export interface SubagentState {
 /** Everything the SubagentManager needs to run + audit sub-agent turns against the session's one model. */
 export interface SubagentDeps {
   readonly llm: OllamaClient;
-  /** The FULL registry tool set (toolDefinitions()); the manager filters out the three sub-agent tools. */
-  readonly tools: Tool[];
   readonly sandbox: SandboxClient;
   readonly projectName: string;
   readonly projectPath: string;

@@ -459,7 +459,13 @@ function routeEdit(
  * the session alive and the answer already recorded).
  */
 export async function spawnRetro(deps: RetroDeps, input: RetroInput): Promise<RetroResult> {
-  const systemPrompt = buildSystemPrompt(loadPhasePrompt('retro'), `Project: ${deps.projectName}`);
+  // Same pure resolve the window uses for its own defs, so the prompt's "# Your Tools" list names
+  // read_phase_rule/edit_phase_rule/submit_retro exactly as the window sends them.
+  const systemPrompt = buildSystemPrompt(
+    loadPhasePrompt('retro'),
+    resolvePhaseTools('retro'),
+    `Project: ${deps.projectName}`,
+  );
   const window = new RetroWindow(deps, systemPrompt);
   await processMessage(window, buildRetroSeed(input), RETRO_MAX_ROUNDS);
 
