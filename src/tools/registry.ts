@@ -11,6 +11,10 @@ import { commitChangesTool } from './commit-changes.js';
 import { dismissSubagentTool } from './dismiss-subagent.js';
 import { editFileTool } from './edit-file.js';
 import { executeCommandTool } from './execute-command.js';
+import { gitBranchTool } from './git-branch.js';
+import { gitInspectTool } from './git-inspect.js';
+import { gitPushTool } from './git-push.js';
+import { gitStashTool } from './git-stash.js';
 import { inboxPostTool } from './inbox-post.js';
 import { inboxReadTool } from './inbox-read.js';
 import { inboxResolveTool } from './inbox-resolve.js';
@@ -40,6 +44,14 @@ const TOOL_MODULES: readonly ToolModule[] = [
   // work; the Worker window strips commit_changes out (it hands everything to the Reviewer instead).
   listChangesTool,
   commitChangesTool,
+  // The rest of git, one tool per operation group. Registered globally; phase-tool-names.ts decides
+  // who gets what. git_inspect is read-only and goes to every phase; git_stash and git_push are
+  // withheld from the Worker (it must not be able to hide the work the Reviewer judges, and it has no
+  // commits of its own to publish), while git_branch is how it puts itself on the task's branch.
+  gitStashTool,
+  gitInspectTool,
+  gitBranchTool,
+  gitPushTool,
   // Cross-phase inbox (V3/04) — the AGENT_NOTES.md replacement; global (every phase reads/posts).
   inboxReadTool,
   inboxPostTool,

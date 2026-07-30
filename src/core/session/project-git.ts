@@ -2,14 +2,16 @@
 // is the only host-side process (CLAUDE.md), so these run git on the HOST against projects/<name> —
 // exactly like run.ts's showTouchedFiles — NOT in a container: the node:24-slim sandbox ships no
 // git, and diff-capture + commit are orchestrator actions gated on the user's accept, never model
-// tool calls. Every call passes an explicit `-C <projectPath>` with an argv (no shell), so nothing
-// can escape the project repo.
+// tool calls. Every call goes through runGit (run-git.ts), which pins git to the project repo with an
+// explicit `-C <projectPath>` and an argv, no shell — so nothing can escape it. The model-facing git
+// tools (stash / branch / push / inspect) live in the project-git-*.ts siblings and share that same
+// invocation.
 
-import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync, statSync } from 'node:fs';
 import path from 'node:path';
 
 import { truncateHeadTail } from '../../tools/truncate.js';
+import { runGit } from './run-git.js';
 
 /** Char budget for the diff fed to the Reviewer — bounded so a huge change can't blow past num_ctx. */
 export const REVIEW_DIFF_BUDGET = 12_000;
@@ -38,26 +40,6 @@ export interface CommitResult {
   readonly error?: string;
 }
 
-interface GitRun {
-  readonly ok: boolean;
-  readonly stdout: string;
-  readonly stderr: string;
-}
-
-/** Run one git command against the project repo. Never throws — a non-zero exit is captured. */
-function runGit(projectPath: string, args: readonly string[]): GitRun {
-  try {
-    const stdout = execFileSync('git', ['-C', projectPath, ...args], {
-      encoding: 'utf-8',
-      maxBuffer: 64 * 1024 * 1024,
-    });
-    return { ok: true, stdout, stderr: '' };
-  } catch (err) {
-    const e = err as { stdout?: string; stderr?: string; message?: string };
-    return { ok: false, stdout: e.stdout ?? '', stderr: (e.stderr ?? e.message ?? 'git failed').trim() };
-  }
-}
-
 /** Strip a `git status --porcelain` line to its project-relative path (handles rename + quoting). */
 function porcelainPath(line: string): string {
   let p = line.slice(3); // after the 2-char XY status + a space
@@ -73,6 +55,10 @@ export function isWorkingTreeDirty(projectPath: string): boolean {
 
 // Stash label prefix: a task-keyed `git stash` message so a failed attempt is recoverable by task id
 // (the stash message IS the durable record — no separate store). One stash per task at a time.
+//
+// This prefix is the TASK LOOP'S and nothing else may touch it. The model's own stash tool uses a
+// disjoint `lad-shelf:` prefix (project-git-stash.ts) precisely so a model can never pop or drop the
+// record Retro and the user depend on — the two namespaces must never be merged.
 const STASH_LABEL_PREFIX = 'lad-stash:';
 
 /** The `stash@{n}` ref of the task's labeled stash, or null if it has none (found by message, not index,

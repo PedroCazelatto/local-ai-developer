@@ -9,12 +9,15 @@ import { resolvePhaseTools } from '../../phases/index.js';
 import { createToolContext } from '../../tools/index.js';
 import { toolError, truncateHeadTail } from '../../tools/index.js';
 import { COMMIT_CHANGES } from '../../tools/commit-changes.js';
+import { GIT_PUSH } from '../../tools/git-push.js';
+import { GIT_STASH } from '../../tools/git-stash.js';
 import type { SandboxClient } from '../container/index.js';
 import type { OllamaClient, Message, StreamHandle, TokenCounts, Tool, ToolCall } from '../llm/index.js';
 import { addTokenCounts } from './add-token-counts.js';
 import { appendAuditRow } from './audit.js';
 import type { ToolCallRecord } from './dispatch.js';
 import { dispatchToolCall } from './dispatch.js';
+import { taskBranchName } from './task-branch-name.js';
 import { processMessage } from './turn-loop.js';
 import type { TurnContext } from './turn-loop.js';
 import type { Task } from './types.js';
@@ -46,6 +49,31 @@ export interface WorkerResult {
 const TEST_RUN_CAPTURE_LIMIT = 4000;
 
 /**
+ * The tools the Worker window refuses outright, each with the sentence the Worker is shown. These are
+ * already absent from WORKER_TOOL_NAMES, so the model is never offered them — the refusal is the
+ * second line of defense, because a model that recovers a tool call from bare JSON can name a tool it
+ * was never offered.
+ *
+ * All three protect the same thing: the Reviewer's position as the gate between written code and the
+ * git history. Committing its own work would make the Worker its own gatekeeper; stashing would let
+ * it hide the work the Reviewer is about to judge; pushing publishes commits it did not make.
+ */
+const WORKER_REFUSALS: Readonly<Record<string, { readonly error: string; readonly hint: string }>> = {
+  [COMMIT_CHANGES]: {
+    error: 'the Worker cannot commit — the Reviewer commits the work it accepts.',
+    hint: 'Finish the code and end with your SUMMARY. The Reviewer commits every file it accepts and returns the rest to you with notes.',
+  },
+  [GIT_STASH]: {
+    error: 'the Worker cannot stash — your work must stay in the working tree for the Reviewer to judge.',
+    hint: 'Leave the code where it is. If you need to move to another branch, git_branch with action:"create" carries your changes with you.',
+  },
+  [GIT_PUSH]: {
+    error: 'the Worker cannot push — it has no commits of its own, because it does not commit.',
+    hint: 'Finish the code and end with your SUMMARY. Publishing is not part of implementing a task.',
+  },
+};
+
+/**
  * A single Worker window implementing the turn loop's TurnContext against its OWN messages array —
  * isolated from the session's per-phase histories (Foundation/06) and from other tasks. Tool calls
  * dispatch through the shared registry and are audited as phase "worker". Reused ACROSS the V3/01 fix
@@ -69,8 +97,9 @@ export class WorkerWindow implements TurnContext {
     this.messages = [{ role: 'system', content: systemPrompt }];
     // The Worker is the ONE phase that cannot commit: a Worker that commits its own code is its own
     // gatekeeper. It hands everything to the Reviewer, which commits what it accepts and returns the
-    // rest with notes. WORKER_TOOL_NAMES omits commit_changes so it cannot see the tool at all, AND
-    // callTool refuses it — the registry is global, so the definition list is what keeps it away.
+    // rest with notes. WORKER_TOOL_NAMES omits commit_changes, git_stash and git_push so it cannot
+    // see them at all, AND callTool refuses all three (WORKER_REFUSALS) — the registry is global, so
+    // the definition list alone is not a guarantee.
     this.workerTools = resolvePhaseTools('worker');
   }
 
@@ -108,11 +137,12 @@ export class WorkerWindow implements TurnContext {
   }
 
   async callTool(name: string, args: Record<string, unknown>): Promise<string> {
-    // commit_changes is a global registry tool, so the dispatcher WOULD run it if asked. Refuse it
-    // here (recoverable + audited) rather than relying on it being absent from the definitions: a
-    // model that recovers a tool call from bare JSON can name a tool it was never offered.
-    if (name === COMMIT_CHANGES) {
-      return this.refuseCommit(name, args);
+    // commit_changes / git_stash / git_push are global registry tools, so the dispatcher WOULD run
+    // them if asked. Refuse them here (recoverable + audited) rather than relying on their absence
+    // from the definitions — see WORKER_REFUSALS.
+    const refusal = WORKER_REFUSALS[name];
+    if (refusal !== undefined) {
+      return this.refuse(name, args, refusal.error, refusal.hint);
     }
     const ctx = createToolContext({
       projectName: this.deps.projectName,
@@ -132,13 +162,9 @@ export class WorkerWindow implements TurnContext {
     return result;
   }
 
-  /** Tell the Worker to route the commit through the Reviewer, and audit the attempt. */
-  private refuseCommit(name: string, args: Record<string, unknown>): string {
-    const message = 'the Worker cannot commit — the Reviewer commits the work it accepts.';
-    const err = toolError(
-      message,
-      'Finish the code and end with your SUMMARY. The Reviewer commits every file it accepts and returns the rest to you with notes.',
-    );
+  /** Refuse a withheld tool with a recoverable message, and audit the attempt like any other call. */
+  private refuse(name: string, args: Record<string, unknown>, message: string, hint: string): string {
+    const err = toolError(message, hint);
     const output = typeof err.content === 'string' ? err.content : JSON.stringify(err.content);
     const record: ToolCallRecord = {
       ts: new Date().toISOString(),
@@ -158,6 +184,10 @@ export class WorkerWindow implements TurnContext {
 /** Assemble the seed user message: the task definition + the spec slice + the Worker's marching orders. */
 export function buildWorkerSeed(task: Task, specSlice: string): string {
   const deps = task.dependsOn.length > 0 ? task.dependsOn.join(', ') : 'none';
+  // taskBranchName: the one-branch-per-task name, derived mechanically from the backlog id + title.
+  // Handing the Worker the exact string means nothing downstream has to guess it — a later fix round
+  // or a re-run names the same branch, and git_branch's create-or-switch makes repeating it harmless.
+  const branch = taskBranchName(task);
   return `You are implementing ONE task from the backlog. Implement exactly this task, test-first — no more, no less.
 
 ## Task: ${task.title}
@@ -168,6 +198,7 @@ ${task.body}
 Depends on: ${deps}
 ${specSlice ? `\n${specSlice}\n` : ''}
 Rules for this task:
+- FIRST, before anything else, put yourself on this task's branch: git_branch(action:"create", name:"${branch}"). One task is one branch. If the branch already exists you simply move onto it — expected on a later round or a re-run, and nothing is lost.
 - Write FAILING tests first, then the minimum code to pass them.
 - Run tests/builds/installs with run_in_project (the project's own container); use execute_command for plain shell. Never touch the host.
 - Write and edit files with write_file / edit_file.

@@ -18,6 +18,11 @@ Close the learning loop after a blocker. When the Reviewer raised a blocker and 
 - Edits to **project docs** follow the normal flow and are committed with the project's work.
 - Edits to a **global phase file** under `rules/phases/` must **never be auto-committed.** Leave the change uncommitted and **warn the user that it must be reviewed before continuing.** The orchestrator's own instruction set must not mutate silently.
 
+## Reading the history
+Most of "what went wrong, and where" is a question about the repo, and `git_inspect` answers it without changing anything: `what:"log"` for what was committed for this task, `what:"show"` for one commit in full, `what:"diff"` for what is still uncommitted. `git_branch(action:"list")` shows the task branches. Output is capped, so narrow a diff with `paths` and keep `count` small.
+
+You do not commit, and you have no reason to move branches. Push only if the user asked for it.
+
 ## Workflow
 1. Read the task, the misunderstanding, and the user's resolving answer.
 2. State the root cause in one sentence.

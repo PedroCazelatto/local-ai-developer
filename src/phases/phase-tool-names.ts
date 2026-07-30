@@ -43,6 +43,10 @@ export const DISCOVERY_TOOL_NAMES: readonly string[] = [
   'run_in_project',
   'list_changes',
   'commit_changes',
+  'git_stash',
+  'git_inspect',
+  'git_branch',
+  'git_push',
   'inbox_read',
   'inbox_post',
   'inbox_resolve',
@@ -65,6 +69,10 @@ export const DESIGN_TOOL_NAMES: readonly string[] = [
   'run_in_project',
   'list_changes',
   'commit_changes',
+  'git_stash',
+  'git_inspect',
+  'git_branch',
+  'git_push',
   'inbox_read',
   'inbox_post',
   'inbox_resolve',
@@ -87,6 +95,10 @@ export const BREAKDOWN_TOOL_NAMES: readonly string[] = [
   'run_in_project',
   'list_changes',
   'commit_changes',
+  'git_stash',
+  'git_inspect',
+  'git_branch',
+  'git_push',
   'inbox_read',
   'inbox_post',
   'inbox_resolve',
@@ -99,11 +111,17 @@ export const BREAKDOWN_TOOL_NAMES: readonly string[] = [
 ];
 
 /**
- * Worker — writes code test-first inside the container. Three deliberate absences:
+ * Worker — writes code test-first inside the container. Five deliberate absences:
  * - `commit_changes`: a Worker that commits its own code is its own gatekeeper. The Reviewer commits.
+ * - `git_stash`: it could otherwise shelve the very work the Reviewer is about to judge, leaving the
+ *   Reviewer a clean tree and no code to review.
+ * - `git_push`: it has no commits of its own to publish — it cannot commit.
  * - the sub-agent tools: a spawned execution window has no SubagentManager to back them.
  * - `ask_user`: execution runs unattended, so a question would stall the batch on a keypress nobody
  *   is there to press. The Worker cannot raise a blocker either — only the Reviewer can.
+ *
+ * It DOES get `git_branch`: one task is one branch, and the Worker is the first actor on a task, so
+ * it is what puts the window on `task/<id>` before any code is written. `git_inspect` is read-only.
  */
 export const WORKER_TOOL_NAMES: readonly string[] = [
   'read_file',
@@ -114,6 +132,8 @@ export const WORKER_TOOL_NAMES: readonly string[] = [
   'execute_command',
   'run_in_project',
   'list_changes',
+  'git_inspect',
+  'git_branch',
   'inbox_read',
   'inbox_post',
   'inbox_resolve',
@@ -141,6 +161,10 @@ export const REVIEWER_TOOL_NAMES: readonly string[] = [
   'inbox_resolve',
   'list_changes',
   'commit_changes',
+  'git_stash',
+  'git_inspect',
+  'git_branch',
+  'git_push',
   // Phase-scoped: the normal exit, the halt exit, and closing the task under review.
   'submit_verdict',
   'raise_blocker',
@@ -152,6 +176,9 @@ export const REVIEWER_TOOL_NAMES: readonly string[] = [
  * the window to a single file on first success; read_phase_rule/edit_phase_rule are the rules-scoped
  * pair (a rules edit is never auto-committed — a human reviews it). No write_file, no shell: Retro
  * patches one existing file, it does not build anything.
+ *
+ * It gets all four of the newer git tools even though it still has no commit_changes: diagnosing what
+ * went wrong is largely a question about history, which is exactly what git_inspect answers.
  */
 export const RETRO_TOOL_NAMES: readonly string[] = [
   'read_file',
@@ -161,6 +188,10 @@ export const RETRO_TOOL_NAMES: readonly string[] = [
   'inbox_read',
   'inbox_post',
   'inbox_resolve',
+  'git_stash',
+  'git_inspect',
+  'git_branch',
+  'git_push',
   // Phase-scoped: the rules-file pair and the terminal submission.
   'read_phase_rule',
   'edit_phase_rule',

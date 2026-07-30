@@ -63,6 +63,21 @@ export {
   REVIEW_DIFF_BUDGET,
 } from './project-git.js';
 export type { ChangedFiles, ChangedPaths, CommitResult } from './project-git.js';
+export { runGit } from './run-git.js';
+export type { GitRun } from './run-git.type.js';
+// The model-facing git operations behind git_stash / git_branch / git_push / git_inspect. The shelf
+// prefix is deliberately disjoint from project-git.ts's task-keyed `lad-stash:` — see
+// project-git-stash.ts.
+export { saveShelf, listShelves, popShelf, dropShelf, isValidShelfLabel, shelfLabelError, SHELF_LABEL_PREFIX } from './project-git-stash.js';
+export type { Shelf, ShelfResult } from './project-git-stash.type.js';
+export { createBranch, switchBranch, listBranches, branchExists, currentBranch, branchNameError } from './project-git-branch.js';
+export type { BranchList, BranchResult } from './project-git-branch.type.js';
+export { pushCurrentBranch } from './project-git-push.js';
+export type { PushResult } from './project-git-push.type.js';
+export { inspectDiff, inspectLog, inspectShow, refError, DEFAULT_LOG_COUNT, MAX_LOG_COUNT } from './project-git-inspect.js';
+export type { InspectResult } from './project-git-inspect.type.js';
+// The branch a task is developed on — one task, one branch (docs/phases.md).
+export { taskBranchName } from './task-branch-name.js';
 export { runBatch, batchSummaryFileName, BATCHES_DIRNAME } from './batch.js';
 export type {
   BatchSummary,
