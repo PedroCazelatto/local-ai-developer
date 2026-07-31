@@ -46,9 +46,13 @@ history is append-only, forever.
 
 **The input box stays on screen while a turn runs.** Its rule, the `›` row, and the rule below it are
 rows reserved at the bottom of the terminal, so the reply streams above them and never disturbs them.
-Typing during a turn goes into that row rather than echoing into the reply, and it is held there:
-**Enter does not send mid-turn** — the text moves into the real prompt, editable, the moment the turn
-ends. (Submitting while the model works is queueing, which is its own pending task.)
+Typing during a turn goes into that row rather than echoing into the reply.
+
+**Enter queues that message instead of sending it**, and the queue runs in order the moment the turn
+finishes — each message exactly as if it had been typed at the prompt. Queueing is announced in the
+scrollback as it happens, so a queued message never looks like a dropped one, and **↑** takes the
+newest one back into the row to edit. Whatever is typed but not queued moves into the real prompt when
+the turn ends.
 
 > The binding terminal-UX invariants (append-only scrollback, never take the alt-buffer, `ESC[2K`
 > only, theme owns every color) are in [constitution.md](../constitution.md).

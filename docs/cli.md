@@ -57,6 +57,22 @@ Binding Shift+Enter, per terminal:
 | iTerm2 | Settings → Keys → Key Bindings | Shift+↩ → *Send Hex Code* → `0x0a` |
 | kitty | `kitty.conf` | `map shift+enter send_text all \x0a` |
 
+## Typing while the model works
+
+The input box does not go away for the length of a turn: its rule, the `›` row, and the rule below it
+are pinned above the status lines, and what you type goes into that row instead of into the streaming
+reply.
+
+**Enter queues the message rather than sending it.** Queued messages run in the order you wrote them
+as soon as the turn finishes — each one exactly as if you had typed it at the prompt, a `/command`
+included — and each is announced in the scrollback (`⏳ queued: …`) the moment you press Enter, so a
+queued message is never indistinguishable from a dropped one.
+
+**↑ takes the newest queued message back** into the row to edit, and says so in the scrollback too. It
+replaces whatever is in the row at the time. Editing there is deliberately just backspace: the full
+buffer — history, arrows, multi-line composition — belongs to the prompt, which reopens with anything
+you typed but did not queue already in it.
+
 ## Model selection
 
 **There is no default model.** A model name compiled into the orchestrator says nothing about what
