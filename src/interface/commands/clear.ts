@@ -1,16 +1,20 @@
-// /clear (V4/04) — wipe ONLY the active phase's history, no confirmation (the user owns the decision
-// to clear — CLAUDE.md). Nothing is destroyed: clearActivePhase MOVES `<phase>.jsonl` into archive/
-// and resets the in-RAM view, so /resume can restore it. Other phases are untouched. A user command,
-// never a model tool — hence it lives here in interface/commands/, not in src/tools/.
+// /clear — start the active phase on a NEW context, no confirmation (the user owns the decision to
+// clear — CLAUDE.md). Nothing is destroyed: the context it sets aside keeps every turn it held and
+// stays reopenable with /resume, so this command reports the address that would bring it back. Other
+// phases are untouched. A user command, never a model tool — hence interface/commands/, not src/tools/.
+//
+// The new context is NOT named here, because it does not exist yet: a context row is created lazily on
+// its first flush, which is the first time the model answers. Naming an id now would be inventing one.
 
 import type { ClearResult } from '../../core/session/index.js';
+import { shortContextId } from '../../core/session/index.js';
 import * as renderer from '../../core/ui/renderer.js';
 import type { Command } from '../command-registry.js';
 
 /** The slice of the orchestrator /clear needs — satisfied structurally by SessionOrchestrator. */
 export interface ClearOrchestrator {
   readonly activePhase: string;
-  // clearActivePhase: archive the active phase's JSONL, reset it in-RAM; returns the archive (or null).
+  // clearActivePhase: point the phase at a new context; returns the one set aside (null if it had none).
   clearActivePhase(): ClearResult;
 }
 
@@ -20,19 +24,22 @@ function titleCase(phase: string): string {
 }
 
 function clearActivePhase(orch: ClearOrchestrator): void {
-  const { phase, archived } = orch.clearActivePhase();
+  const { phase, cleared } = orch.clearActivePhase();
   const name = titleCase(phase);
-  // Report faithfully: an empty phase had no file to archive, so don't claim one was made.
-  if (archived === null) {
-    renderer.systemMessage(`Cleared ${name} (was empty — nothing to archive).`);
+  // Report faithfully: a phase that never produced an answer has no context to set aside, so don't
+  // claim one is recoverable.
+  if (cleared === null) {
+    renderer.systemMessage(`Started a new ${name} context (the previous one was empty — nothing to reopen).`);
     return;
   }
-  renderer.systemMessage(`Cleared ${name} · archived (use /resume to restore)`);
+  const address = `${phase}/${shortContextId(cleared.id)}`;
+  const described = cleared.title === null ? address : `${address} "${cleared.title}"`;
+  renderer.systemMessage(`Started a new ${name} context · /resume reopens ${described}`);
 }
 
 export const clearCommand: Command = {
   name: 'clear',
   group: 'session',
-  description: "Wipe the active phase's history (archived — /resume restores it; other phases untouched)",
+  description: "Start the active phase on a new context (the old one stays — /resume reopens it)",
   run: (ctx) => clearActivePhase(ctx.orch),
 };

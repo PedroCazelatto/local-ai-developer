@@ -12,8 +12,8 @@ import type { Interface as ReadlineInterface } from 'node:readline/promises';
 import { stdin, stdout } from 'node:process';
 
 import type {
-  ArchiveSummary,
   ClearResult,
+  ContextSummary,
   RetroInput,
   RetroResult,
   SubagentInfo,
@@ -71,12 +71,12 @@ export interface ReplOrchestrator {
   switchPhase(name: string): void;
   /** Phase names available for /swap, in a stable order. */
   availablePhases(): string[];
-  /** /clear (V4/04): archive the active phase's history and reset it in-RAM (other phases untouched). */
+  /** /clear: start the active phase on a new context; names the one set aside (other phases untouched). */
   clearActivePhase(): ClearResult;
-  /** /resume (V4/04): the active phase's last `limit` archives, most recent first (summaries from JSONL). */
-  activePhaseArchives(limit: number): ArchiveSummary[];
-  /** /resume (V4/04): restore a chosen archive back into the active file and reload it into RAM. */
-  resumeActivePhaseArchive(basename: string): void;
+  /** /resume listing: the active phase's last `limit` contexts, most recently active first (no LLM call). */
+  activePhaseContexts(limit: number): ContextSummary[];
+  /** /resume reopen: replay a context's turns into the active phase; false if the address matches none. */
+  reopenActiveContext(address: string): boolean;
 }
 
 /** Run the REPL until the user types `/exit` (or EOF). */

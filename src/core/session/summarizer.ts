@@ -9,7 +9,8 @@
 import { oneShot } from '../llm/index.js';
 import type { Message, OllamaClient, TokenCounts } from '../llm/index.js';
 import type { SessionMemory } from './memory.js';
-import type { MemoryRecord } from './memory-store.type.js';
+import type { MemoryRecord } from './memory-db.type.js';
+import { renderTurn } from './render-turn.js';
 
 // Terse, artifact-preserving compression — the three requirements from the task, verbatim in intent.
 const SUMMARY_SYSTEM_PROMPT =
@@ -51,12 +52,16 @@ export async function compactActivePhase(deps: CompactDeps): Promise<CompactResu
   ];
   const { content, tokens } = await oneShot(deps.llm, messages);
 
-  // Append the `summary` record: `replaces` = every collapsed turn's id; its own `tokens` = THIS
-  // throwaway call's exact counts (null if Ollama omitted a metric — never a length estimate).
-  deps.memory.appendSummary(content.trim(), selected.map((record) => record.id), {
-    prompt: tokens.promptTokens,
-    completion: tokens.evalTokens,
-  });
+  // Append the `summary` turn: it collapses every selected turn (addressed by `seq`, which is stable
+  // whether or not the turn has reached the database yet) and carries THIS throwaway call's exact
+  // counts (null if Ollama omitted a metric — never a length estimate). `model` is the model that
+  // wrote the summary, recorded like any other generated turn.
+  deps.memory.appendSummary(
+    content.trim(),
+    selected.map((record) => record.seq),
+    { prompt: tokens.promptTokens, completion: tokens.evalTokens },
+    deps.llm.model,
+  );
   return { replaced: selected.length, tokens };
 }
 
@@ -76,19 +81,7 @@ function selectOldest(visible: readonly MemoryRecord[]): MemoryRecord[] {
 
 /** Render the selected turns as a readable transcript for the summarizer (roles + tool context kept). */
 function buildTranscript(records: readonly MemoryRecord[]): string {
-  return `Summarize this earlier transcript slice:\n\n${records.map(renderRecord).join('\n\n')}`;
-}
-
-/** One turn as a labelled block: `[role]` (or `[tool:<name>]`), its content, and any tool calls made. */
-function renderRecord(record: MemoryRecord): string {
-  const label = record.role === 'tool' && record.tool_name !== undefined ? `tool:${record.tool_name}` : record.role;
-  const parts = [`[${label}]`];
-  if (record.content.trim() !== '') parts.push(record.content.trim());
-  if (record.tool_calls !== undefined && record.tool_calls.length > 0) {
-    const calls = record.tool_calls
-      .map((call) => `${call.function.name}(${JSON.stringify(call.function.arguments)})`)
-      .join(', ');
-    parts.push(`(tool calls: ${calls})`);
-  }
-  return parts.join('\n');
+  // renderTurn: one turn as `[role]` + content + any tool calls — shared with the context-title writer,
+  // so both throwaway contexts read a transcript in exactly the same shape.
+  return `Summarize this earlier transcript slice:\n\n${records.map(renderTurn).join('\n\n')}`;
 }

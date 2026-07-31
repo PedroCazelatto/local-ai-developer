@@ -1,26 +1,44 @@
-// SessionMemory — one isolated message history PER phase, now BACKED by append-only JSONL under
-// projects/<active>/.orchestrator/memory/ (V4/04). It keeps each phase's records in RAM, appends
-// every turn to that phase's `<phase>.jsonl`, and rebuilds the in-RAM view when a phase is activated
-// — so killing `run start` and restarting no longer loses a phase's context. Switching phases only
-// moves the active pointer; histories never leak because each phase owns its own array AND its own
-// file. All disk work is delegated to memory-store.ts (this class owns only the in-RAM state).
+// SessionMemory — one isolated message history PER phase, backed by SQLite (memory.db) under
+// projects/<active>/.orchestrator/. Each phase's turns accumulate in a CONTEXT: a first-class row that
+// can be listed, titled and reopened by address, rather than a filename that had to be renamed to
+// change state. Switching phases only moves the active pointer; histories never leak because each phase
+// owns its own buffer and its own context row.
 //
-// LAZY LOAD: only the phase that just became active is read from disk (VRAM/RAM frugality; there is
-// exactly one active phase, no parallelism — CLAUDE.md). Single-process + single-active-phase means
-// count-then-append is race-free, so no locking is needed.
+// RAM IS AUTHORITATIVE DURING A TURN. Turns are buffered and written once per assistant turn (flush),
+// so a turn costs one transaction and never a read: `seq` is assigned here and the context id is held
+// here. The cost, stated plainly: a kill mid-turn loses the buffered turn.
+//
+// WHICH CONTEXT IS LIVE IS SESSION STATE, NOT DATA. Nothing in the database says "this one is current";
+// the live context per phase lives in this map and dies with the process. Every boot therefore starts a
+// phase on a FRESH context and reaches an older one only when the user reopens it — see docs/mental-model.md.
+//
+// A context row is created LAZILY, on its first flush. A phase the user never talked to leaves no row,
+// and a session with no model selected — which cannot produce an answer — creates nothing at all.
+
+import type { DatabaseSync } from 'node:sqlite';
 
 import type { Message, ToolCall } from '../llm/index.js';
-import { appendRecord, archiveActive, listArchives, readRecords, recordsToMessages, restoreArchive, visibleRecords } from './memory-store.js';
-import type { ArchiveSummary, ClearResult, MemoryRecord, PhaseLoad } from './memory-store.type.js';
+import {
+  collapseIntoSummary,
+  flushContext,
+  listContexts,
+  maxSeq,
+  openMemoryDb,
+  readContextSummary,
+  readVisibleMessages,
+  resolveContextId,
+  setContextTitle,
+} from './memory-db.js';
+import type { ContextSummary, ClearResult, MemoryRecord, PhaseLoad, TurnTokens } from './memory-db.type.js';
 
 /** Valid chat roles for a stored message. */
 export type ChatRole = 'system' | 'user' | 'assistant' | 'tool';
 
-/** The roles a turn is actually persisted under (`summary` is written by V4/05, not through add). */
+/** The roles a turn is persisted under through `add` (`summary` goes through appendSummary). */
 type PersistableRole = 'user' | 'assistant' | 'tool';
 
 interface AddOptions {
-  /** Tool name for a `tool` result message (serialized as Ollama's `tool_name`). */
+  /** Tool name for a `tool` result message (stored as `tool_name`, serialized as Ollama's `tool_name`). */
   readonly toolName?: string;
   /** Structured tool calls for an assistant turn that issued them. */
   readonly toolCalls?: ToolCall[];
@@ -29,115 +47,237 @@ interface AddOptions {
    * `eval_count`→`completion`. Omitted (⇒ null/null) for user and tool turns, which no generation
    * produced. NEVER a length-based estimate (constitution: token counts are always exact).
    */
-  readonly tokens?: { readonly prompt: number | null; readonly completion: number | null };
+  readonly tokens?: TurnTokens;
+  /** The model that GENERATED this turn. Omitted for user/tool turns — no generation produced them. */
+  readonly model?: string;
+}
+
+/** One phase's live state: its context, every turn in RAM, and what has yet to reach the database. */
+interface PhaseState {
+  /** The live context's UUID, or null before its first flush has created the row. */
+  contextId: string | null;
+  /** Every turn in RAM — collapsed ones included, so `seq` never repeats within a context. */
+  records: MemoryRecord[];
+  /** Turns added since the last flush, in order. */
+  pending: MemoryRecord[];
+  /** The `seq` the next turn will take (1-based). */
+  nextSeq: number;
+  /** The live context's title, or null while it has none. */
+  title: string | null;
+  /** Whether a title has already been attempted for this context — one try per context per session. */
+  titleAttempted: boolean;
+}
+
+/** A phase's state on first use: no context row yet, nothing buffered, numbering from 1. */
+function freshState(): PhaseState {
+  return { contextId: null, records: [], pending: [], nextSeq: 1, title: null, titleAttempted: false };
 }
 
 export class SessionMemory {
-  // Per-phase records held in RAM (ALL records, including summaries + replaced ones, so the
-  // sequential id stays == file line count). The live Message view filters/converts on read.
-  private readonly records = new Map<string, MemoryRecord[]>();
+  private readonly db: DatabaseSync;
+  private readonly phases = new Map<string, PhaseState>();
   private active: string | null = null;
 
-  constructor(private readonly projectPath: string) {}
-
   /**
-   * Point at a phase's history, LAZILY loading it from disk the first time it is activated. Returns a
-   * PhaseLoad so the orchestrator can emit a V5/04 `memory_load` event: whether an actual disk read
-   * happened (only on first activation), how many turns it restored, and the EXACT last persisted
-   * prompt_eval_count (the restored context size).
+   * `numCtx` is the EXACT OLLAMA_NUM_CTX every context created in this session is stamped with, and the
+   * ceiling every listing filters on — a context built under a different one is hidden rather than
+   * replayed into a window that would silently drop its oldest tokens.
    */
-  activatePhase(name: string): PhaseLoad {
-    this.active = name;
-    const firstActivation = !this.records.has(name);
-    if (firstActivation) {
-      this.records.set(name, readRecords(this.projectPath, name));
-    }
-    const records = this.records.get(name) ?? [];
-    return {
-      loadedFromDisk: firstActivation,
-      turns: recordsToMessages(records).length,
-      lastPromptTokens: lastPromptTokensOf(records),
-    };
+  constructor(projectPath: string, private readonly numCtx: number) {
+    this.db = openMemoryDb(projectPath);
   }
 
-  /** Append a message to the ACTIVE phase's history — both the RAM array AND its `<phase>.jsonl`. */
+  /** Point at a phase's history, starting it on a fresh context the first time it is activated. */
+  activatePhase(name: string): void {
+    if (!this.phases.has(name)) {
+      this.phases.set(name, freshState());
+    }
+    this.active = name;
+  }
+
+  /** Append a message to the ACTIVE phase's history. Buffered in RAM until the next `flush`. */
   add(role: PersistableRole, content: string, opts?: AddOptions): void {
-    const phase = this.requireActive();
-    const records = this.records.get(phase) ?? [];
+    const state = this.requireState();
     const record: MemoryRecord = {
-      id: String(records.length + 1), // per-file sequential id (inbox/blocker convention; no ULID)
+      seq: state.nextSeq,
       ts: new Date().toISOString(),
       role,
       content,
       tokens: opts?.tokens ?? { prompt: null, completion: null },
+      ...(opts?.model !== undefined ? { model: opts.model } : {}),
       ...(opts?.toolName !== undefined ? { tool_name: opts.toolName } : {}),
       ...(opts?.toolCalls && opts.toolCalls.length > 0 ? { tool_calls: opts.toolCalls } : {}),
     };
-    records.push(record);
-    this.records.set(phase, records);
-    appendRecord(this.projectPath, phase, record);
+    state.nextSeq += 1;
+    state.records.push(record);
+    state.pending.push(record);
   }
 
   /**
-   * V4/05 failsafe: append a synthetic `summary` record that COLLAPSES the turns in `replaces`.
-   * Mirrors add() but for the `summary` role (which add() forbids) and carries the throwaway
-   * summarization call's EXACT tokens. The record lands in the RAM array AND `<phase>.jsonl`
-   * (append-only — originals are never removed); the live `history` view then drops every replaced
-   * turn (recordsToMessages) and renders this summary in their place.
+   * Write everything buffered for the ACTIVE phase in one transaction, creating its context row if this
+   * is the first flush. Called after each assistant turn. A no-op when nothing is pending, so a phase
+   * that only read its inbox never creates a context.
    */
-  appendSummary(
-    content: string,
-    replaces: string[],
-    tokens: { readonly prompt: number | null; readonly completion: number | null },
-  ): void {
+  flush(): void {
+    if (this.active === null) return;
+    const state = this.phases.get(this.active);
+    if (state !== undefined) this.flushPhase(this.active, state);
+  }
+
+  /**
+   * Flush EVERY phase and close the database. Called once, when the session ends: it commits anything
+   * a phase left buffered — a phase swapped away from mid-exchange, or a user turn whose model call
+   * then failed — and closes the handle so SQLite checkpoints the WAL and removes its sidecar files.
+   */
+  close(): void {
+    for (const [phase, state] of this.phases) {
+      this.flushPhase(phase, state);
+    }
+    this.db.close();
+  }
+
+  /** Write one phase's buffered turns, creating its context row on the first flush. No-op when empty. */
+  private flushPhase(phase: string, state: PhaseState): void {
+    if (state.pending.length === 0) return;
+    // flushContext: one transaction — create the context when contextId is null, then insert every
+    // buffered turn. Returns the context's UUID (generated by SQLite's column DEFAULT).
+    state.contextId = flushContext(this.db, {
+      contextId: state.contextId,
+      phase,
+      numCtx: this.numCtx,
+      records: state.pending,
+    });
+    state.pending = [];
+  }
+
+  /**
+   * Summarization failsafe: append a `summary` turn that COLLAPSES the turns in `replacedSeqs`. Flushes
+   * first, so every turn being collapsed is already a row the summary can point `replaced_by` at. The
+   * originals stay in the database — only the visible view drops them — and `tokens` are the throwaway
+   * summarization call's EXACT counts.
+   */
+  appendSummary(content: string, replacedSeqs: readonly number[], tokens: TurnTokens, model?: string): void {
     const phase = this.requireActive();
-    const records = this.records.get(phase) ?? [];
-    const record: MemoryRecord = {
-      id: String(records.length + 1), // per-file sequential id == file line count (as in add)
+    const state = this.requireState();
+    this.flush();
+    if (state.contextId === null) {
+      throw new Error(`cannot summarize phase '${phase}': it has no persisted context`);
+    }
+    const summary: MemoryRecord = {
+      seq: state.nextSeq,
       ts: new Date().toISOString(),
       role: 'summary',
       content,
       tokens,
-      replaces,
+      ...(model !== undefined ? { model } : {}),
     };
-    records.push(record);
-    this.records.set(phase, records);
-    appendRecord(this.projectPath, phase, record);
+    state.nextSeq += 1;
+    // collapseIntoSummary: insert the summary row, then set every collapsed turn's `replaced_by` to it.
+    collapseIntoSummary(this.db, state.contextId, summary, replacedSeqs);
+    const replaced = new Set(replacedSeqs);
+    state.records = state.records.map((record) =>
+      replaced.has(record.seq) ? { ...record, replacedBySeq: summary.seq } : record,
+    );
+    state.records.push(summary);
   }
 
   /**
-   * The active phase's CURRENTLY-VISIBLE records (turns already collapsed by an earlier summary are
-   * dropped) — the summarizer's input for its oldest-50% selection. Empty when no phase is active.
+   * The active phase's CURRENTLY-VISIBLE turns (already-collapsed ones dropped) — the summarizer's input
+   * for its oldest-50% selection. Empty when no phase is active.
    */
   activeVisibleRecords(): readonly MemoryRecord[] {
     if (this.active === null) return [];
-    return visibleRecords(this.records.get(this.active) ?? []);
+    return visibleOf(this.phases.get(this.active)?.records ?? []);
   }
 
-  /** `/clear`: archive the active phase's file, then reset its in-RAM history to empty. */
-  clearActive(): ClearResult {
-    const phase = this.requireActive();
-    const archived = archiveActive(this.projectPath, phase);
-    this.records.set(phase, []);
-    return { phase, archived };
-  }
-
-  /** The last `limit` archives for the active phase, most recent first (summaries from JSONL only). */
-  archivesForActive(limit: number): ArchiveSummary[] {
-    return listArchives(this.projectPath, this.requireActive(), limit);
-  }
-
-  /** `/resume`: restore one archive to the active file, then reload the in-RAM view from disk. */
-  restoreActive(basename: string): void {
-    const phase = this.requireActive();
-    restoreArchive(this.projectPath, phase, basename);
-    this.records.set(phase, readRecords(this.projectPath, phase));
-  }
-
-  /** The active phase's live message array (replaced turns dropped; empty if no phase is active). */
+  /** The active phase's live message array (collapsed turns dropped; empty if no phase is active). */
   get history(): Message[] {
     if (this.active === null) return [];
-    return recordsToMessages(this.records.get(this.active) ?? []);
+    return visibleOf(this.phases.get(this.active)?.records ?? []).map(toMessage);
+  }
+
+  /** The live context's UUID for the active phase, or null before its first flush created the row. */
+  get activeContextId(): string | null {
+    if (this.active === null) return null;
+    return this.phases.get(this.active)?.contextId ?? null;
+  }
+
+  /**
+   * `/clear`: start the active phase on a NEW context. Flushes first so nothing buffered is lost, then
+   * reports the context it set aside — which `/resume` can reopen — or null when the phase had none.
+   * Nothing is deleted: the previous context keeps every turn it held.
+   */
+  clearActive(): ClearResult {
+    const phase = this.requireActive();
+    const state = this.requireState();
+    this.flush();
+    const cleared = state.contextId === null ? null : readContextSummary(this.db, state.contextId);
+    this.phases.set(phase, freshState());
+    return { phase, cleared };
+  }
+
+  /**
+   * The active phase's last `limit` contexts, most recently active first, EXCLUDING the live one.
+   * Contexts written under a different `num_ctx` are omitted (see memory-db.listContexts).
+   */
+  contextsForActive(limit: number): ContextSummary[] {
+    const phase = this.requireActive();
+    return listContexts(this.db, phase, this.numCtx, limit, this.activeContextId);
+  }
+
+  /**
+   * Reopen one of the active phase's contexts, addressed by its UUID or any unique leading prefix.
+   * Flushes the live context first (it keeps its turns and stays reopenable), then replays the chosen
+   * context's visible turns into RAM. Returns null when the address matches no single context of this
+   * phase — the caller turns that into a recoverable line rather than acting on a guess.
+   */
+  reopenActiveContext(address: string): PhaseLoad | null {
+    const phase = this.requireActive();
+    // resolveContextId: a full UUID or a unique prefix, restricted to this phase and the current num_ctx.
+    const contextId = resolveContextId(this.db, phase, this.numCtx, address);
+    if (contextId === null) return null;
+    this.flush();
+    const summary = readContextSummary(this.db, contextId);
+    const records = readVisibleMessages(this.db, contextId);
+    this.phases.set(phase, {
+      contextId,
+      records,
+      pending: [],
+      // Past the highest seq EVER used, collapsed turns included — a reused seq would collide with
+      // `UNIQUE (context_id, seq)` and abort the next flush.
+      nextSeq: maxSeq(this.db, contextId) + 1,
+      title: summary?.title ?? null,
+      // A reopened context that still has no title gets one more chance from this session's first answer.
+      titleAttempted: false,
+    });
+    return { contextId, turns: records.length, lastPromptTokens: lastPromptTokensOf(records) };
+  }
+
+  /**
+   * Whether the active phase's live context should be titled now: it has a row, no title yet, no attempt
+   * this session, and at least one assistant turn carrying real prose. Tool-call turns are stored with
+   * empty content on purpose (see turn-loop.ts), and a title drawn from those would describe nothing.
+   */
+  activeNeedsTitle(): boolean {
+    if (this.active === null) return false;
+    const state = this.phases.get(this.active);
+    if (state === undefined || state.contextId === null) return false;
+    if (state.title !== null || state.titleAttempted) return false;
+    return state.records.some((record) => record.role === 'assistant' && record.content.trim() !== '');
+  }
+
+  /** Record that a title was attempted for the live context — one try per context per session. */
+  markActiveTitleAttempted(): void {
+    const state = this.phases.get(this.active ?? '');
+    if (state !== undefined) state.titleAttempted = true;
+  }
+
+  /** Give the active phase's live context its title (no-op when the context row does not exist yet). */
+  setActiveTitle(title: string): void {
+    const state = this.requireState();
+    if (state.contextId === null) return;
+    setContextTitle(this.db, state.contextId, title);
+    state.title = title;
   }
 
   private requireActive(): string {
@@ -146,6 +286,36 @@ export class SessionMemory {
     }
     return this.active;
   }
+
+  private requireState(): PhaseState {
+    const phase = this.requireActive();
+    const state = this.phases.get(phase);
+    if (state === undefined) {
+      throw new Error(`phase '${phase}' was never activated`);
+    }
+    return state;
+  }
+}
+
+/** The turns a phase still sees: everything no summary has collapsed. */
+function visibleOf(records: readonly MemoryRecord[]): MemoryRecord[] {
+  return records.filter((record) => record.replacedBySeq === undefined);
+}
+
+/**
+ * Map a stored role to a chat role. `summary` replays as an assistant note — it stands in the history
+ * where the turns it collapsed used to be, and any other role would break the chat template on replay.
+ */
+function chatRole(role: MemoryRecord['role']): Message['role'] {
+  return role === 'summary' ? 'assistant' : role;
+}
+
+/** Rebuild one record into the Ollama Message shape (mirrors SessionMemory.add's field handling). */
+function toMessage(record: MemoryRecord): Message {
+  const message: Message = { role: chatRole(record.role), content: record.content };
+  if (record.tool_name !== undefined) message.tool_name = record.tool_name;
+  if (record.tool_calls !== undefined && record.tool_calls.length > 0) message.tool_calls = record.tool_calls;
+  return message;
 }
 
 /** The most recent EXACT prompt_eval_count among the records, or null if none recorded one (never estimated). */

@@ -8,7 +8,11 @@ export { resolveBootModel } from './resolve-boot-model.js';
 export { SessionOrchestrator } from './orchestrator.js';
 export { SessionMemory } from './memory.js';
 export type { ChatRole } from './memory.js';
-export type { ArchiveSummary, ClearResult, MemoryRecord, MemoryRole, PhaseLoad } from './memory-store.type.js';
+// Phase memory is SQLite-backed (projects/<active>/.orchestrator/memory.db): a context is an
+// addressable, titled row rather than a file whose name had to be renamed to change state.
+export { CONTEXT_SHORT_ID_LEN, shortContextId } from './memory-db.js';
+export type { ClearResult, ContextSummary, MemoryRecord, MemoryRole, PhaseLoad, TurnTokens } from './memory-db.type.js';
+export { CONTEXT_TITLE_LIMIT, generateContextTitle } from './generate-context-title.js';
 export { MAX_TOOL_ROUNDS } from './turn-loop.js';
 export type { TurnContext } from './turn-loop.js';
 export { dispatchToolCall } from './dispatch.js';

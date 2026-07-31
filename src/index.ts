@@ -66,7 +66,13 @@ async function main(): Promise<void> {
 
   const orchestrator = new SessionOrchestrator(config, llm, sandbox);
   // The launcher's `finally` stops Docker on exit, so we don't stop the sandbox here.
-  await runRepl(orchestrator);
+  try {
+    await runRepl(orchestrator);
+  } finally {
+    // shutdown: commit whatever any phase left buffered and close memory.db (checkpointing its WAL).
+    // In a `finally` so a crash in the REPL still commits the turns it had rather than dropping them.
+    orchestrator.shutdown();
+  }
 }
 
 main().catch((err) => {

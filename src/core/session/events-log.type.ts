@@ -4,12 +4,17 @@
 // can't otherwise see or replay — swapping phases, loading a phase's persisted memory, firing the
 // summarization failsafe, spawning/dismissing a sub-agent, switching model. Append-only, never loaded
 // into any prompt (a replay/audit artifact, exactly like the audit log).
+//
+// `context_title` records the throwaway call that titled a phase context: the title it produced and the
+// EXACT tokens it cost. That call belongs to no phase's history, so this log is the only place its cost
+// is ever surfaced — search_rules records its own one-shot the same way, in the audit log.
 
 /** The structural actions worth recording. Phase terminology only — never "persona"/"role". */
 export type OrchestratorEventType =
   | 'phase_swap'
   | 'memory_load'
   | 'summarization_fire'
+  | 'context_title'
   | 'subagent_spawn'
   | 'subagent_dismiss'
   | 'model_use';

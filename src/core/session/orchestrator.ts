@@ -16,10 +16,11 @@ import { appendAuditRow } from './audit.js';
 import type { SessionConfig } from './config.js';
 import { dispatchToolCall } from './dispatch.js';
 import { appendEvent } from './events-log.js';
+import { generateContextTitle } from './generate-context-title.js';
 import { SessionMemory } from './memory.js';
 import { drainAnsweredQuestions } from './question-store.js';
 import { compactActivePhase } from './summarizer.js';
-import type { ArchiveSummary, ClearResult, PhaseLoad } from './memory-store.type.js';
+import type { ClearResult, ContextSummary, PhaseLoad } from './memory-db.type.js';
 import { SubagentManager } from './subagents.js';
 import type { SubagentInfo } from './subagents.type.js';
 import { processMessage as processTurns } from './turn-loop.js';
@@ -78,12 +79,15 @@ export class SessionOrchestrator implements TurnContext {
     this.summarizationThreshold = config.summarizationThresholdRatio * config.numCtx;
     this.llm = llm;
     this.sandbox = sandbox;
-    this.memory = new SessionMemory(config.projectPath); // JSONL-backed, under the project's .orchestrator/
+    // SQLite-backed (memory.db under the project's .orchestrator/). numCtx is stamped on every context
+    // this session creates and filters every listing: a context written under a different ceiling is
+    // hidden rather than replayed into a window that would silently drop its oldest tokens.
+    this.memory = new SessionMemory(config.projectPath, config.numCtx);
     this.phase = PhaseFactory.get(config.initialPhase);
-    // activatePhase LAZILY loads this phase's `<phase>.jsonl` — so a restart resumes where it stopped.
-    // On a restart that restores persisted turns, emit a V5/04 memory_load carrying the exact restored
-    // prompt_eval_count (a fresh project with no history emits nothing — emitMemoryLoad guards on turns).
-    this.emitMemoryLoad(this.memory.activatePhase(this.phase.name));
+    // Every boot starts a phase on a FRESH context (docs/mental-model.md): activatePhase reads nothing
+    // from disk, and the context row itself is created lazily on the first flush. An older context is
+    // reached only when the user reopens one — which is what emits a memory_load.
+    this.memory.activatePhase(this.phase.name);
     // The manager resolves each sub-agent's tools from ITS MASTER PHASE's allowlist at spawn (minus the
     // three sub-agent tools, so no nesting) — a sub-agent never gets the full registry, which would be a
     // way around its master's gate. num_ctx is the session's; the live model is read from `llm` at spawn
@@ -177,11 +181,11 @@ export class SessionOrchestrator implements TurnContext {
     return this.memory.history;
   }
 
-  /** Switch active phase; loads its instructions and (lazily, from disk) its own history (no leak). */
+  /** Switch active phase; loads its instructions and points at its own history (no leak, no disk read). */
   switchPhase(name: string): void {
     const from = this.phase.name;
     this.phase = PhaseFactory.get(name);
-    const load = this.memory.activatePhase(this.phase.name);
+    this.memory.activatePhase(this.phase.name);
     // V5/04 phase_swap (covers /swap AND the Shift+Tab cycle — both route through here); skip a no-op
     // swap to the same phase. `phase` is the now-active phase; `detail` carries both ends.
     if (from !== this.phase.name) {
@@ -191,43 +195,99 @@ export class SessionOrchestrator implements TurnContext {
         detail: { from, to: this.phase.name },
       });
     }
-    // A first-time activation that restored persisted turns also logs a memory_load (V5/04).
-    this.emitMemoryLoad(load);
   }
 
   /**
-   * Emit a V5/04 `memory_load` event when a phase activation actually restored persisted history: only
-   * on a first-time disk load with turns to show (a fresh phase or a re-activation from RAM emits
-   * nothing). Carries turnsLoaded + the EXACT restored prompt_eval_count when one was recorded.
+   * Emit a V5/04 `memory_load` event for a REOPENED context — the one path that restores persisted turns
+   * now that every boot starts a phase fresh. Carries the context, turnsLoaded, and the EXACT restored
+   * prompt_eval_count when one was recorded (omitted, never estimated, when it was not).
    */
   private emitMemoryLoad(load: PhaseLoad): void {
-    if (!load.loadedFromDisk || load.turns === 0) return;
+    if (load.turns === 0) return;
     appendEvent(this.projectPath, {
       type: 'memory_load',
       phase: this.phase.name,
-      detail: { phase: this.phase.name, turnsLoaded: load.turns },
+      detail: { phase: this.phase.name, contextId: load.contextId, turnsLoaded: load.turns },
       ...(load.lastPromptTokens !== null ? { promptTokens: load.lastPromptTokens } : {}),
     });
   }
 
-  /** `/clear` (V4/04): archive the active phase's history, reset it in-RAM. Other phases untouched. */
+  /**
+   * `/clear`: start the active phase on a NEW context. Nothing is destroyed — the context it sets aside
+   * keeps every turn and stays reopenable, and the returned ClearResult names it so the command can say
+   * what `/resume` would bring back. Other phases are untouched.
+   */
   clearActivePhase(): ClearResult {
     return this.memory.clearActive();
   }
 
-  /** `/resume` listing: the last `limit` archives for the active phase (summaries from JSONL, no LLM). */
-  activePhaseArchives(limit: number): ArchiveSummary[] {
-    return this.memory.archivesForActive(limit);
+  /** `/resume` listing: the active phase's last `limit` contexts, most recently active first (no LLM). */
+  activePhaseContexts(limit: number): ContextSummary[] {
+    return this.memory.contextsForActive(limit);
   }
 
-  /** `/resume` restore: swap a chosen archive back into the active file and reload it into RAM. */
-  resumeActivePhaseArchive(basename: string): void {
-    this.memory.restoreActive(basename);
+  /**
+   * `/resume` reopen: replay a chosen context's visible turns into the active phase, addressed by its
+   * UUID or a unique prefix. Returns false when the address matches no single context of this phase, so
+   * the command reports a recoverable line instead of acting on a guess.
+   */
+  reopenActiveContext(address: string): boolean {
+    const load = this.memory.reopenActiveContext(address);
+    if (load === null) return false;
+    this.emitMemoryLoad(load);
+    return true;
   }
 
-  /** Entry point the REPL calls for a chat message: run the bounded tool-dispatch turn loop. */
+  /**
+   * End the session cleanly: commit anything any phase left buffered and close memory.db, so SQLite
+   * checkpoints its write-ahead log instead of leaving sidecar files for the next boot to recover.
+   * Called once, after the REPL loop returns.
+   */
+  shutdown(): void {
+    this.memory.close();
+  }
+
+  /**
+   * Entry point the REPL calls for a chat message: run the bounded tool-dispatch turn loop, then title
+   * the context if this exchange produced its first prose answer.
+   */
   async processMessage(userInput: string): Promise<void> {
     await processTurns(this, userInput);
+    await this.titleActiveContext();
+  }
+
+  /**
+   * Give the active phase's context its title, once, after its first prose answer. Runs AFTER the turn
+   * loop rather than inside it: the title costs a throwaway model call, and holding it until the
+   * exchange is finished keeps it off the path between the user's message and the reply.
+   *
+   * Best-effort by design — a context stays untitled rather than failing a turn the user already had.
+   * The attempt is marked before the call, so a model that cannot produce a usable title is not asked
+   * again every exchange for the rest of the session.
+   */
+  private async titleActiveContext(): Promise<void> {
+    if (!this.memory.activeNeedsTitle()) return;
+    this.memory.markActiveTitleAttempted();
+    const contextId = this.memory.activeContextId;
+    if (contextId === null) return;
+    try {
+      // generateContextTitle: a throwaway one-shot (rules/prompts/context-title.md + this context's
+      // history) returning one line of at most CONTEXT_TITLE_LIMIT chars, or null if nothing usable.
+      const titled = await generateContextTitle(this.llm, this.memory.activeVisibleRecords());
+      if (titled === null) return;
+      this.memory.setActiveTitle(titled.title);
+      // The throwaway call belongs to no phase's history, so this log is the only place its EXACT cost is
+      // surfaced (a null count is OMITTED rather than guessed — constitution).
+      appendEvent(this.projectPath, {
+        type: 'context_title',
+        phase: this.phase.name,
+        detail: { contextId, title: titled.title },
+        ...(titled.tokens.promptTokens !== null ? { promptTokens: titled.tokens.promptTokens } : {}),
+        ...(titled.tokens.evalTokens !== null ? { evalTokens: titled.tokens.evalTokens } : {}),
+      });
+    } catch (err) {
+      renderer.systemMessage(`Couldn't title this context: ${err instanceof Error ? err.message : String(err)}`);
+    }
   }
 
   /**
@@ -380,9 +440,20 @@ export class SessionOrchestrator implements TurnContext {
 
   addAssistant(content: string, toolCalls?: ToolCall[]): void {
     // Persist the EXACT counts Ollama just reported for THIS turn (set by onTokens immediately prior
-    // in the turn loop): prompt_eval_count→prompt, eval_count→completion. Never estimated.
+    // in the turn loop): prompt_eval_count→prompt, eval_count→completion. Never estimated. `model` is
+    // the model that generated the turn — recorded per turn, so a mid-session `/models use` is visible
+    // in the history rather than inferred from when the context started.
     const tokens = { prompt: this.lastTokens.promptTokens, completion: this.lastTokens.evalTokens };
-    this.memory.add('assistant', content, toolCalls ? { toolCalls, tokens } : { tokens });
+    const model = this.llm.model;
+    this.memory.add('assistant', content, {
+      tokens,
+      ...(model !== undefined ? { model } : {}),
+      ...(toolCalls ? { toolCalls } : {}),
+    });
+    // An assistant turn is the flush point: everything buffered since the last one reaches memory.db in
+    // ONE transaction, so a turn costs a single write and never a read. Tool results issued by THIS turn
+    // are buffered and land with the next assistant turn, which always follows them.
+    this.memory.flush();
   }
 
   addToolResult(toolName: string, result: string): void {
