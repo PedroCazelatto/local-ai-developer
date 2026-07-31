@@ -41,6 +41,12 @@ export const theme = {
   /** The full-width horizontal rules fencing the input line (repl.ts). */
   divider: chalk.dim as Styler,
   /**
+   * The drawn caret in the type-ahead input row that stays fenced while a turn runs
+   * (input-fence-row.ts). The REAL terminal cursor is down in the scrolling area with the streamed
+   * output, so that pinned row needs a caret of its own to read as live rather than as a picture.
+   */
+  caret: chalk.inverse as Styler,
+  /**
    * A submitted user message, echoed back into the scrollback as one static line: light-gray
    * background with dark text so the user's turns read distinctly from the model's (repl.ts,
    * commitUserMessage). Retune the shade here — the one place any color lives.

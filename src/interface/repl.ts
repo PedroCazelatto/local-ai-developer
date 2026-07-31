@@ -26,6 +26,7 @@ import * as renderer from '../core/ui/renderer.js';
 import * as statusActivity from '../core/ui/status-activity.js';
 import * as statusBar from '../core/ui/status-bar.js';
 import * as activityLine from '../core/ui/activity-line.js';
+import * as inputFence from '../core/ui/input-fence.js';
 import { bindNewlineKey } from '../core/ui/bind-newline-key.js';
 import { theme } from '../core/ui/theme.js';
 import { getCommand } from './command-registry.js';
@@ -158,6 +159,11 @@ export async function runRepl(orch: ReplOrchestrator): Promise<void> {
         firstPrompt = false;
         renderer.inputRuleTop();
         const answer = rl.question(renderer.INPUT_PROMPT);
+        // Anything typed while the turn ran was held in the fenced row rather than echoed into the
+        // reply (input-fence.ts). Hand it to readline as if it had just been typed here, so the box
+        // opens where the user left off — with full editing back, and Enter working again.
+        const typedAhead = inputFence.drain();
+        if (typedAhead !== '') rl.write(typedAhead);
         statusBar.repaint(); // readline drew the prompt (and erased the rows) synchronously — restore them
         raw = await answer;
         line = raw.trim();
@@ -188,10 +194,12 @@ export async function runRepl(orch: ReplOrchestrator): Promise<void> {
         stopTicker();
         processing = false;
         statusActivity.reset(); // clear any lingering tool/turn state so idle shows no activity field
+        inputFence.reset(); // a turn that threw mid-flight must never leave stdin captured (dead prompt)
       }
     }
   } finally {
     activityLine.hide();
+    inputFence.reset(); // give stdin back before the interface closes, whatever ended the loop
     stopTicker();
     unbindNewlineKey(); // give readline its own keypress listener back before the interface closes
     if (stdin.isTTY) stdin.removeListener('keypress', onKeypress);

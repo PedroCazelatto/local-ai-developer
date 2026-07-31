@@ -11,6 +11,7 @@ import type { MarkdownStream } from '../ui/markdown-stream.type.js';
 import * as renderer from '../ui/renderer.js';
 import * as statusActivity from '../ui/status-activity.js';
 import * as activityLine from '../ui/activity-line.js';
+import * as inputFence from '../ui/input-fence.js';
 
 /** Exact value ported from main.py — caps the implement/continue rounds per user message. */
 export const MAX_TOOL_ROUNDS = 8;
@@ -57,6 +58,10 @@ export async function processMessage(
   // Mark a turn in flight so the status line (V5/03) can show the live thinking/elapsed field, and
   // always clear it — even if a stream throws mid-turn — so idle never shows a stuck "thinking".
   statusActivity.turnStarted();
+  // inputFence.begin: pin the fenced `›` box above the status bar for the length of the turn and take
+  // stdin, so typing mid-turn lands in that row instead of echoing into the reply. Reentrant — a
+  // sub-agent's nested processMessage shares the one fence — and always released in the finally.
+  inputFence.begin();
   try {
     if (!(await runTurn(ctx, () => ctx.streamAsk(userInput)))) {
       return; // no tool calls on the first turn → done
@@ -69,6 +74,7 @@ export async function processMessage(
     renderer.systemMessage(`⚠ Reached tool-call limit (${maxRounds}). Stopping.`);
   } finally {
     statusActivity.turnEnded();
+    inputFence.end();
   }
 }
 

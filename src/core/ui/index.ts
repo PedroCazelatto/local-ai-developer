@@ -9,6 +9,8 @@ export type { SelectChoice } from './prompts.js';
 export { confirmKey } from './confirm-key.js';
 // Multi-line composition: Shift+Enter breaks the line instead of submitting it (repl.ts binds it).
 export { bindNewlineKey } from './bind-newline-key.js';
+// The input box stays fenced on screen while a turn runs, holding what is typed until the next prompt.
+export * as inputFence from './input-fence.js';
 export { formatSize } from './format-size.js';
 export { terminalColumns } from './terminal-columns.js';
 // Streamed markdown rendering (V6/01): the model writes plain markdown, the terminal colors it.
