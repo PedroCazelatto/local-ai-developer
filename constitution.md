@@ -112,6 +112,12 @@ model never reads this file. The split:
   - a **transient widget's own frame** (the `ask_user` panel, the spinner), which must erase itself and
     leave exactly one static, copyable summary in the buffer.
 
+  The **pinned bottom rows** are the one thing outside that rule, because they are outside the history:
+  the status bar and the input fence raised while a turn runs live on rows reserved by a DECSTBM scroll
+  region, so nothing that scrolls can reach them and nothing they paint can reach the scrollback. They
+  repaint in place as often as they like. Taking or releasing those rows must stay lossless — scroll the
+  region to free a row, never paint over one that holds output.
+
   Anything already scrolled is immutable. Clear rows with `ESC[2K` on rows you wrote yourself — never
   `ESC[0J`, which erases to the end of the display and wipes the pinned status rows.
 - **The model writes plain markdown; the orchestrator owns every color.** The construct→color mapping

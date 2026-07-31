@@ -44,5 +44,11 @@ still under the cursor and has not scrolled away — and transient widgets (the 
 spinner) repaint only their own frame and then collapse into one static, copyable summary. Finished
 history is append-only, forever.
 
+**The input box stays on screen while a turn runs.** Its rule, the `›` row, and the rule below it are
+rows reserved at the bottom of the terminal, so the reply streams above them and never disturbs them.
+Typing during a turn goes into that row rather than echoing into the reply, and it is held there:
+**Enter does not send mid-turn** — the text moves into the real prompt, editable, the moment the turn
+ends. (Submitting while the model works is queueing, which is its own pending task.)
+
 > The binding terminal-UX invariants (append-only scrollback, never take the alt-buffer, `ESC[2K`
 > only, theme owns every color) are in [constitution.md](../constitution.md).
