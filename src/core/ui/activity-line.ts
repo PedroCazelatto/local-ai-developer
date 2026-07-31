@@ -35,6 +35,11 @@ export function show(): void {
   stdout.write(lineText());
 }
 
+/** Whether the line is on the cursor row right now — asked by anything that must print through it. */
+export function isVisible(): boolean {
+  return visible;
+}
+
 /** Advance the spinner and repaint the line in place. No-op when hidden; called on the REPL ticker. */
 export function repaint(): void {
   if (!visible || !stdout.isTTY) return;

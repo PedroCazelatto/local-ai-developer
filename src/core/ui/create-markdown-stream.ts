@@ -53,24 +53,30 @@ export function createMarkdownStream(prefix: string): MarkdownStream {
    * a long reply reads as clean prose. Code — every line INSIDE a ``` fence — is left verbatim, since
    * its spaces are significant and must not become line breaks.
    */
+  /**
+   * Blank every row the RAW in-progress line occupies and park the cursor at its start, ready for
+   * whatever replaces it. echoedRows counts those rows exactly as the terminal wrapped them (wide
+   * glyphs, exact-fill), so this clears precisely what was streamed live and nothing else.
+   */
+  const blankRawLine = (): void => {
+    const head = prefixOnRow ? prefix : '';
+    const rows = echoedRows(`${head}${line}`);
+    if (rows > 1) stdout.write(`\x1b[${rows - 1}A`); // up to the first row of the raw line
+    stdout.write('\r');
+    for (let row = 0; row < rows; row += 1) {
+      stdout.write('\x1b[2K'); // blank this row (never ESC[0J — that would erase the pinned rows)
+      if (row < rows - 1) stdout.write('\x1b[1B');
+    }
+    if (rows > 1) stdout.write(`\x1b[${rows - 1}A`); // back to the top of the now-blank block
+    stdout.write('\r');
+  };
+
   const flushLine = (): void => {
     const wasInsideFence = insideFence; // did THIS line arrive as fenced code? (before the toggle)
     const rendered = renderMarkdownLine(line, insideFence);
     insideFence = rendered.insideFence;
     const head = prefixOnRow ? prefix : '';
-    if (tty) {
-      // echoedRows counts the raw line's on-screen rows exactly as the terminal wrapped it (wide
-      // glyphs, exact-fill), so the blank-and-repaint clears precisely what was streamed live.
-      const rows = echoedRows(`${head}${line}`);
-      if (rows > 1) stdout.write(`\x1b[${rows - 1}A`); // up to the first row of the raw line
-      stdout.write('\r');
-      for (let row = 0; row < rows; row += 1) {
-        stdout.write('\x1b[2K'); // blank this row (never ESC[0J — that would erase the pinned rows)
-        if (row < rows - 1) stdout.write('\x1b[1B');
-      }
-      if (rows > 1) stdout.write(`\x1b[${rows - 1}A`); // back to the top of the now-blank block
-      stdout.write('\r');
-    }
+    if (tty) blankRawLine();
     const body = `${head}${rendered.text}`;
     const outLines = tty && !wasInsideFence ? wordWrap(body, terminalColumns()) : [body];
     stdout.write(`${outLines.join('\n')}\n`);
@@ -105,6 +111,21 @@ export function createMarkdownStream(prefix: string): MarkdownStream {
       // A trailing line the model left unterminated still needs rendering; a turn that ended on a
       // newline has already been flushed and needs no extra blank line.
       if (line !== '' || prefixOnRow) flushLine();
+    },
+    interject(block: string): void {
+      // Nothing is under the cursor yet (no delta has arrived) or there is no cursor to move: the
+      // block is just a line of output like any other.
+      if (!tty || prefixPending) {
+        stdout.write(`${block}\n`);
+        return;
+      }
+      // Otherwise the raw line is sitting under the cursor half-written. Lift it, drop the block into
+      // the scrollback where it belongs, and lay the raw line back down — the next delta appends to it
+      // exactly as before, and flushLine still repaints the same rows.
+      const head = prefixOnRow ? prefix : '';
+      blankRawLine();
+      stdout.write(`${block}\n`);
+      stdout.write(`${head}${line}`);
     },
   };
 }

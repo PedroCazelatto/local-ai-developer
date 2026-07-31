@@ -15,19 +15,20 @@
 
 import { stdout } from 'node:process';
 
+import * as activityLine from './activity-line.js';
 import { createMarkdownStream } from './create-markdown-stream.js';
 import { echoedRows } from './echoed-rows.js';
+import { INPUT_PROMPT } from './input-prompt.js';
 import type { MarkdownStream } from './markdown-stream.type.js';
 import { terminalColumns } from './terminal-columns.js';
 import { theme } from './theme.js';
-import { visibleWidth } from './visible-width.js';
-import { wordWrap } from './word-wrap.js';
+import { userMessageBars } from './user-message-bars.js';
 
-/** The REPL input prompt. Exported so the input-box erase math measures the SAME string readline echoes. */
-export const INPUT_PROMPT = '› ';
+/** The REPL input prompt. Re-exported so the input-box erase math measures the string readline echoes. */
+export { INPUT_PROMPT };
 
-/** Display columns the ` › ` marker occupies; continuation rows of a wrapped message align under it. */
-const USER_INDENT = 3;
+/** The stream rendering the turn right now, or null between turns — interjectLine prints around it. */
+let live: MarkdownStream | null = null;
 
 /** One-time boot clear: wipe the launcher's noise (screen + scrollback), home the cursor. */
 export function clearScreen(): void {
@@ -43,7 +44,35 @@ export function clearScreen(): void {
  * Call once per turn, on the FIRST visible delta, so a pure tool-call turn prints no empty header.
  */
 export function assistantStream(): MarkdownStream {
-  return createMarkdownStream('');
+  const stream = createMarkdownStream('');
+  // Held so interjectLine below can print THROUGH a reply in flight. Released by end(), which the turn
+  // loop always calls — including on a turn that produced no prose at all.
+  live = stream;
+  return {
+    push: (delta) => stream.push(delta),
+    end: () => {
+      stream.end();
+      live = null;
+    },
+    interject: (block) => stream.interject(block),
+  };
+}
+
+/**
+ * Print one line into the scrollback that must arrive NOW, whatever owns the cursor row. A reply being
+ * streamed is lifted and laid back down around it (create-markdown-stream's interject); the transient
+ * activity line is hidden and shown again. Without this the line would land in the middle of a
+ * half-written sentence — the reason it exists is a message queued mid-turn.
+ */
+export function interjectLine(text: string): void {
+  if (live !== null) {
+    live.interject(text);
+    return;
+  }
+  const wasVisible = activityLine.isVisible();
+  if (wasVisible) activityLine.hide();
+  stdout.write(`${text}\n`);
+  if (wasVisible) activityLine.show();
 }
 
 /** A single blank line — the separator between turns (history is blank-separated, never ruled). */
@@ -88,25 +117,21 @@ function eraseInputBox(raw: string): void {
  * in the append-only scrollback. Off a TTY nothing was erasable, so it just prints the summary.
  */
 export function commitUserMessage(raw: string): void {
-  const cols = terminalColumns();
-  // Word-wrap the message (break only at spaces, never mid-word) under a ` › ` marker, continuation
-  // rows aligned beneath it. Each row is a FULL-WIDTH gray bar: padded by DISPLAY width (visibleWidth
-  // counts CJK/emoji as two columns) so the background spans the whole terminal row, not just the text.
-  //
-  // The breaks the user typed with Shift+Enter are structure, not overflow, so each of THEIR lines is
-  // wrapped on its own — a line break they chose can never be swallowed by refilling the paragraph,
-  // and a deliberately blank line stays a blank gray row.
-  const lines = raw
-    .trim()
-    .split('\n')
-    .flatMap((source) => wordWrap(source, Math.max(1, cols - USER_INDENT)));
-  const bars = lines.map((text, index) => {
-    const prefix = index === 0 ? ` ${INPUT_PROMPT}` : ' '.repeat(USER_INDENT);
-    const row = `${prefix}${text}`;
-    return theme.userMessage(row + ' '.repeat(Math.max(0, cols - visibleWidth(row))));
-  });
+  // userMessageBars: the message word-wrapped under a ` › ` marker as full-width gray rows.
+  const bars = userMessageBars(raw, terminalColumns());
   if (stdout.isTTY) eraseInputBox(raw);
   stdout.write(`${bars.join('\n')}\n\n`);
+}
+
+/**
+ * Print a message that was never in the live input box — one queued mid-turn, running now that its
+ * turn came. Same gray block as a typed message, since by this point it IS the user's turn; there is
+ * simply no input box to collapse, and a leading blank line stands in for the separator the prompt
+ * would have printed above it.
+ */
+export function printUserMessage(raw: string): void {
+  const bars = userMessageBars(raw, terminalColumns());
+  stdout.write(`\n${bars.join('\n')}\n\n`);
 }
 
 /** An empty submit adds nothing to history — just erase the box (TTY) and move on. */

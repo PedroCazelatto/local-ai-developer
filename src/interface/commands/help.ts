@@ -62,8 +62,9 @@ function renderHelp(): void {
   }
 
   write('');
-  write(theme.meta('  Tab: complete a command or its argument · Shift+Tab: cycle the active phase'));
-  write(theme.meta('  /swap <phase>: jump straight to one'));
+  write(theme.meta('  Shift+Enter (or Ctrl+J / Alt+Enter): break the line instead of sending it'));
+  write(theme.meta('  While the model works — Enter: queue the message · ↑: take the last one back'));
+  write(theme.meta('  /swap <phase>: jump straight to the phase you want'));
   write('');
 }
 

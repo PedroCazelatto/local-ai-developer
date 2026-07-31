@@ -27,6 +27,7 @@ import * as statusActivity from '../core/ui/status-activity.js';
 import * as statusBar from '../core/ui/status-bar.js';
 import * as activityLine from '../core/ui/activity-line.js';
 import * as inputFence from '../core/ui/input-fence.js';
+import * as messageQueue from '../core/ui/message-queue.js';
 import { bindNewlineKey } from '../core/ui/bind-newline-key.js';
 import { theme } from '../core/ui/theme.js';
 import { getCommand } from './command-registry.js';
@@ -176,26 +177,28 @@ export async function runRepl(orch: ReplOrchestrator): Promise<void> {
       }
       renderer.commitUserMessage(raw); // collapse the box into a static gray user-message line + blank
 
-      // Any error from a command or a turn is SHOWN and swallowed — one bad turn (a dropped Ollama
-      // stream, a tool blowup) must never kill the session. Only genuinely fatal errors that escape to
-      // `main().catch` (boot failures, Node runtime faults) end the app, printing to the console.
       processing = true;
       startTicker();
+      let exitRequested = false;
       try {
-        if (line.startsWith('/')) {
-          if (await handleCommand(orch, line, rl)) break; // /exit requested
-        } else {
-          await orch.processMessage(line);
+        exitRequested = await runInput(orch, line, rl);
+        // Messages submitted while the turn ran were queued, not sent (input-fence.ts). They run now,
+        // in the order they were written, each one exactly as if it had been typed at the prompt — a
+        // queued `/command` included. The queue may grow while it drains, since every message here
+        // runs a turn of its own with the fence up, so this reads it until it is genuinely empty.
+        while (!exitRequested) {
+          const queued = messageQueue.dequeue();
+          if (queued === null) break;
+          renderer.printUserMessage(queued); // no live box to collapse — print the gray block outright
+          exitRequested = await runInput(orch, queued, rl);
         }
-      } catch (err) {
-        activityLine.hide(); // the activity line may still be up if the turn threw mid-stream
-        renderer.errorLine(`✖ ${err instanceof Error ? err.message : String(err)}`);
       } finally {
         stopTicker();
         processing = false;
         statusActivity.reset(); // clear any lingering tool/turn state so idle shows no activity field
         inputFence.reset(); // a turn that threw mid-flight must never leave stdin captured (dead prompt)
       }
+      if (exitRequested) break;
     }
   } finally {
     activityLine.hide();
@@ -229,6 +232,25 @@ function updateStatus(orch: ReplOrchestrator): void {
 /** Capitalize the first letter for display (discovery → Discovery). */
 function capitalize(s: string): string {
   return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+/**
+ * Run ONE line of input — a `/command` or a chat message — returning true only when it asked to exit.
+ *
+ * Any error is SHOWN and swallowed here rather than at the loop: one bad turn (a dropped Ollama stream,
+ * a tool blowup) must never kill the session, and must not strand the messages queued behind it either.
+ * Only genuinely fatal errors that escape to `main().catch` (boot failures, Node runtime faults) end
+ * the app, printing to the console.
+ */
+async function runInput(orch: ReplOrchestrator, input: string, rl: ReadlineInterface): Promise<boolean> {
+  try {
+    if (input.startsWith('/')) return await handleCommand(orch, input, rl);
+    await orch.processMessage(input);
+  } catch (err) {
+    activityLine.hide(); // the activity line may still be up if the turn threw mid-stream
+    renderer.errorLine(`✖ ${err instanceof Error ? err.message : String(err)}`);
+  }
+  return false;
 }
 
 /**

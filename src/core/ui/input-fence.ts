@@ -16,8 +16,12 @@ import { stdin, stdout } from 'node:process';
 
 import { captureTypeAhead } from './capture-type-ahead.js';
 import { inputFenceRow } from './input-fence-row.js';
+import * as messageQueue from './message-queue.js';
+import * as renderer from './renderer.js';
+import { singleLine } from './single-line.js';
 import * as statusBar from './status-bar.js';
 import { terminalColumns } from './terminal-columns.js';
+import { theme } from './theme.js';
 
 /** How many begin() calls are outstanding — nested turns share one fence. */
 let depth = 0;
@@ -28,7 +32,28 @@ let pending = '';
 
 /** Repaint the type-ahead row after an edit — one reserved row, so it costs no scrolling. */
 function render(text: string): void {
-  statusBar.setInputFence(inputFenceRow(text, terminalColumns()));
+  statusBar.setInputFence(inputFenceRow(text, terminalColumns(), messageQueue.size()));
+}
+
+/**
+ * Enter mid-turn: the message joins the queue the REPL drains when the turn ends, and says so in the
+ * scrollback right away — a message that vanished into a queue with no trace would be indistinguishable
+ * from one that was dropped. interjectLine is what makes that safe to print into a reply in flight.
+ */
+function submit(text: string): void {
+  messageQueue.enqueue(text);
+  renderer.interjectLine(theme.meta(`⏳ queued: ${singleLine(text)}`));
+}
+
+/**
+ * ↑ mid-turn: the newest queued message comes back into the row to edit, and the scrollback says so
+ * too. Without that line the history would keep claiming a message was queued that never ran — and
+ * history here is append-only, so the original line cannot be taken back.
+ */
+function recall(): string | null {
+  const text = messageQueue.recall();
+  if (text !== null) renderer.interjectLine(theme.meta(`↩ un-queued: ${singleLine(text)}`));
+  return text;
 }
 
 /**
@@ -40,9 +65,10 @@ export function begin(): void {
   if (depth > 1 || stop !== null) return;
   if (!stdin.isTTY || !stdout.isTTY) return;
   // captureTypeAhead: suspends every keypress listener (readline's included, so nothing echoes into
-  // the streamed reply) and buffers printable keys until the returned stop() restores them.
-  stop = captureTypeAhead(stdin, pending, render);
-  statusBar.showInputFence(inputFenceRow(pending, terminalColumns()));
+  // the streamed reply) and owns the keys until the returned stop() restores them — printable keys and
+  // backspace build the row, Enter queues it, ↑ takes the last one back.
+  stop = captureTypeAhead(stdin, pending, { onChange: render, onSubmit: submit, onRecall: recall });
+  statusBar.showInputFence(inputFenceRow(pending, terminalColumns(), messageQueue.size()));
 }
 
 /** A turn ended: on the LAST outstanding begin, give stdin back and drop the fence. */

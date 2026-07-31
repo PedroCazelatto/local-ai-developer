@@ -13,27 +13,33 @@
 // nothing reaches readline's buffer, and the caller renders the text where it belongs. stop()
 // restores precisely what was found and hands back the buffer for the next prompt.
 //
-// Two keys are deliberately NOT ours:
+// The keymap while a turn runs:
+//   - printable keys and backspace build the buffer;
+//   - Enter hands a non-empty buffer to onSubmit (the REPL queues it) and clears the row;
+//   - ↑ asks for the last submitted message back and puts it in the row to edit;
+//   - Shift+Enter is ignored: the row is one line, and a message being composed across lines belongs
+//     at the real prompt where readline can edit it properly;
 //   - Ctrl+C is forwarded to the suspended listeners, so it still reaches readline and still ends the
 //     session mid-turn. Swallowing the one escape hatch from a long turn would be a bad trade.
-//   - Enter is ignored, not submitted (see backlog/queue-messages-while-thinking.md — queueing a
-//     message mid-turn is its own task). Editing is deliberately just backspace here: the full
-//     buffer, with history and multi-line composition, is readline's job and resumes at the prompt.
+//
+// Editing is deliberately just backspace: the full buffer, with history and multi-line composition, is
+// readline's job and resumes the moment the prompt reopens.
 
-import type { KeypressListener, KeypressSource } from './capture-type-ahead.type.js';
+import { isNewlineKey } from './is-newline-key.js';
+import type { KeypressListener, KeypressSource, TypeAheadHandlers } from './capture-type-ahead.type.js';
 
 /** C0 controls + DEL. Stripped from a keystroke so a pasted newline can never enter the buffer. */
 const CONTROL = /[\x00-\x1f\x7f]/g;
 
 /**
- * Route keystrokes on `input` into a type-ahead buffer seeded with `initial`, calling `onChange` with
- * the buffer after every edit. Returns stop(): it detaches, restores the listeners it suspended, and
- * returns the final buffer.
+ * Route keystrokes on `input` into a type-ahead buffer seeded with `initial`, reporting every edit to
+ * `handlers`. Returns stop(): it detaches, restores the listeners it suspended, and returns whatever is
+ * left in the buffer (what was typed but not submitted).
  */
 export function captureTypeAhead(
   input: KeypressSource,
   initial: string,
-  onChange: (text: string) => void,
+  handlers: TypeAheadHandlers,
 ): () => string {
   const suspended = input.listeners('keypress') as KeypressListener[];
   for (const listener of suspended) input.off('keypress', listener);
@@ -46,11 +52,29 @@ export function captureTypeAhead(
       for (const listener of suspended) listener(str, key);
       return;
     }
+    // ↑ before the escape-sequence guard below, which would otherwise swallow it as `\x1b[A`.
+    if (key?.name === 'up') {
+      const recalled = handlers.onRecall();
+      if (recalled === null) return; // nothing queued: the row keeps whatever is in it
+      text = recalled;
+      handlers.onChange(text);
+      return;
+    }
+    // isNewlineKey: Shift+Enter / Alt+Enter, which compose a line break at the prompt. Claimed here
+    // ONLY to stop the `return`/`enter` check below reading them as a submit.
+    if (isNewlineKey(key)) return;
+    if (key?.name === 'return') {
+      if (text.trim() === '') return; // an empty submit queues nothing
+      handlers.onSubmit(text);
+      text = '';
+      handlers.onChange(text);
+      return;
+    }
     if (key?.name === 'backspace') {
       const glyphs = [...text]; // by code point: one backspace deletes one glyph, not half a pair
       glyphs.pop();
       text = glyphs.join('');
-      onChange(text);
+      handlers.onChange(text);
       return;
     }
     if (key?.ctrl === true || key?.meta === true) return; // shortcuts belong to nobody here
@@ -59,7 +83,7 @@ export function captureTypeAhead(
     const printable = str.replace(CONTROL, ''); // Enter/Tab/Esc reduce to nothing and are dropped
     if (printable === '') return;
     text += printable;
-    onChange(text);
+    handlers.onChange(text);
   };
 
   input.on('keypress', onKey);
