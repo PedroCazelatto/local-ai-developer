@@ -11,8 +11,8 @@ local-ai-developer/
 │   │   ├── container/      # Docker sandbox + per-project runner (dockerode)
 │   │   ├── llm/            # Ollama client, one-shot throwaway calls, stream filter, json repair
 │   │   └── ui/             # renderer, status bar, theme, prompts, spinner
-│   ├── phases/             # phase abstraction + factory
-│   ├── context/            # system/phase prompt + standards catalog loaders
+│   ├── phases/             # phase abstraction + factory + the per-phase tool allowlists
+│   ├── context/            # system/phase prompt + generated tool list + standards catalog loaders
 │   ├── interface/          # REPL, command registry, /commands
 │   └── tools/              # actions — each file is a model-callable tool
 ├── rules/

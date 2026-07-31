@@ -96,8 +96,11 @@ work; it calls `inbox_post` whenever it spots a concern that belongs to another 
 
 ## Git / commit policy
 
-Committing is a **model-driven tool call**, not something the orchestrator does behind the model's
-back. Two tools, both host-side (the root sandbox ships no git):
+Git is a **model-driven tool call**, not something the orchestrator does behind the model's back.
+Every git tool is host-side (the root sandbox ships no git) and every one of them runs through
+`runGit` — an explicit `-C <projectPath>` with an argv and **no shell**, so nothing can escape the
+project repo. The model never gets the in-app slash-commands; it gets tools that do the same job with
+guardrails.
 
 - `list_changes()` — every uncommitted path in the project repo, with its status code. Paths only,
   never a diff, so a large working tree can't quietly consume `num_ctx`.
@@ -107,11 +110,43 @@ back. Two tools, both host-side (the root sandbox ships no git):
   own change cannot talk the log into agreeing, and the message costs the calling phase no context.
   Any path escaping the project repo is refused — the guard that keeps a [rules/](../rules/) edit from
   ever being committed by a model.
+- `git_inspect(what, ref?, paths?, count?)` — read-only history: `diff`, `log`, `show`. **Bounded**:
+  `diff`/`show` truncate head+tail at `REVIEW_DIFF_BUDGET`, and `log` is capped at 100 commits
+  (default 20). The model can narrow those limits, never raise them.
+- `git_stash(action, label?)` — `save` / `list` / `pop` / `drop`, addressed by a label the model
+  chooses, never by `stash@{n}` (an index shifts the moment anything else is stashed). Labels live
+  under `lad-shelf:`, **disjoint from the task loop's own `lad-stash:<taskId>`** records, so a model
+  can never pop or drop the stashed failed attempt that Retro reads and the user reviews. A label may
+  not contain a colon, so the prefix cannot be forged.
+- `git_branch(action, name?)` — `create` / `switch` / `list`. Nothing deletes a branch. `create` on a
+  branch that already exists **switches to it** and reports `existed: true`, so a re-run or a later
+  fix round costs no wasted turn. A dirty working tree is treated differently by the two: `create` is
+  allowed (`checkout -b` carries the work across intact), `switch` to an existing branch is **refused**
+  with a recoverable message, so work never rides onto a branch it doesn't belong to.
+- `git_push()` — **no arguments**: always the checked-out branch, always `origin`, always `-u`, never
+  a force. A branch missing on the remote **is created by the push**; a missing **repository is an
+  error** — the model never creates one, so it fails with a recoverable message and the user creates
+  the repo.
+
+### One task, one branch
+
+Every task is developed on its own branch, `task/<id>-<title-slug>` — derived mechanically from the
+backlog (`taskBranchName`), where the title slug is dropped when the id's own leaf already ends with
+it. **The Worker creates it**, as its first action: it is the first actor on a task, and its seed
+message names the exact string, so nothing downstream has to guess. Create-or-switch makes repeating
+the call harmless across the fix loop, an escalation, or a re-run. The Reviewer then commits onto the
+branch it finds.
+
+**Nothing merges a task branch back.** Finished work reaches the main branch when the **user** merges
+it; the model can push a branch, and that is where its authority ends.
+
+Planning output is not a task: Discovery/Design/Breakdown commit on the branch that is checked out and
+do not branch for their own work. No phase branches or pushes unless the user asked for it.
 
 Who may commit:
 
 - **Every phase except the Worker.** The planning phases commit their approved output at each
-  approval point. Branch tooling is not needed.
+  approval point.
 - **The Worker never commits.** `commit_changes` is stripped from its tool definitions *and* refused
   in its window, because a Worker that commits its own code is its own gatekeeper. It leaves work in
   the working tree and hands everything to the Reviewer.

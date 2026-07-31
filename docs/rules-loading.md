@@ -18,6 +18,24 @@ Two folders:
 - **Standards** ([rules/standards/](../rules/standards/)) — on-demand reference rules, loaded via tool
   call. This folder is intended to grow freely; do not maintain a copy of its listing anywhere else.
 
+## What a phase can call
+
+Each phase has one array of tool names in
+[src/phases/phase-tool-names.ts](../src/phases/phase-tool-names.ts), and `resolvePhaseTools` turns
+that array into the tool definitions its window sends to Ollama. **The array is the gate:** a tool it
+does not name is a tool that phase never sees. An unknown phase, or a name no tool answers to, throws
+— a typo cannot quietly shrink a phase's surface, which would otherwise be invisible at runtime.
+
+The phase markdown does **not** list those tools. `buildToolSection` renders the same array the
+window sends into a `# Your Tools` block in the system prompt, so the advertised list and the real
+surface are one thing and cannot disagree. Hand-written inventories in the phase files drifted three
+times before this: a phase file's job is to say *when* to reach for a tool, never *whether* it
+exists. The block costs roughly 100–200 tokens per turn — that is the price of the guarantee.
+
+The planning phases (Discovery/Design/Breakdown) get no shell: `execute_command` and `run_in_project`
+are absent from their arrays, because planning writes documents and `read_file`/`list_files`/
+`search_in_files` already cover inspection.
+
 ## Retrieval: LLM-delegated search
 
 To keep the main context lean, the standards catalog is **not** in the system prompt. Two tools:

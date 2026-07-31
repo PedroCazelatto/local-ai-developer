@@ -9,7 +9,8 @@ There is exactly **one** local Ollama model. Everything else is context windows.
   ceiling; exceed it and Ollama silently drops the oldest tokens.
 - A **"subagent" is not a new model** — it is a fresh, empty `messages` array with a one-shot system
   prompt plus a single task, run against the same Ollama, then discarded. Isolation is just a
-  separate list.
+  separate list. It inherits **its master phase's** tool array minus the three sub-agent tools (so it
+  cannot nest), never the full registry — a sub-agent must not be a way around its master's gate.
 - A **phase** is the unit of work and the unit of instruction. Each phase has an instruction set (its
   markdown under [rules/](../rules/)) that configures the window it runs in. Elsewhere these are
   called "skills" or "personas" — in this project the single word is **phase**.
