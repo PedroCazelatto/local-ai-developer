@@ -24,7 +24,10 @@ The launcher also runs directly: `node scripts/run.mjs install | start <project>
 - `/questions` — answer the `ask_user` questions you skipped (delivered to the asking phase on its
   next turn)
 - `/models list | pull <name> | use <name>` — manage the active model
-- `/clear` · `/resume` — clear or restore the active phase's history
+- `/clear` — start the active phase on a new context (the old one is kept, not wiped)
+- `/resume [<address>]` — reopen one of the active phase's earlier contexts, by address
+  (`design/7a888b1f`) or from a numbered list. See the memory model in
+  [mental-model.md](mental-model.md).
 - `/subagents` — list active sub-agents
 - `/help` — list every command · `/exit` — quit
 
@@ -101,7 +104,11 @@ needs the installed list to decide anything, and a session without Ollama can do
 
 [.env.example](../.env.example) holds:
 
-- `OLLAMA_NUM_CTX` — the hard token ceiling per context window.
+- `OLLAMA_NUM_CTX` — the hard token ceiling per context window. **Changing it hides every phase
+  context written under the old value** — they are not listed and cannot be reopened, because replaying
+  a history built for a larger window would silently lose its oldest turns. Nothing is deleted:
+  restoring the old value brings them back. It is read once at boot, so a change takes effect only on
+  the next `run start`. See the memory model in [mental-model.md](mental-model.md).
 - `SUMMARIZATION_THRESHOLD_RATIO` — compact a phase once its exact `prompt_eval_count` reaches this
   fraction of `OLLAMA_NUM_CTX`. Must be in `(0, 1]`.
 

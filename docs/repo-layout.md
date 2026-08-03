@@ -17,7 +17,8 @@ local-ai-developer/
 │   └── tools/              # actions — each file is a model-callable tool
 ├── rules/
 │   ├── phases/             # phase instruction sets (markdown), injected on phase load
-│   └── standards/          # on-demand reference rules (markdown)
+│   ├── standards/          # on-demand reference rules (markdown), searchable via search_rules
+│   └── prompts/            # orchestrator-owned one-shot prompts; never searchable by the model
 ├── docs/                   # the docs indexed by CLAUDE.md
 ├── backlog/                # one markdown file per pending task; delete + commit on completion
 ├── projects/               # each child is its own git repo, developed by the model

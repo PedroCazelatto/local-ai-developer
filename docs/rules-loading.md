@@ -4,7 +4,7 @@ Rules are all Markdown, under [rules/](../rules/), and are **global** — projec
 orchestrator and do not override rules. These files are what the *local Ollama model* reads; they are
 not Claude Code's instructions.
 
-Two folders:
+Three folders:
 
 - **Phases** ([rules/phases/](../rules/phases/)) — the phase instruction sets, injected automatically
   when a phase is loaded. A file holds the phase definition *and* the workflow it owns. The set is
@@ -17,6 +17,14 @@ Two folders:
   [retro.md](../rules/phases/retro.md)
 - **Standards** ([rules/standards/](../rules/standards/)) — on-demand reference rules, loaded via tool
   call. This folder is intended to grow freely; do not maintain a copy of its listing anywhere else.
+- **Prompts** ([rules/prompts/](../rules/prompts/)) — the instructions the **orchestrator** injects into
+  a throwaway one-shot context, read by `loadPrompt`
+  ([src/context/load-prompt.ts](../src/context/load-prompt.ts)) and **deliberately not part of the
+  standards catalog.** The distinction is direction: a standards file is something the model may *choose*
+  to read, while these are written to be used *on* it, so offering one to `search_rules` would be
+  offering the model the prompt that describes it.
+  [context-title.md](../rules/prompts/context-title.md) is the first —
+  the rules for titling a phase context (see [mental-model.md](mental-model.md)).
 
 ## What a phase can call
 
