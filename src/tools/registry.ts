@@ -8,6 +8,7 @@ import type { Tool } from '../core/llm/index.js';
 import { askSubagentTool } from './ask-subagent.js';
 import { askUserTool } from './ask-user.js';
 import { commitChangesTool } from './commit-changes.js';
+import { debateTool } from './debate.js';
 import { dismissSubagentTool } from './dismiss-subagent.js';
 import { editFileTool } from './edit-file.js';
 import { executeCommandTool } from './execute-command.js';
@@ -66,6 +67,11 @@ const TOOL_MODULES: readonly ToolModule[] = [
   spawnSubagentTool,
   askSubagentTool,
   dismissSubagentTool,
+  // Model-to-model deliberation — a bounded challenger/proponent argument over the claim the caller is
+  // about to commit to, distilled to one digest. Registered globally; it needs no SubagentManager (it
+  // runs on the same throwaway one-shot device as search_rules), so unlike the sub-agent tools it can be
+  // handed to a spawned window — which is why the Reviewer and Retro get it.
+  debateTool,
   // Interactive questioning (V6/01) — a round of multiple-choice questions put straight to the user.
   // Registered globally so the interactive phases advertise it; the orchestrator does NOT pass it to
   // the spawned execution windows (Worker/Reviewer/Retro), which run unattended and would stall a

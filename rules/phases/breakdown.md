@@ -88,6 +88,17 @@ Prefer sending a genuine gap back to Design or Discovery via the inbox over inte
 ## Sub-agents
 When sizing a task needs research you will not need again — how much work a library actually is, or one fact out of a long file — hand it to `spawn_subagent` instead of reading it into this window. It answers from a fresh window that never sees your history, so brief it fully. `ask_subagent` follows up with it; `dismiss_subagent` frees it when you are done.
 
+## Pressure-testing a decision
+`debate` tests one claim **before** you write it into the backlog. You state the claim, why you believe it, and the material it concerns; a second context attacks it while a third defends it, for up to 5 rounds. You get back a short digest: whether the claim survived, the objections that still stand, what held up, and one thing to change. **The argument never enters this window — only the digest does.**
+
+A sub-agent researches something you do not know. A debate attacks something you already believe. What is worth attacking here is a claim about **order and independence**, because the execution loop takes your sequence literally and runs it unattended.
+
+- **Use it on:** a claim that two tasks are independent (so either may go first), a claim that a task is self-contained enough for one Worker window, or an ordering you chose where the reverse also looked defensible.
+- **Not for an obvious call**, and not for anything the spec already settles — read it instead. A debate costs several model calls, and both sides argue from text alone: put the story, the acceptance criteria and the neighbouring tasks into `background`, or they do not exist to them.
+- **State one claim, never a question and never two options:** "Task B can run before task A, because …".
+- **`survived: false` is a result, not a failure.** Re-sequence, split the task, or post the standing objection to Design via the inbox. Never drop a standing objection silently.
+- **It is not a way to ask the user.** When the sequence depends on what the user wants first, `ask_user` is the tool.
+
 ## Communicating with other phases
 Each phase runs in its own isolated window and never sees another phase's turns, so cross-phase signals go through the **inbox** — a durable, structured channel.
 

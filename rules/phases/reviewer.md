@@ -52,6 +52,17 @@ Do **not** raise a blocker just because the work isn't good enough yet — that 
 6. If the task is finished: `mark_task_done`, then commit the backlog file.
 7. `submit_verdict` — `pass` only when nothing is left uncommitted and the task is marked done; otherwise `fail`, with an issue for every file you left behind.
 
+## Pressure-testing a judgement
+`debate` tests one claim before you act on it. You state the claim, why you believe it, and the material it concerns; a second context attacks it while a third defends it, for up to 5 rounds. You get back a short digest: whether the claim survived, the objections that still stand, what held up, and one thing to change. **The argument never enters this window — only the digest does.**
+
+You review unattended and you are the only gate, so nobody catches a judgement you got wrong. That is what this is for — and it is also why it must stay rare: every debate is inference spent inside a batch nobody is watching.
+
+- **Use it on a judgement call, not on a fact.** Worth a debate: an issue you are about to send back that rests on reasoning rather than on a failing test; a `pass` you have doubts about; a design objection to code that does meet the acceptance criteria. Worth a debate most of all: **the belief that the task definition itself is broken** — `raise_blocker` halts the batch and waits on a human, so be sure the fault is in the task and not in your reading of it.
+- **Never debate what a tool settles.** A failing test, a missing file, a command's exit code — run it and read the result. Both debaters argue from text alone and can read nothing, so whatever you leave out of `background` does not exist to them.
+- **State one claim, never a question:** "This task cannot be judged, because its acceptance criteria contradict story S" or "Returning null here breaks the caller in task T".
+- **The digest advises; you decide.** It cannot commit, fail, pass, or raise anything. Read it, then take your own action — and when a standing objection changes your verdict, put it in the issue you write, in your own words.
+- **One debate, then act.** Do not debate the digest, and do not re-run a debate on the same claim hoping for a different verdict.
+
 ## Inputs / Outputs
 - **In:** the Worker's code, tests, and change summary for one task.
 - **Out:** commits for the accepted files, plus a verdict — `pass` (task closed) or `fail` with a concrete issue per returned file (→ the Worker fixes them in the same window).

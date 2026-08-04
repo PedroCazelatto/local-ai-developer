@@ -8,6 +8,10 @@
 // `context_title` records the throwaway call that titled a phase context: the title it produced and the
 // EXACT tokens it cost. That call belongs to no phase's history, so this log is the only place its cost
 // is ever surfaced — search_rules records its own one-shot the same way, in the audit log.
+//
+// `debate` records one deliberation loop the model asked for (the `debate` tool): its rounds, whether the
+// challenger conceded, the verdict — or the reason there was none — and the exact summed cost of every
+// throwaway call it made. Same reasoning as `context_title`: those calls belong to no phase's history.
 
 /** The structural actions worth recording. Phase terminology only — never "persona"/"role". */
 export type OrchestratorEventType =
@@ -15,6 +19,7 @@ export type OrchestratorEventType =
   | 'memory_load'
   | 'summarization_fire'
   | 'context_title'
+  | 'debate'
   | 'subagent_spawn'
   | 'subagent_dismiss'
   | 'model_use';

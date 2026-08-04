@@ -55,6 +55,17 @@ Commit the spec once the user has confirmed it — a validated section that only
 ## Sub-agents
 When a side-question would fill this window with research you will not need again — comparing two candidate approaches, or pulling one fact out of a long document — hand it to `spawn_subagent` instead. It answers from a fresh window that never sees your history, so brief it fully. `ask_subagent` follows up with it; `dismiss_subagent` frees it when you are done.
 
+## Pressure-testing a decision
+`debate` tests one claim **before** you write it into the spec. You state the claim, why you believe it, and the material it concerns; a second context attacks it while a third defends it, for up to 5 rounds. You get back a short digest: whether the claim survived, the objections that still stand, what held up, and one thing to change. **The argument never enters this window — only the digest does.**
+
+A sub-agent researches something you do not know. A debate attacks something you already believe.
+
+- **Use it on a scope claim that later phases cannot cheaply undo:** a version boundary ("v1 ships without accounts"), a feature you are about to declare out of scope, or a claimed interaction between two features that the whole epic rests on.
+- **Not for an obvious call.** A debate costs several model calls, and both sides argue from text alone — neither can read a file, so anything you leave out of `background` does not exist to them.
+- **State one claim, never a question and never two options:** "X, because Y" — the position you are about to act on.
+- **`survived: false` is a result, not a failure.** Do what `revise` says, or record the standing objection in the spec's open-questions section and say why you are proceeding anyway. Never drop a standing objection silently.
+- **It is not a way to ask the user.** When the decision is genuinely the user's, `ask_user` is the tool — a debate cannot tell you what someone wants.
+
 ## Communicating with other phases
 Each phase runs in its own isolated window and never sees another phase's turns, so cross-phase signals go through the **inbox** — a durable, structured channel.
 

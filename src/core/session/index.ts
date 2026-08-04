@@ -98,6 +98,19 @@ export { raiseBlocker, resolveBlocker, openBlockerForTask, readBlockerRows } fro
 export type { RaisedBlocker, ResolvedBlocker, BlockerRow } from './blocker-store.type.js';
 export { spawnRetro, RetroError } from './retro-runner.js';
 export type { RetroInput, RetroResult, RetroScope, RetroDeps, RetroSubmission } from './retro-runner.type.js';
+// Model-to-model deliberation (backlog/model-to-model-dialogue.md): challenger ⇄ proponent on throwaway
+// contexts, distilled by a third — one model, three windows, none of them in any phase's memory.
+export { runDebate, MAX_DEBATE_ROUNDS } from './run-debate.js';
+export { parseDebateDigest } from './parse-debate-digest.js';
+export type {
+  DebateRequest,
+  DebateRole,
+  DebateTurn,
+  DebateDigest,
+  DebateDeps,
+  DebateFailure,
+  DebateOutcome,
+} from './run-debate.type.js';
 export { SubagentManager, SUBAGENT_TOOL_NAMES, SUBAGENT_SHORT_ID_LEN } from './subagents.js';
 export type {
   SubagentInfo,

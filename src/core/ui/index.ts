@@ -16,6 +16,12 @@ export { terminalColumns } from './terminal-columns.js';
 // Streamed markdown rendering (V6/01): the model writes plain markdown, the terminal colors it.
 export { createMarkdownStream } from './create-markdown-stream.js';
 export type { MarkdownStream } from './markdown-stream.type.js';
+// A deliberation loop printed into the scrollback: one block per turn, then the closing line. The digest
+// goes to the model, the argument goes to the user (src/core/session/run-debate.ts).
+export { renderDebateTurn } from './render-debate-turn.js';
+export type { DebateTurnView } from './render-debate-turn.type.js';
+export { renderDebateSummary } from './render-debate-summary.js';
+export type { DebateSummaryView } from './render-debate-summary.type.js';
 // The ask_user widget (V6/01) — a tabbed question panel; shared by the tool and `/questions`.
 export { askQuestions } from './ask-questions.js';
 export type { AskQuestion, AskOutcome } from './ask-questions.type.js';

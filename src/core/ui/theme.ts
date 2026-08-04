@@ -53,6 +53,16 @@ export const theme = {
    */
   userMessage: chalk.bgAnsi256(250).black as Styler,
   /**
+   * The two sides of a deliberation loop (run-debate.ts), printed as headers above each turn. Their own
+   * roles rather than a reuse of success/danger: a challenger is not a failure and a proponent is not a
+   * pass — they are two voices, and the eye only has to tell them apart. Red attacks, green defends,
+   * which is the one convention a reader already has.
+   */
+  debate: {
+    challenger: chalk.bold.redBright as Styler,
+    proponent: chalk.bold.greenBright as Styler,
+  },
+  /**
    * Markdown roles. The model emits PLAIN markdown and never picks a color (see system-prompt.ts);
    * render-markdown-line.ts maps each construct onto exactly one role below. Colors live only here,
    * so the whole markdown look is retuned in one place. Yellow means "code" everywhere — inline and

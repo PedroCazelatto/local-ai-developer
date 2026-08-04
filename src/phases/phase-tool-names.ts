@@ -58,6 +58,7 @@ export const DISCOVERY_TOOL_NAMES: readonly string[] = [
   'spawn_subagent',
   'ask_subagent',
   'dismiss_subagent',
+  'debate',
   'ask_user',
 ];
 
@@ -82,6 +83,7 @@ export const DESIGN_TOOL_NAMES: readonly string[] = [
   'spawn_subagent',
   'ask_subagent',
   'dismiss_subagent',
+  'debate',
   'ask_user',
 ];
 
@@ -106,11 +108,12 @@ export const BREAKDOWN_TOOL_NAMES: readonly string[] = [
   'spawn_subagent',
   'ask_subagent',
   'dismiss_subagent',
+  'debate',
   'ask_user',
 ];
 
 /**
- * Worker — writes code test-first inside the container. Five deliberate absences:
+ * Worker — writes code test-first inside the container. Six deliberate absences:
  * - `commit_changes`: a Worker that commits its own code is its own gatekeeper. The Reviewer commits.
  * - `git_stash`: it could otherwise shelve the very work the Reviewer is about to judge, leaving the
  *   Reviewer a clean tree and no code to review.
@@ -118,6 +121,11 @@ export const BREAKDOWN_TOOL_NAMES: readonly string[] = [
  * - the sub-agent tools: a spawned execution window has no SubagentManager to back them.
  * - `ask_user`: execution runs unattended, so a question would stall the batch on a keypress nobody
  *   is there to press. The Worker cannot raise a blocker either — only the Reviewer can.
+ * - `debate`: it WOULD work here (a debate needs no manager), and it is withheld anyway. The Worker
+ *   implements a task somebody else already decided; what it faces are compile errors and failing
+ *   tests, which are settled by running them, not by arguing. Every debate it ran would be inference
+ *   spent per task inside the unattended batch. The pressure-testing happens where the decisions are
+ *   made — planning — and where they are judged: the Reviewer.
  *
  * It DOES get `git_branch`: one task is one branch, and the Worker is the first actor on a task, so
  * it is what puts the window on `task/<id>` before any code is written. `git_inspect` is read-only.
@@ -164,6 +172,10 @@ export const REVIEWER_TOOL_NAMES: readonly string[] = [
   'git_inspect',
   'git_branch',
   'git_push',
+  // Pressure-test a verdict before submitting it. The Reviewer is the sole gatekeeper and runs
+  // unattended, so a confidently-wrong judgement is the most expensive mistake in the loop — and unlike
+  // the sub-agent tools, a debate needs no manager, so a spawned window can hold it.
+  'debate',
   // Phase-scoped: the normal exit, the halt exit, and closing the task under review.
   'submit_verdict',
   'raise_blocker',
@@ -191,6 +203,9 @@ export const RETRO_TOOL_NAMES: readonly string[] = [
   'git_inspect',
   'git_branch',
   'git_push',
+  // Pressure-test a diagnosis before acting on it: a Retro edit to a global rules file changes what
+  // every future phase reads, from a sample size of one blocker.
+  'debate',
   // Phase-scoped: the rules-file pair and the terminal submission.
   'read_phase_rule',
   'edit_phase_rule',
