@@ -23,8 +23,14 @@ Three folders:
   standards catalog.** The distinction is direction: a standards file is something the model may *choose*
   to read, while these are written to be used *on* it, so offering one to `search_rules` would be
   offering the model the prompt that describes it.
-  [context-title.md](../rules/prompts/context-title.md) is the first —
-  the rules for titling a phase context (see [mental-model.md](mental-model.md)).
+  The folder so far:
+  [context-title.md](../rules/prompts/context-title.md) — the rules for titling a phase context (see
+  [mental-model.md](mental-model.md)) — plus the three that make up one deliberation loop,
+  [debate-challenger.md](../rules/prompts/debate-challenger.md),
+  [debate-proponent.md](../rules/prompts/debate-proponent.md) and
+  [debate-digest.md](../rules/prompts/debate-digest.md) (see [phases.md](phases.md)). A debate is the
+  clearest case for the rule above: the challenger prompt is written to attack whatever the model just
+  decided, so a model that could read it first would be reading the brief for its own cross-examination.
 
 ## What a phase can call
 

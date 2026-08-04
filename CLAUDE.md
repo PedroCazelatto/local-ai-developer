@@ -42,7 +42,7 @@ that owns the topic.
 | [constitution.md](constitution.md) | **The quality bar for code.** TypeScript conventions, `never any`, one function per file, exact token counts, tool logging, git workflow, terminal-UX invariants, instruction integrity. |
 | [docs/product.md](docs/product.md) | What the project is and is not — goals, non-goals, no parallelism, OS-agnostic reach, how terminal output renders. |
 | [docs/mental-model.md](docs/mental-model.md) | One model, many context windows — stateless chat API, what a "subagent" really is, what a phase is, and the memory model (phase **contexts** as titled, addressable records in SQLite, a fresh one per boot, `/clear` · `/resume`, the summarization failsafe, `num_ctx` isolation). |
-| [docs/phases.md](docs/phases.md) | How a session works — planning phases (Discovery/Design/Breakdown) and `ask_user`, the execution loop (Worker/Reviewer, 5-round cap, `raise_blocker`), Retro, the cross-phase inbox, git/commit policy. |
+| [docs/phases.md](docs/phases.md) | How a session works — planning phases (Discovery/Design/Breakdown) and `ask_user`, the execution loop (Worker/Reviewer, 5-round cap, `raise_blocker`), Retro, the `debate` deliberation loop, the cross-phase inbox, git/commit policy. |
 | [docs/rules-loading.md](docs/rules-loading.md) | The [rules/](rules/) folders and how the model retrieves standards — `search_rules` / `load_rule` and the throwaway search context. |
 | [docs/sandboxing.md](docs/sandboxing.md) | The two-tier Docker model — `ai_sandbox`, per-project `runner`, `execute_command` vs. `run_in_project`, tool ground rules. |
 | [docs/repo-layout.md](docs/repo-layout.md) | Where code lives, plus the [backlog/](backlog/) convention (one file per task; delete it in the commit that ships the work). |

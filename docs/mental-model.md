@@ -11,6 +11,13 @@ There is exactly **one** local Ollama model. Everything else is context windows.
   prompt plus a single task, run against the same Ollama, then discarded. Isolation is just a
   separate list. It inherits **its master phase's** tool array minus the three sub-agent tools (so it
   cannot nest), never the full registry — a sub-agent must not be a way around its master's gate.
+- A **throwaway one-shot** is the smallest form of the same idea: one fresh `messages` array, no tools,
+  never appended to any phase's history, discarded when it answers (`oneShot` in
+  [src/core/llm/one-shot.ts](../src/core/llm/one-shot.ts)). It is what powers `search_rules`, the
+  summarizer, the commit-message writer, the context titler, and the three windows of a **debate** — a
+  challenger, a proponent and a distiller arguing a claim so the calling phase pays context for the
+  conclusion alone ([phases.md](phases.md)). Two windows of the one model disagreeing is not a second
+  opinion from a second model; it is the same weights reading a different `messages` array.
 - A **phase** is the unit of work and the unit of instruction. Each phase has an instruction set (its
   markdown under [rules/](../rules/)) that configures the window it runs in. Elsewhere these are
   called "skills" or "personas" — in this project the single word is **phase**.

@@ -78,6 +78,47 @@ correct file so the mistake does not recur:
   **global** phase instruction file under [rules/](../rules/).
 - **Task-specific** — a one-off gap in this task's definition → edit the **project** doc only.
 
+## Pressure-testing a decision: the deliberation loop
+
+A phase about to commit to something expensive can have the claim argued against first, with the
+**`debate`** tool. It is the same one model in more context windows (see
+[mental-model.md](mental-model.md)): the orchestrator runs a **challenger** window against a
+**proponent** window, then a third window distils the argument, and only that digest reaches the caller.
+
+- **The caller pays for the digest, not the argument.** All three windows are throwaway one-shots — the
+  device behind `search_rules` and `composeCommitMessage` — so a five-round debate costs the calling
+  phase four fields: whether the claim survived, the objections that still stand, what held up, and one
+  thing to revise. That is the reason it is a tool rather than an instruction to argue with a sub-agent
+  by hand: doing it by hand puts every objection and every rebuttal into the caller's own `num_ctx`.
+- **The challenger opens, and it does not see the caller's reasoning.** It gets the claim and the
+  material; the proponent gets the claim, the material **and** the caller's own rationale. That
+  asymmetry is deliberate — the challenger has to find the faults itself instead of picking at the
+  caller's wording, while the proponent can never lose on a fact it was never given.
+- **Bounded at 5 rounds, with an early exit.** The cap lives in code (`MAX_DEBATE_ROUNDS`) and the model
+  cannot raise it, like `MAX_TOOL_ROUNDS`. The challenger states `objecting` or `conceded` on every
+  turn, and a concession ends the debate at once — a claim nobody can attack any further is the
+  strongest result this loop reports.
+- **No tools, on either side.** Both debaters argue from text alone and can read nothing, so whatever
+  the caller leaves out of `background` does not exist to them. Neither one can write, commit, or raise
+  anything: a debate has no authority, only an opinion.
+- **Neither debater grades its own fight.** A third context reads the finished transcript and writes the
+  digest. If it cannot produce a readable verdict — after one reformat request — the tool returns a
+  recoverable error, and no verdict is invented (the same rule as everywhere else: an absent value is
+  surfaced, never guessed).
+- **The user watches; the model reads.** Every turn is printed into the scrollback as it lands, with the
+  closing line naming the rounds, the verdict, and the exact token cost — so a conclusion never arrives
+  with its reasoning hidden. The events log gets one `debate` row per loop, which is the only durable
+  record of what those throwaway calls cost.
+- **Who gets it:** the three planning phases, the **Reviewer** (the sole gatekeeper, running unattended,
+  where a confidently-wrong judgement is most expensive) and **Retro** (whose systemic edit changes what
+  every future phase reads, from a sample of one blocker). Unlike the sub-agent tools it needs no
+  manager, which is what lets a spawned window hold it.
+- **Not the Worker.** It would work there and is withheld anyway: the Worker implements a decision
+  somebody else made, and what it faces — compile errors, failing tests — is settled by running them,
+  not by arguing. Every debate it ran would be inference spent per task inside the unattended batch.
+- **Discretionary everywhere.** No phase is forced to debate anything; each phase file says when one
+  earns its cost. Nothing is persisted: the windows die with the tool call.
+
 ## Cross-phase communication: the inbox
 
 Each window has its **own isolated history** and never sees another phase's turns, so cross-phase
