@@ -17,6 +17,30 @@ for the stronger model, which is backwards.
 Each section is independently shippable. Ship them in any order and trim this file as they land; delete
 it when nothing is left.
 
+## Discount this list where it is self-referential
+
+This document was produced by asking one agent harness to compare a second one against itself. That is
+a structurally suspect exercise and the list should be read with it in mind: the output of "compare X
+to me" is always going to be a list of ways X should be more like me.
+
+The parts to trust hardest are the ones that follow from physics rather than taste. §1 is right because
+16k is 16k, and an unbounded `read_file` is indefensible on any harness at any model size. §2b is right
+because three phases genuinely cannot enumerate a subdirectory today.
+
+The two to trust least are flagged in place, and both are cases where the recommending harness has a
+very large context window and this one does not:
+
+- **§8** (an in-task plan) helps an agent with room to spare. A Worker at 16k may simply lose window to
+  it for no return. It is a hypothesis, not a recommendation.
+- **§4** (mid-turn steering) is arguably against the grain of the product. The stated value is "start a
+  batch and walk away"; steering serves someone sitting and watching, which is the mode this project
+  deprioritized on purpose. Cancelling is clearly right. Steering may not be.
+
+More generally: every section below carries an outside reading of this project's intent. The open
+decisions that are marked are the ones that were visible from the code and the docs. The ones that were
+not visible are exactly the ones this list will have gotten wrong — so treat the whole file as a draft
+to correct, not a plan to execute.
+
 ## Suggested order
 
 By value per unit of work, not by section number:
@@ -140,6 +164,10 @@ between dispatching a tool call and starting the next turn.
 Worth doing only after cancel exists, since cancel is the safety net that makes steering optional
 rather than the only way out.
 
+**Low confidence — see the caveat at the top.** This may be the wrong feature for this product. An
+unattended batch has nobody watching to steer it, and the queue already handles the attended case
+adequately. Decide whether it is wanted at all before building it.
+
 ## 5. Long-running commands block the loop
 
 `run_in_project` blocks with a 120-second default, and the container is killed at the cap. A real
@@ -203,6 +231,11 @@ appended to — would help it converge, and would give `TaskLoopReporter` someth
 round than `round 3/5`. The replace-not-append rule is what keeps this from becoming another §1b
 problem.
 
+**Low confidence — see the caveat at the top.** This is a habit carried over from a harness with room
+to spare. At 16k the plan competes with the code the Worker is reading, and it may cost more window
+than it saves rounds. If it is tried, measure it: compare rounds-to-pass with and without, on the same
+tasks, before keeping it.
+
 ## 9. Sub-agent results are unstructured prose
 
 `ask_subagent` returns free text into the parent's window, so the parent has to re-read and interpret
@@ -212,6 +245,67 @@ digest.
 
 Generalizing that to sub-agents — a required response shape declared at spawn — makes their answers
 parseable instead of prose, and bounds what a rambling sub-agent can cost its parent.
+
+## 10. Escalation has no memory
+
+Not a parity gap — this is a defect in the execution loop, found during the same pass and recorded here
+rather than in its own file. Split it out if that reads better.
+
+`TASK_STATUSES` is `pending | in_progress | done | blocked` (`src/core/session/types.ts`). There is no
+terminal-failure state, and nothing anywhere records that a task was attempted.
+
+So a task that burns all five rounds without a pass is set back to **`pending`**
+(`run-task-loop.ts`, both the MAX_ROUNDS exit and the error paths), at which point it is
+indistinguishable from a task nobody has ever touched. `resolveSelector('all')` takes everything that
+is not `done`, so the next `/run all` picks it up and spends another five rounds on it — with a fresh
+Worker that starts blind, since the stash is deliberately never reused.
+
+Blocked tasks do not have this problem: they stay `blocked` until `/answer`, which is exactly the right
+shape. It is only escalation that forgets.
+
+The reason this is worse than it first looks: the escalation *is* recorded, in the batch summary under
+`.orchestrator/batches/`. But nothing reads that back — that is the `/batch` item in
+[inspection-commands.md](inspection-commands.md). So the only durable record of "this was tried and it
+failed" sits in a file the tool cannot show, while the backlog file that actually drives scheduling
+says `pending`. Two `/run all` invocations overnight can spend the second half of the night re-failing
+the first half's tasks.
+
+The shape of a fix is a distinct status plus an attempt count in the task's frontmatter, so `/run all`
+skips it by default while `/run <id>` still retries deliberately.
+
+## Open decisions — settle these before writing code
+
+- **Whether the status vocabulary grows, or the attempt count alone carries it.** A new status is
+  clearer to read in a task file; a count is less invasive to everything that switches on status.
+- **What re-running a failed task means.** Retry from scratch (today's behavior), or refuse without an
+  explicit override.
+- **Where the count is written, and by whom.** The Reviewer owns `mark_task_done` and is the only
+  execution actor that commits, so a counter written by the loop is a new writer of task files.
+- **Whether a `/run all` that skips previously-failed tasks is the default** or an opt-in flag. The
+  unattended-batch use case argues for skipping by default; the "I fixed the spec, try again" case
+  argues the other way.
+
+## The docs are the only verification layer
+
+Context for whoever picks up [test-the-invariant-functions.md](test-the-invariant-functions.md), and
+the strongest argument for it — one that file does not currently make.
+
+The governance layer here is roughly 2,500 lines against 15,000 lines of code. That ratio is unusually
+high and it is mostly earned: it is why this repo can be assessed quickly by someone who has never seen
+it, and the two pieces of drift that were found were both in the places the currency rule does *not*
+cover — `README.md`, which is exempted by a working rule, and the comments pointing at
+`complete-line.ts`, which are code rather than docs.
+
+The thing worth naming: with no tests, the docs are carrying **both** jobs. They are the specification
+and they are the verification. That is why `docs/sandboxing.md` asserting "every file it edits happens
+inside a container" is worse than an ordinary stale sentence — with tests that claim would be a failing
+assertion, and without them it is prose that reads as true.
+
+So tests would not add a verification layer. They would **relieve** one that is currently overloaded,
+and let the docs go back to describing intent instead of also standing in for proof. If the
+constitution amendment is a hard no, that is a legitimate call — but the doc-currency rule is then
+carrying more weight than it was designed for, and that trade should be made knowingly rather than by
+default.
 
 ## What must not be traded away
 
