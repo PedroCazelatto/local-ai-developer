@@ -28,6 +28,24 @@ The functions worth pinning — no Docker, no Ollama, no terminal:
 Deliberately out of scope: anything needing a live model, a container, or a real terminal. Those stay
 on the existing "drive it with a throwaway script" and terminal-emulator-harness rules.
 
+## The strongest argument for this, which the exemption obscures
+
+The governance layer here is roughly 2,500 lines against 15,000 lines of code. That ratio is unusually high and it
+is mostly earned: it is why this repo can be assessed quickly by someone who has never seen it, and the drift found
+during a full assessment was confined to the two places the currency rule does *not* cover — `README.md`, exempted
+by a working rule, and the comments pointing at a `complete-line.ts` that does not exist
+([resolve-dead-tab-completion.md](resolve-dead-tab-completion.md)).
+
+The thing worth naming: with no tests, the docs are carrying **both** jobs. They are the specification and they are
+the verification. That is why `docs/sandboxing.md` asserting "every file it edits happens inside a container" is
+worse than an ordinary stale sentence — with tests that claim would be a failing assertion, and without them it is
+prose that reads as true. (That specific case is [resolve-symlinks-in-path-scoping.md](resolve-symlinks-in-path-scoping.md).)
+
+So tests would not add a verification layer. They would **relieve** one that is currently overloaded, and let the
+docs go back to describing intent instead of also standing in for proof. If the constitution amendment is a hard no,
+that is a legitimate call — but the doc-currency rule is then carrying more weight than it was designed for, and
+that trade should be made knowingly rather than by default.
+
 ## Blocked on a decision
 
 This contradicts `constitution.md` as written, so it cannot be started until the user decides whether
