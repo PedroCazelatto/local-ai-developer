@@ -50,8 +50,8 @@ By value per unit of work, not by importance:
 1. [bound-read-file-output.md](bound-read-file-output.md) — small change, largest single effect.
 2. [evict-stale-tool-results.md](evict-stale-tool-results.md) — medium change, comparable effect. Read its
    KV-cache caveat before committing to the design; it is the one cost the original comparison missed.
-3. [search-in-files-context-lines.md](search-in-files-context-lines.md) and
-   [list-files-subdirectories.md](list-files-subdirectories.md) — small, large.
+3. [list-files-subdirectories.md](list-files-subdirectories.md) — small, large. Its pair, the
+   `search_in_files` context lines and cheaper modes, has shipped.
 4. [small-model-lane-for-one-shots.md](small-model-lane-for-one-shots.md) — small, large, and already an open
    question in `docs/open-questions.md`. Pairs with [per-window-num-ctx.md](per-window-num-ctx.md).
 5. [read-before-edit-guard.md](read-before-edit-guard.md) — small, medium. Depends on nothing, and it is what

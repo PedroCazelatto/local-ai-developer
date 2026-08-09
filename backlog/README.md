@@ -1,6 +1,6 @@
 # Backlog checklist
 
-An index of the 24 open task files in this folder, in the order worth shipping, plus the 2 framing notes
+An index of the 23 open task files in this folder, in the order worth shipping, plus the 2 framing notes
 that are not tasks.
 
 **This file is not a task and is not deleted when work ships.** It is upkeep: when a task's file is deleted
@@ -27,9 +27,11 @@ Cheapest work per unit of value, and the two gaps both framing notes call physic
 - [ ] **[Let `list_files` see a subdirectory](list-files-subdirectories.md)** — *Harness capability.*
       Discovery, Design and Breakdown cannot enumerate a folder at all today, and
       `phase-tool-names.ts` documents that hole as a policy choice. Correct that comment in the same change.
-- [ ] **[Context lines and a cheaper default for `search_in_files`](search-in-files-context-lines.md)** —
-      *Harness capability.* Same effort as the bounded read and the same goal: answer from the search result
-      instead of paying for the file.
+- [x] ~~**Context lines and a cheaper default for `search_in_files`**~~ — *Harness capability.* Shipped:
+      case-insensitive by default, `context_lines` with overlapping context merged, and an opt-in
+      `output_mode:"paths"` — content stayed the default rather than becoming paths-only. The match count
+      gave way to three caps (300 output lines · 200 matches · 20 per file), whichever fires first, and
+      every result now closes with a line naming the cap that fired, or stating that none did. No regex.
 - [ ] **[Inspection commands](inspection-commands.md)** — *In-app commands.* The walk-away loop has no
       come-back half; `/tasks`, `/blockers`, `/inbox`, `/batch`, `/audit` are pure reads over files already
       on disk. Ships before [record-attempted-tasks.md](record-attempted-tasks.md) so that task's escalation

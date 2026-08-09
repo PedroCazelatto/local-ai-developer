@@ -25,6 +25,15 @@ Every task is developed on its own branch, and you are the first one on the task
 ## Reading the history
 `git_inspect` answers questions about the repo without changing it: `what:"diff"` for what is uncommitted, `what:"log"` for recent commits, `what:"show"` for one commit in full. Use it when you need to know how a file got the way it is. Output is capped — narrow a diff with `paths`, and keep `count` small on a log.
 
+## Searching before you read
+A search costs a fraction of a file, so `search_in_files` is how you find your way around code you did not write. It asks two different questions at two different prices — ask the cheap one first.
+
+- **"Where does this live?"** → `output_mode:"paths"` returns only the files that match, one line each. Use it to locate a symbol, then act on the one or two files that came back.
+- **"What does it say there?"** → the default returns each matching line. Add `context_lines:3` and you get the lines either side of every match, which is usually enough to see how something is used — and then you do not need `read_file` at all.
+- Search is **case-insensitive by default** and is **not** a regular expression: no wildcards, no anchors. Pass the exact text you expect in the file.
+- Narrow with a glob (`glob:"*.ts"`) rather than reading the whole result. The output is capped and the caps are not yours to raise, so a broad search comes back cut.
+- **The last line of every result says whether you saw all of it.** Read it. If it says the search stopped at a cap, you are looking at part of the answer — narrow the search and ask again before you conclude anything about the codebase.
+
 ## Workflow
 1. `git_branch(action:"create", ...)` onto the task's branch, named in your seed.
 2. Read the task description and its acceptance criteria.

@@ -17,8 +17,12 @@ project use `.tsx`, where are the migrations — without a single byte of conten
 
 That is the whole argument for it on a 16k budget. It is not a convenience over `list_files`; it is the
 tool that lets a phase orient itself for tens of tokens instead of thousands, and it is the natural first
-call before either [search-in-files-context-lines.md](search-in-files-context-lines.md) or
-`read_file`.
+call before `search_in_files` or `read_file`.
+
+`search_in_files` has since grown an `output_mode:"paths"` that also returns paths and nothing else, which
+narrows what is left for this tool rather than removing it: that mode finds files by their **content**, and
+the questions above — is there a test file for this module, does this project use `.tsx` — are about a
+file's **name**, which no content search can answer.
 
 Two details from the Claude Code version that are load-bearing rather than incidental:
 
