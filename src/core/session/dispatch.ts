@@ -1,10 +1,17 @@
 // Tool dispatch (V1/02) — the single choke point every tool call passes through: normalize the
 // model's arguments, look the tool up, validate required params, execute it, and turn the outcome
-// into the `tool` message string the model reads back. NOTHING here throws up into the turn loop:
+// into the `tool` message string the model reads back. Tool FAILURES never throw up into the turn loop:
 // an unknown tool, malformed args, a missing required field, or a tool that throws all become a
 // structured recoverable error `{ error, hint? }` so the model can self-correct and the turn
 // continues. This is also where the audit log hooks in (V1/06) via the `onToolCall` seam.
+//
+// EXACTLY ONE exception, and it is not a tool failure: a TurnAbortedError raised inside a tool that was
+// itself running a model call — a sub-agent's turn, search_rules' throwaway one-shot, a debate round.
+// The user cancelled the whole turn; handing that back as a tool result would let the parent read "the
+// call failed", reason about it, and carry on, which is the exact opposite of what the key press meant.
+// It is audited first (the call did happen) and then rethrown.
 
+import { TurnAbortedError } from '../llm/index.js';
 import { getTool, toolNames } from '../../tools/registry.js';
 import type { JSONSchema, JsonObject, ToolAuditExtra, ToolContext, ToolResult } from '../../tools/types.js';
 import { toolError } from '../../tools/types.js';
@@ -172,6 +179,10 @@ export async function dispatchToolCall(
     return record(args, s.exitStatus, s.content, s.error, Math.round(performance.now() - start), s.metadata);
   } catch (err) {
     const s = serializeResult(toolError(messageOf(err)));
-    return record(args, s.exitStatus, s.content, s.error, Math.round(performance.now() - start));
+    // Audited either way — a cancelled call still happened, and the audit log is the only durable record
+    // of it — then the one exception in this file is rethrown rather than returned. See the header.
+    const output = record(args, s.exitStatus, s.content, s.error, Math.round(performance.now() - start));
+    if (err instanceof TurnAbortedError) throw err;
+    return output;
   }
 }

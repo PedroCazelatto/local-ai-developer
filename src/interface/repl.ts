@@ -11,11 +11,13 @@ import { createInterface } from 'node:readline/promises';
 import type { Interface as ReadlineInterface } from 'node:readline/promises';
 import { stdin, stdout } from 'node:process';
 
+import { TurnAbortedError } from '../core/llm/index.js';
 import type {
   ClearResult,
   ContextSummary,
   RetroInput,
   RetroResult,
+  RunStopSignal,
   SubagentInfo,
   Task,
   TaskLoopReporter,
@@ -63,6 +65,12 @@ export interface ReplOrchestrator {
   listSubagents(): SubagentInfo[];
   /** Run the full turn loop for a chat message (streams output + dispatches tools). */
   processMessage(userInput: string): Promise<void>;
+  /** Ctrl+C mid-turn: stop the model call in flight. False when nothing was generating. */
+  cancelActiveTurn(): boolean;
+  /** Drop a cancel armed during a tool call that no later model call ever consumed. */
+  clearPendingCancel(): void;
+  /** The `/stop` wind-down request for the run in flight (armed here, read by the loops). */
+  readonly runStop: RunStopSignal;
   /** Run the V3/01 implement→test→review→fix loop for a backlog task (the Reviewer commits). */
   runTaskLoop(task: Task, specSlice: string, reporter: TaskLoopReporter): Promise<TaskLoopResult>;
   /** Spawn the V3/03 Retro window after a blocker is answered (patches the one right file). */
@@ -91,6 +99,10 @@ export async function runRepl(orch: ReplOrchestrator): Promise<void> {
     renderer.systemMessage(`No model selected. Pull one with  /models pull ${SUGGESTED_MODEL}`);
   }
   const rl = createInterface({ input: stdin, output: stdout });
+
+  // Hand the fence the two things it cannot decide for itself (input-fence.ts keeps no session knowledge):
+  // what Ctrl+C means mid-turn, and which submitted lines are control instructions rather than messages.
+  inputFence.setHandlers({ cancel: () => requestCancel(orch), control: (line) => handleStopLine(orch, line) });
 
   // Multi-line composition: hand Shift+Enter (a bare LF) to the edit buffer instead of letting
   // readline submit on it, so the message keeps growing until Enter (a CR) sends the whole thing.
@@ -197,6 +209,9 @@ export async function runRepl(orch: ReplOrchestrator): Promise<void> {
         processing = false;
         statusActivity.reset(); // clear any lingering tool/turn state so idle shows no activity field
         inputFence.reset(); // a turn that threw mid-flight must never leave stdin captured (dead prompt)
+        // Same reasoning as the fence reset: a Ctrl+C armed during a tool call that no later model call
+        // consumed must not survive into an unrelated turn the user starts afterwards.
+        orch.clearPendingCancel();
       }
       if (exitRequested) break;
     }
@@ -209,6 +224,47 @@ export async function runRepl(orch: ReplOrchestrator): Promise<void> {
     statusBar.disable(); // release the reserved rows and restore normal scrolling
     rl.close();
   }
+}
+
+/**
+ * Ctrl+C mid-turn. Claims the press when there was something to stop, and says so in the scrollback —
+ * a turn that simply stopped producing text, with no line explaining why, is indistinguishable from a
+ * turn that died. The line also states the second half of the keymap, because the escape hatch changing
+ * shape is exactly the thing a user needs told at the moment they reach for it.
+ *
+ * Returns false when nothing was generating and nothing was already armed, which lets the key fall
+ * through to readline and end the session as it always has.
+ */
+function requestCancel(orch: ReplOrchestrator): boolean {
+  if (!orch.cancelActiveTurn()) return false;
+  renderer.interjectLine(theme.meta('⎋ stopping this turn — press Ctrl+C again to quit'));
+  return true;
+}
+
+/**
+ * A `/stop` line typed into the fence while a run is in flight. Claimed HERE rather than queued because
+ * the queue drains only when the whole `/run` ends — which is the very thing being asked to stop.
+ *
+ * Strict about what it claims: only `/stop` and `/stop round`. Anything else falls through to the queue
+ * and reaches the command registry, so a typo is reported as an unknown command instead of being
+ * swallowed by the fence and quietly arming nothing.
+ */
+function handleStopLine(orch: ReplOrchestrator, line: string): boolean {
+  if (!orch.runStop.active) return false;
+  const words = line.trim().toLowerCase().split(/\s+/);
+  if (words[0] !== '/stop') return false;
+  if (words.length > 2) return false;
+  const arg = words[1];
+  if (arg !== undefined && arg !== 'round') return false;
+
+  if (arg === 'round') {
+    orch.runStop.request('round');
+    renderer.interjectLine(theme.meta('⏸ will stop after this round — the task ends without a verdict'));
+    return true;
+  }
+  orch.runStop.request('task');
+  renderer.interjectLine(theme.meta('⏸ will stop after this task — it finishes and commits first'));
+  return true;
 }
 
 /**
@@ -248,7 +304,15 @@ async function runInput(orch: ReplOrchestrator, input: string, rl: ReadlineInter
     await orch.processMessage(input);
   } catch (err) {
     activityLine.hide(); // the activity line may still be up if the turn threw mid-stream
-    renderer.errorLine(`✖ ${err instanceof Error ? err.message : String(err)}`);
+    // A cancelled turn is not a failure and must not be dressed as one: the user asked for it, the
+    // exchange has already been branched off the history by the orchestrator, and the prompt below is
+    // about to reopen ready for a rewrite. A TIMEOUT is a fault, so it keeps the error styling — its
+    // message already says what to check.
+    if (err instanceof TurnAbortedError && err.reason === 'user') {
+      renderer.systemMessage('⎋ Turn cancelled. The message and its partial reply were set aside.');
+    } else {
+      renderer.errorLine(`✖ ${err instanceof Error ? err.message : String(err)}`);
+    }
   }
   return false;
 }

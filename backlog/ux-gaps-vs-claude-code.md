@@ -42,9 +42,11 @@ reasons attached.
 
 In descending order of how much the gap actually costs the user:
 
-1. **No way to stop a turn** — [cancel-an-in-flight-turn.md](cancel-an-in-flight-turn.md). Already recorded, and it
-   is the right first thing. Ctrl+C ends the session and loses the in-flight turn; the Ollama call carries no
-   `AbortSignal` and no timeout. Minutes per turn on a 3060, and no recovery. **This one is physics, not taste.**
+1. ~~**No way to stop a turn.**~~ **Shipped.** It was the right first thing and it was physics, not taste.
+   Ctrl+C now stops the turn and a second press still quits, both Ollama paths carry an `AbortSignal`,
+   `OLLAMA_TIMEOUT_MS` abandons a daemon that has gone silent, a cancelled exchange branches off the phase's
+   history so the prompt can be rewritten, and `/stop` · `/stop round` wind a batch down without discarding
+   the tasks it finished.
 2. **Tool calls are almost opaque** — [show-tool-calls-in-the-scrollback.md](show-tool-calls-in-the-scrollback.md).
    `→ tool: read_file` and nothing else: no path, no result, no diff, during an autonomous no-confirmation loop.
    **Also taste-independent** — the data is already at the call site and in the audit log.

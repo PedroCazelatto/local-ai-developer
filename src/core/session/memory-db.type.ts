@@ -42,6 +42,13 @@ export interface MemoryRecord {
   readonly tokens: TurnTokens;
   /** `seq` of the `summary` turn that collapsed this one; absent while the turn is still visible. */
   readonly replacedBySeq?: number;
+  /**
+   * ISO-8601 UTC of when the user cancelled the exchange this turn belongs to; absent for every turn
+   * that was not cancelled. The second reason a turn leaves the live history — see the schema's note.
+   * A cancelled turn is hidden, never deleted: the exchange is branched off so the prompt can be
+   * rewritten, and stays on disk for audit.
+   */
+  readonly cancelledAt?: string;
 }
 
 /**

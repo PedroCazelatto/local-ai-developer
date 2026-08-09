@@ -5,6 +5,7 @@
 // invariant governs, so a null promptTokens/evalTokens propagates instead of being coerced to a number.
 
 import type { TokenCounts } from '../llm/index.js';
+import type { RunStopSignal } from './run-stop-signal.js';
 import type { TaskLoopResult } from './run-task-loop.type.js';
 import type { Task } from './types.js';
 
@@ -48,6 +49,23 @@ export interface BatchSkipped {
   readonly reason: string;
 }
 
+/**
+ * A task the user interrupted — Ctrl+C cut the model call, or a `/stop round` ended the loop between
+ * rounds. Its own bucket rather than an escalation, because nothing judged it: the distinction is what
+ * stops a wound-down overnight run from reading, the next morning, as five tasks that failed review.
+ * Like every other non-pass it stashes what was left and may still carry commits an earlier round landed.
+ */
+export interface BatchCancelled {
+  readonly taskId: string;
+  readonly rounds: number;
+  /** One line on how it was stopped, from the loop that stopped. */
+  readonly reason: string;
+  /** Short SHAs the Reviewer accepted before the interruption; empty when nothing landed. */
+  readonly commits: readonly string[];
+  /** Stable `git stash` label of the preserved attempt, or null if there was nothing to stash. */
+  readonly stashRef: string | null;
+}
+
 /** One unattended batch's persisted outcome — written under .orchestrator/batches/ for the morning after. */
 export interface BatchSummary {
   /** Sequential batch number (also the persisted file-name prefix). */
@@ -59,11 +77,18 @@ export interface BatchSummary {
   readonly passed: BatchPassed[];
   readonly escalated: BatchEscalated[];
   readonly blocked: BatchBlocked[];
+  readonly cancelled: BatchCancelled[];
   readonly skipped: BatchSkipped[];
   /** EXACT sum of every task's loop tokens (a null field means some turn omitted it — never estimated). */
   readonly tokens: TokenCounts;
   /** Present only when a pre-flight refusal or an infra fault stopped the batch early. */
   readonly abortedReason?: string;
+  /**
+   * Present only when the USER wound the batch down (`/stop`, `/stop round`, or Ctrl+C). Separate from
+   * `abortedReason`, which means the batch broke: a deliberate stop is not a fault and must not be
+   * reported as one, and the tasks it had already finished are all still in their own buckets.
+   */
+  readonly stoppedReason?: string;
 }
 
 /** Position of a task within the batch's candidate list, for the `task N/M` progress line. */
@@ -83,6 +108,8 @@ export interface BatchDeps {
   readonly projectPath: string;
   // runTask: run ONE eligible task through the V3/01 implement→test→review→fix loop; the Reviewer commits.
   runTask(task: Task, position: BatchPosition): Promise<TaskLoopResult>;
+  /** The `/stop` wind-down request, read between tasks. See run-stop-signal.ts. */
+  readonly stop: RunStopSignal;
 }
 
 /** UI seam the batch reports progress through (the interface supplies the rendering). */

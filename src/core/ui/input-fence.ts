@@ -11,6 +11,14 @@
 // The buffer OUTLIVES a single turn on purpose. A `/run` task loop is many turns with gaps between
 // them, and text typed during the Worker must still be there when the Reviewer's turn ends; the REPL
 // drains it into the next real prompt, where readline takes over with full editing.
+//
+// TWO things submitted here do NOT join the queue, and both are injected by the REPL rather than decided
+// in this layer (which knows about rows and keystrokes, not about sessions):
+//   - Ctrl+C, offered to the cancel handler. It stops the model call in flight; declining hands the key
+//     back to readline, which ends the session as it always did.
+//   - a control line such as `/stop`, offered to the control handler. Queueing one would be useless — the
+//     queue drains only when the whole `/run` finishes, which is precisely the thing being asked to stop.
+// Both default to "not handled" when no handler is registered, so off a REPL the fence behaves as before.
 
 import { stdin, stdout } from 'node:process';
 
@@ -29,6 +37,21 @@ let depth = 0;
 let stop: (() => string) | null = null;
 /** Text typed while turns ran, waiting for the next prompt to claim it. */
 let pending = '';
+/** Registered by the REPL: claims a submitted line as a control instruction instead of queueing it. */
+let controlHandler: ((line: string) => boolean) | null = null;
+/** Registered by the REPL: claims Ctrl+C as a cancel; false lets the key end the session as before. */
+let cancelHandler: (() => boolean) | null = null;
+
+/**
+ * Wire the fence to the session (called once, by the REPL). `control` gets every submitted line first and
+ * returns true when it claimed it; `cancel` gets every mid-turn Ctrl+C and returns true when it stopped
+ * something. Keeping both as injected callbacks is what lets this module stay pure UI — it never learns
+ * what a turn or a batch is.
+ */
+export function setHandlers(handlers: { control(line: string): boolean; cancel(): boolean }): void {
+  controlHandler = handlers.control;
+  cancelHandler = handlers.cancel;
+}
 
 /** Repaint the type-ahead row after an edit — one reserved row, so it costs no scrolling. */
 function render(text: string): void {
@@ -41,8 +64,15 @@ function render(text: string): void {
  * from one that was dropped. interjectLine is what makes that safe to print into a reply in flight.
  */
 function submit(text: string): void {
+  // A control line acts NOW rather than joining the queue, and says so itself — see the header.
+  if (controlHandler?.(text) === true) return;
   messageQueue.enqueue(text);
   renderer.interjectLine(theme.meta(`⏳ queued: ${singleLine(text)}`));
+}
+
+/** Ctrl+C mid-turn: let the session try to cancel; false means "not mine" and the key ends the session. */
+function cancel(): boolean {
+  return cancelHandler?.() === true;
 }
 
 /**
@@ -67,7 +97,12 @@ export function begin(): void {
   // captureTypeAhead: suspends every keypress listener (readline's included, so nothing echoes into
   // the streamed reply) and owns the keys until the returned stop() restores them — printable keys and
   // backspace build the row, Enter queues it, ↑ takes the last one back.
-  stop = captureTypeAhead(stdin, pending, { onChange: render, onSubmit: submit, onRecall: recall });
+  stop = captureTypeAhead(stdin, pending, {
+    onChange: render,
+    onSubmit: submit,
+    onRecall: recall,
+    onCancel: cancel,
+  });
   statusBar.showInputFence(inputFenceRow(pending, terminalColumns(), messageQueue.size()));
 }
 

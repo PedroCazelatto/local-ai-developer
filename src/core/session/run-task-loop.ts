@@ -11,6 +11,7 @@
 // is refused unless the repo agrees. So a round can land commits even when the verdict is a fail, and
 // a `pass` is proof the tree was already clean — the loop just reports what the Reviewer committed.
 
+import { TurnAbortedError } from '../llm/index.js';
 import type { TokenCounts } from '../llm/index.js';
 import { addTokenCounts } from './add-token-counts.js';
 import { setTaskStatus } from './backlog.js';
@@ -56,6 +57,20 @@ export async function runTaskLoop(
 
   try {
     for (round = 1; round <= MAX_ROUNDS; round += 1) {
+      // `/stop round` wind-down: checked HERE, before a round starts, so the round already running
+      // finishes cleanly (its Reviewer commits what it accepts) and only the NEXT one is refused. Round 1
+      // is included: a stop asked for while the batch was between tasks must not start work at all.
+      if (deps.stop.stopBeforeNextRound) {
+        setTaskStatus(deps.projectPath, task.id, 'pending');
+        return {
+          taskId: task.id,
+          outcome: 'cancelled',
+          rounds: round - 1,
+          cancelReason: 'stopped by /stop round before the next round.',
+          commits,
+          tokens: addTokenCounts(reviewerTokens, worker.tokens),
+        };
+      }
       reporter.roundStarted(round, MAX_ROUNDS);
 
       // Round 1 seeds the task; later rounds append the prior Reviewer feedback as the next user turn
@@ -154,6 +169,22 @@ export async function runTaskLoop(
     // Reviewer that never produced a usable verdict is a reason to escalate to a human, not a crash;
     // anything else (a dropped Ollama stream) propagates for the caller to surface.
     setTaskStatus(deps.projectPath, task.id, 'pending');
+    // Ctrl+C cut the Worker's or the Reviewer's model call. That is an interruption, not a failed
+    // attempt: reporting it as an escalation would put a judgement in the summary that no Reviewer made,
+    // and (once record-attempted-tasks lands) would count a round the user stopped against the task.
+    if (err instanceof TurnAbortedError) {
+      return {
+        taskId: task.id,
+        outcome: 'cancelled',
+        rounds: round,
+        cancelReason:
+          err.reason === 'user'
+            ? `cancelled during round ${round}.`
+            : `round ${round} was abandoned — ${err.message}`,
+        commits,
+        tokens: addTokenCounts(reviewerTokens, worker.tokens),
+      };
+    }
     if (err instanceof ReviewerVerdictError) {
       return {
         taskId: task.id,

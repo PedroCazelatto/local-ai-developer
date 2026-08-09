@@ -12,6 +12,10 @@ export { listModels, hasModel, pullModel } from './ollama-models.js';
 export { pickSmallestModel } from './pick-smallest-model.js';
 export { matchesModelName } from './matches-model-name.js';
 export type { InstalledModel, PullProgress, PullProgressHandler, PullOutcome } from './ollama-models.type.js';
+// Cancellation: every aborted model call — Ctrl+C or a stalled daemon — surfaces as this one error, on
+// both the streamed and the non-streamed path, so one instanceof check covers every window.
+export { TurnAbortedError } from './turn-aborted-error.js';
+export type { TurnAbortReason } from './turn-aborted-error.type.js';
 export { StreamFilter } from './stream-filter.js';
 export { loadsOrRepair, repairDecode } from './json-repair.js';
 export { recoverToolCalls } from './tool-call-recovery.js';

@@ -50,7 +50,9 @@ async function main(): Promise<void> {
     fail(`could not reach Ollama: ${err instanceof Error ? err.message : String(err)}`);
   }
 
-  const llm = new OllamaClient({ modelName, numCtx: config.numCtx });
+  // timeoutMs is the per-call STALL window (OLLAMA_TIMEOUT_MS), not a cap on how long a turn may run —
+  // every chunk restarts it, so only a daemon that has gone quiet trips it. See config.ts.
+  const llm = new OllamaClient({ modelName, numCtx: config.numCtx, timeoutMs: config.timeoutMs });
   const sandbox = new SandboxClient({
     containerName: SANDBOX_CONTAINER,
     projectPath: config.projectPath,

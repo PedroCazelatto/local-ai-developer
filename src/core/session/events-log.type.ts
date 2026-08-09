@@ -12,6 +12,12 @@
 // `debate` records one deliberation loop the model asked for (the `debate` tool): its rounds, whether the
 // challenger conceded, the verdict — or the reason there was none — and the exact summed cost of every
 // throwaway call it made. Same reasoning as `context_title`: those calls belong to no phase's history.
+//
+// `turn_cancelled` records a turn the user stopped (or the stall watchdog abandoned) and how many turns
+// left the live history with it. This is the ONLY forward-facing trace of a cancelled exchange: the turns
+// themselves are branched off the window, so without this row a session would show a gap in `seq` and
+// nothing that explains it. It is also where the cost lands — the GPU time a cancelled turn spent is
+// real and is not refunded by hiding the turn.
 
 /** The structural actions worth recording. Phase terminology only — never "persona"/"role". */
 export type OrchestratorEventType =
@@ -22,7 +28,8 @@ export type OrchestratorEventType =
   | 'debate'
   | 'subagent_spawn'
   | 'subagent_dismiss'
-  | 'model_use';
+  | 'model_use'
+  | 'turn_cancelled';
 
 /**
  * One events-log line. Any token figure here is the EXACT Ollama count (constitution: never a

@@ -20,6 +20,7 @@ import { addTokenCounts } from './add-token-counts.js';
 import { findTask, readBacklog, taskSkipReason } from './backlog.js';
 import type {
   BatchBlocked,
+  BatchCancelled,
   BatchDeps,
   BatchEscalated,
   BatchPassed,
@@ -59,8 +60,11 @@ export async function runBatch(
   const passed: BatchPassed[] = [];
   const escalated: BatchEscalated[] = [];
   const blocked: BatchBlocked[] = [];
+  const cancelled: BatchCancelled[] = [];
   const skipped: BatchSkipped[] = [];
   let tokens: TokenCounts = { promptTokens: 0, evalTokens: 0 };
+  /** Set once the user wound the batch down — a deliberate stop, never reported as an abort. */
+  let stoppedReason: string | undefined;
 
   // Pre-flight (honors the V3/03 systemic-patch pause): never run a batch on top of an unreviewed global
   // instruction change, nor on a dirty project tree (which would mix a stray change into a task's review).
@@ -70,6 +74,14 @@ export async function runBatch(
   for (let i = 0; abortedReason === undefined && i < taskIds.length; i += 1) {
     const id = taskIds[i] ?? '';
     const position: BatchPosition = { index: i + 1, total };
+
+    // `/stop` wind-down: checked at the TASK boundary, so whatever ran before this point kept its full
+    // loop — verdict, commits and all — and only the untouched remainder is left for a later run. This is
+    // the whole point of the two scopes: winding an overnight batch down must never cost work already done.
+    if (deps.stop.stopBeforeNextTask) {
+      stoppedReason = `stopped by the user with ${taskIds.length - i} task(s) not started.`;
+      break;
+    }
 
     // Reload each iteration — a prior task's commit changes what's runnable now. taskSkipReason: done /
     // blocked-awaiting-answer / unmet-deps / not-found (shared with the single-task /run path).
@@ -107,20 +119,29 @@ export async function runBatch(
 
     tokens = addTokenCounts(tokens, result.tokens); // exact sum across every task's loop
     reporter.taskOutcome(result);
-    routeOutcome(deps.projectPath, result, { passed, escalated, blocked });
+    routeOutcome(deps.projectPath, result, { passed, escalated, blocked, cancelled });
+
+    // A cancelled task ends the batch. Ctrl+C cut a model call mid-round, so continuing would start the
+    // NEXT task on a box the user just reached for the stop key on — the opposite of what the press meant.
+    if (result.outcome === 'cancelled') {
+      stoppedReason = `${result.cancelReason ?? 'cancelled.'} ${taskIds.length - i - 1} task(s) not started.`;
+      break;
+    }
   }
 
   const summary: BatchSummary = {
     seq: nextSeq(deps.projectPath),
     startedAt,
     finishedAt: new Date().toISOString(),
-    total: passed.length + escalated.length + blocked.length,
+    total: passed.length + escalated.length + blocked.length + cancelled.length,
     passed,
     escalated,
     blocked,
+    cancelled,
     skipped,
     tokens,
     ...(abortedReason !== undefined ? { abortedReason } : {}),
+    ...(stoppedReason !== undefined ? { stoppedReason } : {}),
   };
   persistSummary(deps.projectPath, summary);
   reporter.finished(summary);
@@ -148,7 +169,12 @@ function preflightRefusal(projectPath: string): string | undefined {
 function routeOutcome(
   projectPath: string,
   result: TaskLoopResult,
-  buckets: { passed: BatchPassed[]; escalated: BatchEscalated[]; blocked: BatchBlocked[] },
+  buckets: {
+    passed: BatchPassed[];
+    escalated: BatchEscalated[];
+    blocked: BatchBlocked[];
+    cancelled: BatchCancelled[];
+  },
 ): void {
   // A commit with no sha (git reported none) contributes nothing to report — drop it rather than
   // invent a placeholder the user could mistake for a real ref.
@@ -164,6 +190,19 @@ function routeOutcome(
       taskId: result.taskId,
       blockerId: result.blockerId ?? null,
       question: result.question ?? '',
+      commits,
+      stashRef,
+    });
+    return;
+  }
+  if (result.outcome === 'cancelled') {
+    // Stashed like every other non-pass: an interrupted attempt is exactly the kind of work worth keeping
+    // for inspection, and the tree has to be clean either way for whatever runs next.
+    const stashRef = stashTaskAttempt(projectPath, result.taskId);
+    buckets.cancelled.push({
+      taskId: result.taskId,
+      rounds: result.rounds,
+      reason: result.cancelReason ?? 'cancelled.',
       commits,
       stashRef,
     });

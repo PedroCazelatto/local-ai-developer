@@ -34,6 +34,7 @@ import type {
   BatchDeps,
   BatchPosition,
   BatchReporter,
+  RunStopSignal,
   Task,
   TaskLoopReporter,
   TaskLoopResult,
@@ -48,6 +49,8 @@ export interface RunOrchestrator {
   readonly projectPath: string;
   // runTaskLoop: the V3/01 implement→test→review→fix controller for one task; the Reviewer commits.
   runTaskLoop(task: Task, specSlice: string, reporter: TaskLoopReporter): Promise<TaskLoopResult>;
+  /** The `/stop` wind-down request — armed for the length of a run so the fence can claim `/stop`. */
+  readonly runStop: RunStopSignal;
 }
 
 /** A resolved selector: the ordered task ids to attempt, and whether it is an unattended batch. */
@@ -148,6 +151,16 @@ function renderOutcome(result: TaskLoopResult): void {
     renderer.systemMessage(
       `Persisted as ${result.blockerId ?? result.taskId}. Answer later with: /answer ${result.taskId} <your answer> · ${cost}`,
     );
+    return;
+  }
+  if (result.outcome === 'cancelled') {
+    // Deliberately a plain system line, not an error: the user stopped this, and whatever the Reviewer
+    // accepted before the interruption is already committed and is reported the same way as elsewhere.
+    renderer.systemMessage(`⎋ ${result.taskId} STOPPED after ${result.rounds} round(s) — ${result.cancelReason ?? ''}`);
+    if (shas.length > 0) {
+      renderer.systemMessage(`The Reviewer had already accepted part of it: ${committed}`);
+    }
+    renderer.systemMessage(cost);
     return;
   }
   // escalated — 5 rounds with no pass (or an empty diff / no verdict). Partial acceptance means some
@@ -270,6 +283,8 @@ async function dispatchRun(args: readonly string[], orch: RunOrchestrator): Prom
   const deps: BatchDeps = {
     projectPath: orch.projectPath,
     runTask: (task, position) => orch.runTaskLoop(task, buildSpecSlice(orch.projectPath, task), buildReporter(task, position)),
+    // The same signal the fence arms from a `/stop` line — the batch reads it between tasks.
+    stop: orch.runStop,
   };
   await runBatch(deps, selection.ids, buildBatchReporter());
 }
@@ -293,11 +308,25 @@ function completeRun(ctx: CompletionContext): string[] {
   }
 }
 
+/**
+ * Bracket the whole run with the stop signal armed, so `/stop` typed into the fence is claimed for
+ * exactly as long as there is something to stop — and cleared afterwards, so a stop asked for during one
+ * run can never wind down the next one before it has started.
+ */
+async function runWithStopArmed(args: readonly string[], orch: RunOrchestrator): Promise<void> {
+  orch.runStop.begin();
+  try {
+    await dispatchRun(args, orch);
+  } finally {
+    orch.runStop.end();
+  }
+}
+
 export const runCommand: Command = {
   name: 'run',
   group: 'execution',
   description: 'Run backlog tasks through the implement→test→review→fix loop (the Reviewer commits what it accepts)',
   usage: '/run [next | all | <task-id>[,<id>…]]',
   complete: completeRun,
-  run: (ctx) => dispatchRun(ctx.args, ctx.orch),
+  run: (ctx) => runWithStopArmed(ctx.args, ctx.orch),
 };

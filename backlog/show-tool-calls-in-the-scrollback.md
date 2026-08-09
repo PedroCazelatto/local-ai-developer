@@ -14,9 +14,9 @@ adds a live elapsed timer while the call runs (`running edit_file (1.1s)`) and t
 correct behavior for a transient widget — but it means the only thing left in the append-only history is the
 tool's name.
 
-This is the largest UX gap in the product after
-[cancel-an-in-flight-turn.md](cancel-an-in-flight-turn.md), and it is the cheapest to close: `args` is already
-in hand one line above the print, and every result already goes through the audit log's single choke point.
+With cancelling shipped, this is the largest remaining UX gap in the product, and it is the cheapest to
+close: `args` is already in hand one line above the print, and every result already goes through the audit
+log's single choke point.
 
 What it needs:
 

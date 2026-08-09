@@ -14,4 +14,11 @@ export interface TypeAheadHandlers {
   onSubmit(text: string): void;
   /** ↑: the caller returns a message to put back in the buffer, or null when it has none. */
   onRecall(): string | null;
+  /**
+   * Ctrl+C mid-turn. Return true to CLAIM the press as a cancel (the turn stops, the session lives);
+   * return false to decline it, and the key falls through to readline exactly as it always did and ends
+   * the session. Declining is what keeps the escape hatch honest: a press that cannot cancel anything —
+   * nothing is generating, or the turn was already cancelled and is still unwinding — must still quit.
+   */
+  onCancel(): boolean;
 }

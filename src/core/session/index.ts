@@ -91,8 +91,13 @@ export type {
   BatchPassed,
   BatchEscalated,
   BatchBlocked,
+  BatchCancelled,
   BatchSkipped,
 } from './batch.type.js';
+// The `/stop` wind-down request behind `/stop` and `/stop round`: armed by the input fence for the
+// length of a run, read by the task loop between rounds and by the batch driver between tasks.
+export { RunStopSignal } from './run-stop-signal.js';
+export type { StopScope } from './run-stop-signal.type.js';
 export { rulesPhasesDirty } from './rules-phases-dirty.js';
 export { raiseBlocker, resolveBlocker, openBlockerForTask, readBlockerRows } from './blocker-store.js';
 export type { RaisedBlocker, ResolvedBlocker, BlockerRow } from './blocker-store.type.js';

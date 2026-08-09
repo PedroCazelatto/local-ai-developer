@@ -38,10 +38,16 @@ export function renderBatchSummary(summary: BatchSummary): void {
   if (summary.abortedReason !== undefined) {
     write(theme.danger(`⚠ ${summary.abortedReason}`));
   }
+  // A wind-down is NOT a fault: the user asked for it and everything before it ran in full, so it is
+  // stated plainly rather than in the danger colour that means "something went wrong here".
+  if (summary.stoppedReason !== undefined) {
+    write(theme.meta(`⏸ ${summary.stoppedReason}`));
+  }
 
   write(theme.success(`  passed     ${summary.passed.length}`));
   write(theme.danger(`  escalated  ${summary.escalated.length}`));
   write(theme.danger(`  blocked    ${summary.blocked.length}`));
+  write(theme.meta(`  cancelled  ${summary.cancelled.length}`));
   write(theme.meta(`  skipped    ${summary.skipped.length}`));
 
   if (summary.passed.length > 0) {
@@ -72,6 +78,17 @@ export function renderBatchSummary(summary: BatchSummary): void {
       if (b.commits.length > 0) write(theme.meta(`      partially accepted: ${describeCommits(b.commits)}`));
       if (b.question.trim() !== '') write(theme.meta(`      Q: ${firstLine(b.question)}`));
       write(theme.meta(`      answer with: /answer ${b.taskId} <your answer>`));
+    }
+  }
+
+  if (summary.cancelled.length > 0) {
+    write('');
+    write(theme.strong('Stopped by you (attempt stashed; nothing was judged):'));
+    for (const c of summary.cancelled) {
+      write(theme.meta(`  ⎋ ${c.taskId} — ${c.rounds} round(s) · stash: ${c.stashRef ?? '(nothing to stash)'}`));
+      if (c.commits.length > 0) write(theme.meta(`      partially accepted: ${describeCommits(c.commits)}`));
+      if (c.reason.trim() !== '') write(theme.meta(`      ${firstLine(c.reason)}`));
+      write(theme.meta(`      still pending — /run ${c.taskId} to pick it up again`));
     }
   }
 

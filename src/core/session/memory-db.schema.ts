@@ -45,6 +45,15 @@ PRAGMA synchronous = FULL;
  * walked in JS. `messages.model` is the model that GENERATED the turn; user and tool rows carry NULL
  * because no generation produced them, the same rule the token columns follow.
  *
+ * `messages.cancelled_at` is the second way a turn leaves the visible history, and it exists so that
+ * cancelling a turn does not have to DELETE anything. When the user stops a turn mid-flight, the whole
+ * exchange it belongs to — the user message, every assistant turn and tool result it produced, and the
+ * partial answer it was cut off in — is stamped here and drops out of the window, leaving the prompt
+ * free to be rewritten. The rows stay for audit, exactly as a collapsed turn does: nothing a session
+ * wrote is ever destroyed, it is only branched off the live history. `seq` is NOT reused after a cancel
+ * (`UNIQUE (context_id, seq)` still governs every row, hidden or not), so the numbering simply carries a
+ * gap where the abandoned branch sits.
+ *
  * The `*_touch` triggers maintain `updated_at`. Each UPDATEs its own table, which does not recurse:
  * SQLite's `recursive_triggers` is OFF by default and this code never turns it on.
  */
@@ -76,14 +85,31 @@ CREATE TABLE IF NOT EXISTS messages (
   prompt_tokens     INTEGER,
   completion_tokens INTEGER,
   replaced_by       TEXT    REFERENCES messages(id),
+  cancelled_at      TEXT,
   created_at        TEXT    NOT NULL DEFAULT (${SQL_NOW}),
   updated_at        TEXT    NOT NULL DEFAULT (${SQL_NOW}),
   UNIQUE (context_id, seq)
 );
 
-CREATE INDEX IF NOT EXISTS messages_visible ON messages (context_id, seq) WHERE replaced_by IS NULL;
-
 CREATE TRIGGER IF NOT EXISTS messages_touch AFTER UPDATE ON messages BEGIN
   UPDATE messages SET updated_at = ${SQL_NOW} WHERE id = NEW.id;
 END;
+`;
+
+/** The `messages.cancelled_at` migration for a database created before cancelling existed. */
+export const ADD_CANCELLED_AT = 'ALTER TABLE messages ADD COLUMN cancelled_at TEXT';
+
+/**
+ * Applied AFTER the cancelled_at migration, because the partial index below reads that column and a
+ * database written by an earlier version does not have it yet.
+ *
+ * `messages_visible` is dropped rather than redefined: an index is created `IF NOT EXISTS` by NAME, so
+ * an existing database would have kept the old single-predicate definition forever and every visible-turn
+ * query would have fallen back to a scan the moment cancelled_at joined the predicate.
+ */
+export const MEMORY_INDEXES = `
+DROP INDEX IF EXISTS messages_visible;
+
+CREATE INDEX IF NOT EXISTS messages_live ON messages (context_id, seq)
+  WHERE replaced_by IS NULL AND cancelled_at IS NULL;
 `;

@@ -5,6 +5,7 @@ import type { SandboxClient } from '../container/index.js';
 import type { OllamaClient, TokenCounts } from '../llm/index.js';
 import type { ReviewVerdict } from './review-types.js';
 import type { ReviewerCommit } from './reviewer-runner.js';
+import type { RunStopSignal } from './run-stop-signal.js';
 
 /**
  * How one task's loop ended:
@@ -12,11 +13,15 @@ import type { ReviewerCommit } from './reviewer-runner.js';
  * - `escalated` — MAX_ROUNDS elapsed with no pass (or the Worker changed nothing / the Reviewer
  *                 produced no verdict); surfaced to the user with the last feedback.
  * - `blocked`   — the Reviewer raised a blocker (V3/02); loop halted mid-round.
+ * - `cancelled` — the user stopped it: Ctrl+C cut the model call in flight, or a `/stop round` wind-down
+ *                 ended the loop between rounds. Distinct from `escalated` ON PURPOSE — the task was not
+ *                 tried and found wanting, it was interrupted, and a summary that called it an escalation
+ *                 would be reporting a judgement nobody made.
  *
- * `escalated` and `blocked` no longer imply "nothing committed": the Reviewer commits partially, so
- * files it accepted in an earlier round are already in git. `commits` is what actually landed.
+ * `escalated`, `blocked` and `cancelled` none of them imply "nothing committed": the Reviewer commits
+ * partially, so files it accepted in an earlier round are already in git. `commits` is what actually landed.
  */
-export type TaskLoopOutcome = 'passed' | 'escalated' | 'blocked';
+export type TaskLoopOutcome = 'passed' | 'escalated' | 'blocked' | 'cancelled';
 
 /** The session infrastructure the loop binds a Worker/Reviewer window to (supplied by the orchestrator). */
 export interface TaskLoopDeps {
@@ -24,6 +29,8 @@ export interface TaskLoopDeps {
   readonly sandbox: SandboxClient;
   readonly projectName: string;
   readonly projectPath: string;
+  /** The `/stop` wind-down request, read between rounds. See run-stop-signal.ts. */
+  readonly stop: RunStopSignal;
 }
 
 /** The single result the loop returns for one task. */
@@ -44,6 +51,8 @@ export interface TaskLoopResult {
   readonly blockerId?: string;
   /** The last Reviewer feedback — present when outcome === "escalated", so a human sees why. */
   readonly lastFeedback?: string;
+  /** How a `cancelled` loop was stopped, in one line — present only when outcome === "cancelled". */
+  readonly cancelReason?: string;
   /**
    * EXACT sum of every Worker AND Reviewer turn's prompt/eval counts across all rounds. A field is
    * `null` when any contributing turn omitted that metric — surfaced, never estimated (constitution).

@@ -22,6 +22,7 @@ import {
   collapseIntoSummary,
   flushContext,
   listContexts,
+  markCancelled,
   maxSeq,
   openMemoryDb,
   readContextSummary,
@@ -196,6 +197,55 @@ export class SessionMemory {
     return visibleOf(this.phases.get(this.active)?.records ?? []).map(toMessage);
   }
 
+  /**
+   * The `seq` the active phase's NEXT added turn will take. Snapshotted before a turn's user message is
+   * added, so that cancelling can name exactly where the exchange began — everything from that seq
+   * onward is what the cancel branches off. Reading it never mutates anything.
+   */
+  get activeNextSeq(): number {
+    if (this.active === null) return 1;
+    return this.phases.get(this.active)?.nextSeq ?? 1;
+  }
+
+  /**
+   * Cancel the active phase's exchange starting at `fromSeq`: every turn from there on — the user
+   * message, whatever the model answered, the tool calls it made and their results — leaves the live
+   * history, so the next prompt starts from where the exchange began and the user can rewrite it.
+   *
+   * NOTHING IS DELETED. Turns already on disk are stamped in place, turns still buffered carry the stamp
+   * into their own INSERT, and the buffer is flushed here so a cancelled exchange is preserved rather
+   * than dropped on the floor — hidden from the window, readable for audit. `seq` is not reclaimed, so
+   * the branch keeps its numbering and later turns continue past the gap (`UNIQUE (context_id, seq)`
+   * governs hidden rows too). Returns how many turns were branched off.
+   */
+  markExchangeCancelled(fromSeq: number): number {
+    const state = this.requireState();
+    const cancelledAt = new Date().toISOString();
+    const affected = state.records.filter(
+      (record) => record.seq >= fromSeq && record.cancelledAt === undefined,
+    );
+    if (affected.length === 0) return 0;
+
+    // Which turns had not reached the database yet — they get the stamp through their own INSERT.
+    const buffered = new Set(state.pending.map((record) => record.seq));
+    const stamp = (record: MemoryRecord): MemoryRecord =>
+      record.seq >= fromSeq && record.cancelledAt === undefined ? { ...record, cancelledAt } : record;
+    state.records = state.records.map(stamp);
+    // Rebuilt from the NEW records rather than mapped separately: `pending` holds the same objects as
+    // `records`, and stamping produced replacements, so re-selecting by seq is what keeps the two in step.
+    state.pending = state.records.filter((record) => buffered.has(record.seq));
+
+    const flushed = affected.filter((record) => !buffered.has(record.seq)).map((record) => record.seq);
+    if (state.contextId !== null && flushed.length > 0) {
+      // markCancelled: one transaction stamping every already-persisted turn of the exchange.
+      markCancelled(this.db, state.contextId, flushed, cancelledAt);
+    }
+    // Land the buffered turns now that they are marked. They are invisible either way; flushing is what
+    // makes the cancelled branch inspectable instead of lost when the process ends.
+    this.flush();
+    return affected.length;
+  }
+
   /** The live context's UUID for the active phase, or null before its first flush created the row. */
   get activeContextId(): string | null {
     if (this.active === null) return null;
@@ -297,9 +347,9 @@ export class SessionMemory {
   }
 }
 
-/** The turns a phase still sees: everything no summary has collapsed. */
+/** The turns a phase still sees: everything no summary has collapsed and no cancel has branched off. */
 function visibleOf(records: readonly MemoryRecord[]): MemoryRecord[] {
-  return records.filter((record) => record.replacedBySeq === undefined);
+  return records.filter((record) => record.replacedBySeq === undefined && record.cancelledAt === undefined);
 }
 
 /**

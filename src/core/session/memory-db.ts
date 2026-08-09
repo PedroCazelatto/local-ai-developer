@@ -18,8 +18,18 @@ import { mkdirSync } from 'node:fs';
 import path from 'node:path';
 
 import type { ToolCall } from '../llm/index.js';
-import { MEMORY_PRAGMAS, MEMORY_SCHEMA } from './memory-db.schema.js';
+import { ADD_CANCELLED_AT, MEMORY_INDEXES, MEMORY_PRAGMAS, MEMORY_SCHEMA } from './memory-db.schema.js';
 import type { ContextSummary, MemoryRecord, MemoryRole } from './memory-db.type.js';
+
+/**
+ * The two ways a turn leaves a phase's live history without being deleted: a summary collapsed it, or the
+ * user cancelled the exchange it belonged to. Built in one place and reused by every read, so a new
+ * reason to hide a turn can never be added to one query and forgotten in another. `alias` qualifies the
+ * columns for the queries that join (`m.` in LIST_SELECT).
+ */
+function visibleWhere(alias = ''): string {
+  return `${alias}replaced_by IS NULL AND ${alias}cancelled_at IS NULL`;
+}
 
 /** How many leading UUID characters address a context in the UI and to the model (`design/7a888b1f`). */
 export const CONTEXT_SHORT_ID_LEN = 8;
@@ -50,7 +60,22 @@ export function openMemoryDb(projectPath: string): DatabaseSync {
   const db = new DatabaseSync(databaseFile(projectPath));
   db.exec(MEMORY_PRAGMAS);
   db.exec(MEMORY_SCHEMA);
+  // Between the tables and the indexes on purpose: the partial index reads cancelled_at, which a
+  // database written before cancelling existed does not have yet.
+  addCancelledAtColumn(db);
+  db.exec(MEMORY_INDEXES);
   return db;
+}
+
+/**
+ * Add `messages.cancelled_at` to a database created before turns could be cancelled. SQLite has no
+ * `ADD COLUMN IF NOT EXISTS`, so presence is asked of `PRAGMA table_info` first — the check is a read of
+ * one small table at boot, and it makes the migration idempotent the way every other statement here is.
+ */
+function addCancelledAtColumn(db: DatabaseSync): void {
+  const columns = db.prepare('SELECT name FROM pragma_table_info(?)').all('messages');
+  if (columns.some((column) => asText(column['name']) === 'cancelled_at')) return;
+  db.exec(ADD_CANCELLED_AT);
 }
 
 /** Read one column as text, or '' when the value is absent/non-text (defensive; the schema forbids it). */
@@ -158,10 +183,15 @@ function insertContext(db: DatabaseSync, phase: string, numCtx: number): string 
 /** The insert every flush uses. `created_at` is passed EXPLICITLY — see flushContext. */
 const INSERT_MESSAGE =
   'INSERT INTO messages (context_id, seq, role, content, model, tool_name, tool_calls, ' +
-  'prompt_tokens, completion_tokens, created_at, updated_at) ' +
-  'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)';
+  'prompt_tokens, completion_tokens, cancelled_at, created_at, updated_at) ' +
+  'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)';
 
-/** Bind one buffered record to INSERT_MESSAGE's parameters, in order. */
+/**
+ * Bind one buffered record to INSERT_MESSAGE's parameters, in order. `cancelled_at` is written on the
+ * INSERT rather than stamped by a follow-up UPDATE: a turn cancelled while it was still buffered has
+ * never been on disk, so it should arrive already hidden instead of appearing in the live history for
+ * the width of one transaction.
+ */
 function messageParams(contextId: string, record: MemoryRecord): SQLInputValue[] {
   return [
     contextId,
@@ -173,6 +203,7 @@ function messageParams(contextId: string, record: MemoryRecord): SQLInputValue[]
     record.tool_calls !== undefined && record.tool_calls.length > 0 ? JSON.stringify(record.tool_calls) : null,
     record.tokens.prompt,
     record.tokens.completion,
+    record.cancelledAt ?? null,
     record.ts,
     record.ts,
   ];
@@ -223,21 +254,49 @@ export function collapseIntoSummary(
   });
 }
 
+/**
+ * Stamp `cancelled_at` on every already-flushed turn of a cancelled exchange, in one transaction, so the
+ * live history loses the whole exchange at once or not at all.
+ *
+ * Nothing is deleted — the rows stay exactly as a summary-collapsed turn does, readable with a plain
+ * `SELECT … WHERE cancelled_at IS NOT NULL` — and `seq` is never reclaimed, so the abandoned branch keeps
+ * its numbering and the turns that follow simply continue past the gap. Turns still buffered in RAM are
+ * not this function's business: they carry `cancelledAt` into their own INSERT (see messageParams).
+ */
+export function markCancelled(
+  db: DatabaseSync,
+  contextId: string,
+  seqs: readonly number[],
+  cancelledAt: string,
+): void {
+  if (seqs.length === 0) return;
+  inTransaction(db, () => {
+    const mark = db.prepare(
+      'UPDATE messages SET cancelled_at = ? WHERE context_id = ? AND seq = ? AND cancelled_at IS NULL',
+    );
+    for (const seq of seqs) {
+      mark.run(cancelledAt, contextId, seq);
+    }
+  });
+}
+
 /** Give a context its title. Called once per context, after its first prose answer. */
 export function setContextTitle(db: DatabaseSync, contextId: string, title: string): void {
   db.prepare('UPDATE contexts SET title = ? WHERE id = ?').run(title, contextId);
 }
 
 /**
- * A context's CURRENTLY-VISIBLE turns in order — turns a summary has collapsed are excluded by the
- * `replaced_by IS NULL` predicate, so the collapse walk that used to run in JS is now the query. This
- * is what a reopen replays into the phase's prompt.
+ * A context's CURRENTLY-VISIBLE turns in order — turns a summary collapsed and turns a cancelled exchange
+ * branched off are both excluded by the VISIBLE predicate, so the walk that used to run in JS is the
+ * query. This is what a reopen replays into the phase's prompt, which is why a cancelled exchange must be
+ * filtered here too: reopening a context should restore the history the phase actually had, not the one
+ * the user stopped and rewrote.
  */
 export function readVisibleMessages(db: DatabaseSync, contextId: string): MemoryRecord[] {
   const rows = db
     .prepare(
       'SELECT seq, role, content, model, tool_name, tool_calls, prompt_tokens, completion_tokens, created_at ' +
-        'FROM messages WHERE context_id = ? AND replaced_by IS NULL ORDER BY seq',
+        `FROM messages WHERE context_id = ? AND ${visibleWhere()} ORDER BY seq`,
     )
     .all(contextId);
   return rows.map(toRecord);
@@ -264,7 +323,7 @@ const LIST_SELECT = `
          COALESCE(MAX(m.created_at), c.created_at) AS last_at,
          group_concat(DISTINCT m.model) AS models
   FROM contexts c
-  LEFT JOIN messages m ON m.context_id = c.id AND m.replaced_by IS NULL
+  LEFT JOIN messages m ON m.context_id = c.id AND ${visibleWhere('m.')}
 `;
 
 /** Rebuild one listing row into a ContextSummary. */

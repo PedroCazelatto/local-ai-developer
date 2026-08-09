@@ -19,9 +19,11 @@ boundary rather than a cancel-and-restart that discards the turn.
 Either answer is fine and should be recorded — if the answer is no, delete this file and say so in
 `docs/product.md` so the question does not get re-opened.
 
-**Build [cancel-an-in-flight-turn.md](cancel-an-in-flight-turn.md) first regardless.** Cancel is the safety
-net that makes steering optional; without it, steering would be the only way out of a bad turn, which is the
-wrong reason to build it.
+**Cancelling has shipped**, which was the prerequisite: Ctrl+C stops the turn in flight, the exchange
+branches off the phase's history so the message can be rewritten, and `/stop` · `/stop round` wind a batch
+down (see the *Stopping a turn* section of `docs/cli.md`). That was the safety net making steering optional
+— without it, steering would have been the only way out of a bad turn, which is the wrong reason to build
+it. The question is now genuinely just "is steering worth it on its own merits".
 
 ## If the answer is yes
 

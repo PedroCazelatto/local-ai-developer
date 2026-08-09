@@ -24,6 +24,14 @@ export const DEFAULT_PHASE = 'discovery';
  * this fraction of num_ctx. 0.75 leaves headroom for the next response + tool-result payloads.
  */
 export const DEFAULT_SUMMARIZATION_THRESHOLD_RATIO = 0.75;
+/**
+ * How long ONE model call may go silent before it is abandoned (OLLAMA_TIMEOUT_MS). This is a STALL
+ * window, not a cap on how long a turn may take: every chunk that arrives restarts it, so a 14–32b model
+ * that spends nine legitimate minutes on a turn never trips it, while an unreachable or wedged daemon
+ * surfaces as one recoverable line instead of a REPL that hangs forever. A non-streamed one-shot has no
+ * chunks to restart it and so is capped outright at this value. See core/llm/begin-model-call.ts.
+ */
+export const DEFAULT_TIMEOUT_MS = 120_000;
 
 export interface SessionConfig {
   /** The locked <project-name> from argv (source of truth). */
@@ -42,6 +50,8 @@ export interface SessionConfig {
    * prompt_eval_count ≥ this ratio × numCtx.
    */
   readonly summarizationThresholdRatio: number;
+  /** From OLLAMA_TIMEOUT_MS, else DEFAULT_TIMEOUT_MS — the per-call stall window (see the constant). */
+  readonly timeoutMs: number;
   /** Phase the session opens in. */
   readonly initialPhase: string;
 }
@@ -84,6 +94,27 @@ function resolveThresholdRatio(): number {
 }
 
 /**
+ * Read OLLAMA_TIMEOUT_MS, guarding NaN / non-positive values by falling back loudly. A zero or negative
+ * window would fire the watchdog before the model could answer at all — it reads as "no timeout" but
+ * behaves as "cancel everything" — so it is rejected rather than honoured.
+ */
+function resolveTimeoutMs(): number {
+  const raw = process.env.OLLAMA_TIMEOUT_MS;
+  if (raw === undefined || raw.trim() === '') {
+    return DEFAULT_TIMEOUT_MS;
+  }
+  const parsed = Number(raw);
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    console.warn(
+      `Warning: OLLAMA_TIMEOUT_MS='${raw}' is not a positive number of milliseconds; ` +
+        `using default ${DEFAULT_TIMEOUT_MS}.`,
+    );
+    return DEFAULT_TIMEOUT_MS;
+  }
+  return Math.floor(parsed);
+}
+
+/**
  * Resolve and validate the session config for `projectName`. Throws a clear Error if the
  * project folder is missing — the caller prints it and exits non-zero (fail loud and early,
  * never proceed toward starting a container against a non-existent path).
@@ -112,6 +143,7 @@ export function loadConfig(projectName: string): SessionConfig {
     projectPath,
     numCtx: resolveNumCtx(),
     summarizationThresholdRatio: resolveThresholdRatio(),
+    timeoutMs: resolveTimeoutMs(),
     initialPhase: DEFAULT_PHASE,
   };
 }

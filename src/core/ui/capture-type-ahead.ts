@@ -19,8 +19,11 @@
 //   - ↑ asks for the last submitted message back and puts it in the row to edit;
 //   - Shift+Enter is ignored: the row is one line, and a message being composed across lines belongs
 //     at the real prompt where readline can edit it properly;
-//   - Ctrl+C is forwarded to the suspended listeners, so it still reaches readline and still ends the
-//     session mid-turn. Swallowing the one escape hatch from a long turn would be a bad trade.
+//   - Ctrl+C is offered to onCancel FIRST: the press stops the turn in flight and the session lives on.
+//     If nothing is there to cancel — or a cancel is already unwinding, so this is the second press — the
+//     handler declines and the key is forwarded to the suspended listeners exactly as before, reaching
+//     readline and ending the session. The escape hatch never disappears; it just takes two presses while
+//     there is something worth stopping first.
 //
 // Editing is deliberately just backspace: the full buffer, with history and multi-line composition, is
 // readline's job and resumes the moment the prompt reopens.
@@ -47,8 +50,10 @@ export function captureTypeAhead(
   let text = initial;
 
   const onKey: KeypressListener = (str, key) => {
-    // Ctrl+C: hand it back untouched so readline raises SIGINT and the session ends, as it does today.
+    // Ctrl+C: offer it as a cancel first. Only if the handler declines does it go back to the suspended
+    // listeners, where readline raises SIGINT and the session ends exactly as it always has.
     if (key?.ctrl === true && key.name === 'c') {
+      if (handlers.onCancel()) return;
       for (const listener of suspended) listener(str, key);
       return;
     }

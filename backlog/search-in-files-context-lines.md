@@ -38,9 +38,9 @@ otherwise read to find out.
   assumes matching lines come back, or stays an opt-in parameter. The phase instruction sets under
   `rules/phases/` would need to teach the two-step search either way.
 - **Whether regex is added at all.** It is the most-requested shape and the one with a real
-  denial-of-service edge — a catastrophically backtracking pattern from a confidently-wrong model wedges
-  the turn with no cancel to fall back on (see [steer-a-running-turn.md](steer-a-running-turn.md) and
-  [cancel-an-in-flight-turn.md](cancel-an-in-flight-turn.md)). Fixed strings plus case-insensitivity
-  covers most of the value with none of that.
+  denial-of-service edge: a catastrophically backtracking pattern from a confidently-wrong model wedges
+  the turn. Cancelling has since shipped, but it is **not** the answer here — Ctrl+C stops the model call,
+  and a runaway regex is burning the host's CPU inside a tool call, which nothing currently interrupts.
+  Fixed strings plus case-insensitivity covers most of the value with none of that.
 - **What the 200-match cap becomes** once matches can carry context lines. 200 matches × 7 lines is not
   a bounded result any more, so the cap has to move to a line or token budget rather than a match count.

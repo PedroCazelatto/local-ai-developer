@@ -9,7 +9,7 @@ import type { Phase } from '../../phases/index.js';
 import { createToolContext } from '../../tools/index.js';
 import type { SandboxClient } from '../container/index.js';
 import { OllamaClient } from '../llm/index.js';
-import type { Message, StreamHandle, TokenCounts, Tool, ToolCall } from '../llm/index.js';
+import type { Message, StreamHandle, TokenCounts, Tool, ToolCall, TurnAbortReason } from '../llm/index.js';
 import * as renderer from '../ui/renderer.js';
 import { addTokenCounts } from './add-token-counts.js';
 import { appendAuditRow } from './audit.js';
@@ -23,6 +23,7 @@ import { compactActivePhase } from './summarizer.js';
 import type { ClearResult, ContextSummary, PhaseLoad } from './memory-db.type.js';
 import { SubagentManager } from './subagents.js';
 import type { SubagentInfo } from './subagents.type.js';
+import { RunStopSignal } from './run-stop-signal.js';
 import { processMessage as processTurns } from './turn-loop.js';
 import type { TurnContext } from './turn-loop.js';
 import { runTaskLoop } from './run-task-loop.js';
@@ -69,6 +70,17 @@ export class SessionOrchestrator implements TurnContext {
   // Sub-agents (V5/01) the interactive phases spawn mid-turn: in-memory only, dropped at session end.
   // Exposed to the sub-agent tools via ctx.subagents, to `/subagents`, and to the status-line count.
   private readonly subagents: SubagentManager;
+
+  // The `/stop` wind-down request for whatever /run is in flight. One per session, handed to every task
+  // loop and batch, armed by the input fence's control line and cleared when the run ends — so a stop
+  // asked for during last night's batch can never silently apply to this morning's.
+  readonly runStop = new RunStopSignal();
+
+  // Where the ACTIVE phase's current exchange began (the seq its user message took). Captured in
+  // streamAsk rather than at the top of the turn loop on purpose: beforeModelCall may add a user message
+  // of its own just before it — the answers drained from `/questions` — and those are delivered exactly
+  // once, so a cancel must branch off the exchange WITHOUT taking them down with it.
+  private exchangeStartSeq: number | null = null;
 
   constructor(config: SessionConfig, llm: OllamaClient, sandbox: SandboxClient) {
     this.project = config.projectName;
@@ -304,6 +316,9 @@ export class SessionOrchestrator implements TurnContext {
         sandbox: this.sandbox,
         projectName: this.project,
         projectPath: this.projectPath,
+        // The session's one wind-down request: the loop reads it between rounds, so `/stop round` lands
+        // on the round boundary rather than tearing down the round already running.
+        stop: this.runStop,
       },
       task,
       specSlice,
@@ -334,6 +349,9 @@ export class SessionOrchestrator implements TurnContext {
   // ---------------------------------------------------------------- TurnContext seam (turn-loop)
 
   streamAsk(userInput: string): StreamHandle {
+    // Snapshot BEFORE the user message is added: this seq is what a cancel branches the history back to,
+    // so it must name the user's own turn and nothing earlier (see the field).
+    this.exchangeStartSeq = this.memory.activeNextSeq;
     this.memory.add('user', userInput);
     return this.llm.stream(this.buildMessages(), this.activeTools());
   }
@@ -436,6 +454,59 @@ export class SessionOrchestrator implements TurnContext {
       `Answers to question(s) you asked earlier and I had not answered yet:\n\n${body}`,
     );
     renderer.systemMessage(`Delivered ${answers.length} saved answer(s) to ${titleCase(phase)}.`);
+  }
+
+  /**
+   * Ctrl+C during a turn: stop whatever model call is generating. Returns false when nothing was in
+   * flight, which is what lets the REPL fall the key through to its old meaning instead of swallowing a
+   * press the user meant as "quit". One client serves every window, so this reaches the active phase, a
+   * spawned Worker/Reviewer/Retro, a sub-agent and a throwaway one-shot alike.
+   */
+  cancelActiveTurn(): boolean {
+    return this.llm.cancel();
+  }
+
+  /** Drop a cancel armed during a tool call that no later model call consumed — see the client's note. */
+  clearPendingCancel(): void {
+    this.llm.clearPendingCancel();
+  }
+
+  /**
+   * The turn was cancelled or timed out. Keep what the model had produced, then branch the WHOLE exchange
+   * — the user's message, every turn it caused, and this partial answer — off the live history, so the
+   * next prompt opens where the exchange began and the user can rewrite it.
+   *
+   * Nothing is destroyed: markExchangeCancelled hides the turns and flushes them, so the abandoned branch
+   * stays on disk and readable. The one thing that does NOT roll back is cost — the tokens those turns
+   * spent are gone whatever the history says, so the phase total keeps them and this emits the event that
+   * explains the gap they leave behind.
+   */
+  onAborted(reason: TurnAbortReason, partial: Message): void {
+    const start = this.exchangeStartSeq;
+    this.exchangeStartSeq = null;
+    // The partial answer is added, not dropped: it is part of the branch being set aside, and a branch
+    // missing the turn that was actually interrupted would be the one record worth having. Tokens are
+    // omitted (⇒ null/null) — Ollama reports counts only on a final chunk this stream never got, and a
+    // count that did not arrive is never estimated (constitution).
+    const model = this.llm.model;
+    if (partial.content !== '' || (partial.tool_calls && partial.tool_calls.length > 0)) {
+      this.memory.add('assistant', partial.content, {
+        ...(model !== undefined ? { model } : {}),
+        ...(partial.tool_calls && partial.tool_calls.length > 0 ? { toolCalls: partial.tool_calls } : {}),
+      });
+    }
+    // A null start means no user message opened this exchange (a spawned window's path, which does not
+    // reach here). Nothing to branch, so keep the turn rather than hide an arbitrary slice of history.
+    if (start === null) {
+      this.memory.flush();
+      return;
+    }
+    const turns = this.memory.markExchangeCancelled(start);
+    appendEvent(this.projectPath, {
+      type: 'turn_cancelled',
+      phase: this.phase.name,
+      detail: { reason, turns },
+    });
   }
 
   addAssistant(content: string, toolCalls?: ToolCall[]): void {

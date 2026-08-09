@@ -6,7 +6,8 @@
 // The loop drives the UI (renderer + spinner) and the orchestrator through the TurnContext seam
 // (SessionOrchestrator implements it), so this file stays free of Ollama/sandbox details.
 
-import type { StreamHandle, TokenCounts, ToolCall } from '../llm/index.js';
+import { TurnAbortedError } from '../llm/index.js';
+import type { Message, StreamHandle, TokenCounts, ToolCall, TurnAbortReason } from '../llm/index.js';
 import type { MarkdownStream } from '../ui/markdown-stream.type.js';
 import * as renderer from '../ui/renderer.js';
 import * as statusActivity from '../ui/status-activity.js';
@@ -35,7 +36,12 @@ export interface TurnContext {
   addAssistant(content: string, toolCalls?: ToolCall[]): void;
   /** Store a tool result message. */
   addToolResult(toolName: string, result: string): void;
-  /** Dispatch one tool call; returns a string result (recoverable errors included, never throws). */
+  /**
+   * Dispatch one tool call; returns a string result, recoverable errors included. The ONE thing it
+   * throws is a TurnAbortedError from a tool that was itself running a model call (a sub-agent's turn,
+   * search_rules' one-shot, a debate round) — a cancel there is an instruction about the whole turn, not
+   * a tool failure for the model to read and reason about. See dispatch.ts.
+   */
   callTool(name: string, args: Record<string, unknown>): Promise<string>;
   /**
    * Optional: a spawned window that reaches a terminal state mid-turn (e.g. the Reviewer captured
@@ -43,6 +49,13 @@ export interface TurnContext {
    * running another turn. Absent/false for the interactive phases and the Worker.
    */
   isComplete?(): boolean;
+  /**
+   * Optional: the turn was cancelled or timed out, and `partial` is whatever the model had produced when
+   * the stream was cut. The interactive phases implement it to keep that partial turn on disk and branch
+   * the whole exchange off the live history, so the prompt can be rewritten. Spawned windows leave it
+   * absent — their history dies with the window the abort is tearing down anyway.
+   */
+  onAborted?(reason: TurnAbortReason, partial: Message): void;
 }
 
 /**
@@ -62,27 +75,42 @@ export async function processMessage(
   // stdin, so typing mid-turn lands in that row instead of echoing into the reply. Reentrant — a
   // sub-agent's nested processMessage shares the one fence — and always released in the finally.
   inputFence.begin();
+  // Whatever the model had produced when a turn was cut, carried out here so that EVERY way an exchange
+  // can be aborted — mid-stream, or inside a tool call that is itself running a model (a sub-agent's
+  // turn, search_rules' one-shot, a debate round) — rolls back through the one path below. Two rollback
+  // sites would be two things to keep in step; there is one.
+  const cut: AbortedTurn = { message: { role: 'assistant', content: '' } };
   try {
-    if (!(await runTurn(ctx, () => ctx.streamAsk(userInput)))) {
+    if (!(await runTurn(ctx, () => ctx.streamAsk(userInput), cut))) {
       return; // no tool calls on the first turn → done
     }
     for (let round = 0; round < maxRounds; round++) {
-      if (!(await runTurn(ctx, () => ctx.streamContinue()))) {
+      if (!(await runTurn(ctx, () => ctx.streamContinue(), cut))) {
         return; // model finished
       }
     }
     renderer.systemMessage(`⚠ Reached tool-call limit (${maxRounds}). Stopping.`);
+  } catch (err) {
+    // The interactive phases branch the whole exchange off their live history here; spawned windows
+    // leave the hook absent and simply unwind. Anything that is not an abort passes straight through.
+    if (err instanceof TurnAbortedError) ctx.onAborted?.(err.reason, cut.message);
+    throw err;
   } finally {
     statusActivity.turnEnded();
     inputFence.end();
   }
 }
 
+/** Carries the partial assistant message from whichever turn was cut out to the rollback. */
+interface AbortedTurn {
+  message: Message;
+}
+
 /**
  * Stream one assistant turn and dispatch any tool calls. Returns true if tool calls were
  * dispatched (caller should run another turn), false otherwise.
  */
-async function runTurn(ctx: TurnContext, start: () => StreamHandle): Promise<boolean> {
+async function runTurn(ctx: TurnContext, start: () => StreamHandle, cut: AbortedTurn): Promise<boolean> {
   // Run any pre-call failsafe (V4/05 summarization) BEFORE the user turn is added / the stream opens,
   // so the imminent call runs on the compacted history. A no-op for spawned windows (hook absent).
   await ctx.beforeModelCall?.();
@@ -94,13 +122,24 @@ async function runTurn(ctx: TurnContext, start: () => StreamHandle): Promise<boo
   // FIRST visible delta (never before) so the spinner can't interleave with model text and a pure
   // tool-call turn prints no orphan prefix.
   let stream: MarkdownStream | null = null;
-  for await (const delta of handle.deltas) {
-    if (!delta) continue;
-    if (stream === null) {
-      activityLine.hide();
-      stream = renderer.assistantStream();
+  try {
+    for await (const delta of handle.deltas) {
+      if (!delta) continue;
+      if (stream === null) {
+        activityLine.hide();
+        stream = renderer.assistantStream();
+      }
+      stream.push(delta);
     }
-    stream.push(delta);
+  } catch (err) {
+    // A cancelled or timed-out turn lands here. Close the UI down exactly as a completed turn would —
+    // the half-written line is real output the user watched arrive, and the append-only rule means it
+    // stays — then record what was produced so processMessage's rollback can keep it. handle.result()
+    // is readable after an abort precisely so this is possible (see StreamHandle).
+    activityLine.hide();
+    stream?.end();
+    if (err instanceof TurnAbortedError) cut.message = handle.result().message;
+    throw err;
   }
   activityLine.hide(); // covers a turn with no visible prose (e.g. a pure tool-call turn)
   stream?.end(); // renders a trailing line the model left unterminated; no-op if nothing streamed
