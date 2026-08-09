@@ -67,6 +67,15 @@ implement → test → review → fix → (loop, max 5 rounds)
   - The Reviewer calls `raise_blocker` **immediately** on genuine confusion — an ambiguous,
     under-specified, or self-contradictory task definition. The loop halts at once and surfaces the
     question to the user; nothing proceeds until the user answers.
+- **Stopping a run.** Walking away is the point, so coming back and winding it down must not cost the
+  work it already did (keys and exact wording in [cli.md](cli.md)):
+  - **Ctrl+C** cancels the model call in flight. The task ends as `cancelled` and the batch stops there.
+  - **`/stop`** finishes the current task — verdict, commits and all — then stops before the next one.
+  - **`/stop round`** finishes the current round, then stops; the task ends without a verdict.
+  - `cancelled` is a **fourth outcome**, deliberately not an escalation. An escalation is a judgement —
+    five rounds tried and none passed — and a task the user interrupted was never judged at all. It
+    reverts to `pending` and is listed separately in the batch summary. Anything a Reviewer committed
+    before the interruption stays committed, and what is left is stashed like any other non-pass.
 
 ## Retro phase (automatic — fires after the user resolves a blocker)
 
