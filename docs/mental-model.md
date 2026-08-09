@@ -65,6 +65,14 @@ can be listed, described and reopened by address, which is what lets a phase —
   the confirmation, and `/resume` reopens it. Other phases are untouched.
 - **Nothing is ever deleted.** Not by `/clear`, not by the summarization failsafe, not by a `num_ctx`
   change. Every mechanism below hides turns from the *live view*; the rows stay.
+- **A cancelled turn branches the exchange off.** Stopping a turn with Ctrl+C takes the whole exchange
+  out of the live window at once — the user's message, every assistant turn it produced, the tool calls
+  and their results, and the partial answer it was cut off in — so the prompt reopens where the exchange
+  began and the message can be rewritten. The rows are stamped, not removed, exactly as a summarized turn
+  is; `seq` is never reused, so the abandoned branch keeps its numbering and later turns continue past
+  the gap. Reopening the context replays the history the phase actually had, never the branch. The one
+  thing that does *not* roll back is cost: those turns were evaluated on the GPU, so the phase's exact
+  token total keeps them, and the events log records the cancellation that explains the gap.
 - **Token-threshold failsafe:** when a phase's history crosses `SUMMARIZATION_THRESHOLD_RATIO` of
   `OLLAMA_NUM_CTX`, the orchestrator summarizes the oldest turns and replaces them with a single
   summary entry. The originals stay in the database, pointed at the summary that stands in for them.

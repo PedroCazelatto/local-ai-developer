@@ -29,6 +29,8 @@ The launcher also runs directly: `node scripts/run.mjs install | start <project>
   (`design/7a888b1f`) or from a numbered list. See the memory model in
   [mental-model.md](mental-model.md).
 - `/subagents` — list active sub-agents
+- `/stop` · `/stop round` — wind a running `/run` down (see *Stopping a turn* below); typed into the
+  fenced input box while the run is in flight, not at an idle prompt
 - `/help` — list every command · `/exit` — quit
 
 These are **user commands, and the model never invokes them.** Where the model needs the same
@@ -76,6 +78,43 @@ replaces whatever is in the row at the time. Editing there is deliberately just 
 buffer — history, arrows, multi-line composition — belongs to the prompt, which reopens with anything
 you typed but did not queue already in it.
 
+## Stopping a turn
+
+**Ctrl+C stops the turn; a second Ctrl+C quits.** While something is running the first press cancels it
+and hands you back the prompt — the session, every phase's history and the whole batch survive. Press it
+again and it means what it always meant, so the escape hatch never disappears; it just takes two presses
+while there is something worth stopping first. At the prompt, with nothing running, one press still
+quits.
+
+It works during a tool call too, not only while text is streaming: a `run_in_project npm test` can run
+for minutes, and a press there stops the turn at the next model call rather than falling through and
+ending the session.
+
+**A cancelled exchange is set aside, not kept.** Your message, whatever the model had answered, and the
+tool calls it made along the way all leave the phase's window together, so the prompt reopens where you
+left off and you can rewrite the message that sent it down the wrong path. Nothing is destroyed: the
+whole exchange stays in `memory.db` marked cancelled, and the session's events log records the turn and
+what it cost. **The tokens are not refunded** — a cancelled turn had already been evaluated on the GPU,
+so the phase's `Ctx` figure keeps counting them. That is the honest number, not a bookkeeping quirk.
+
+### Winding a batch down
+
+During `/run`, two lines typed into the fenced input box act immediately instead of joining the queue —
+they have to, since the queue only drains once the run they would be stopping has finished:
+
+| Line | Effect |
+|---|---|
+| `/stop` | Finish the current **task** — its verdict, its commits and all — then stop before the next one. |
+| `/stop round` | Finish the current **round**, then stop. The task ends without a verdict and stays runnable. |
+
+Both are announced in the scrollback the moment you press Enter. Neither discards work already done:
+tasks the batch already finished keep their outcomes, and the end-of-batch summary lists what was stopped
+separately from what failed review — an interrupted task was never judged, and reporting it as an
+escalation would put a verdict in the report that no Reviewer ever gave.
+
+`/stop` is claimed only while a run is in flight. Typed at any other time it is an unknown command, and
+a stop asked for during one run never carries into the next.
+
 ## Model selection
 
 **There is no default model.** A model name compiled into the orchestrator says nothing about what
@@ -111,6 +150,12 @@ needs the installed list to decide anything, and a session without Ollama can do
   the next `run start`. See the memory model in [mental-model.md](mental-model.md).
 - `SUMMARIZATION_THRESHOLD_RATIO` — compact a phase once its exact `prompt_eval_count` reaches this
   fraction of `OLLAMA_NUM_CTX`. Must be in `(0, 1]`.
+- `OLLAMA_TIMEOUT_MS` — how long one model call may go **silent** before it is abandoned (default
+  `120000`). A **stall** window, not a limit on how long a turn may take: every chunk restarts it, so a
+  slow-but-alive model is never killed for being slow, while a wedged or unreachable daemon surfaces as
+  one recoverable line instead of a REPL that hangs forever. A one-shot (summarization, `search_rules`,
+  the context titler) receives its whole response at once and so has nothing to restart the window —
+  there this value caps the entire call. A timeout is reported as a fault; a cancel is not.
 
 The model name is deliberately **not** an env var: it lives in the UI (`/models`, persisted to
 `state.json` — see *Model selection* above). The active phase will eventually follow.
