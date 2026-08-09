@@ -37,9 +37,11 @@ by a working rule, and the comments pointing at a `complete-line.ts` that does n
 ([resolve-dead-tab-completion.md](resolve-dead-tab-completion.md)).
 
 The thing worth naming: with no tests, the docs are carrying **both** jobs. They are the specification and they are
-the verification. That is why `docs/sandboxing.md` asserting "every file it edits happens inside a container" is
-worse than an ordinary stale sentence — with tests that claim would be a failing assertion, and without them it is
-prose that reads as true. (That specific case is [resolve-symlinks-in-path-scoping.md](resolve-symlinks-in-path-scoping.md).)
+the verification. That is why `docs/sandboxing.md` asserting "every file it edits happens inside a container" was
+worse than an ordinary stale sentence — with tests that claim would have been a failing assertion, and without them
+it was prose that read as true. That specific case has since been closed by moving the file tools into the
+container, and it closed the way this file predicts: the host-only fix passed every check that could be made
+host-side, and only driving the real tools against a real container showed the escape still worked.
 
 So tests would not add a verification layer. They would **relieve** one that is currently overloaded, and let the
 docs go back to describing intent instead of also standing in for proof. If the constitution amendment is a hard no,

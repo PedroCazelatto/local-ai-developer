@@ -1,6 +1,18 @@
 // search_in_files (V1/03) — LITERAL substring search over the UTF-8 text files under the project root,
-// case-INSENSITIVE by default. Host-side, scoped by ctx.resolve, skipping the heavy/generated trees
-// (walk-project-files.ts). Optional filename glob. Forward-slash paths regardless of host OS.
+// case-INSENSITIVE by default. Optional filename glob. Forward-slash paths regardless of host OS.
+//
+// TWO STEPS, both inside the sandbox. `grep -l` in the container decides WHICH files hold the pattern
+// (one round trip, vendored trees pruned before grep opens them), then only those files are pulled
+// across as bytes and scanned here. Nothing walks the host: a symlink planted in the project would
+// otherwise let a search read host files into the model's window — a link is an exfiltration path IN,
+// not just a write path out. `output_mode:"paths"` never leaves step one, so it transfers no content
+// at all, which is most of why it is the cheap mode.
+//
+// Where the two steps disagree: grep selects candidates, and for "content" the authority is still
+// findMatchingLines here — a candidate whose matches it cannot confirm simply contributes nothing. In
+// "paths" mode grep IS the authority, since confirming would mean reading every file and paying the
+// exact cost the mode exists to avoid. With -F fixed strings under LC_ALL=C.UTF-8 the two agree on
+// anything short of exotic Unicode case folding.
 //
 // Not a regular expression, on purpose. Regex is the most-requested shape and the one with a real
 // denial-of-service edge: a catastrophically backtracking pattern from a confidently-wrong model wedges
@@ -20,27 +32,27 @@
 // alone stopped being a bound the moment matches could carry context — 200 matches x 7 lines is not a
 // bounded result — so the line budget is what actually holds the window, with the match caps beneath it.
 
-import { readFileSync } from 'node:fs';
 import path from 'node:path';
 
 import { findMatchingLines } from './find-matching-lines.js';
-import { decodeUtf8Strict, globToRegExp, messageOf } from './fs-support.js';
+import { decodeUtf8Strict, globToRegExp } from './fs-support.js';
+// One `grep -l` in the container: the project-root-relative paths that hold the pattern, sorted.
+import { listSearchCandidates } from './list-search-candidates.js';
 import { parseSearchRequest } from './parse-search-request.js';
 import { renderFileMatches } from './render-file-matches.js';
 import type { SearchCaps, SearchStopReason } from './search-in-files.type.js';
 import { summarizeSearch } from './summarize-search.js';
 import type { ToolModule, ToolResult } from './types.js';
 import { toolError } from './types.js';
-import { walkProjectFiles } from './walk-project-files.js';
 
 /**
- * The three ceilings, in one place. 300 output lines is roughly a fifth of a 16k window once the
+ * The three ceilings, in one place. 200 output lines is roughly an eighth of a 16k window once the
  * system prompt is paid for — a search may inform a turn, it may not become the turn. The 200-match
  * cap is what this tool always had; 20 per file stops one hot file consuming the whole result and
  * starving the other files that also matched.
  */
 export const SEARCH_CAPS: SearchCaps = {
-  maxOutputLines: 300,
+  maxOutputLines: 200,
   maxMatches: 200,
   maxMatchesPerFile: 20,
 };
@@ -100,13 +112,20 @@ export const searchInFilesTool: ToolModule = {
     if (!parsed.ok) return toolError(parsed.error, parsed.hint);
     const request = parsed.request;
 
-    let root: string;
-    try {
-      root = ctx.resolve('.');
-    } catch (err) {
-      return toolError(messageOf(err));
+    // listSearchCandidates: `grep -rlIF` in the sandbox, with SKIP_DIRS pruned and the glob passed as
+    // --include. It narrows the project to the files worth transferring; it does not decide the answer.
+    const candidates = await listSearchCandidates(
+      ctx.sandbox,
+      request.pattern,
+      request.glob,
+      request.caseSensitive,
+    );
+    if (!candidates.ok) {
+      return toolError(`Error searching for '${request.pattern}': ${candidates.message}`);
     }
 
+    // grep's --include already applied this glob; re-applying globToRegExp keeps the committed
+    // `*`/`?`-on-the-basename semantics authoritative rather than deferring to the container's fnmatch.
     const globRe = request.glob !== null ? globToRegExp(request.glob) : null;
     // Fold the needle ONCE for the whole search; the per-file scan folds each line it tests.
     const needle = request.caseSensitive ? request.pattern : request.pattern.toLowerCase();
@@ -116,23 +135,12 @@ export const searchInFilesTool: ToolModule = {
     let files = 0;
     let stop: SearchStopReason = null;
 
-    // walkProjectFiles yields every file under the root, depth-first, with .git/node_modules/dist/etc.
-    // pruned — an unfiltered walk spends the whole match budget inside vendored code.
-    for (const full of walkProjectFiles(root)) {
-      if (globRe !== null && !globRe.test(path.basename(full))) continue;
-      let text: string;
-      try {
-        text = decodeUtf8Strict(readFileSync(full));
-      } catch {
-        continue; // binary or unreadable — skipped silently, as the Python port did
-      }
-      const relative = path.relative(root, full).split(path.sep).join('/');
+    for (const relative of candidates.paths) {
+      if (globRe !== null && !globRe.test(path.posix.basename(relative))) continue;
 
       if (request.outputMode === 'paths') {
-        // One line per file and nothing else, so the first hit settles the file: no need to scan on,
-        // and no need to split it into lines at all.
-        const haystack = request.caseSensitive ? text : text.toLowerCase();
-        if (!haystack.includes(needle)) continue;
+        // The file list IS the answer here, and grep already established it — so this mode never
+        // transfers a byte of content. That is the whole reason it is the cheap one.
         rows.push(relative);
         files += 1;
         matches += 1; // in this mode a "match" IS a file, so maxMatches is the file cap
@@ -145,6 +153,17 @@ export const searchInFilesTool: ToolModule = {
           break;
         }
         continue;
+      }
+
+      // Content mode pays for the bytes, one candidate at a time, and stops as soon as a ceiling
+      // fires — so the number of transfers is bounded by the caps, not by the size of the project.
+      const read = await ctx.sandbox.readWorkspaceFile(relative);
+      if (!read.ok || read.kind !== 'file') continue; // vanished or a directory — skipped silently
+      let text: string;
+      try {
+        text = decodeUtf8Strict(read.bytes);
+      } catch {
+        continue; // not UTF-8 text — skipped silently, as the host-side walk did
       }
 
       const lines = text.split('\n');

@@ -32,11 +32,17 @@ export const PHASE_SCOPED_TOOL_NAMES: readonly string[] = [
  * user through ask_user.
  *
  * NO SHELL. `execute_command` and `run_in_project` are deliberately absent from all three planning
- * phases: planning writes documents, and read_file/list_files/search_in_files already cover every
- * inspection a spec or a backlog needs. A build or a test run during an interview spends the VRAM
+ * phases: planning writes documents, and a build or a test run during an interview spends the VRAM
  * budget on work the execution loop exists to do. This follows the constitution's "grow the tool set
  * on demand" — the day a planning phase demonstrably needs a command, it gets one back, with the
  * reason recorded here.
+ *
+ * That absence is only defensible while the read tools genuinely cover inspection, and for a long
+ * time this comment claimed they did when they did not: `list_files` took no arguments and listed the
+ * project root non-recursively, so with no shell these three phases could not enumerate a
+ * subdirectory AT ALL. A real hole was documented here as a policy choice. `list_files` now takes a
+ * `path` and a `depth` (src/tools/list-files.ts), which is what makes the sentence above true rather
+ * than merely stated.
  */
 export const DISCOVERY_TOOL_NAMES: readonly string[] = [
   'read_file',

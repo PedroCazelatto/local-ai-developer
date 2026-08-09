@@ -1,6 +1,6 @@
 # Backlog checklist
 
-An index of the 23 open task files in this folder, in the order worth shipping, plus the 2 framing notes
+An index of the 20 open task files in this folder, in the order worth shipping, plus the 2 framing notes
 that are not tasks.
 
 **This file is not a task and is not deleted when work ships.** It is upkeep: when a task's file is deleted
@@ -17,20 +17,24 @@ Cheapest work per unit of value, and the two gaps both framing notes call physic
 - [x] ~~**Cancel an in-flight turn**~~ — *Terminal UX.* Shipped: Ctrl+C stops the turn and a second press
       still quits, both Ollama paths carry an `AbortSignal`, `OLLAMA_TIMEOUT_MS` is a stall window, a
       cancelled exchange branches off the live history, and `/stop` · `/stop round` wind a batch down.
-- [ ] **[Bound `read_file`, and number its lines](bound-read-file-output.md)** — *Memory / context.* Small
-      change, largest single effect; the one unbounded output path in a repo where everything else
-      truncates. Line numbers are the half that stops a second read.
+- [x] ~~**Bound `read_file`, and number its lines**~~ — *Memory / context.* Shipped: 250 lines or 5 000
+      characters, whichever runs out first, with `offset`/`limit` the model can narrow but never widen.
+      Output is line-numbered (`  12→`), every read ends with the range it showed and the file's total,
+      and a line too long to finish resumes at `char_offset` so the notice always names a way forward.
 - [ ] **[Show what a tool call actually did](show-tool-calls-in-the-scrollback.md)** — *Terminal UX.* The
       largest UX gap after cancel and the cheapest to close — `args` is already in hand one line above the
       print, and every result already passes the audit log's choke point. A record, not a confirmation
       prompt.
-- [ ] **[Let `list_files` see a subdirectory](list-files-subdirectories.md)** — *Harness capability.*
-      Discovery, Design and Breakdown cannot enumerate a folder at all today, and
-      `phase-tool-names.ts` documents that hole as a policy choice. Correct that comment in the same change.
+- [x] ~~**Let `list_files` see a subdirectory**~~ — *Harness capability.* Shipped: an optional `path` and
+      a `depth` (default 1, so the bare call is unchanged), rendered as an indented tree with files before
+      directories. Entries are filtered by the project's own `.gitignore` — read as a file, never
+      `git check-ignore`, so an uncommitted file is never hidden — falling back to `SKIP_DIRS` when there
+      is none, and `.git/` always. Capped at 500 entries, which says how many it left out. The
+      `phase-tool-names.ts` comment that documented the hole as a policy choice is corrected.
 - [x] ~~**Context lines and a cheaper default for `search_in_files`**~~ — *Harness capability.* Shipped:
       case-insensitive by default, `context_lines` with overlapping context merged, and an opt-in
       `output_mode:"paths"` — content stayed the default rather than becoming paths-only. The match count
-      gave way to three caps (300 output lines · 200 matches · 20 per file), whichever fires first, and
+      gave way to three caps (200 output lines · 200 matches · 20 per file), whichever fires first, and
       every result now closes with a line naming the cap that fired, or stating that none did. No regex.
 - [ ] **[Inspection commands](inspection-commands.md)** — *In-app commands.* The walk-away loop has no
       come-back half; `/tasks`, `/blockers`, `/inbox`, `/batch`, `/audit` are pure reads over files already
@@ -49,10 +53,15 @@ Not parity gaps. Each is a place where the repo currently says something that is
       the read-tracking here, then the `rules/phases/` prompts can tell the Worker to stop verifying its own
       edits — which is what removes one of the two duplicates
       [evict-stale-tool-results.md](evict-stale-tool-results.md) exists to clean up after.
-- [ ] **[Close the symlink hole in path scoping](resolve-symlinks-in-path-scoping.md)** — *Sandboxing /
-      security.* `docs/sandboxing.md` asserts a guarantee the lexical `resolveInProject` check does not
-      provide. Touches the same `ctx.resolve` as `list_files` above; settle the two together. The doc edit is
-      review-gated — hand the diff over, never auto-commit.
+- [x] ~~**Close the symlink hole in path scoping**~~ — *Sandboxing / security.* Shipped, and by the larger
+      of the two options: the file tools now do their work INSIDE the container rather than host-side, so
+      `docs/sandboxing.md`'s original claim is true instead of merely asserted. Bytes cross as a tar stream
+      over Docker's archive endpoints (`read_file`/`write_file`/`edit_file`); `list_files` and
+      `search_in_files` are `find` and `grep -rl` in the sandbox, neither of which follows a link.
+      `resolveInProject` was hardened anyway — it still scopes the host-side git tools. A live test proved
+      the host check alone was not enough: a link planted from inside the sandbox does not materialize on
+      NTFS, so a container-side `realpath -m` re-check is what actually closes it. **The `docs/sandboxing.md`
+      diff is review-gated and was left uncommitted.**
 - [ ] **[Minor cleanups](minor-cleanups.md)** — *Repo hygiene.* Three unrelated small defects in one commit:
       the shell interpolation in `run.mjs`, the `.gitignore` exception that is not implemented, and the dead
       link in [switch-phase-tool.md](switch-phase-tool.md).
@@ -135,8 +144,10 @@ first:
 
 - **`inspection-commands` in Tier 1.** The UX note ranks it third, but it is pure reads over existing
   formats and it is what makes the escalation record in `record-attempted-tasks` visible at all.
-- **`resolve-symlinks-in-path-scoping` in Tier 2, not Tier 1.** The false claim in `docs/sandboxing.md` is
-  the urgent half; the exploit is not reachable by a non-adversarial model and may not materialize on
-  Windows at all. Correcting the doc could be split out and done immediately.
+- **`resolve-symlinks-in-path-scoping` in Tier 2, not Tier 1.** Shipped from Tier 2, and the ranking's
+  reasoning was half wrong in a way worth keeping on the record: it argued the exploit "may not materialize
+  on Windows at all", which was true of the *link* and false of the *hole*. Windows is precisely where the
+  host-side check could not see the link, so the escape worked there and a host-only fix would have shipped
+  believing it had closed something.
 - **The whole of Tier 3 after Tier 2.** These have the largest effect on what the model can actually think
   with, and an argument exists for putting the `num_ctx` and small-model pair much earlier.

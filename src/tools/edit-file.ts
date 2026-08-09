@@ -1,11 +1,16 @@
 // edit_file (V1/03) — ported from tools/edit_file.py. Replaces an exact string that must appear
 // EXACTLY ONCE; no change if it is missing or matches more than once (the model must add context to
-// disambiguate). Host-side, path-scoped. Replacement is literal — done by index splice, never
-// String.replace, so `$`-sequences in new_string are not reinterpreted.
+// disambiguate). Replacement is literal — done by index splice, never String.replace, so
+// `$`-sequences in new_string are not reinterpreted.
+//
+// Read-modify-write, all three steps against the CONTAINER: the file comes back over Docker's
+// archive endpoint, the splice happens here, and the result goes back the same way. `ctx.resolve`
+// runs first as the scoping check. Not atomic, and deliberately not pretending to be — nothing else
+// is writing the project while a phase holds the turn (docs/product.md, no parallelism).
 
-import { readFileSync, writeFileSync } from 'node:fs';
-
-import { codeOf, decodeUtf8Strict, messageOf } from './fs-support.js';
+import { decodeUtf8Strict, messageOf } from './fs-support.js';
+// Validates the path under the project root (throws on escape) and returns it /workspace-relative.
+import { scopeToWorkspace } from './scope-to-workspace.js';
 import type { ToolModule, ToolResult } from './types.js';
 import { toolError } from './types.js';
 
@@ -51,20 +56,25 @@ export const editFileTool: ToolModule = {
     if (oldString === newString) {
       return toolError("'old_string' and 'new_string' are identical — nothing to do.");
     }
-    let resolved: string;
-    try {
-      resolved = ctx.resolve(relative);
-    } catch (err) {
-      return toolError(messageOf(err));
+    // scopeToWorkspace: checks the path host-side (`..`, absolute) AND container-side (a symlink the
+    // host cannot see), returning the /workspace-relative posix path the transport wants.
+    const scoped = await scopeToWorkspace(ctx, relative);
+    if (!scoped.ok) return toolError(scoped.error);
+
+    const read = await ctx.sandbox.readWorkspaceFile(scoped.relative);
+    if (!read.ok) {
+      return read.notFound
+        ? toolError(`File '${relative}' not found.`)
+        : toolError(`Error reading '${relative}': ${read.message}`);
+    }
+    if (read.kind === 'directory') {
+      return toolError(`Error reading '${relative}': it is a directory, not a file.`);
     }
 
     let original: string;
     try {
-      original = decodeUtf8Strict(readFileSync(resolved));
+      original = decodeUtf8Strict(read.bytes);
     } catch (err) {
-      if (codeOf(err) === 'ENOENT') {
-        return toolError(`File '${relative}' not found.`);
-      }
       if (err instanceof TypeError) {
         return toolError(`File '${relative}' is not valid UTF-8 text.`);
       }
@@ -83,10 +93,9 @@ export const editFileTool: ToolModule = {
 
     const index = original.indexOf(oldString);
     const updated = original.slice(0, index) + newString + original.slice(index + oldString.length);
-    try {
-      writeFileSync(resolved, updated, 'utf-8');
-    } catch (err) {
-      return toolError(`Error writing '${relative}': ${messageOf(err)}`);
+    const written = await ctx.sandbox.writeWorkspaceFile(scoped.relative, Buffer.from(updated, 'utf-8'));
+    if (!written.ok) {
+      return toolError(`Error writing '${relative}': ${written.message}`);
     }
     return `Edited '${relative}'.`;
   },

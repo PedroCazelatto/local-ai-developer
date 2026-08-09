@@ -2,10 +2,9 @@
 
 **Category:** Harness capability
 
-Nothing answers "which files match `**/*.test.ts`?" The model has to walk directories — which it cannot
-do below the project root today, see
-[list-files-subdirectories.md](list-files-subdirectories.md) — or grep for content it hopes is unique to
-those files.
+Nothing answers "which files match `**/*.test.ts`?" The model has to walk directories — `list_files` now
+reaches below the project root with a `path` and a `depth`, so this is a walk it can perform rather than
+one it cannot, but it is still a walk — or grep for content it hopes is unique to those files.
 
 ## Why this shape
 

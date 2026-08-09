@@ -25,10 +25,10 @@ This came from asking one agent harness to compare a second one against itself. 
 exercise and the tasks should be read with it in mind: the output of "compare X to me" is always going to be a
 list of ways X should be more like me.
 
-The parts to trust hardest are the ones that follow from physics rather than taste.
-[bound-read-file-output.md](bound-read-file-output.md) is right because 16k is 16k, and an unbounded `read_file`
-is indefensible on any harness at any model size. [list-files-subdirectories.md](list-files-subdirectories.md) is
-right because three phases genuinely cannot enumerate a subdirectory today.
+The parts to trust hardest are the ones that follow from physics rather than taste. Bounding `read_file`, which
+has shipped, was right because 16k is 16k, and an unbounded `read_file` is indefensible on any harness at any
+model size. Letting `list_files` see a subdirectory, which has also shipped, was right because three phases
+genuinely could not enumerate one.
 
 The two to trust least both open with a *decide whether to build this at all* section, and both are cases where
 the recommending harness has a very large context window and this one does not:
@@ -47,11 +47,11 @@ the ones this list will have gotten wrong — so treat these as drafts to correc
 
 By value per unit of work, not by importance:
 
-1. [bound-read-file-output.md](bound-read-file-output.md) — small change, largest single effect.
+1. Bounding and numbering `read_file` — small change, largest single effect. **Shipped.**
 2. [evict-stale-tool-results.md](evict-stale-tool-results.md) — medium change, comparable effect. Read its
    KV-cache caveat before committing to the design; it is the one cost the original comparison missed.
-3. [list-files-subdirectories.md](list-files-subdirectories.md) — small, large. Its pair, the
-   `search_in_files` context lines and cheaper modes, has shipped.
+3. Letting `list_files` see a subdirectory — small, large. **Shipped**, together with its pair, the
+   `search_in_files` context lines and cheaper modes.
 4. [small-model-lane-for-one-shots.md](small-model-lane-for-one-shots.md) — small, large, and already an open
    question in `docs/open-questions.md`. Pairs with [per-window-num-ctx.md](per-window-num-ctx.md).
 5. [read-before-edit-guard.md](read-before-edit-guard.md) — small, medium. Depends on nothing, and it is what

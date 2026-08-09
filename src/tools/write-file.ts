@@ -1,11 +1,18 @@
-// write_file (V1/03) — ported from tools/write_file.py. Creates or overwrites a UTF-8 file under
-// the project root, creating parent directories automatically (the Worker writes src/foo/bar.ts
-// into a fresh project — missing this breaks scaffolding). Host-side, path-scoped via ctx.resolve.
-
-import { mkdirSync, writeFileSync } from 'node:fs';
-import path from 'node:path';
+// write_file (V1/03) — creates or overwrites a UTF-8 file under the project root, creating parent
+// directories automatically (the Worker writes src/foo/bar.ts into a fresh project — missing this
+// breaks scaffolding).
+//
+// The write happens INSIDE the sandbox. Bytes cross as a tar stream over Docker's archive endpoint,
+// never as a shell command, so file content is never interpolated into `sh -c` and there is no
+// quoting rule for a model's file to break. The parent chain is carried as directory members of that
+// same archive, which is what replaced the old host-side recursive mkdir.
+//
+// `ctx.resolve` still runs first, as the scoping check: a path that leaves the project is refused
+// here with a message the model can act on, before anything reaches the container.
 
 import { messageOf } from './fs-support.js';
+// Validates the path under the project root (throws on escape) and returns it /workspace-relative.
+import { scopeToWorkspace } from './scope-to-workspace.js';
 import type { ToolModule, ToolResult } from './types.js';
 import { toolError } from './types.js';
 
@@ -34,18 +41,18 @@ export const writeFileTool: ToolModule = {
     if (typeof content !== 'string') {
       return toolError("'content' must be a string.");
     }
-    let resolved: string;
-    try {
-      resolved = ctx.resolve(relative);
-    } catch (err) {
-      return toolError(messageOf(err));
+    // scopeToWorkspace: checks the path host-side (`..`, absolute) AND container-side (a symlink the
+    // host cannot see), returning the /workspace-relative posix path the transport wants.
+    const scoped = await scopeToWorkspace(ctx, relative);
+    if (!scoped.ok) return toolError(scoped.error);
+    if (scoped.relative === '') {
+      return toolError(`Error writing '${relative}': it is the project root, not a file.`);
     }
-    try {
-      mkdirSync(path.dirname(resolved), { recursive: true });
-      writeFileSync(resolved, content, 'utf-8');
-      return `Wrote ${content.length} characters to '${relative}'.`;
-    } catch (err) {
-      return toolError(`Error writing '${relative}': ${messageOf(err)}`);
+
+    const written = await ctx.sandbox.writeWorkspaceFile(scoped.relative, Buffer.from(content, 'utf-8'));
+    if (!written.ok) {
+      return toolError(`Error writing '${relative}': ${written.message}`);
     }
+    return `Wrote ${content.length} characters to '${relative}'.`;
   },
 };

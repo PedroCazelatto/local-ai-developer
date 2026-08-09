@@ -7,13 +7,29 @@
 // The whole security model is the mount boundary: only the active project is bind-mounted at
 // /workspace, so `..` / `$(...)` / symlinks inside a command cannot escape a container that
 // simply never had the host mounted. Do not add more mounts.
+//
+// TWO channels, both landing inside that mount:
+//   - `exec` — a shell command, for the tools whose whole job is a command (execute_command) and
+//     for the two inspection tools that are a directory walk (list_files, search_in_files).
+//   - `readWorkspaceFile` / `writeWorkspaceFile` — EXACT BYTES over Docker's archive endpoints, for
+//     read_file / write_file / edit_file. Deliberately not a shell command: file content would
+//     otherwise have to survive `sh -c` quoting, and a tar stream has no quoting rules to get wrong
+//     and no argv length ceiling.
 
 import { Writable } from 'node:stream';
 
 import Docker from 'dockerode';
 
+import { decodeTarFile } from './decode-tar-file.js';
+import { encodeTar } from './encode-tar.js';
+import type { SandboxRead, SandboxWrite } from './sandbox-file.type.js';
+import type { TarEntry } from './tar-entry.type.js';
+
 /** The long-lived root sandbox container (created by `docker compose up -d`). */
 export const SANDBOX_CONTAINER = 'ai_sandbox';
+
+/** Where the active project is bind-mounted. The project root IS this path — nothing above it exists. */
+const WORKSPACE = '/workspace';
 
 /** node:<lts>-slim, not debian: V1's project work + `npm i` need node/npm in the box already. */
 const DEFAULT_IMAGE = 'node:24-slim';
@@ -116,7 +132,7 @@ export class SandboxClient {
    * it never throws (throwing would kill the model's turn). Ports client.py's try/except.
    */
   async exec(command: string, opts: ExecOptions = {}): Promise<ExecResult> {
-    const workdir = opts.workdir ?? '/workspace';
+    const workdir = opts.workdir ?? WORKSPACE;
     try {
       const container = this.docker.getContainer(this.containerName);
       const exec = await container.exec({
@@ -153,6 +169,69 @@ export class SandboxClient {
       // Container-not-found, image error, exec failure → structured, recoverable result.
       return { exitCode: 1, stdout: '', stderr: messageOf(err) };
     }
+  }
+
+  /**
+   * Read one file out of /workspace as exact bytes, via Docker's archive endpoint. `relative` is
+   * project-root-relative and posix-separated; the CALLER has already scoped it (tools/context.ts's
+   * resolveInProject), so this method only transports.
+   *
+   * Recoverable in the same way `exec` is — a missing path comes back as `{ ok: false, notFound:
+   * true }`, a dead daemon as `{ ok: false, notFound: false }`, and neither throws.
+   */
+  async readWorkspaceFile(relative: string): Promise<SandboxRead> {
+    try {
+      const container = this.docker.getContainer(this.containerName);
+      const stream = await container.getArchive({ path: `${WORKSPACE}/${relative}` });
+      const archive = await this.drain(stream);
+      // Docker answers a single-path request with a one-entry tar; decodeTarFile walks any GNU/PAX
+      // metadata members and returns that entry's bytes, or reports that it was a directory.
+      const member = decodeTarFile(archive);
+      if (member.kind === 'directory') return { ok: true, kind: 'directory' };
+      if (member.kind === 'empty') return { ok: false, notFound: true, message: 'no such file' };
+      return { ok: true, kind: 'file', bytes: member.bytes };
+    } catch (err) {
+      const notFound = statusCodeOf(err) === 404;
+      return { ok: false, notFound, message: messageOf(err) };
+    }
+  }
+
+  /**
+   * Write one file into /workspace as exact bytes, creating its parent chain. `relative` is
+   * project-root-relative and posix-separated, already scoped by the caller.
+   *
+   * The archive is extracted AT /workspace and carries a directory member for every ancestor, which
+   * is what replaces the old host-side `mkdirSync(dirname, { recursive: true })` — write_file must
+   * still scaffold `src/foo/bar.ts` into an empty project.
+   */
+  async writeWorkspaceFile(relative: string, bytes: Uint8Array): Promise<SandboxWrite> {
+    const segments = relative.split('/').filter((segment) => segment !== '');
+    const entries: TarEntry[] = [];
+    for (let i = 0; i < segments.length - 1; i += 1) {
+      entries.push({ path: segments.slice(0, i + 1).join('/'), kind: 'directory' });
+    }
+    entries.push({ path: segments.join('/'), kind: 'file', bytes });
+
+    try {
+      const container = this.docker.getContainer(this.containerName);
+      // Docker's PUT /archive extracts before it answers, so awaiting the request IS awaiting the
+      // write. What it resolves to is not a readable stream (unlike getArchive) and must not be
+      // drained — doing so turned every successful write into a reported failure.
+      await container.putArchive(encodeTar(entries), { path: WORKSPACE });
+      return { ok: true };
+    } catch (err) {
+      return { ok: false, message: messageOf(err) };
+    }
+  }
+
+  /** Collect a readable stream into one Buffer. */
+  private drain(stream: NodeJS.ReadableStream): Promise<Buffer> {
+    return new Promise<Buffer>((resolve, reject) => {
+      const chunks: Buffer[] = [];
+      stream.on('data', (chunk: Buffer) => chunks.push(Buffer.from(chunk)));
+      stream.on('end', () => resolve(Buffer.concat(chunks)));
+      stream.on('error', reject);
+    });
   }
 
   /** Resolve true on stream `end`, false on timeout; reject on stream error. */
