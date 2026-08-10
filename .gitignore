@@ -7,8 +7,12 @@ docker-compose.override.yml
 node_modules/
 dist/
 
-# Projects (except hello-world - example project)
-projects/
+# Projects — every project is ignored except hello-world, the example that ships with the repo.
+# `projects/*`, not `projects/`: git never descends into an excluded DIRECTORY, so a negation
+# under `projects/` could never re-include anything. Excluding the children one at a time leaves
+# the directory itself readable, which is what makes the negation below work.
+projects/*
+!projects/hello-world/
 
 # Logs
 logs

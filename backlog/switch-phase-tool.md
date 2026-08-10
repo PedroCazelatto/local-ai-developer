@@ -12,8 +12,11 @@ job with guardrails** — `switch_phase` is the first of them, standing in for `
 - either a **fresh context** or an **existing phase context** chosen by the caller.
 
 The outgoing phase reads the list of available phase contexts and decides for itself whether to open a
-fresh one or resume an old one. That decision is only as good as the context titles, which is why this
-task **depends on [phase-context-history.md](phase-context-history.md)** — build that first.
+fresh one or resume an old one. That decision is only as good as the context titles, and **that
+prerequisite has landed** in `3cc8b7b`: a phase context is now a titled, addressable record — a one-line
+title saying why the context exists, and a `<phase>/<8-char UUID>` address that reopens it. Nothing
+blocks this task. See the memory model in [docs/mental-model.md](../docs/mental-model.md) for what it
+delivered.
 
 Decided:
 

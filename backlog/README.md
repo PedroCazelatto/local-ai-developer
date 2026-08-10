@@ -71,9 +71,16 @@ Not parity gaps. Each is a place where the repo currently says something that is
       the host check alone was not enough: a link planted from inside the sandbox does not materialize on
       NTFS, so a container-side `realpath -m` re-check is what actually closes it. **The `docs/sandboxing.md`
       diff is review-gated and was left uncommitted.**
-- [ ] **[Minor cleanups](minor-cleanups.md)** — *Repo hygiene.* Three unrelated small defects in one commit:
-      the shell interpolation in `run.mjs`, the `.gitignore` exception that is not implemented, and the dead
-      link in [switch-phase-tool.md](switch-phase-tool.md).
+- [x] ~~**Minor cleanups**~~ — *Repo hygiene.* Shipped, all three. `run.mjs` validates the project name
+      against the same `SAFE_NAME` rule `/new-project` enforces and spawns argv arrays instead of formatted
+      strings, which also closes a second hole the task file did not name: the same string reaches compose's
+      mount path, where `../..` mounted a directory from OUTSIDE `projects/` at `/workspace`. `.gitignore`
+      implements the `hello-world` exception it had only claimed — `projects/*` plus a negation, because git
+      never descends into an excluded directory. The dead link in
+      [switch-phase-tool.md](switch-phase-tool.md) now says its prerequisite landed. **One residue: on
+      Windows `npm` is a `.cmd`, which Node refuses to spawn without a shell, so that one child keeps
+      `shell: true` and the validation is what contains it. The `docs/repo-layout.md` diff is review-gated
+      and was left uncommitted.**
 - [ ] **[Resolve the dead Tab completion](resolve-dead-tab-completion.md)** — *In-app commands.* Five sites
       reason carefully about a `complete-line.ts` that does not exist. **Needs your call:** wire it back or
       delete the hook. Either is fine; leaving it is not.
