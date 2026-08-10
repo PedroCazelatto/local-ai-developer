@@ -48,7 +48,9 @@ exists. The block costs roughly 100–200 tokens per turn — that is the price 
 
 The planning phases (Discovery/Design/Breakdown) get no shell: `execute_command` and `run_in_project`
 are absent from their arrays, because planning writes documents and `read_file`/`list_files`/
-`search_in_files` already cover inspection.
+`search_in_files` already cover inspection. That last clause was untrue for as long as `list_files`
+took no arguments — with no shell, those three phases could not enumerate a subdirectory at all. It
+holds now that `list_files` takes a `path` and a `depth`.
 
 ## Retrieval: LLM-delegated search
 

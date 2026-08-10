@@ -65,6 +65,12 @@ can be listed, described and reopened by address, which is what lets a phase —
   the confirmation, and `/resume` reopens it. Other phases are untouched.
 - **Nothing is ever deleted.** Not by `/clear`, not by the summarization failsafe, not by a `num_ctx`
   change. Every mechanism below hides turns from the *live view*; the rows stay.
+- **What the window has READ dies with the context.** Each window tracks which files it has read, so the
+  write tools can refuse a file it has not seen (see *Look before you write* in
+  [sandboxing.md](sandboxing.md)). That record follows the phase context: `/clear` and `/resume` empty
+  it, because the reads live in the context being swapped out and the model can no longer see them.
+  `/swap` leaves it alone — a different phase is a different window, not a different context. It is the
+  one piece of window state that is neither persisted nor process-lifetime: it is context-lifetime.
 - **A cancelled turn branches the exchange off.** Stopping a turn with Ctrl+C takes the whole exchange
   out of the live window at once — the user's message, every assistant turn it produced, the tool calls
   and their results, and the partial answer it was cut off in — so the prompt reopens where the exchange
