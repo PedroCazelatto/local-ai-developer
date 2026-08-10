@@ -17,6 +17,7 @@ import { createToolContext } from '../../tools/index.js';
 import { resolvePhaseTools } from '../../phases/index.js';
 import type { Message, TokenCounts, Tool } from '../llm/index.js';
 import * as renderer from '../ui/renderer.js';
+import { theme } from '../ui/theme.js';
 import { addTokenCounts } from './add-token-counts.js';
 import { appendAuditRow } from './audit.js';
 import { dispatchToolCall } from './dispatch.js';
@@ -173,7 +174,13 @@ export class SubagentManager implements SubagentHandle {
       state.messages.push({ role: 'assistant', content: '', tool_calls: toolCalls });
       for (const call of toolCalls) {
         const name = call.function.name;
-        renderer.systemMessage(`→ tool: ${name} [sub:${short}]`);
+        // interjectLine, NOT systemMessage: a sub-agent's turns run INSIDE the master's spawn/ask tool
+        // call, so the master's transient activity line is on the cursor row the whole time. A plain
+        // write lands on that row and the spinner's next in-place repaint moves down one — leaving
+        // `⠙ running ask_subagent (1.1s)→ tool: read_file [sub:ab12]` behind as permanent scrollback, a
+        // transient widget's frame stuck in append-only history. interjectLine hides the line, prints,
+        // and shows it again. The style is applied here because interjectLine takes a finished string.
+        renderer.interjectLine(theme.meta(`→ tool: ${name} [sub:${short}]`));
         const result = await this.dispatch(state, name, call.function.arguments);
         state.messages.push({ role: 'tool', content: result, tool_name: name });
       }
