@@ -37,6 +37,8 @@ import { raiseBlocker } from './blocker-store.js';
 import type { RaisedBlocker } from './blocker-store.type.js';
 import type { ToolCallRecord } from './dispatch.js';
 import { dispatchToolCall } from './dispatch.js';
+import { createReadTracker } from './read-tracker.js';
+import type { FileReadTracker } from './read-tracker.type.js';
 import { listChangedPaths } from './project-git.js';
 import type { ReviewVerdict } from './review-types.js';
 import { processMessage } from './turn-loop.js';
@@ -145,6 +147,12 @@ class ReviewerWindow implements TurnContext {
   private verdictAttempts = 0;
   /** Commits this Reviewer made, in order — captured from each successful commit_changes call. */
   private readonly commitsMade: ReviewerCommit[] = [];
+  /**
+   * This window's read tracker. The Reviewer has no write_file/edit_file, so nothing here is ever
+   * guarded against — it is passed because ToolContext requires one, and requiring it is what stops a
+   * window from silently opting out of the guard. Its reads stay its own either way.
+   */
+  private readonly readTracker: FileReadTracker = createReadTracker();
   /** True once mark_task_done flipped the task under review to `done`; required before a `pass`. */
   private taskMarkedDone = false;
 
@@ -241,6 +249,7 @@ class ReviewerWindow implements TurnContext {
         sandbox: this.deps.sandbox,
         phase: 'reviewer',
         llm: this.deps.llm, // backs ctx.oneShot for search_rules (V4/02) and the commit-message writer
+        readTracker: this.readTracker, // this window's own (the Reviewer cannot write, so never gated)
       });
       const result = await dispatchToolCall(ctx, name, args, {
         onToolCall: (record) => appendAuditRow(this.deps.projectPath, record),

@@ -19,6 +19,8 @@ import { appendEvent } from './events-log.js';
 import { generateContextTitle } from './generate-context-title.js';
 import { SessionMemory } from './memory.js';
 import { drainAnsweredQuestions } from './question-store.js';
+import { createReadTracker } from './read-tracker.js';
+import type { FileReadTracker } from './read-tracker.type.js';
 import { compactActivePhase } from './summarizer.js';
 import type { ClearResult, ContextSummary, PhaseLoad } from './memory-db.type.js';
 import { SubagentManager } from './subagents.js';
@@ -66,6 +68,14 @@ export class SessionOrchestrator implements TurnContext {
   // to its pre-compaction EXACT prompt count ("before"); onTokens emits summarization_fire with the
   // next call's exact prompt count as "after", then clears the entry.
   private readonly pendingSummarization = new Map<string, number | null>();
+
+  // What each master phase has READ, so write_file/edit_file can refuse a file the window has not seen
+  // or has seen a stale copy of (tools/guard-write-target.ts). Keyed by phase because each phase is its
+  // own window onto its own context; `/swap` moves between them and must not empty either. `/clear` and
+  // `/resume` DO empty the active phase's entry — they change which context the phase is on, and the
+  // tracker follows the context. The spawned windows (Worker/Reviewer/Retro) and each sub-agent own
+  // theirs instead, which is what stops a sub-agent's reads satisfying its parent's guard.
+  private readonly readTrackers = new Map<string, FileReadTracker>();
 
   // Sub-agents (V5/01) the interactive phases spawn mid-turn: in-memory only, dropped at session end.
   // Exposed to the sub-agent tools via ctx.subagents, to `/subagents`, and to the status-line count.
@@ -193,6 +203,19 @@ export class SessionOrchestrator implements TurnContext {
     return this.memory.history;
   }
 
+  /**
+   * The active phase's read tracker, created on first use. Lazily rather than per phase up front so a
+   * phase the session never visits never holds one, and so `/clear` can simply drop the entry.
+   */
+  private trackerForActivePhase(): FileReadTracker {
+    const existing = this.readTrackers.get(this.phase.name);
+    if (existing !== undefined) return existing;
+    // createReadTracker: an empty per-window map of path → hash of the bytes the window read.
+    const created = createReadTracker();
+    this.readTrackers.set(this.phase.name, created);
+    return created;
+  }
+
   /** Switch active phase; loads its instructions and points at its own history (no leak, no disk read). */
   switchPhase(name: string): void {
     const from = this.phase.name;
@@ -230,6 +253,10 @@ export class SessionOrchestrator implements TurnContext {
    * what `/resume` would bring back. Other phases are untouched.
    */
   clearActivePhase(): ClearResult {
+    // The read tracker follows the phase CONTEXT, not the process: the context being set aside is where
+    // those reads live, and the new one carries no history of them. A guard that still honoured them
+    // would be answering for a window the model can no longer see.
+    this.readTrackers.delete(this.phase.name);
     return this.memory.clearActive();
   }
 
@@ -246,6 +273,9 @@ export class SessionOrchestrator implements TurnContext {
   reopenActiveContext(address: string): boolean {
     const load = this.memory.reopenActiveContext(address);
     if (load === null) return false;
+    // Same rule as `/clear`: a different context is a different window's worth of reads. Dropped only
+    // once the reopen has actually succeeded — a failed address changes nothing.
+    this.readTrackers.delete(this.phase.name);
     this.emitMemoryLoad(load);
     return true;
   }
@@ -545,6 +575,7 @@ export class SessionOrchestrator implements TurnContext {
       phase: this.phase.name,
       llm: this.llm, // backs ctx.oneShot for search_rules (V4/02)
       subagents: this.subagents, // ONLY the interactive master phases can spawn sub-agents (V5/01)
+      readTracker: this.trackerForActivePhase(), // survives this per-call context; see read-tracker.ts
     });
     // Every dispatched call — success, failure, or sub-step — is appended to the audit log (V1/06).
     return dispatchToolCall(ctx, name, args, {

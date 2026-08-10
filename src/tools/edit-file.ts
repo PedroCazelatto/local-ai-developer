@@ -9,6 +9,8 @@
 // is writing the project while a phase holds the turn (docs/product.md, no parallelism).
 
 import { decodeUtf8Strict, messageOf } from './fs-support.js';
+// Refuses an existing file this window has not read, or has read a now-stale copy of.
+import { guardWriteTarget } from './guard-write-target.js';
 // Validates the path under the project root (throws on escape) and returns it /workspace-relative.
 import { scopeToWorkspace } from './scope-to-workspace.js';
 import type { ToolModule, ToolResult } from './types.js';
@@ -29,7 +31,11 @@ function countOccurrences(haystack: string, needle: string): number {
 export const editFileTool: ToolModule = {
   name: 'edit_file',
   description:
-    "Replace an exact string in an existing file. The 'old_string' must appear exactly once — if it is missing or matches multiple times, no change is made. Use this for small, targeted edits instead of rewriting the whole file.",
+    "Replace an exact string in an existing file. The 'old_string' must appear exactly once — if it is " +
+    'missing or matches multiple times, no change is made. Use this for targeted edits instead of ' +
+    'rewriting the whole file. You must have read the file with read_file first, and it must not have ' +
+    'changed since you read it; otherwise the edit is refused and nothing is lost. You do NOT need to ' +
+    're-read a file to check that your own edit landed — a successful result means it did.',
   parameters: {
     type: 'object',
     properties: {
@@ -81,6 +87,12 @@ export const editFileTool: ToolModule = {
       return toolError(`Error reading '${relative}': ${messageOf(err)}`);
     }
 
+    // Look before you write: the window must have read this file, and the bytes it read must still be
+    // the bytes on disk. Checked against `read.bytes`, which this tool was already holding — the read
+    // above is the same one the splice needs, so the guard costs no extra container round-trip.
+    const guard = guardWriteTarget(ctx.readTracker, relative, read.bytes);
+    if (!guard.ok) return toolError(guard.error, guard.hint);
+
     const occurrences = countOccurrences(original, oldString);
     if (occurrences === 0) {
       return toolError(`'old_string' not found in '${relative}'.`);
@@ -93,10 +105,14 @@ export const editFileTool: ToolModule = {
 
     const index = original.indexOf(oldString);
     const updated = original.slice(0, index) + newString + original.slice(index + oldString.length);
-    const written = await ctx.sandbox.writeWorkspaceFile(scoped.relative, Buffer.from(updated, 'utf-8'));
+    const bytes = Buffer.from(updated, 'utf-8');
+    const written = await ctx.sandbox.writeWorkspaceFile(scoped.relative, bytes);
     if (!written.ok) {
       return toolError(`Error writing '${relative}': ${written.message}`);
     }
+    // The file the model just wrote IS a file it has seen — record the NEW bytes so its own next edit
+    // to the same file is not refused as stale by the change it made itself.
+    ctx.readTracker.record(relative, bytes);
     return `Edited '${relative}'.`;
   },
 };

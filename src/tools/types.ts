@@ -7,6 +7,7 @@
 
 import type { SandboxClient } from '../core/container/index.js';
 import type { Message, OneShotResult } from '../core/llm/index.js';
+import type { FileReadTracker } from '../core/session/read-tracker.type.js';
 import type { SubagentHandle } from '../core/session/subagents.type.js';
 
 // ------------------------------------------------------------------ JSON + JSON-schema vocabulary
@@ -103,6 +104,16 @@ export interface ToolContext {
   readonly phase: string; // active phase name, for the audit row
   /** Join `relative` onto the project root, rejecting any path that escapes it (throws on escape). */
   resolve(relative: string): string;
+  /**
+   * What THIS window has read, and whether those files still hold the bytes it read. read_file records
+   * into it; write_file and edit_file refuse an existing file the window has not read or has read a
+   * stale copy of (tools/guard-write-target.ts).
+   *
+   * Required, never optional: a window without a tracker would be a window where the guard silently
+   * does not apply, and the one place that would be hardest to notice is the one that matters most.
+   * Each runner owns exactly one, so a sub-agent's reads never satisfy its parent's guard.
+   */
+  readonly readTracker: FileReadTracker;
   /**
    * A fresh, HISTORY-FREE call to the session model (same model + num_ctx), returning content + exact
    * tokens. search_rules (V4/02) uses it to resolve an intent against the standards catalog inside a

@@ -18,7 +18,7 @@ Turn a vague idea into validated, scoped product requirements — before any arc
 3. List the features **and how they interact** — feature interaction is what makes an Epic coherent, not just a pile of features.
 4. Group the features into one or more **Epics** (a unit of high-level business value, e.g. "User Authentication"). Do not talk about buttons or database tables.
 5. Record the **versioned scope**: what ships in v1, what is deferred to v2/v3, and what is out of scope entirely.
-6. Write your output to `PRODUCT_SPEC.md` at the project root with `edit_file` (or `write_file` if it does not exist yet). Fill only the sections the scaffold already defines — **Vision**, **Domain Glossary**, **Epics** — and do not invent new section names:
+6. **Read `PRODUCT_SPEC.md` before you write to it** — `edit_file` and `write_file` refuse to change a file that exists until this window has read it, and refuse again if it changed after you read it. The refusal says which case it is; nothing is lost either way. Write your output to `PRODUCT_SPEC.md` at the project root with `edit_file` (or `write_file` if it does not exist yet — creating a new file is never refused). Fill only the sections the scaffold already defines — **Vision**, **Domain Glossary**, **Epics** — and do not invent new section names:
    - **Vision:** the problem, the users, the outcome.
    - **Domain Glossary:** the ubiquitous language (one line per term).
    - **Epics:** the validated epic list; for each feature/epic mark **v1** or **deferred (v2/v3)**, and end the section with an explicit **Out of scope** list.

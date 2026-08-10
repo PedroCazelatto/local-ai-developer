@@ -30,6 +30,8 @@ import { addTokenCounts } from './add-token-counts.js';
 import { appendAuditRow } from './audit.js';
 import type { ToolCallRecord } from './dispatch.js';
 import { dispatchToolCall } from './dispatch.js';
+import { createReadTracker } from './read-tracker.js';
+import type { FileReadTracker } from './read-tracker.type.js';
 import { commitPaths } from './project-git.js';
 import type { RetroDeps, RetroInput, RetroResult, RetroSubmission } from './retro-runner.type.js';
 import { processMessage } from './turn-loop.js';
@@ -101,6 +103,12 @@ class RetroWindow implements TurnContext {
   private edited: string | null = null;
   /** The captured diagnosis — null until submit_retro succeeds; makes the window terminal. */
   private captured: RetroSubmission | null = null;
+  /**
+   * This window's read tracker, backing the guard on `edit_file` — Retro's only write. It pairs well
+   * with the single-file lock below: Retro is told to make ONE smallest edit, and it now has to have
+   * read that file before it can make it.
+   */
+  private readonly readTracker: FileReadTracker = createReadTracker();
 
   constructor(
     private readonly deps: RetroDeps,
@@ -215,6 +223,7 @@ class RetroWindow implements TurnContext {
       sandbox: this.deps.sandbox,
       phase: 'retro',
       llm: this.deps.llm, // required by createToolContext; Retro's tools don't use ctx.oneShot
+      readTracker: this.readTracker, // this window's own — backs the guard on Retro's one edit_file
     });
     return dispatchToolCall(ctx, name, args, {
       onToolCall: (record) => appendAuditRow(this.deps.projectPath, record),

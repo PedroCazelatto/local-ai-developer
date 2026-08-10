@@ -22,6 +22,7 @@ import { appendAuditRow } from './audit.js';
 import { dispatchToolCall } from './dispatch.js';
 import { appendEvent } from './events-log.js';
 import { generateSubagentId } from './generate-subagent-id.js';
+import { createReadTracker } from './read-tracker.js';
 import type {
   SubagentAskOutcome,
   SubagentDeps,
@@ -88,6 +89,9 @@ export class SubagentManager implements SubagentHandle {
       messages: [{ role: 'system', content: initialContext }],
       toolDefs: this.toolsForMaster(masterPhase),
       masterPhase,
+      // createReadTracker: this sub-agent's own record of what IT has read — isolated from the master's
+      // the same way `messages` is, so neither one's reads unlock the other's writes.
+      readTracker: createReadTracker(),
       createdAt: Date.now(),
       promptTokens: 0,
       evalTokens: 0,
@@ -192,6 +196,7 @@ export class SubagentManager implements SubagentHandle {
       sandbox: this.deps.sandbox,
       phase: state.masterPhase,
       llm: this.deps.llm, // required by createToolContext; backs ctx.oneShot for search_rules
+      readTracker: state.readTracker, // THIS sub-agent's own — never the master's (see SubagentState)
     });
     return dispatchToolCall(ctx, name, args, {
       onToolCall: (record) => appendAuditRow(this.deps.projectPath, { ...record, subagentId: state.id }),

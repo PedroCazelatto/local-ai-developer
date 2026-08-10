@@ -5,6 +5,7 @@
 
 import type { SandboxClient } from '../container/index.js';
 import type { Message, OllamaClient, Tool } from '../llm/index.js';
+import type { FileReadTracker } from './read-tracker.type.js';
 
 /**
  * One live sub-agent's in-memory state (dies with the session — no JSONL, unlike per-phase memory).
@@ -30,6 +31,13 @@ export interface SubagentState {
   readonly toolDefs: Tool[];
   /** The phase that spawned it — stamped as `phase` on every audit row for this sub-agent's tool calls. */
   readonly masterPhase: string;
+  /**
+   * Its OWN read tracker, isolated exactly like `messages`. A sub-agent's reads must never satisfy its
+   * master's look-before-you-write guard: the master never saw what the sub-agent read, and a brief
+   * summarising a file is not the file — which is precisely the case the guard exists to catch. The
+   * isolation runs the other way too: the master's reads do not unlock writes here.
+   */
+  readonly readTracker: FileReadTracker;
   /** Date.now() ms at spawn — drives the age shown by `/subagents`. */
   readonly createdAt: number;
   /** EXACT cumulative prompt_eval_count; null once any turn failed to report it (never estimated). */

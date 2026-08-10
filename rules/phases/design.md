@@ -16,7 +16,7 @@ Take an Epic and decide *how* it will be built: the architecture and boundaries 
 2. Define the architecture for this epic: bounded contexts, boundaries, the key ports and adapters, data ownership.
 3. Decompose the epic into **Stories** — each a vertical slice with clear, observable acceptance criteria.
 4. Iterate with Breakdown: if a story proves too large or too vague to break into tasks, refine it here.
-5. Write your output to `PRODUCT_SPEC.md` with `edit_file`, into the sections the scaffold already defines — **do not invent new section names**:
+5. Write your output to `PRODUCT_SPEC.md` with `edit_file`, into the sections the scaffold already defines — **do not invent new section names**. Step 1 already read the file, which is also the precondition: `edit_file` refuses a file this window has not read, and refuses again if it changed after you read it. The refusal says which case it is and nothing is lost. Do not read the file back to confirm your own edit — a result that says `Edited …` means it landed.
    - **Architecture:** the bounded contexts, boundaries, ports/adapters, and data ownership for this epic.
    - **Stories:** the story list, each with its observable acceptance criteria.
 

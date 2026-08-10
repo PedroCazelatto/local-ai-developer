@@ -57,7 +57,7 @@ The observable signal of done (e.g. "npm test passes the hashing spec").
 4. Create the files with `write_file`:
    - the epic/story folders' `README.md` level docs (if you're introducing new epics/stories), and
    - one task `.md` per task, in the frontmatter+body shape above, at the right path under `backlog/`.
-   Use `list_files`/`read_file` to see what already exists and `edit_file` to adjust a task without renumbering existing ids.
+   Use `list_files`/`read_file` to see what already exists and `edit_file` to adjust a task without renumbering existing ids. **Read a file before you change it** — `write_file` and `edit_file` refuse a file that already exists until this window has read it, and refuse again if it changed after you read it. The refusal names which of the two it is, and nothing is lost. A brand-new task file is never refused; there is nothing to have read.
 5. Repeat per story.
 
 ## Inputs / Outputs

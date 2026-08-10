@@ -34,6 +34,15 @@ A search costs a fraction of a file, so `search_in_files` is how you find your w
 - Narrow with a glob (`glob:"*.ts"`) rather than reading the whole result. The output is capped and the caps are not yours to raise, so a broad search comes back cut.
 - **The last line of every result says whether you saw all of it.** Read it. If it says the search stopped at a cap, you are looking at part of the answer — narrow the search and ask again before you conclude anything about the codebase.
 
+## Changing a file
+You read a file before you change it. This is enforced, not advised: `edit_file` and `write_file` refuse to touch a file that already exists until this window has read it, and refuse again if the file changed after you read it. Nothing is lost when one refuses — the file is untouched and you are told which of the two cases it is.
+
+- **"You have not read it"** → call `read_file` on that path, then make the change against what the file actually says.
+- **"It has changed since you read it"** → something else wrote the file. Between rounds that is usually the Reviewer's git. Read it again, then re-apply your change to the current contents.
+- **Creating a new file is never refused.** There is nothing to have read. `write_file` on a path that does not exist works immediately, parent directories included.
+- **Prefer `edit_file` for a file that exists.** Rewriting a whole file to change part of it costs you the file's full length in output, and it is how parts you did not mean to touch get dropped.
+- **Do not read a file back to check your own edit.** A result that says `Edited …` means the change landed; a failure says so plainly. Your next edit to that same file needs no re-read either — the tool already knows what you wrote. A verification read spends your window to learn what the tool result told you.
+
 ## Workflow
 1. `git_branch(action:"create", ...)` onto the task's branch, named in your seed.
 2. Read the task description and its acceptance criteria.

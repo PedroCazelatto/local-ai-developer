@@ -17,6 +17,8 @@ import { addTokenCounts } from './add-token-counts.js';
 import { appendAuditRow } from './audit.js';
 import type { ToolCallRecord } from './dispatch.js';
 import { dispatchToolCall } from './dispatch.js';
+import { createReadTracker } from './read-tracker.js';
+import type { FileReadTracker } from './read-tracker.type.js';
 import { taskBranchName } from './task-branch-name.js';
 import { processMessage } from './turn-loop.js';
 import type { TurnContext } from './turn-loop.js';
@@ -90,6 +92,14 @@ export class WorkerWindow implements TurnContext {
   private tokenSum: TokenCounts = { promptTokens: 0, evalTokens: 0 };
   /** The Worker's allowlist from phase-tool-names.ts — notably without commit_changes (see callTool). */
   private readonly workerTools: Tool[];
+  /**
+   * What this window has read, backing the look-before-you-write guard on write_file/edit_file. One per
+   * WorkerWindow, so it lives exactly as long as the window does — created once per task and kept
+   * across all five fix rounds, like `messages`. That is deliberate: a read stays valid for as long as
+   * the bytes do, and the Reviewer drives git between rounds, so what catches a file changing under the
+   * Worker is the staleness half (a content hash), not an expiry.
+   */
+  private readonly readTracker: FileReadTracker = createReadTracker();
 
   constructor(private readonly deps: WorkerDeps) {
     // The Worker is the ONE phase that cannot commit: a Worker that commits its own code is its own
@@ -156,6 +166,7 @@ export class WorkerWindow implements TurnContext {
       sandbox: this.deps.sandbox,
       phase: 'worker',
       llm: this.deps.llm, // backs ctx.oneShot for search_rules (V4/02)
+      readTracker: this.readTracker, // this window's own; a sub-agent's reads never reach it
     });
     const result = await dispatchToolCall(ctx, name, args, {
       onToolCall: (record) => appendAuditRow(this.deps.projectPath, record),

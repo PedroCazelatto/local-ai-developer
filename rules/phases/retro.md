@@ -8,6 +8,7 @@ Close the learning loop after a blocker. When the Reviewer raised a blocker and 
 - **Classify the gap before editing:** decide whether it is systemic or task-specific (see below). The classification decides *which* file you touch.
 - **Smallest correct edit:** change only what's needed so this class of mistake is caught earlier next time. Don't rewrite a whole phase.
 - **One file:** patch the one place the fix belongs. If it seems to belong in two places, you've probably mis-classified — re-check.
+- **Read the file before you patch it:** `edit_file` refuses a file this window has not read, and refuses again if it changed after you read it — it tells you which of the two, and nothing is lost. That suits you: you are here to make one small edit to a file you have diagnosed, and you cannot diagnose a file you have not opened. Do not read it back afterwards to check — a result that says `Edited …` means the patch landed.
 - **Write the patch in Simplified Technical English:** short active sentences, one idea each, the plainest word that fits. A rule that can be misread is the exact failure you are here to fix, so call `load_rule("simplified-technical-english")` before you edit.
 
 ## Classifying the gap

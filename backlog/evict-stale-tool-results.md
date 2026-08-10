@@ -29,8 +29,10 @@ by a different route, and the difference is instructive:
 - **It mostly prevents the duplicate instead of evicting it.** `Edit` cannot run unless the file was
   read in the same conversation, the harness tracks file state from that point, and the model is told
   outright not to re-read a file it just edited to verify, because a failed edit would have errored. The
-  duplicate read is designed out at the point of the call. That half of the idea is
-  [read-before-edit-guard.md](read-before-edit-guard.md).
+  duplicate read is designed out at the point of the call. That half of the idea has **shipped** — both
+  write tools refuse a file the window has not read, and `rules/phases/` now tells the Worker, Design and
+  Retro not to read a file back to verify their own edit. So one of the two duplicates this task exists
+  to clean up after should already be gone; measure what is left before designing for it.
 - **What it cannot prevent, it summarizes *partially*.** Its compaction hands forward a summary
   **plus whatever context did not need summarizing** — the recent turns survive verbatim. The failsafe
   here rewrites the history as one artifact, which is the blunter instrument. Partial is the shape to

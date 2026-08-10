@@ -117,6 +117,12 @@ export const readFileTool: ToolModule = {
           );
     }
 
+    // The window has now SEEN this file, which is what write_file and edit_file check before they
+    // change it (tools/guard-write-target.ts). Recorded against the file's FULL bytes, not the slice
+    // shown: a bounded read still tells the model what the file is, and hashing only the visible
+    // window would call every large file stale the moment it was read with a different offset.
+    ctx.readTracker.record(path, read.bytes);
+
     // formatReadNotice: the trailing `[showed lines A-B of N …]` line, present on every read, naming
     // which cap fired and the offset that continues from here.
     const notice = formatReadNotice(slice, path);

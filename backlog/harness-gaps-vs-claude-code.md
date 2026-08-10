@@ -54,8 +54,10 @@ By value per unit of work, not by importance:
    `search_in_files` context lines and cheaper modes.
 4. [small-model-lane-for-one-shots.md](small-model-lane-for-one-shots.md) — small, large, and already an open
    question in `docs/open-questions.md`. Pairs with [per-window-num-ctx.md](per-window-num-ctx.md).
-5. [read-before-edit-guard.md](read-before-edit-guard.md) — small, medium. Depends on nothing, and it is what
-   lets the phase prompts stop the Worker re-reading its own edits.
+5. Refusing to write a file the window has not read — small, medium. **Shipped**, and wider than the entry
+   asked for: `write_file` is gated too, branching on existence, because a full overwrite of an existing
+   file is the most destructive thing the model can do and was the least guarded. The phase prompts now
+   tell the Worker not to re-read its own edits.
 
 Worthwhile but not urgent: [glob-files-by-path.md](glob-files-by-path.md),
 [surface-matching-standards.md](surface-matching-standards.md),

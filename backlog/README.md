@@ -1,6 +1,6 @@
 # Backlog checklist
 
-An index of the 20 open task files in this folder, in the order worth shipping, plus the 2 framing notes
+An index of the 19 open task files in this folder, in the order worth shipping, plus the 2 framing notes
 that are not tasks.
 
 **This file is not a task and is not deleted when work ships.** It is upkeep: when a task's file is deleted
@@ -24,7 +24,9 @@ Cheapest work per unit of value, and the two gaps both framing notes call physic
 - [ ] **[Show what a tool call actually did](show-tool-calls-in-the-scrollback.md)** — *Terminal UX.* The
       largest UX gap after cancel and the cheapest to close — `args` is already in hand one line above the
       print, and every result already passes the audit log's choke point. A record, not a confirmation
-      prompt.
+      prompt. **All four of its open decisions are answered** (in the file), and the read-before-write guard
+      shipped first on purpose: `write_file` now reads before it overwrites, so the true GitHub-style diff
+      for both write tools costs no round-trip it was not already paying.
 - [x] ~~**Let `list_files` see a subdirectory**~~ — *Harness capability.* Shipped: an optional `path` and
       a `depth` (default 1, so the bare call is unchanged), rendered as an indented tree with files before
       directories. Entries are filtered by the project's own `.gitignore` — read as a file, never
@@ -49,10 +51,17 @@ Not parity gaps. Each is a place where the repo currently says something that is
       task reverts to `pending`, so a second overnight `/run all` re-fails the first one's tasks. Pairs with
       [budget-ceilings-for-runs-and-batches.md](budget-ceilings-for-runs-and-batches.md) — both need an
       outcome the backlog can see.
-- [ ] **[Make `edit_file` refuse an unread file](read-before-edit-guard.md)** — *Harness capability.* Build
-      the read-tracking here, then the `rules/phases/` prompts can tell the Worker to stop verifying its own
-      edits — which is what removes one of the two duplicates
-      [evict-stale-tool-results.md](evict-stale-tool-results.md) exists to clean up after.
+- [x] ~~**Make `edit_file` refuse an unread file**~~ — *Harness capability.* Shipped, and wider than the
+      file asked for: **`write_file` is gated too**, branching on existence — creating is free, overwriting
+      an existing file needs the same read. That was the file's own open question, and the answer came from
+      asking why two tools do the same job: an unguarded whole-file overwrite is the most destructive thing
+      the model has. Tracking is per WINDOW (a sub-agent's reads never satisfy its master's guard) and
+      follows the phase CONTEXT — `/clear` and `/resume` empty it, `/swap` does not, and the Worker's
+      survives all five rounds. Staleness is a content hash, not an mtime: both write tools already hold the
+      bytes, so it costs no extra container round-trip and does not fire on a git checkout that rewrote a
+      file to identical bytes. `rules/phases/` now tells the Worker, Design and Retro not to re-read a file
+      to verify their own edit. **The `docs/sandboxing.md` and `docs/mental-model.md` diffs are
+      review-gated and were left uncommitted.**
 - [x] ~~**Close the symlink hole in path scoping**~~ — *Sandboxing / security.* Shipped, and by the larger
       of the two options: the file tools now do their work INSIDE the container rather than host-side, so
       `docs/sandboxing.md`'s original claim is true instead of merely asserted. Bytes cross as a tar stream
@@ -151,3 +160,10 @@ first:
   believing it had closed something.
 - **The whole of Tier 3 after Tier 2.** These have the largest effect on what the model can actually think
   with, and an argument exists for putting the `num_ctx` and small-model pair much earlier.
+
+One ordering was overruled in practice, and the reason generalises: the read-before-write guard was pulled
+out of Tier 2 and shipped **before** `show-tool-calls-in-the-scrollback`, because the two wanted the same
+container round-trip. `write_file` could not diff an overwrite without first reading what it was about to
+destroy — which is the guard's read. Two tasks that need the same fetch are one ordering decision, and the
+one that makes the fetch happen goes first. Worth checking for elsewhere in this list before picking up the
+next item.
