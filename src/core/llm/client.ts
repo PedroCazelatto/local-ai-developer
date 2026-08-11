@@ -43,7 +43,22 @@ export class OllamaClient {
   // the user declined the boot download still gets a working REPL (to run `/models pull`), it just cannot
   // take a turn yet. Every path that needs a name for real goes through requireModel().
   private modelName: string | undefined;
-  private readonly numCtx: number;
+  /**
+   * The BASE token ceiling — the one WINDOW calls are sent under (OLLAMA_NUM_CTX). PUBLIC and
+   * `readonly`: this client is what actually puts `num_ctx` on the wire, so it is the one place the value
+   * cannot drift from what Ollama was told, and a window deciding whether its prompt is nearing the
+   * ceiling asks the thing that set it rather than having the number threaded through three interfaces.
+   *
+   * "Base", not simply "the" ceiling, because it is about to stop being the only one: per-window
+   * `num_ctx` gives bounded one-shot roles (the context titler, rules search, the commit-message writer)
+   * a smaller ceiling of their own. Every WINDOW role — the interactive phases, the Worker, the Reviewer,
+   * Retro, sub-agents — stays on this value, which is why a window may safely compare its own
+   * prompt_eval_count against it.
+   *
+   * It must NOT be read as "the ceiling this particular call used". Once a second lane exists, only the
+   * call site knows which role it played; this field answers the base, and nothing else.
+   */
+  readonly baseNumCtx: number;
   private lastTokens: TokenCounts = NO_TOKENS;
   /** Stall window for a single call, from OLLAMA_TIMEOUT_MS — see begin-model-call.ts for the shape. */
   private readonly timeoutMs: number;
@@ -62,7 +77,7 @@ export class OllamaClient {
 
   constructor(opts: { modelName: string | undefined; numCtx: number; timeoutMs: number }) {
     this.modelName = opts.modelName;
-    this.numCtx = opts.numCtx;
+    this.baseNumCtx = opts.numCtx;
     this.timeoutMs = opts.timeoutMs;
     this.ollama = new Ollama();
   }
@@ -161,7 +176,7 @@ export class OllamaClient {
         messages,
         tools,
         stream: false,
-        options: { num_ctx: this.numCtx },
+        options: { num_ctx: this.baseNumCtx },
       });
       return { message: recoverIfNeeded(response.message), tokens: this.captureTokens(response) };
     } catch (err) {
@@ -234,7 +249,7 @@ export class OllamaClient {
           messages,
           tools,
           stream: true,
-          options: { num_ctx: this.numCtx },
+          options: { num_ctx: this.baseNumCtx },
         });
         // The `ollama` package exposes no per-request signal param for chat, so bridge the lifetime onto
         // the iterator's own abort() — the same bridge ollama-models.ts builds for a cancelled pull. The

@@ -43,6 +43,16 @@ You read a file before you change it. This is enforced, not advised: `edit_file`
 - **Prefer `edit_file` for a file that exists.** Rewriting a whole file to change part of it costs you the file's full length in output, and it is how parts you did not mean to touch get dropped.
 - **Do not read a file back to check your own edit.** A result that says `Edited …` means the change landed; a failure says so plainly. Your next edit to that same file needs no re-read either — the tool already knows what you wrote. A verification read spends your window to learn what the tool result told you.
 
+## When an older tool result turns into one line
+Your window has a size limit, and this task runs for several rounds. When it fills up, the oldest results of tools that only *looked* at something — `read_file`, `list_files`, `search_in_files`, `git_inspect`, `execute_command`, `run_in_project` — are replaced by a single line naming the call, like:
+
+`[read_file 'src/core/llm/client.ts' — text dropped from this window to stay inside the context limit. The file is unchanged and still editable. Re-read only if you need it.]`
+
+- **That line is me, not a failure.** The call really happened and really returned what you remember; only the text is no longer being carried. Nothing went wrong and there is nothing to retry.
+- **You do not need to read the file again to edit it.** The read still counts: `edit_file` and `write_file` will not refuse a file just because its text was dropped. Re-read only when you actually need lines you have not already acted on.
+- **Results of tools that CHANGED something are never dropped** — every `write_file`, `edit_file` and `git_branch` result stays exactly as it was, and so do your three most recent results of any kind.
+- **The best way to keep your own context is to stop re-reading.** Read a file once, act on it, and say what you did rather than pasting it back.
+
 ## Workflow
 1. `git_branch(action:"create", ...)` onto the task's branch, named in your seed.
 2. Read the task description and its acceptance criteria.

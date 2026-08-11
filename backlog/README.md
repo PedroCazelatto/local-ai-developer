@@ -108,9 +108,21 @@ Not parity gaps. Each is a place where the repo currently says something that is
 
 Where the window is also a clock. Two of these want measurement before design.
 
-- [ ] **[Evict stale tool results](evict-stale-tool-results.md)** — *Memory / context.* **Verify the
-      KV-cache premise first** with a throwaway two-call script; rewriting history can cost more wall clock
-      than the tokens it reclaims. The dedupe-superseded-reads subset needs no policy and ships on its own.
+- [x] ~~**Evict stale tool results**~~ — *Memory / context.* Shipped for the **Worker**, whose window
+      persists across all five rounds and had no bound at all. The KV-cache premise was verified first and
+      it changed the design: a prefix rewrite really does force re-evaluation from the edit point (12.4s on
+      a 14b, 31.3s on a 32b, against 0.07s to resend the same prompt), but the penalty is **one-time**, not
+      per-turn, and it collapses to nothing when the cut is late — stubbing the newest tool result cost
+      0.22s, less than a plain append. So the rule is a band: never rewrite anything in the older half of
+      the window, always keep the newest 3 results, and never fire for fewer than 2 at once. A pass that
+      would have to reach into the head **defers instead**. Tool results are stubbed by the rule *stub what
+      the window learned, never what it did* (default-deny), the stub tells the Worker its read still
+      satisfies the write guard so it is not tempted to re-read, and an `eviction_fire` event carries the
+      exact before/after counts. The **dedupe-superseded-reads subset was dropped**, not deferred: a
+      superseded read sits wherever it happens to be — usually early, which is exactly where the penalty
+      lives and where the least is reclaimed — and `read_file`'s `offset`/`limit` mean two reads of one
+      path are usually different slices rather than duplicates. **The `docs/mental-model.md` and
+      `docs/cli.md` diffs are review-gated and were left uncommitted.**
 - [ ] **[The spawned windows have no failsafe](spawned-windows-have-no-failsafe.md)** — *Memory / context.*
       `beforeModelCall` exists only on `SessionOrchestrator`, so the Worker, Reviewer, Retro and sub-agent
       windows have no compaction at all and Ollama silently drops their oldest tokens past `num_ctx` —

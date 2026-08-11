@@ -1,9 +1,12 @@
-// Orchestrator events log (V5/04) — appends ONE JSON line per orchestrator-level structural event to
+// Orchestrator events log (V5/04) — appends ONE JSON line per harness-level structural event to
 // projects/<active>/.orchestrator/events.jsonl, a SIBLING of the tool-audit log written through the
 // SAME appendJsonlLine writer (V1/06 durability). Distinct concerns, never merged: audit = the model's
-// tool calls, events = the orchestrator's own actions (phase swap / memory load / summarization fire /
-// sub-agent spawn+dismiss / model use). Lives under the ACTIVE PROJECT (per-project persistence,
-// CLAUDE.md), never in the orchestrator repo, and is NEVER injected into any phase's prompt.
+// tool calls, events = the harness's own actions (phase swap / memory load / summarization fire /
+// eviction fire / sub-agent spawn+dismiss / model use). Lives under the ACTIVE PROJECT (per-project
+// persistence, CLAUDE.md), never in the orchestrator repo, and is NEVER injected into any phase's prompt.
+//
+// Most rows come from SessionOrchestrator; `eviction_fire` comes from a spawned Worker window. See
+// events-log.type.ts for why that widening is the right line to draw.
 
 import path from 'node:path';
 

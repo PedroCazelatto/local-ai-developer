@@ -51,6 +51,10 @@ export type { Backlog, Task, TaskStatus } from './types.js';
 export { TASK_STATUSES } from './types.js';
 export { runWorkerTask } from './worker-runner.js';
 export type { WorkerDeps, WorkerResult } from './worker-runner.js';
+export { evictStaleToolResults, KEEP_RECENT_TOOL_RESULTS } from './evict-stale-tool-results.js';
+export type { EvictionRewrite } from './evict-stale-tool-results.type.js';
+export { isEvictableTool } from './is-evictable-tool.js';
+export { formatEvictedStub } from './format-evicted-stub.js';
 // REVIEWER_TOOL_NAMES now lives with every other phase's array in phases/phase-tool-names.ts.
 export { runReviewerTask, ReviewerVerdictError } from './reviewer-runner.js';
 export type { ReviewerDeps, ReviewerInput, ReviewerOutcome, ReviewerCommit } from './reviewer-runner.js';

@@ -25,6 +25,20 @@ export const DEFAULT_PHASE = 'discovery';
  */
 export const DEFAULT_SUMMARIZATION_THRESHOLD_RATIO = 0.75;
 /**
+ * Tool-result eviction trigger: stub older tool results in a spawned window once its EXACT
+ * prompt_eval_count reaches this fraction of num_ctx (see evict-stale-tool-results.ts).
+ *
+ * Deliberately BELOW the summarization ratio above. Eviction is the cheaper instrument — it costs no
+ * inference at all, and the measurement behind it showed a late rewrite costs less prompt-evaluation
+ * than a plain append — so it should get a clear run at reclaiming the window before the blunter
+ * failsafe would have fired.
+ *
+ * 0.6 is a PROPOSAL, not a measurement. Nothing was measured that says 0.6 is better than 0.55 or 0.65;
+ * what was measured is only that eviction is cheap when it cuts late, which argues for "earlier than
+ * 0.75" and no more than that. Tune it against real runs rather than treating it as derived.
+ */
+export const DEFAULT_EVICTION_THRESHOLD_RATIO = 0.6;
+/**
  * How long ONE model call may go silent before it is abandoned (OLLAMA_TIMEOUT_MS). This is a STALL
  * window, not a cap on how long a turn may take: every chunk that arrives restarts it, so a 14–32b model
  * that spends nine legitimate minutes on a turn never trips it, while an unreachable or wedged daemon
@@ -50,6 +64,11 @@ export interface SessionConfig {
    * prompt_eval_count ≥ this ratio × numCtx.
    */
   readonly summarizationThresholdRatio: number;
+  /**
+   * From EVICTION_THRESHOLD_RATIO (a value in (0, 1]), else DEFAULT_EVICTION_THRESHOLD_RATIO. A spawned
+   * window stubs its older tool results when its exact prompt_eval_count ≥ this ratio × numCtx.
+   */
+  readonly evictionThresholdRatio: number;
   /** From OLLAMA_TIMEOUT_MS, else DEFAULT_TIMEOUT_MS — the per-call stall window (see the constant). */
   readonly timeoutMs: number;
   /** Phase the session opens in. */
@@ -73,22 +92,22 @@ function resolveNumCtx(): number {
 }
 
 /**
- * Read SUMMARIZATION_THRESHOLD_RATIO, guarding NaN / a value outside (0, 1] by falling back loudly.
- * A ratio ≤ 0 never leaves headroom, and a ratio > 1 would let a phase blow past num_ctx before the
- * failsafe fires — both defeat the VRAM safety it exists for, so reject them and use the default.
+ * Read a context-pressure ratio from `name`, guarding NaN / a value outside (0, 1] by falling back
+ * loudly. A ratio ≤ 0 never leaves headroom, and a ratio > 1 would let a window blow past num_ctx before
+ * the mechanism fires — both defeat the VRAM safety they exist for, so reject them and use the default.
+ *
+ * Shared by both ratios rather than written twice: they are the same value with different triggers, and
+ * two copies of a validator are two places for the bounds to drift apart.
  */
-function resolveThresholdRatio(): number {
-  const raw = process.env.SUMMARIZATION_THRESHOLD_RATIO;
+function resolveRatio(name: string, fallback: number): number {
+  const raw = process.env[name];
   if (raw === undefined || raw.trim() === '') {
-    return DEFAULT_SUMMARIZATION_THRESHOLD_RATIO;
+    return fallback;
   }
   const parsed = Number(raw);
   if (!Number.isFinite(parsed) || parsed <= 0 || parsed > 1) {
-    console.warn(
-      `Warning: SUMMARIZATION_THRESHOLD_RATIO='${raw}' is not a number in (0, 1]; ` +
-        `using default ${DEFAULT_SUMMARIZATION_THRESHOLD_RATIO}.`,
-    );
-    return DEFAULT_SUMMARIZATION_THRESHOLD_RATIO;
+    console.warn(`Warning: ${name}='${raw}' is not a number in (0, 1]; using default ${fallback}.`);
+    return fallback;
   }
   return parsed;
 }
@@ -142,7 +161,11 @@ export function loadConfig(projectName: string): SessionConfig {
     projectName,
     projectPath,
     numCtx: resolveNumCtx(),
-    summarizationThresholdRatio: resolveThresholdRatio(),
+    summarizationThresholdRatio: resolveRatio(
+      'SUMMARIZATION_THRESHOLD_RATIO',
+      DEFAULT_SUMMARIZATION_THRESHOLD_RATIO,
+    ),
+    evictionThresholdRatio: resolveRatio('EVICTION_THRESHOLD_RATIO', DEFAULT_EVICTION_THRESHOLD_RATIO),
     timeoutMs: resolveTimeoutMs(),
     initialPhase: DEFAULT_PHASE,
   };

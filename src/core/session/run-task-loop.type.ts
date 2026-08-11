@@ -29,6 +29,12 @@ export interface TaskLoopDeps {
   readonly sandbox: SandboxClient;
   readonly projectName: string;
   readonly projectPath: string;
+  /**
+   * From SessionConfig — the fraction of num_ctx at which the persistent Worker window starts stubbing
+   * its older tool results (worker-runner.ts). Carried here because TaskLoopDeps is what the loop hands
+   * straight to `new WorkerWindow(...)`, so WorkerDeps' own fields have to be satisfiable from it.
+   */
+  readonly evictionThresholdRatio: number;
   /** The `/stop` wind-down request, read between rounds. See run-stop-signal.ts. */
   readonly stop: RunStopSignal;
 }

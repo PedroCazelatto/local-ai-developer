@@ -48,6 +48,8 @@ export class SessionOrchestrator implements TurnContext {
   private readonly memory: SessionMemory;
   private phase: Phase;
   private lastTokens: TokenCounts = NO_TOKENS;
+  /** Handed to each spawned Worker window; see run-task-loop.type.ts and worker-runner.ts. */
+  private readonly evictionThresholdRatio: number;
 
   // Summarization failsafe (V4/05). The trigger point (exact tokens): a phase whose last
   // prompt_eval_count reaches this many tokens is scheduled to compact before its NEXT model call.
@@ -99,6 +101,9 @@ export class SessionOrchestrator implements TurnContext {
     // Exact token ceiling for the failsafe: ratio × num_ctx. Compared against the EXACT
     // prompt_eval_count (never a length estimate — constitution) to schedule a compaction.
     this.summarizationThreshold = config.summarizationThresholdRatio * config.numCtx;
+    // Kept as the RATIO, not a threshold: it belongs to the spawned Worker window, which resolves it
+    // against the client's own num_ctx when it is created (worker-runner.ts).
+    this.evictionThresholdRatio = config.evictionThresholdRatio;
     this.llm = llm;
     this.sandbox = sandbox;
     // SQLite-backed (memory.db under the project's .orchestrator/). numCtx is stamped on every context
@@ -346,6 +351,7 @@ export class SessionOrchestrator implements TurnContext {
         sandbox: this.sandbox,
         projectName: this.project,
         projectPath: this.projectPath,
+        evictionThresholdRatio: this.evictionThresholdRatio,
         // The session's one wind-down request: the loop reads it between rounds, so `/stop round` lands
         // on the round boundary rather than tearing down the round already running.
         stop: this.runStop,

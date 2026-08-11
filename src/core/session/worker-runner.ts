@@ -13,10 +13,13 @@ import { GIT_PUSH } from '../../tools/git-push.js';
 import { GIT_STASH } from '../../tools/git-stash.js';
 import type { SandboxClient } from '../container/index.js';
 import type { OllamaClient, Message, StreamHandle, TokenCounts, Tool, ToolCall } from '../llm/index.js';
+import * as renderer from '../ui/renderer.js';
 import { addTokenCounts } from './add-token-counts.js';
 import { recordToolCall } from './record-tool-call.js';
 import type { ToolCallRecord } from './dispatch.js';
 import { dispatchToolCall } from './dispatch.js';
+import { appendEvent } from './events-log.js';
+import { evictStaleToolResults } from './evict-stale-tool-results.js';
 import { createReadTracker } from './read-tracker.js';
 import type { FileReadTracker } from './read-tracker.type.js';
 import { taskBranchName } from './task-branch-name.js';
@@ -34,6 +37,13 @@ export interface WorkerDeps {
   readonly sandbox: SandboxClient;
   readonly projectName: string;
   readonly projectPath: string;
+  /**
+   * From SessionConfig — the fraction of the base context ceiling at which this window starts stubbing
+   * its older tool results. Threaded, unlike the ceiling itself (which is read off `llm.baseNumCtx`,
+   * since the client is what puts it on the wire), because config is what owns a tuning ratio and boot
+   * is where it is resolved.
+   */
+  readonly evictionThresholdRatio: number;
 }
 
 /** What one Worker window produces: its final summary + its last test/build run (for the Reviewer). */
@@ -90,6 +100,20 @@ export class WorkerWindow implements TurnContext {
   lastTestRun: string | null = null;
   /** Running EXACT sum of every turn's tokens (a null metric poisons the sum — never estimated). */
   private tokenSum: TokenCounts = { promptTokens: 0, evalTokens: 0 };
+  /** `evictionThresholdRatio × num_ctx` — the exact prompt size at which this window starts stubbing. */
+  private readonly evictionThreshold: number;
+  /**
+   * The EXACT prompt_eval_count that tripped eviction, held until the pass runs; `null` when no pass is
+   * owed. Non-null doubles as "scheduled" because a pass is only ever scheduled on a real count — a
+   * metric Ollama omitted cannot ground a VRAM decision, so it schedules nothing (never estimate).
+   */
+  private evictionScheduledAt: number | null = null;
+  /**
+   * A pass that has RUN and is waiting for the next turn to report the real post-eviction prompt size.
+   * `after` is unknowable at pass time (the new prompt has not been evaluated yet) and computing one
+   * would be an estimate, so the row is deferred exactly as summarization_fire defers its own.
+   */
+  private evictionAwaitingAfter: { before: number; evicted: number; fromIndex: number } | null = null;
   /** The Worker's allowlist from phase-tool-names.ts — notably without commit_changes (see callTool). */
   private readonly workerTools: Tool[];
   /**
@@ -117,6 +141,11 @@ export class WorkerWindow implements TurnContext {
       `Project: ${deps.projectName}`,
     );
     this.messages = [{ role: 'system', content: systemPrompt }];
+    // The ceiling comes off the CLIENT, which is what actually puts num_ctx on the wire, so it can never
+    // drift from what Ollama was told; the ratio comes from config, which owns tuning values. `baseNumCtx`
+    // is the right one of the two ceilings on purpose: the Worker is a WINDOW role, and window roles all
+    // run at the base value — only the bounded one-shots get a smaller lane of their own.
+    this.evictionThreshold = deps.llm.baseNumCtx * deps.evictionThresholdRatio;
   }
 
   /** EXACT summed tokens across every turn of this window's whole life (all fix rounds). */
@@ -136,6 +165,74 @@ export class WorkerWindow implements TurnContext {
   onTokens(tokens: TokenCounts): void {
     // Sum exact counts across every turn so the V3/01 loop can report the Worker's whole-task cost.
     this.tokenSum = addTokenCounts(this.tokenSum, tokens);
+    // A pass ran before THIS call, so this call's prompt_eval_count IS the exact post-eviction size —
+    // the deferred "after" the pass itself could not know.
+    const awaiting = this.evictionAwaitingAfter;
+    if (awaiting !== null) {
+      this.evictionAwaitingAfter = null;
+      this.emitEvictionFire(awaiting, tokens.promptTokens);
+    }
+    // Trigger: schedule a pass before the next model call once this window's EXACT prompt size reaches
+    // the ratio. A null count never schedules — a guess is not a basis for rewriting history.
+    if (tokens.promptTokens !== null && tokens.promptTokens >= this.evictionThreshold) {
+      this.evictionScheduledAt = tokens.promptTokens;
+    }
+  }
+
+  /**
+   * Late-batch eviction (the turn loop awaits this before EVERY model call — turn-loop.ts). The Worker
+   * is the one window whose history persists across all five review rounds by design, and it has no
+   * summarization failsafe at all, so without this its only bound is Ollama silently dropping its oldest
+   * tokens at num_ctx.
+   *
+   * Costs no inference: it rewrites the array and returns. What it does cost is prompt re-evaluation
+   * from the earliest message it touched, which is why the pass refuses to touch the head of the window
+   * — see evict-stale-tool-results.ts for the measurements that fixed that rule.
+   */
+  async beforeModelCall(): Promise<void> {
+    if (this.evictionScheduledAt === null) return;
+    const before = this.evictionScheduledAt;
+    // Cleared on every trip, acted on or not: a pass that declines must not re-run on every subsequent
+    // call. onTokens simply reschedules for as long as the window stays over the threshold.
+    this.evictionScheduledAt = null;
+    // evictStaleToolResults: stub older tool results in place, NEVER a message earlier than the newest
+    // surviving half of the window, and never the newest few results. An empty list means acting would
+    // have meant reaching into the head — so it defers rather than paying a full re-evaluation.
+    const rewrites = evictStaleToolResults(this.messages);
+    const first = rewrites[0];
+    if (first === undefined) return;
+    for (const rewrite of rewrites) {
+      const message = this.messages[rewrite.index];
+      // Rewritten in place: the stub REPLACES the result's text and the message itself stays, so the
+      // assistant tool_call it answers keeps its partner and the chat template still renders.
+      if (message !== undefined) message.content = rewrite.content;
+    }
+    // One line, because the user is about to wait through a prompt re-evaluation and an unexplained
+    // pause in an unattended run is exactly what the tool-call record exists to end.
+    const plural = rewrites.length === 1 ? '' : 's';
+    renderer.systemMessage(`Freeing Worker context: stubbed ${rewrites.length} older tool result${plural}.`);
+    this.evictionAwaitingAfter = { before, evicted: rewrites.length, fromIndex: first.index };
+  }
+
+  /**
+   * Write the deferred `eviction_fire` row. `before` is always a real count (nothing schedules on a
+   * null); `after` is omitted and the row flagged `incomplete` when Ollama did not report one, rather
+   * than filled in — a missing metric is surfaced, never papered over (constitution).
+   */
+  private emitEvictionFire(
+    pass: { before: number; evicted: number; fromIndex: number },
+    after: number | null,
+  ): void {
+    const detail: Record<string, string | number | boolean> = {
+      evicted: pass.evicted,
+      // The index the rewrite started at IS the point Ollama re-evaluates the prompt from, so this is
+      // the field that explains what the pass cost in wall clock.
+      from_index: pass.fromIndex,
+      before: pass.before,
+    };
+    if (after !== null) detail['after'] = after;
+    else detail['incomplete'] = true;
+    appendEvent(this.deps.projectPath, { type: 'eviction_fire', phase: this.activePhase, detail });
   }
 
   addAssistant(content: string, toolCalls?: ToolCall[]): void {
