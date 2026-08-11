@@ -1,6 +1,6 @@
 # Backlog checklist
 
-An index of the 18 open task files in this folder, in the order worth shipping, plus the 2 framing notes
+An index of the 20 open task files in this folder, in the order worth shipping, plus the 2 framing notes
 that are not tasks.
 
 **This file is not a task and is not deleted when work ships.** It is upkeep: when a task's file is deleted
@@ -126,6 +126,16 @@ Where the window is also a clock. Two of these want measurement before design.
       saving the file wants turns out to live in the window sizes rather than the weights: a one-shot sends
       no tools and no phase markdown, so it already skips the 29–44% fixed overhead whichever model runs
       it. Revisit only with a dedicated big→small→big benchmark.
+- [ ] **[Cap `debate`'s `background` parameter](cap-the-debate-background-parameter.md)** — *Memory /
+      context.* The one model-supplied payload in the repo with no bound, replayed into two windows on
+      every call — up to ten times in one debate. `run-debate.ts` already names the hazard for the third
+      window while leaving it uncapped for the first two. Prerequisite for letting the debate windows take
+      a reduced ceiling in [per-window-num-ctx.md](per-window-num-ctx.md).
+- [ ] **[Is 16 384 the right `OLLAMA_NUM_CTX`?](tune-the-global-num-ctx-default.md)** — *Memory / context.*
+      Held out of the per-window task on purpose: that one tunes which window gets what, this one asks
+      whether the number they are measured against is right. 16 384 already offloads 1.93 GB to CPU while
+      8 192 is fully resident — but it also leaves the Worker ~2.8k of working room after fixed overhead,
+      and changing it hides every existing context. **Benchmark generation throughput first.**
 - [ ] **[Hint the matching standard](surface-matching-standards.md)** — *Model behavior.* One throwaway
       match at seed time so standards that exist are actually read. A natural first user of the small lane.
 - [ ] **[Budget ceilings for a task and a batch](budget-ceilings-for-runs-and-batches.md)** — *Execution
