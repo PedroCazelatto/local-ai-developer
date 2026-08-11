@@ -3,12 +3,17 @@
 // pinned bottom rows (rule + two status lines) fresh. Streaming output + the activity line are driven
 // by the orchestrator's turn loop; this loop reads input, renders the shell around it, and paints status.
 //
+// It also owns the Tab key: completion CYCLES the word under the cursor through its candidates in
+// place (cycle-completion.ts), which is the one shape that fits this terminal — it prints nothing, so
+// there is no candidate list to reconcile with the pinned rows or with the append-only scrollback.
+//
 // Scrollback is preserved: a plain readline interface writes to the normal buffer (no alt-screen). The
 // one-time clearScreen() at boot wipes launcher noise; the status bar reserves the bottom rows (see
 // status-bar.ts) but the conversation and input stay in the scrolling area, copyable as ever.
 
 import { createInterface } from 'node:readline/promises';
 import type { Interface as ReadlineInterface } from 'node:readline/promises';
+import type { Key } from 'node:readline';
 import { stdin, stdout } from 'node:process';
 
 import { TurnAbortedError } from '../core/llm/index.js';
@@ -33,6 +38,9 @@ import * as messageQueue from '../core/ui/message-queue.js';
 import { bindNewlineKey } from '../core/ui/bind-newline-key.js';
 import { theme } from '../core/ui/theme.js';
 import { getCommand } from './command-registry.js';
+import { cycleCompletion } from './cycle-completion.js';
+import type { CompletionCycle } from './cycle-completion.type.js';
+import { replaceInputLine } from './replace-input-line.js';
 
 /** How often (ms) the status + activity line repaint while a turn runs, to tick the elapsed timer. */
 const STATUS_TICK_MS = 100;
@@ -98,7 +106,16 @@ export async function runRepl(orch: ReplOrchestrator): Promise<void> {
   if (orch.model === undefined) {
     renderer.systemMessage(`No model selected. Pull one with  /models pull ${SUGGESTED_MODEL}`);
   }
-  const rl = createInterface({ input: stdin, output: stdout });
+  // The no-op completer exists to SWALLOW Tab, and that is its whole job: with a completer registered,
+  // readline neither self-inserts a literal tab nor runs its own completion. Both matter. Its inline
+  // candidate print lands between the transient input rule and the input line, which puts the rule out
+  // of reach of renderer's erase math and strands it in the append-only scrollback. Tab is driven
+  // instead by the keypress handler below, which cycles through candidates in place and prints nothing.
+  const rl = createInterface({
+    input: stdin,
+    output: stdout,
+    completer: (line: string): [string[], string] => [[], line],
+  });
 
   // Hand the fence the two things it cannot decide for itself (input-fence.ts keeps no session knowledge):
   // what Ctrl+C means mid-turn, and which submitted lines are control instructions rather than messages.
@@ -109,8 +126,14 @@ export async function runRepl(orch: ReplOrchestrator): Promise<void> {
   // Must run before the status listener below — it replaces readline's keypress listener with its own.
   const unbindNewlineKey = bindNewlineKey(rl, stdin);
 
-  // True only while a command / chat turn is being handled — drives the live status ticker.
+  // True only while a command / chat turn is being handled. Drives the live status ticker, and gates
+  // Tab completion to idle — a completion redraws the prompt, which must never happen over a reply.
   let processing = false;
+
+  // The Tab cycle in flight, or null when the last key was not a Tab. Dropping it on every other key is
+  // half of what stops a stale cycle overwriting a word the user has since retyped; cycle-completion.ts
+  // holds the other half, which re-checks that the line still reads as this handler left it.
+  let cycle: CompletionCycle | null = null;
 
   // Turns are separated by one blank line; the very first prompt follows the header's own spacing, so
   // it skips the separator. Flipped false after the first input box is drawn.
@@ -130,9 +153,15 @@ export async function runRepl(orch: ReplOrchestrator): Promise<void> {
       statusBar.repaint(); // readline's ESC[0J erased the pinned rows — restore all three
     });
   };
-  // The keypress handler now does ONE thing: repaint the pinned rows after each keystroke (readline's
-  // ESC[0J erases them on every line refresh). Completion and the Shift+Tab phase-cycle were removed.
-  const onKeypress = (): void => scheduleStatus();
+  // Two jobs per keystroke. A plain Tab steps the completion cycle; every other key drops the cycle. And
+  // whatever the key, the pinned rows are repainted, since readline's ESC[0J erases them on every line
+  // refresh. Shift+Tab is deliberately NOT claimed: readline's tab branch finds the no-op completer and
+  // does nothing with it, so the key stays free rather than acquiring a second meaning.
+  const onKeypress = (_str: string | undefined, key: Key | undefined): void => {
+    if (isCompletionKey(key) && !processing) cycle = completeAtCursor(orch, rl, cycle);
+    else cycle = null;
+    scheduleStatus();
+  };
   if (stdin.isTTY) stdin.on('keypress', onKeypress);
 
   // While a turn runs, repaint on an interval so the activity line's spinner + elapsed timer tick
@@ -224,6 +253,36 @@ export async function runRepl(orch: ReplOrchestrator): Promise<void> {
     statusBar.disable(); // release the reserved rows and restore normal scrolling
     rl.close();
   }
+}
+
+/**
+ * True for a PLAIN forward Tab, the only key completion answers to. Shift+Tab is excluded on purpose —
+ * it is unbound, not a reverse cycle and no longer the phase-cycle it once was — and so are Ctrl/Alt+Tab,
+ * which belong to the terminal and the window manager.
+ */
+function isCompletionKey(key: Key | undefined): boolean {
+  return key !== undefined && key.name === 'tab' && key.shift !== true && key.ctrl !== true && key.meta !== true;
+}
+
+/**
+ * One Tab press, returning the cycle to carry into the next one (null when there was nothing to
+ * complete: a chat line, an unknown command, or an argument position offering no candidates).
+ *
+ * cycleCompletion: swaps the word under the cursor for the next candidate, wrapping after the last —
+ * so Tab never prints anything and the pinned rows are never disturbed by a candidate list. It is
+ * SYNCHRONOUS by contract, which is the constraint the whole feature is shaped around: this runs inline
+ * in the keypress handler while the pinned rows are repainted from a setImmediate scheduled by that same
+ * handler, so an awaited lookup would resolve after the repaint and leave those rows blank.
+ */
+function completeAtCursor(
+  orch: ReplOrchestrator,
+  rl: ReadlineInterface,
+  active: CompletionCycle | null,
+): CompletionCycle | null {
+  const step = cycleCompletion({ line: rl.line, cursor: rl.cursor, orch, active });
+  if (step === null) return null;
+  replaceInputLine(rl, step.line, step.cursor); // write readline's own buffer + a cursor-preserving refresh
+  return step.cycle;
 }
 
 /**
