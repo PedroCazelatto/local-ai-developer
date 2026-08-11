@@ -60,12 +60,21 @@ export const KEEP_RECENT_TOOL_RESULTS = 3;
  * This is the "batch" half of late-batch eviction, and it is not a micro-optimization. The prefix from
  * the earliest rewritten message is re-evaluated ONCE per pass whatever that pass reclaimed, so one
  * rewrite that frees a lot beats five that each free a little — five passes pay the re-evaluation five
- * times. Without this floor a window sitting just over the threshold would rewrite a single result every
- * turn, never reclaim enough to drop back under, and pay the cost again on the next turn.
+ * times over.
+ *
+ * WHY TWO, SPECIFICALLY, AND WHY IT MUST NOT BE TUNED TO 1. This is not a round number picked for
+ * caution: the value exists because the band-holds-exactly-one case was hit while verifying the pass,
+ * on an ordinary window. That case is a trap rather than a small inefficiency. Rewriting one result
+ * reclaims too little to bring the prompt back under EVICTION_THRESHOLD_RATIO, so the window is still
+ * over it on the next turn, schedules another pass, finds the one result the advancing floor just
+ * uncovered, and rewrites again — paying a re-evaluation every single turn to free a trickle. At 1 this
+ * constant does not soften that behaviour, it IS that behaviour. Two is the smallest value that makes a
+ * pass wait for something worth paying for.
  *
  * A COUNT again, for the same reason as KEEP_RECENT_TOOL_RESULTS: the only way to express "reclaims
  * enough" in tokens would be to measure un-evaluated text by its length, and a length-derived token
- * figure is exactly what the constitution forbids.
+ * figure is exactly what the constitution forbids. Raising it is safe and merely makes passes rarer and
+ * larger; lowering it to 1 reintroduces the defect it was added to close.
  */
 export const MIN_BATCH_TOOL_RESULTS = 2;
 
