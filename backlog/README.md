@@ -1,6 +1,6 @@
 # Backlog checklist
 
-An index of the 20 open task files in this folder, in the order worth shipping, plus the 2 framing notes
+An index of the 19 open task files in this folder, in the order worth shipping, plus the 2 framing notes
 that are not tasks.
 
 **This file is not a task and is not deleted when work ships.** It is upkeep: when a task's file is deleted
@@ -170,6 +170,12 @@ Where the window is also a clock. Two of these want measurement before design.
 
 ## Tier 4 — worthwhile, not urgent
 
+- [ ] **[Move both logs into SQLite tables](move-the-logs-into-sqlite-tables.md)** — *Memory / context.*
+      **Nothing reads `events.jsonl`** — five event types are written to a file no command surfaces, so an
+      unexplained pause has no in-app explanation. Decided: both logs become **two tables** in the existing
+      `memory.db`, so the concerns stay distinct in the schema and what unifies is the store and the
+      reader. Overturns the "never merged" invariant in `events-log.ts`'s header, and trades the
+      flat-file durability argument in `audit.ts`'s for transactions — read both headers first.
 - [ ] **[Add a glob-by-path tool](glob-files-by-path.md)** — *Harness capability.* Paths are the cheapest
       unit of knowledge about a codebase. Decide alongside `list_files`: new tool, or a mode of that one.
 - [ ] **[Structured sub-agent results](structured-subagent-results.md)** — *Harness capability.* The
