@@ -15,6 +15,7 @@ import { TurnAbortedError } from '../llm/index.js';
 import { getTool, toolNames } from '../../tools/registry.js';
 import type { JSONSchema, JsonObject, ToolAuditExtra, ToolContext, ToolResult } from '../../tools/types.js';
 import { toolError } from '../../tools/types.js';
+import type { ToolCallDisplay } from '../ui/tool-call-display.type.js';
 
 /** Raw materials for one audit row, handed to the audit sink (V1/06 formats + writes the JSONL). */
 export interface ToolCallRecord {
@@ -28,6 +29,14 @@ export interface ToolCallRecord {
   readonly error: string | null; // null on success; the error message on failure
   readonly metadata?: JsonObject; // tool-specific fields (e.g. execute_command's workdir)
   readonly subagentId?: string; // set (by the SubagentManager sink) for a sub-agent's own call — V5/01 lineage
+  /**
+   * What the SCROLLBACK should say about this call — the `←` result line and any diff. NOT audit data:
+   * appendAuditRow builds its JSONL row from an explicit field list and never reads this, so
+   * tool_audit.jsonl's format is unaffected and a diff body stays out of the log. It rides on the
+   * record because the record is the ONE thing every finished call passes through — including the
+   * three runner-level refusal paths (worker/reviewer/retro) that never reach this dispatcher.
+   */
+  readonly display?: ToolCallDisplay;
 }
 
 export interface DispatchDeps {
@@ -74,6 +83,7 @@ interface SerializedResult {
   readonly exitStatus: number;
   readonly error: string | null;
   readonly metadata?: JsonObject;
+  readonly display?: ToolCallDisplay;
   readonly auditExtras?: readonly ToolAuditExtra[];
 }
 
@@ -86,7 +96,14 @@ function serializeResult(result: ToolResult): SerializedResult {
   const errorField = errorOf(result.content);
   const exitStatus = result.exitStatus ?? (errorField !== null ? -1 : 0);
   const error = result.error !== undefined ? result.error : errorField;
-  return { content, exitStatus, error, metadata: result.metadata, auditExtras: result.auditExtras };
+  return {
+    content,
+    exitStatus,
+    error,
+    metadata: result.metadata,
+    display: result.display,
+    auditExtras: result.auditExtras,
+  };
 }
 
 /** The `error` string of a structured payload, if it carries one (for deriving exit_status/error). */
@@ -117,6 +134,7 @@ export async function dispatchToolCall(
     error: string | null,
     durationMs: number,
     metadata?: JsonObject,
+    display?: ToolCallDisplay,
   ): string => {
     deps.onToolCall?.({
       ts,
@@ -128,6 +146,7 @@ export async function dispatchToolCall(
       output,
       error,
       ...(metadata !== undefined ? { metadata } : {}),
+      ...(display !== undefined ? { display } : {}),
     });
     return output;
   };
@@ -162,7 +181,8 @@ export async function dispatchToolCall(
   try {
     const result = await tool.execute(ctx, args);
     const s = serializeResult(result);
-    // Extra sub-step rows (e.g. run_in_project's build) are written FIRST so they precede the run.
+    // Extra sub-step rows (e.g. run_in_project's build) are written FIRST so they precede the run —
+    // and so their `←` line prints above the run's, in the order the two steps actually happened.
     for (const extra of s.auditExtras ?? []) {
       deps.onToolCall?.({
         ts,
@@ -174,9 +194,18 @@ export async function dispatchToolCall(
         output: extra.output,
         error: extra.error,
         ...(extra.metadata !== undefined ? { metadata: extra.metadata } : {}),
+        ...(extra.display !== undefined ? { display: extra.display } : {}),
       });
     }
-    return record(args, s.exitStatus, s.content, s.error, Math.round(performance.now() - start), s.metadata);
+    return record(
+      args,
+      s.exitStatus,
+      s.content,
+      s.error,
+      Math.round(performance.now() - start),
+      s.metadata,
+      s.display,
+    );
   } catch (err) {
     const s = serializeResult(toolError(messageOf(err)));
     // Audited either way — a cancelled call still happened, and the audit log is the only durable record

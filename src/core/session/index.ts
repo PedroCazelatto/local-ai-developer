@@ -18,6 +18,11 @@ export type { TurnContext } from './turn-loop.js';
 export { dispatchToolCall } from './dispatch.js';
 export type { ToolCallRecord, DispatchDeps } from './dispatch.js';
 export { appendAuditRow, OUTPUT_PREVIEW_LIMIT } from './audit.js';
+// The ONE place a finished tool call is recorded: its durable audit row AND its `←` scrollback line.
+// Every audit-writing site goes through it — including the three runner-level refusals that never
+// reach the dispatcher, which are exactly the calls the record was built to make visible.
+export { recordToolCall } from './record-tool-call.js';
+export { shortSubagentId } from './short-subagent-id.js';
 export { appendJsonlLine } from './append-jsonl-line.js';
 // Questions the user skipped during an ask_user round (V6/01) — durable, re-asked by /questions, and
 // delivered back to the phase that asked on its next turn.

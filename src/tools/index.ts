@@ -48,6 +48,9 @@ export { dismissSubagentTool, DISMISS_SUBAGENT } from './dismiss-subagent.js';
 // windows by the orchestrator (they run unattended; a question would stall the batch).
 export { askUserTool, ASK_USER } from './ask-user.js';
 export { truncateHeadTail, DEFAULT_OUTPUT_LIMIT } from './truncate.js';
+// The compact +/- diff the write tools hand to the scrollback, and the caps above which it collapses
+// to counts alone.
+export { buildFileDiff, DIFF_MAX_CHANGED_LINES, DIFF_MAX_CHARS } from './build-file-diff.js';
 // Phase-scoped (Reviewer-only, V2/01) — deliberately NOT added to the registry in registry.ts.
 export { submitVerdictTool, parseVerdict, SUBMIT_VERDICT } from './submit-verdict.js';
 export type { VerdictParse } from './submit-verdict.js';

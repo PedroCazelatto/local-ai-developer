@@ -12,7 +12,7 @@ import { OllamaClient } from '../llm/index.js';
 import type { Message, StreamHandle, TokenCounts, Tool, ToolCall, TurnAbortReason } from '../llm/index.js';
 import * as renderer from '../ui/renderer.js';
 import { addTokenCounts } from './add-token-counts.js';
-import { appendAuditRow } from './audit.js';
+import { recordToolCall } from './record-tool-call.js';
 import type { SessionConfig } from './config.js';
 import { dispatchToolCall } from './dispatch.js';
 import { appendEvent } from './events-log.js';
@@ -577,9 +577,10 @@ export class SessionOrchestrator implements TurnContext {
       subagents: this.subagents, // ONLY the interactive master phases can spawn sub-agents (V5/01)
       readTracker: this.trackerForActivePhase(), // survives this per-call context; see read-tracker.ts
     });
-    // Every dispatched call — success, failure, or sub-step — is appended to the audit log (V1/06).
+    // recordToolCall: every dispatched call — success, failure, or sub-step — is appended to the audit
+    // log (V1/06) AND recorded in the scrollback as its `←` result line.
     return dispatchToolCall(ctx, name, args, {
-      onToolCall: (record) => appendAuditRow(this.projectPath, record),
+      onToolCall: (record) => recordToolCall(this.projectPath, record),
     });
   }
 

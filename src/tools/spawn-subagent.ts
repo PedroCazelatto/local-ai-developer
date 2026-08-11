@@ -6,6 +6,9 @@
 // dismiss_subagent(id). The sub-agent gets every tool the master has EXCEPT the three sub-agent tools,
 // so it cannot spawn its own sub-agents (no nesting).
 
+// The same short form its own tool-call lines were marked with, so the block and its answer read as
+// one thing. Imported from its own module rather than from subagents.ts, which imports THIS file.
+import { shortSubagentId } from '../core/session/short-subagent-id.js';
 import type { JsonObject, ToolModule, ToolResult } from './types.js';
 import { toolError } from './types.js';
 
@@ -58,6 +61,8 @@ export const spawnSubagentTool: ToolModule = {
     // answer, and returns the new id + that first response. ctx.phase is stamped on its audit rows.
     const { id, response } = await handle.spawn(ctx.phase, initialContext, task);
     const content: JsonObject = { id, response };
-    return { content };
+    // The new sub-agent's SHORT id, which is what its own `→`/`←` lines above this one were marked
+    // with — so the block of indented calls and the answer they produced read as one thing.
+    return { content, display: { summary: `sub:${shortSubagentId(id)} answered · ${response.length} chars` } };
   },
 };

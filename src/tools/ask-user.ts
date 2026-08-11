@@ -78,7 +78,14 @@ export const askUserTool: ToolModule = {
     // saveUnansweredQuestions: append an `asked` row per skipped question, minting its id at write
     // time. /questions re-offers them later; the answers reach this phase on a later turn.
     const saved = saveUnansweredQuestions(ctx.projectPath, ctx.phase, skipped);
+    // The panel erased its own frame and left its transcript; this is the one-line tally beside it.
+    // A skipped question is SAVED, not lost, and the count says so rather than reading as a drop.
+    const tally =
+      saved.length === 0
+        ? `${answered.length} answered`
+        : `${answered.length} answered, ${saved.length} saved for later`;
     return {
+      display: { summary: tally },
       content: {
         answered,
         unanswered: saved.map((question) => ({ id: question.id, question: question.question })),

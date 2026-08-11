@@ -31,7 +31,7 @@ import { SUBMIT_VERDICT, parseVerdict } from '../../tools/submit-verdict.js';
 import type { SandboxClient } from '../container/index.js';
 import type { OllamaClient, Message, StreamHandle, TokenCounts, Tool, ToolCall } from '../llm/index.js';
 import { addTokenCounts } from './add-token-counts.js';
-import { appendAuditRow } from './audit.js';
+import { recordToolCall } from './record-tool-call.js';
 import { BACKLOG_DIRNAME, setTaskStatus } from './backlog.js';
 import { raiseBlocker } from './blocker-store.js';
 import type { RaisedBlocker } from './blocker-store.type.js';
@@ -252,7 +252,7 @@ class ReviewerWindow implements TurnContext {
         readTracker: this.readTracker, // this window's own (the Reviewer cannot write, so never gated)
       });
       const result = await dispatchToolCall(ctx, name, args, {
-        onToolCall: (record) => appendAuditRow(this.deps.projectPath, record),
+        onToolCall: (record) => recordToolCall(this.deps.projectPath, record),
       });
       // Remember what this review actually landed, so the loop can report it and the next Worker turn
       // can be told which of its files were accepted. Read back from the tool's own result, not from
@@ -306,7 +306,7 @@ class ReviewerWindow implements TurnContext {
       commit_next: backlogFile,
       note: `Now commit ${backlogFile} with commit_changes, then submit your verdict.`,
     });
-    this.audit(MARK_TASK_DONE, args, 0, output, null, start);
+    this.audit(MARK_TASK_DONE, args, 0, output, null, start, `${this.task.id} marked done`);
     return output;
   }
 
@@ -333,8 +333,9 @@ class ReviewerWindow implements TurnContext {
 
     if (parsed.ok && problem === null) {
       this.verdict = parsed.verdict;
-      const output = `Verdict recorded: ${parsed.verdict.result} — ${parsed.verdict.issues.length} issue(s).`;
-      this.audit(SUBMIT_VERDICT, args, 0, output, null, start);
+      const issues = parsed.verdict.issues.length;
+      const output = `Verdict recorded: ${parsed.verdict.result} — ${issues} issue(s).`;
+      this.audit(SUBMIT_VERDICT, args, 0, output, null, start, `${parsed.verdict.result} · ${issues} issue${issues === 1 ? '' : 's'}`);
       return output;
     }
 
@@ -383,7 +384,7 @@ class ReviewerWindow implements TurnContext {
       ok: true,
       blocker: { id: raised.id, question: raised.question, raisedAt: raised.raisedAt },
     });
-    this.audit(RAISE_BLOCKER, args, 0, output, null, start);
+    this.audit(RAISE_BLOCKER, args, 0, output, null, start, `blocker ${raised.id} raised — the loop halts here`);
     return output;
   }
 
@@ -399,7 +400,12 @@ class ReviewerWindow implements TurnContext {
     return output;
   }
 
-  /** Append one audit row for a call this window handles directly (submit_verdict / a refusal). */
+  /**
+   * Record one call this window handles directly (the three phase-scoped exits, or a refusal): its
+   * audit row AND its `←` line. These never reach the shared dispatcher, so without this they would be
+   * the calls with no result line at all — and a refused write tool is precisely the case the record
+   * exists for. `summary` is the tool's own words; omitted, the line falls back to `error`.
+   */
   private audit(
     tool: string,
     args: Record<string, unknown>,
@@ -407,6 +413,7 @@ class ReviewerWindow implements TurnContext {
     output: string,
     error: string | null,
     startedAt: number,
+    summary?: string,
   ): void {
     const record: ToolCallRecord = {
       ts: new Date().toISOString(),
@@ -417,8 +424,9 @@ class ReviewerWindow implements TurnContext {
       durationMs: Math.round(performance.now() - startedAt),
       output,
       error,
+      ...(summary !== undefined ? { display: { summary } } : {}),
     };
-    appendAuditRow(this.deps.projectPath, record);
+    recordToolCall(this.deps.projectPath, record);
   }
 }
 

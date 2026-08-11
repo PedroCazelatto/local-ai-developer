@@ -36,6 +36,10 @@ export const inboxReadTool: ToolModule = {
     // readInbox: replay the active phase's own JSONL, fold posts + resolves, filter by status.
     const items = readInbox(ctx.projectPath, active, status);
     // A JSON array string is a plain success result — the model parses it (all tool results are strings).
-    return JSON.stringify(items);
+    const label = status === 'open' ? 'open item' : 'item';
+    return {
+      content: JSON.stringify(items),
+      display: { summary: items.length === 0 ? 'empty' : `${items.length} ${label}${items.length === 1 ? '' : 's'}` },
+    };
   },
 };

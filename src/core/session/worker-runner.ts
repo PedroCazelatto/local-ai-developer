@@ -14,7 +14,7 @@ import { GIT_STASH } from '../../tools/git-stash.js';
 import type { SandboxClient } from '../container/index.js';
 import type { OllamaClient, Message, StreamHandle, TokenCounts, Tool, ToolCall } from '../llm/index.js';
 import { addTokenCounts } from './add-token-counts.js';
-import { appendAuditRow } from './audit.js';
+import { recordToolCall } from './record-tool-call.js';
 import type { ToolCallRecord } from './dispatch.js';
 import { dispatchToolCall } from './dispatch.js';
 import { createReadTracker } from './read-tracker.js';
@@ -169,7 +169,7 @@ export class WorkerWindow implements TurnContext {
       readTracker: this.readTracker, // this window's own; a sub-agent's reads never reach it
     });
     const result = await dispatchToolCall(ctx, name, args, {
-      onToolCall: (record) => appendAuditRow(this.deps.projectPath, record),
+      onToolCall: (record) => recordToolCall(this.deps.projectPath, record),
     });
     // Remember the last test/build run so V2/02 can seed the Reviewer with the Worker's own results.
     if (name === 'run_in_project') {
@@ -193,7 +193,7 @@ export class WorkerWindow implements TurnContext {
       output,
       error: message,
     };
-    appendAuditRow(this.deps.projectPath, record);
+    recordToolCall(this.deps.projectPath, record);
     return output;
   }
 }

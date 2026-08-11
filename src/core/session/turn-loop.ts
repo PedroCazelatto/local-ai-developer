@@ -9,6 +9,7 @@
 import { TurnAbortedError } from '../llm/index.js';
 import type { Message, StreamHandle, TokenCounts, ToolCall, TurnAbortReason } from '../llm/index.js';
 import type { MarkdownStream } from '../ui/markdown-stream.type.js';
+import { printToolCall } from '../ui/print-tool-call.js';
 import * as renderer from '../ui/renderer.js';
 import * as statusActivity from '../ui/status-activity.js';
 import * as activityLine from '../ui/activity-line.js';
@@ -162,7 +163,10 @@ async function runTurn(ctx: TurnContext, start: () => StreamHandle, cut: Aborted
   for (const call of toolCalls) {
     const name = call.function.name;
     const args = call.function.arguments;
-    renderer.systemMessage(`→ tool: ${name}`);
+    // printToolCall: `→ <tool> <the argument that names what it did>` — the path, the command, the
+    // pattern — fitted to the terminal and styled by the theme. Printed BEFORE the call runs, so the
+    // record is on screen while the work happens; its `←` result line comes from the audit sink.
+    printToolCall(name, args);
     // Surface the executing tool + a live elapsed timer on the transient activity line; always clear it
     // when the call returns (or throws — callTool never throws, but be defensive) so the line is gone
     // the instant the tool finishes.

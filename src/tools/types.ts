@@ -9,6 +9,7 @@ import type { SandboxClient } from '../core/container/index.js';
 import type { Message, OneShotResult } from '../core/llm/index.js';
 import type { FileReadTracker } from '../core/session/read-tracker.type.js';
 import type { SubagentHandle } from '../core/session/subagents.type.js';
+import type { ToolCallDisplay } from '../core/ui/tool-call-display.type.js';
 
 // ------------------------------------------------------------------ JSON + JSON-schema vocabulary
 
@@ -57,6 +58,14 @@ export interface StructuredToolResult {
   /** Tool-specific fields recorded on the audit row (e.g. execute_command's resolved workdir). */
   readonly metadata?: JsonObject;
   /**
+   * What the SCROLLBACK should say about this call — the `←` result line, and the diff when the call
+   * changed a file. Never written to the audit log (appendAuditRow builds its row from an explicit
+   * field list), so a diff body cannot bloat tool_audit.jsonl. It rides out on the result because the
+   * dispatch choke point cannot derive it: only this tool held the file's bytes before and after, or
+   * knows how many matches it stopped counting at. A tool that omits it still gets a result line.
+   */
+  readonly display?: ToolCallDisplay;
+  /**
    * Extra audit rows for internal sub-steps of one tool call — e.g. run_in_project's auto-build,
    * which is logged as its own row BEFORE the run row (V1/05/06). The dispatcher writes these; the
    * tool never touches the audit log directly.
@@ -73,6 +82,8 @@ export interface ToolAuditExtra {
   readonly output: string;
   readonly error: string | null;
   readonly metadata?: JsonObject;
+  /** The sub-step's own `←` line — a build that failed is otherwise invisible from the outside. */
+  readonly display?: ToolCallDisplay;
 }
 
 /** A plain string is the simple success path; a StructuredToolResult carries JSON / audit detail. */

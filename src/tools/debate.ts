@@ -142,10 +142,18 @@ export const debateTool: ToolModule = {
       rounds: outcome.rounds,
       conceded: outcome.conceded,
     };
+    const objections = outcome.digest.standingObjections.length;
     const result: StructuredToolResult = {
       content,
       // The debate's EXACT cost on the audit row too, the way search_rules records its own one-shot.
       metadata: { debatePromptTokens: outcome.tokens.promptTokens, debateEvalTokens: outcome.tokens.evalTokens },
+      // The verdict and what still stands against it — the two facts a reader of the transcript above
+      // would otherwise have to re-derive. The argument itself already printed as it happened.
+      display: {
+        summary:
+          `${outcome.digest.survived ? 'survived' : 'did not survive'} · ` +
+          `${objections} standing objection${objections === 1 ? '' : 's'} · ${outcome.rounds} round${outcome.rounds === 1 ? '' : 's'}`,
+      },
     };
     return result;
   },

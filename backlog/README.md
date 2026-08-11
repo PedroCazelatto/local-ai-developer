@@ -21,12 +21,14 @@ Cheapest work per unit of value, and the two gaps both framing notes call physic
       characters, whichever runs out first, with `offset`/`limit` the model can narrow but never widen.
       Output is line-numbered (`  12→`), every read ends with the range it showed and the file's total,
       and a line too long to finish resumes at `char_offset` so the notice always names a way forward.
-- [ ] **[Show what a tool call actually did](show-tool-calls-in-the-scrollback.md)** — *Terminal UX.* The
-      largest UX gap after cancel and the cheapest to close — `args` is already in hand one line above the
-      print, and every result already passes the audit log's choke point. A record, not a confirmation
-      prompt. **All four of its open decisions are answered** (in the file), and the read-before-write guard
-      shipped first on purpose: `write_file` now reads before it overwrites, so the true GitHub-style diff
-      for both write tools costs no round-trip it was not already paying.
+- [x] ~~**Show what a tool call actually did**~~ — *Terminal UX.* Shipped: `→ <tool> <the one argument
+      that names what it did>` before the call and `← <result>` after it, with a compact +/- diff under
+      the write tools that collapses to `+12 −3` with the path above 20 changed lines or 2 000
+      characters. A failure is red and says why, so a refused `edit_file` no longer reads like a
+      successful one; a sub-agent's calls are indented and marked `[sub:…]`. A path is never truncated —
+      the row wraps instead. The hook is `recordToolCall`, replacing every `appendAuditRow` site rather
+      than the dispatcher's `onToolCall` seam, which would have missed all three runner-level refusals —
+      the very calls the record exists for.
 - [x] ~~**Let `list_files` see a subdirectory**~~ — *Harness capability.* Shipped: an optional `path` and
       a `depth` (default 1, so the bare call is unchanged), rendered as an indented tree with files before
       directories. Entries are filtered by the project's own `.gitignore` — read as a file, never

@@ -22,12 +22,14 @@ import path from 'node:path';
 import { availablePhaseNames, buildSystemPrompt, loadPhasePrompt, phasePromptPath, PHASES_DIR } from '../../context/index.js';
 import { PHASE_SCOPED_TOOL_NAMES, RETRO_TOOL_NAMES, resolvePhaseTools } from '../../phases/index.js';
 import { createToolContext, resolveInProject, toolError } from '../../tools/index.js';
+import { buildFileDiff } from '../../tools/build-file-diff.js';
 import { applyPhaseRuleEdit, EDIT_PHASE_RULE } from '../../tools/edit-phase-rule.js';
 import { READ_PHASE_RULE, readPhaseRule } from '../../tools/read-phase-rule.js';
 import { parseRetroSubmission, SUBMIT_RETRO } from '../../tools/submit-retro.js';
 import type { Message, StreamHandle, TokenCounts, Tool, ToolCall } from '../llm/index.js';
+import type { ToolCallDisplay } from '../ui/tool-call-display.type.js';
 import { addTokenCounts } from './add-token-counts.js';
-import { appendAuditRow } from './audit.js';
+import { recordToolCall } from './record-tool-call.js';
 import type { ToolCallRecord } from './dispatch.js';
 import { dispatchToolCall } from './dispatch.js';
 import { createReadTracker } from './read-tracker.js';
@@ -226,7 +228,7 @@ class RetroWindow implements TurnContext {
       readTracker: this.readTracker, // this window's own — backs the guard on Retro's one edit_file
     });
     return dispatchToolCall(ctx, name, args, {
-      onToolCall: (record) => appendAuditRow(this.deps.projectPath, record),
+      onToolCall: (record) => recordToolCall(this.deps.projectPath, record),
     });
   }
 
@@ -241,7 +243,8 @@ class RetroWindow implements TurnContext {
       this.audit(READ_PHASE_RULE, args, -1, output, read.error, start);
       return output;
     }
-    this.audit(READ_PHASE_RULE, args, 0, read.content, null, start);
+    const lines = read.content === '' ? 0 : read.content.split('\n').length;
+    this.audit(READ_PHASE_RULE, args, 0, read.content, null, start, { summary: `${lines} line${lines === 1 ? '' : 's'}` });
     return read.content;
   }
 
@@ -266,7 +269,12 @@ class RetroWindow implements TurnContext {
     }
     this.edited = edit.resolvedPath; // lock on a real edit
     const output = `Patched global phase file rules/phases/${edit.phase}.md (UNCOMMITTED — it will need your review before continuing).`;
-    this.audit(EDIT_PHASE_RULE, args, 0, output, null, start);
+    // buildFileDiff over the file's text either side of the patch: this is the one edit in the product
+    // that a human is REQUIRED to review before the session continues, so the diff belongs on screen.
+    const rel = `rules/phases/${edit.phase}.md`;
+    const diff = buildFileDiff(rel, edit.before, edit.after);
+    const summary = diff === null ? 'patched (uncommitted)' : `+${diff.added} −${diff.removed} (uncommitted)`;
+    this.audit(EDIT_PHASE_RULE, args, 0, output, null, start, diff === null ? { summary } : { summary, diff });
     return output;
   }
 
@@ -297,7 +305,7 @@ class RetroWindow implements TurnContext {
     }
     this.captured = parsed.submission;
     const output = `Retro recorded: ${parsed.submission.scope} — ${parsed.submission.rootCause}`;
-    this.audit(SUBMIT_RETRO, args, 0, output, null, start);
+    this.audit(SUBMIT_RETRO, args, 0, output, null, start, { summary: `recorded — ${parsed.submission.scope}` });
     return output;
   }
 
@@ -335,7 +343,12 @@ class RetroWindow implements TurnContext {
     return output;
   }
 
-  /** Append one audit row for a call this window handles directly (rules tools / submit / refusals). */
+  /**
+   * Record one call this window handles directly (the rules-scoped pair, submit_retro, a refusal): its
+   * audit row AND its `←` line. These never reach the shared dispatcher, so without this they would be
+   * the calls with no result line at all. `display` is the tool's own words plus, for a rules edit, the
+   * diff itself; omitted, the line falls back to `error`.
+   */
   private audit(
     tool: string,
     args: Record<string, unknown>,
@@ -343,6 +356,7 @@ class RetroWindow implements TurnContext {
     output: string,
     error: string | null,
     startedAt: number,
+    display?: ToolCallDisplay,
   ): void {
     const record: ToolCallRecord = {
       ts: new Date().toISOString(),
@@ -353,8 +367,9 @@ class RetroWindow implements TurnContext {
       durationMs: Math.round(performance.now() - startedAt),
       output,
       error,
+      ...(display !== undefined ? { display } : {}),
     };
-    appendAuditRow(this.deps.projectPath, record);
+    recordToolCall(this.deps.projectPath, record);
   }
 }
 

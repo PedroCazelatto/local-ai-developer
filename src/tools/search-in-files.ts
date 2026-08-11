@@ -216,7 +216,7 @@ export const searchInFilesTool: ToolModule = {
     }
 
     if (rows.length === 0) {
-      return `No matches for '${request.pattern}'.`;
+      return { content: `No matches for '${request.pattern}'.`, display: { summary: 'no match' } };
     }
     // summarizeSearch closes every result with what was found and which ceiling, if any, cut it —
     // so a truncated search can never be read as a complete one.
@@ -229,6 +229,15 @@ export const searchInFilesTool: ToolModule = {
       caps: SEARCH_CAPS,
       narrowed: request.glob !== null,
     });
-    return [...rows, notice].join('\n');
+    // The same two numbers the model's closing notice carries, and the same honesty about a ceiling:
+    // in "paths" mode a match IS a file, so counting matches there would say the same thing twice.
+    const found =
+      request.outputMode === 'paths'
+        ? `${files} file${files === 1 ? '' : 's'} matched`
+        : `${matches} match${matches === 1 ? '' : 'es'} in ${files} file${files === 1 ? '' : 's'}`;
+    return {
+      content: [...rows, notice].join('\n'),
+      display: { summary: stop === null ? found : `${found} (cut at the ${stop} cap)` },
+    };
   },
 };

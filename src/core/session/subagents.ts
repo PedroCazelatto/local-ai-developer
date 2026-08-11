@@ -16,11 +16,11 @@ import { SPAWN_SUBAGENT } from '../../tools/spawn-subagent.js';
 import { createToolContext } from '../../tools/index.js';
 import { resolvePhaseTools } from '../../phases/index.js';
 import type { Message, TokenCounts, Tool } from '../llm/index.js';
-import * as renderer from '../ui/renderer.js';
-import { theme } from '../ui/theme.js';
+import { printToolCall } from '../ui/print-tool-call.js';
+import { shortSubagentId } from './short-subagent-id.js';
 import { addTokenCounts } from './add-token-counts.js';
-import { appendAuditRow } from './audit.js';
 import { dispatchToolCall } from './dispatch.js';
+import { recordToolCall } from './record-tool-call.js';
 import { appendEvent } from './events-log.js';
 import { generateSubagentId } from './generate-subagent-id.js';
 import { createReadTracker } from './read-tracker.js';
@@ -36,8 +36,10 @@ import type {
 /** The three tools a sub-agent must NOT receive — stripped from its tool defs so it cannot nest. */
 export const SUBAGENT_TOOL_NAMES: readonly string[] = [SPAWN_SUBAGENT, ASK_SUBAGENT, DISMISS_SUBAGENT];
 
-/** How many chars of the id the `[sub:<short>]` marker + `/subagents` list show. */
-export const SUBAGENT_SHORT_ID_LEN = 4;
+// The short-id length lives in its own file so spawn_subagent can name the sub-agent that answered
+// without importing this module (which imports the tool). Re-exported here because that is where
+// `/subagents` and core/session/index.ts have always read it from.
+export { SUBAGENT_SHORT_ID_LEN } from './short-subagent-id.js';
 
 // A sub-agent may read a couple of files before answering; give it headroom before the loop cap trips,
 // but far less than the Worker's implement loop (a sub-agent is a focused side-task, not a full build).
@@ -141,7 +143,7 @@ export class SubagentManager implements SubagentHandle {
   list(): SubagentInfo[] {
     return [...this.agents.values()].map((s) => ({
       id: s.id,
-      shortId: s.id.slice(0, SUBAGENT_SHORT_ID_LEN),
+      shortId: shortSubagentId(s.id),
       createdAt: s.createdAt,
       messageCount: s.messages.length,
       promptTokens: s.promptTokens,
@@ -157,7 +159,7 @@ export class SubagentManager implements SubagentHandle {
    */
   private async runTurns(state: SubagentState, userMessage: string): Promise<string> {
     state.messages.push({ role: 'user', content: userMessage });
-    const short = state.id.slice(0, SUBAGENT_SHORT_ID_LEN);
+    const short = shortSubagentId(state.id);
 
     for (let round = 0; round <= SUBAGENT_MAX_ROUNDS; round += 1) {
       const { message, tokens } = await this.deps.llm.chat(state.messages, state.toolDefs);
@@ -174,13 +176,13 @@ export class SubagentManager implements SubagentHandle {
       state.messages.push({ role: 'assistant', content: '', tool_calls: toolCalls });
       for (const call of toolCalls) {
         const name = call.function.name;
-        // interjectLine, NOT systemMessage: a sub-agent's turns run INSIDE the master's spawn/ask tool
-        // call, so the master's transient activity line is on the cursor row the whole time. A plain
-        // write lands on that row and the spinner's next in-place repaint moves down one — leaving
-        // `⠙ running ask_subagent (1.1s)→ tool: read_file [sub:ab12]` behind as permanent scrollback, a
-        // transient widget's frame stuck in append-only history. interjectLine hides the line, prints,
-        // and shows it again. The style is applied here because interjectLine takes a finished string.
-        renderer.interjectLine(theme.meta(`→ tool: ${name} [sub:${short}]`));
+        // printToolCall with the short id: same `→ <tool> <subject>` record every phase gets, indented
+        // one step and marked `[sub:…]`, so a sub-agent's twenty calls read as somebody else's work
+        // rather than burying the parent call they happened inside. It prints through interjectLine —
+        // a sub-agent's turns run INSIDE the master's spawn/ask call, so the master's transient
+        // activity line owns the cursor row the whole time, and writing straight to it would weld the
+        // spinner frame into the append-only scrollback.
+        printToolCall(name, call.function.arguments, short);
         const result = await this.dispatch(state, name, call.function.arguments);
         state.messages.push({ role: 'tool', content: result, tool_name: name });
       }
@@ -205,8 +207,11 @@ export class SubagentManager implements SubagentHandle {
       llm: this.deps.llm, // required by createToolContext; backs ctx.oneShot for search_rules
       readTracker: state.readTracker, // THIS sub-agent's own — never the master's (see SubagentState)
     });
+    // recordToolCall: the audit row (with this sub-agent's id for lineage) AND the `←` result line,
+    // indented and marked like the `→` line above it.
+    const short = shortSubagentId(state.id);
     return dispatchToolCall(ctx, name, args, {
-      onToolCall: (record) => appendAuditRow(this.deps.projectPath, { ...record, subagentId: state.id }),
+      onToolCall: (record) => recordToolCall(this.deps.projectPath, { ...record, subagentId: state.id }, short),
     });
   }
 

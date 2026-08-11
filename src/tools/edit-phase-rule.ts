@@ -46,9 +46,22 @@ export const editPhaseRuleTool: Tool = {
   },
 };
 
-/** Result of an edit_phase_rule call: the patched path, or a structured recoverable error. */
+/**
+ * Result of an edit_phase_rule call: the patched path, or a structured recoverable error.
+ *
+ * A success carries the file's text on BOTH sides of the edit so the Retro window can show the diff in
+ * the scrollback. It costs nothing to return — both are already in hand here — and it matters more for
+ * this tool than for any other write: a systemic Retro edit changes what every future phase reads, and
+ * it is deliberately left uncommitted for a human to review. The diff is the start of that review.
+ */
 export type PhaseRuleEdit =
-  | { readonly ok: true; readonly resolvedPath: string; readonly phase: string }
+  | {
+      readonly ok: true;
+      readonly resolvedPath: string;
+      readonly phase: string;
+      readonly before: string;
+      readonly after: string;
+    }
   | { readonly ok: false; readonly error: string; readonly hint?: string };
 
 function messageOf(err: unknown): string {
@@ -108,5 +121,5 @@ export function applyPhaseRuleEdit(phase: unknown, oldString: unknown, newString
   } catch (err) {
     return { ok: false, error: `could not write rules/phases/${normalized}.md: ${messageOf(err)}` };
   }
-  return { ok: true, resolvedPath: file, phase: normalized };
+  return { ok: true, resolvedPath: file, phase: normalized, before: original, after: updated };
 }

@@ -47,6 +47,7 @@ export const loadRuleTool: ToolModule = {
       const content: JsonObject = { error: 'unknown standard', name: name.trim(), available: [...result.available] };
       return { content, exitStatus: -1, error: 'unknown standard' };
     }
-    return result.body;
+    const lines = result.body === '' ? 0 : result.body.split('\n').length;
+    return { content: result.body, display: { summary: `${lines} line${lines === 1 ? '' : 's'}` } };
   },
 };

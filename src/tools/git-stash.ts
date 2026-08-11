@@ -81,6 +81,7 @@ export const gitStashTool: ToolModule = {
       return {
         content: { shelves, count: shelves.length },
         metadata: { ...metadata, count: shelves.length },
+        display: { summary: `${shelves.length} shelf${shelves.length === 1 ? '' : 'ves'}` },
       };
     }
 
@@ -103,6 +104,7 @@ export const gitStashTool: ToolModule = {
       return {
         content: { saved: true, label, note: 'the working tree is now clean.' },
         metadata: { ...metadata, label },
+        display: { summary: 'saved — the working tree is clean' },
       };
     }
 
@@ -119,6 +121,10 @@ export const gitStashTool: ToolModule = {
       action === 'pop'
         ? { popped: true, label, note: 'the shelved work is back in the working tree.' }
         : { dropped: true, label, note: 'the shelved work is gone.' };
-    return { content, metadata: { ...metadata, label } };
+    return {
+      content,
+      metadata: { ...metadata, label },
+      display: { summary: action === 'pop' ? 'popped — the shelved work is back' : 'dropped' },
+    };
   },
 };

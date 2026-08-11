@@ -39,6 +39,6 @@ export const dismissSubagentTool: ToolModule = {
     }
     const { ok } = handle.dismiss(id.trim()); // always { ok: true } — idempotent by contract
     const content: JsonObject = { ok };
-    return { content };
+    return { content, display: { summary: 'dismissed' } };
   },
 };

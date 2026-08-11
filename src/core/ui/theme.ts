@@ -63,6 +63,17 @@ export const theme = {
     proponent: chalk.bold.greenBright as Styler,
   },
   /**
+   * The two sides of the compact diff printed after a write_file / edit_file call
+   * (format-tool-result-lines.ts). Their own roles rather than a reuse of success/danger, on the same
+   * reasoning as the debate pair above: an added line is not a pass and a removed line is not a
+   * failure — they are the two halves of one change, and green-adds/red-removes is the single
+   * convention every reader already has for a diff.
+   */
+  diff: {
+    added: chalk.green as Styler,
+    removed: chalk.red as Styler,
+  },
+  /**
    * Markdown roles. The model emits PLAIN markdown and never picks a color (see system-prompt.ts);
    * render-markdown-line.ts maps each construct onto exactly one role below. Colors live only here,
    * so the whole markdown look is retuned in one place. Yellow means "code" everywhere — inline and

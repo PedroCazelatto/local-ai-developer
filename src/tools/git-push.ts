@@ -47,6 +47,11 @@ export const gitPushTool: ToolModule = {
     return {
       content,
       metadata: { ...metadata, created_remote_branch: result.createdRemoteBranch, up_to_date: result.upToDate },
+      display: {
+        summary: result.upToDate
+          ? `already up to date · ${result.branch ?? 'the current branch'}`
+          : `pushed ${result.branch ?? 'the current branch'} → origin${result.createdRemoteBranch ? ' (new remote branch)' : ''}`,
+      },
     };
   },
 };

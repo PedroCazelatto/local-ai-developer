@@ -135,6 +135,17 @@ export const readFileTool: ToolModule = {
       stoppedBy: slice.stoppedBy,
       cutMidLine: slice.cutMidLine,
     };
-    return { content: slice.text === '' ? notice : `${slice.text}\n\n${notice}`, metadata };
+    // The scrollback line says how much of the file the window actually got: a whole file reports its
+    // length, a bounded or offset read reports the range AND the total — the same "a cut file never
+    // looks like a short one" rule the model's own notice follows, for the person watching.
+    const whole = slice.firstLine === 1 && slice.lastLine === slice.totalLines;
+    const summary = whole
+      ? `${slice.totalLines} line${slice.totalLines === 1 ? '' : 's'}`
+      : `lines ${slice.firstLine}-${slice.lastLine} of ${slice.totalLines}`;
+    return {
+      content: slice.text === '' ? notice : `${slice.text}\n\n${notice}`,
+      metadata,
+      display: { summary },
+    };
   },
 };

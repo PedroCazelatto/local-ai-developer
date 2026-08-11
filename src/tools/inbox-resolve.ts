@@ -41,7 +41,7 @@ export const inboxResolveTool: ToolModule = {
     // resolveInboxItem: scan recipient files for `id`, reject unknown/already-resolved, else append a resolve event.
     const result = resolveInboxItem(ctx.projectPath, resolver, args['id'].trim(), args['note'].trim());
     if (result.ok) {
-      return { content: { ok: true, id: result.id } };
+      return { content: { ok: true, id: result.id }, display: { summary: `resolved ${result.id}` } };
     }
     return { content: { ok: false, error: result.error, message: result.message } };
   },

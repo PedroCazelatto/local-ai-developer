@@ -83,7 +83,8 @@ export const listFilesTool: ToolModule = {
     const isIgnored = await buildIgnoreFilter(ctx.sandbox);
     const visible = listing.entries.filter((entry) => !isIgnored(entry));
     if (visible.length === 0) {
-      return scoped === '' || scoped === '.' ? 'The project is empty.' : `'${requested}' is empty.`;
+      const empty = scoped === '' || scoped === '.' ? 'The project is empty.' : `'${requested}' is empty.`;
+      return { content: empty, display: { summary: 'empty' } };
     }
 
     // renderFileTree: indents by depth, files before directories, and applies the cap in that same
@@ -93,6 +94,10 @@ export const listFilesTool: ToolModule = {
     if (tree.omitted > 0) {
       rows.push('', `... ${tree.omitted} more entries not shown (cap: ${MAX_ENTRIES}).`);
     }
-    return rows.join('\n');
+    // The scrollback line counts what the model was actually shown, and says so when the cap cut the
+    // listing — a truncated tree must not read as a complete one there either.
+    const shown = tree.rows.length;
+    const summary = tree.omitted > 0 ? `${shown} of ${shown + tree.omitted} entries` : `${shown} entries`;
+    return { content: rows.join('\n'), display: { summary } };
   },
 };

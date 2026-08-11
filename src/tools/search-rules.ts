@@ -51,7 +51,7 @@ export const searchRulesTool: ToolModule = {
       return toolError(`standards catalog is unavailable: ${messageOf(err)}`);
     }
     if (catalog.length === 0) {
-      return { content: { matches: [] } };
+      return { content: { matches: [] }, display: { summary: 'the standards catalog is empty' } };
     }
 
     // The catalog + intent live ONLY inside this throwaway call and are discarded — never added to the
@@ -69,6 +69,11 @@ export const searchRulesTool: ToolModule = {
       content: { matches },
       // Record the throwaway call's EXACT cost on the audit row (never estimated — constitution).
       metadata: { searchModelPromptTokens: tokens.promptTokens, searchModelEvalTokens: tokens.evalTokens },
+      // The names themselves, not just how many: they are short, and they are what the next load_rule
+      // call will be about, so the two lines read as a pair.
+      display: {
+        summary: matches.length === 0 ? 'no match' : `${matches.length} standard(s): ${matches.join(', ')}`,
+      },
     };
     return result;
   },

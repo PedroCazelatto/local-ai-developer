@@ -31,6 +31,10 @@ export const listChangesTool: ToolModule = {
       files,
       status,
     };
-    return { content, metadata: { project: ctx.projectName, count: files.length } };
+    return {
+      content,
+      metadata: { project: ctx.projectName, count: files.length },
+      display: { summary: files.length === 0 ? 'clean' : `${files.length} changed file${files.length === 1 ? '' : 's'}` },
+    };
   },
 };

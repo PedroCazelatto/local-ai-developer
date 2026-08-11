@@ -150,6 +150,14 @@ export const gitInspectTool: ToolModule = {
       empty: result.output === '',
       truncated: result.truncated,
     };
-    return { content, metadata: { ...metadata, truncated: result.truncated, chars: result.output.length } };
+    // Lines rather than characters: git output is read by the row, and "cut" is said out loud so a
+    // capped diff is never mistaken for the whole of one.
+    const lines = result.output === '' ? 0 : result.output.split('\n').length;
+    const summary = result.output === '' ? 'empty' : `${lines} line${lines === 1 ? '' : 's'}${result.truncated ? ' (cut at the cap)' : ''}`;
+    return {
+      content,
+      metadata: { ...metadata, truncated: result.truncated, chars: result.output.length },
+      display: { summary },
+    };
   },
 };

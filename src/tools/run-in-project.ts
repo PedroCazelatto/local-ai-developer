@@ -84,6 +84,10 @@ export const runInProjectTool: ToolModule = {
         output: truncateHeadTail(`STDOUT: ${build.stdout}\nSTDERR: ${build.stderr}`, RUN_OUTPUT_LIMIT),
         error: build.exitCode === 0 ? null : 'build failed',
         metadata: { step: 'build' },
+        // The build gets its own `←` line, printed above the run's. It has no `→` line of its own
+        // because the model never asked for it — but a failing build is the most likely reason a test
+        // run "did nothing", and today it is invisible from the outside.
+        display: { summary: `build exit ${build.exitCode}` },
       });
       if (isDaemonError(build.stderr)) {
         return { content: { error: 'Docker daemon unreachable.' }, exitStatus: -1, error: 'Docker daemon unreachable.', auditExtras: extras };
@@ -115,7 +119,14 @@ export const runInProjectTool: ToolModule = {
         stderr,
         duration_ms: run.durationMs,
       };
-      return { content: payload, exitStatus: -1, error: `timed out after ${timeoutS}s`, metadata, auditExtras: extras };
+      return {
+        content: payload,
+        exitStatus: -1,
+        error: `timed out after ${timeoutS}s`,
+        metadata,
+        auditExtras: extras,
+        display: { summary: `timed out after ${timeoutS}s` },
+      };
     }
 
     const payload: JsonObject = {
@@ -124,6 +135,6 @@ export const runInProjectTool: ToolModule = {
       stderr: truncateHeadTail(run.stderr, RUN_OUTPUT_LIMIT),
       duration_ms: run.durationMs,
     };
-    return { content: payload, exitStatus: run.exitCode, metadata, auditExtras: extras };
+    return { content: payload, exitStatus: run.exitCode, metadata, auditExtras: extras, display: { summary: `exit ${run.exitCode}` } };
   },
 };

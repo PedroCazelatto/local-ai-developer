@@ -8,6 +8,8 @@
 // runs first as the scoping check. Not atomic, and deliberately not pretending to be — nothing else
 // is writing the project while a phase holds the turn (docs/product.md, no parallelism).
 
+// The compact +/- diff shown in the scrollback; null when the change is too large to count exactly.
+import { buildFileDiff } from './build-file-diff.js';
 import { decodeUtf8Strict, messageOf } from './fs-support.js';
 // Refuses an existing file this window has not read, or has read a now-stale copy of.
 import { guardWriteTarget } from './guard-write-target.js';
@@ -113,6 +115,17 @@ export const editFileTool: ToolModule = {
     // The file the model just wrote IS a file it has seen — record the NEW bytes so its own next edit
     // to the same file is not refused as stale by the change it made itself.
     ctx.readTracker.record(relative, bytes);
-    return `Edited '${relative}'.`;
+    // buildFileDiff: the compact +/- diff for the scrollback. An edit is always ONE contiguous splice,
+    // so the common-prefix/suffix trim reduces it to exactly the changed region — the counts are exact
+    // and the LCS never sees more than the replaced text.
+    const diff = buildFileDiff(relative, original, updated);
+    const summary =
+      diff === null
+        ? `edited — ${original.split('\n').length} lines → ${updated.split('\n').length} lines`
+        : `+${diff.added} −${diff.removed}`;
+    return {
+      content: `Edited '${relative}'.`,
+      display: diff === null ? { summary } : { summary, diff },
+    };
   },
 };

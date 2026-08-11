@@ -72,6 +72,7 @@ export const gitBranchTool: ToolModule = {
       return {
         content: { branches, current, detached: current === null },
         metadata: { ...metadata, count: branches.length, current },
+        display: { summary: `${branches.length} branch${branches.length === 1 ? '' : 'es'} · on ${current ?? 'a detached HEAD'}` },
       };
     }
 
@@ -111,6 +112,9 @@ export const gitBranchTool: ToolModule = {
     if (action === 'create' && result.existed) {
       content['note'] = `'${result.branch}' already existed — you are now on it, nothing was created.`;
     }
-    return { content, metadata: { ...metadata, branch: result.branch, existed: result.existed } };
+    // Where the window ended up, which for create-or-switch is the only thing that matters — and it
+    // says "already existed" out loud, because a create that silently switched is worth seeing.
+    const landed = `on ${result.branch}${action === 'create' && result.existed ? ' (already existed)' : ''}`;
+    return { content, metadata: { ...metadata, branch: result.branch, existed: result.existed }, display: { summary: landed } };
   },
 };

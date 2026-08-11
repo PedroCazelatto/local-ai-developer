@@ -56,6 +56,6 @@ export const askSubagentTool: ToolModule = {
       return { content, exitStatus: -1, error: 'unknown_subagent' };
     }
     const content: JsonObject = { response: outcome.response };
-    return { content };
+    return { content, display: { summary: `${outcome.response.length} chars` } };
   },
 };

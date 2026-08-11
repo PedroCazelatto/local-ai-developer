@@ -144,6 +144,11 @@ export const commitChangesTool: ToolModule = {
       content,
       exitStatus: 0,
       metadata: { ...metadata, sha: commit.sha ?? null, files: commit.files, remaining: remaining.length },
+      // The sha and the file count: what landed, and how much of it. The paths are already on the
+      // `→` line (one of them) or would be the unbounded dump this record exists to avoid (several).
+      display: {
+        summary: `${commit.sha ?? 'committed'} · ${commit.files.length} file${commit.files.length === 1 ? '' : 's'}`,
+      },
     };
   },
 };

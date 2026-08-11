@@ -56,6 +56,6 @@ export const inboxPostTool: ToolModule = {
     }
     // postToInbox: assign the next project-global id, append a `post` event to the recipient's JSONL, return the item.
     const item = postToInbox(ctx.projectPath, from, to, body);
-    return { content: { ok: true, id: item.id } };
+    return { content: { ok: true, id: item.id }, display: { summary: `posted ${item.id}` } };
   },
 };

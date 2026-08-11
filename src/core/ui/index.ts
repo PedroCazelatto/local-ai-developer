@@ -13,6 +13,19 @@ export { bindNewlineKey } from './bind-newline-key.js';
 export * as inputFence from './input-fence.js';
 export { formatSize } from './format-size.js';
 export { terminalColumns } from './terminal-columns.js';
+// The tool-call record in the scrollback: `→ <tool> <what it did>` before the call, `← <result>` (plus
+// a compact diff, for the tools that change files) after it. Both are static history, never a widget.
+export { printToolCall } from './print-tool-call.js';
+export { printToolResult } from './print-tool-result.js';
+export type { ToolResultView } from './print-tool-result.js';
+export { formatToolCallLine, SUBAGENT_INDENT } from './format-tool-call-line.js';
+export type { ToolCallLineInput } from './format-tool-call-line.type.js';
+export { formatToolResultLines } from './format-tool-result-lines.js';
+export type { ToolResultLinesInput } from './format-tool-result-lines.type.js';
+export { toolCallSubject } from './tool-call-subject.js';
+export type { ToolCallSubject } from './tool-call-subject.type.js';
+export type { ToolCallDisplay, ToolDiffDisplay } from './tool-call-display.type.js';
+export { stripControlChars } from './strip-control-chars.js';
 // Streamed markdown rendering (V6/01): the model writes plain markdown, the terminal colors it.
 export { createMarkdownStream } from './create-markdown-stream.js';
 export type { MarkdownStream } from './markdown-stream.type.js';

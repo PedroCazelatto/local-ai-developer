@@ -52,6 +52,8 @@ export const executeCommandTool: ToolModule = {
     const combined = truncateHeadTail(`STDOUT: ${result.stdout}\nSTDERR: ${result.stderr}`);
     // Success returns the output string EVEN on a non-zero shell exit (the model needs the error
     // text); the audit row keeps the REAL exit code.
-    return { content: combined, exitStatus: result.exitCode, metadata };
+    // The exit code IS the result here, so it is the whole summary; the printer adds the elapsed time,
+    // which for a shell command is the other half of what you wanted to know.
+    return { content: combined, exitStatus: result.exitCode, metadata, display: { summary: `exit ${result.exitCode}` } };
   },
 };
