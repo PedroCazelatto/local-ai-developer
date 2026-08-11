@@ -1,6 +1,6 @@
 # Backlog checklist
 
-An index of the 19 open task files in this folder, in the order worth shipping, plus the 2 framing notes
+An index of the 18 open task files in this folder, in the order worth shipping, plus the 2 framing notes
 that are not tasks.
 
 **This file is not a task and is not deleted when work ships.** It is upkeep: when a task's file is deleted
@@ -56,6 +56,16 @@ Not parity gaps. Each is a place where the repo currently says something that is
       task reverts to `pending`, so a second overnight `/run all` re-fails the first one's tasks. Pairs with
       [budget-ceilings-for-runs-and-batches.md](budget-ceilings-for-runs-and-batches.md) — both need an
       outcome the backlog can see.
+- [ ] **[Boot can pick a model that cannot call tools](boot-can-pick-a-toolless-model.md)** — *Model
+      behavior.* `pickSmallestModel` sorts on disk bytes and never asks what the model can do, so the
+      first-run path — no `state.json`, no model named at boot — can select a model whose `/api/tags`
+      capabilities are `completion,insert`. Every phase here is a tool-calling loop. Found while measuring
+      for [per-window-num-ctx.md](per-window-num-ctx.md); the interesting half is the failure path, not the
+      filter.
+- [ ] **[The required Node version is never enforced](node-version-is-not-enforced.md)** — *Repo hygiene.*
+      `engines` says `>=24` because `node:sqlite` is unflagged there, and nothing checks it — the machine
+      this repo is developed on runs v22.14.0. Expected to fail when the session opens `memory.db`, which
+      is the wrong end of the problem to be told about. **Confirming that failure is part of the task.**
 - [x] ~~**Make `edit_file` refuse an unread file**~~ — *Harness capability.* Shipped, and wider than the
       file asked for: **`write_file` is gated too**, branching on existence — creating is free, overwriting
       an existing file needs the same read. That was the file's own open question, and the answer came from
@@ -101,11 +111,21 @@ Where the window is also a clock. Two of these want measurement before design.
 - [ ] **[Evict stale tool results](evict-stale-tool-results.md)** — *Memory / context.* **Verify the
       KV-cache premise first** with a throwaway two-call script; rewriting history can cost more wall clock
       than the tokens it reclaims. The dedupe-superseded-reads subset needs no policy and ships on its own.
+- [ ] **[The spawned windows have no failsafe](spawned-windows-have-no-failsafe.md)** — *Memory / context.*
+      `beforeModelCall` exists only on `SessionOrchestrator`, so the Worker, Reviewer, Retro and sub-agent
+      windows have no compaction at all and Ollama silently drops their oldest tokens past `num_ctx` —
+      demonstrated, not inferred. Pairs with the eviction item above: eviction bounds the tail-heavy case
+      cheaply, and only a failsafe bounds the head-heavy one. **Nothing may lower a window's ceiling until
+      this ships** — that ceiling is currently the only bound those windows have.
 - [ ] **[Give each window its own `num_ctx`](per-window-num-ctx.md)** — *Memory / context.* One global
       ceiling serves the Worker and the 60-character context titler alike.
 - [ ] **[Run the one-shots on a small model](small-model-lane-for-one-shots.md)** — *Memory / context.*
-      Sibling of the item above — same resolution point, best built together. Already open in
-      `docs/open-questions.md`, and the `debate` loop made it more expensive than it was.
+      **Deferred by decision, not blocked.** Measured on the 3060: the session model at `num_ctx` 8192
+      occupies 10.3 GB of 12 and only one model is ever resident, so every hop to a small model and back
+      is two reloads of the big one — 2.6 s at best, 13–22 s typically — to save a 60-character title. The
+      saving the file wants turns out to live in the window sizes rather than the weights: a one-shot sends
+      no tools and no phase markdown, so it already skips the 29–44% fixed overhead whichever model runs
+      it. Revisit only with a dedicated big→small→big benchmark.
 - [ ] **[Hint the matching standard](surface-matching-standards.md)** — *Model behavior.* One throwaway
       match at seed time so standards that exist are actually read. A natural first user of the small lane.
 - [ ] **[Budget ceilings for a task and a batch](budget-ceilings-for-runs-and-batches.md)** — *Execution
