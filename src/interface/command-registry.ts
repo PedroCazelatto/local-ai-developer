@@ -12,15 +12,20 @@ import type { Interface as ReadlineInterface } from 'node:readline/promises';
 
 import { modelsCommand } from '../commands/models.js';
 import { answerCommand } from './commands/answer.js';
+import { auditCommand } from './commands/audit.js';
+import { batchCommand } from './commands/batch.js';
+import { blockersCommand } from './commands/blockers.js';
 import { clearCommand } from './commands/clear.js';
 import { exitCommand } from './commands/exit.js';
 import { helpCommand } from './commands/help.js';
+import { inboxCommand } from './commands/inbox.js';
 import { newProjectCommand } from './commands/new-project.js';
 import { questionsCommand } from './commands/questions.js';
 import { resumeCommand } from './commands/resume.js';
 import { runCommand } from './commands/run.js';
 import { subagentsCommand } from './commands/subagents.js';
 import { swapCommand } from './commands/swap.js';
+import { tasksCommand } from './commands/tasks.js';
 import type { ReplOrchestrator } from './repl.js';
 
 /** The purpose buckets `/help` groups commands under. The display order/labels live in commands/help.ts. */
@@ -81,6 +86,13 @@ const COMMANDS: readonly Command[] = [
   runCommand,
   answerCommand,
   questionsCommand,
+  // The inspection commands (backlog/inspection-commands.md) — pure reads over what the session has
+  // already written under .orchestrator/, so the walk-away loop has a come-back half.
+  tasksCommand,
+  blockersCommand,
+  inboxCommand,
+  batchCommand,
+  auditCommand,
 ];
 
 /** name → command, built once with a duplicate-name guard (a dup is a build-time mistake, fail loud). */

@@ -38,10 +38,13 @@ Cheapest work per unit of value, and the two gaps both framing notes call physic
       `output_mode:"paths"` — content stayed the default rather than becoming paths-only. The match count
       gave way to three caps (200 output lines · 200 matches · 20 per file), whichever fires first, and
       every result now closes with a line naming the cap that fired, or stating that none did. No regex.
-- [ ] **[Inspection commands](inspection-commands.md)** — *In-app commands.* The walk-away loop has no
-      come-back half; `/tasks`, `/blockers`, `/inbox`, `/batch`, `/audit` are pure reads over files already
-      on disk. Ships before [record-attempted-tasks.md](record-attempted-tasks.md) so that task's escalation
-      record becomes readable.
+- [x] ~~**Inspection commands**~~ — *In-app commands.* Shipped: `/tasks` renders the backlog as a compact
+      epic/story tree carrying each task's status, order and unmet dependencies and marking the one
+      `/run next` would pick; `/blockers` lists every open blocker with the exact `/answer` line to
+      resolve it; `/inbox [<phase>|all]` opens the cross-phase channel the model could previously see and
+      the user could not; `/batch [n]` re-prints a persisted summary through the same renderer that wrote
+      it; `/audit [n]` shows the last N tool calls (default 20, uncapped). All pure reads — no new
+      persistence, no model call, and none of them reachable by a phase.
 
 ## Tier 2 — defects and misleading code
 
@@ -81,9 +84,13 @@ Not parity gaps. Each is a place where the repo currently says something that is
       Windows `npm` is a `.cmd`, which Node refuses to spawn without a shell, so that one child keeps
       `shell: true` and the validation is what contains it. The `docs/repo-layout.md` diff is review-gated
       and was left uncommitted.**
-- [ ] **[Resolve the dead Tab completion](resolve-dead-tab-completion.md)** — *In-app commands.* Five sites
-      reason carefully about a `complete-line.ts` that does not exist. **Needs your call:** wire it back or
-      delete the hook. Either is fine; leaving it is not.
+- [x] ~~**Resolve the dead Tab completion**~~ — *In-app commands.* Wired back, and the shape is what made it
+      possible: **Tab cycles.** It swaps the word under the cursor for the next candidate and wraps after the
+      last, so nothing is ever printed and there is no candidate list to reconcile with the pinned rows or
+      with the append-only scrollback — readline's own inline list was measured on the grid emulator
+      stranding the input rule in history. Command names complete off the registry, so a newly registered
+      command gets it for free; `/run` and `/answer` complete task ids from a sync backlog read; Shift+Tab
+      stays unbound. **The `docs/cli.md` diff is review-gated and was left uncommitted.**
 
 ## Tier 3 — context economy and throughput
 
