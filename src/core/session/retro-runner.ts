@@ -140,11 +140,11 @@ class RetroWindow implements TurnContext {
 
   streamAsk(userInput: string): StreamHandle {
     this.messages.push({ role: 'user', content: userInput });
-    return this.deps.llm.stream(this.messages, this.retroTools);
+    return this.deps.llm.stream('retro', this.messages, this.retroTools);
   }
 
   streamContinue(): StreamHandle {
-    return this.deps.llm.stream(this.messages, this.retroTools);
+    return this.deps.llm.stream('retro', this.messages, this.retroTools);
   }
 
   onTokens(tokens: TokenCounts): void {

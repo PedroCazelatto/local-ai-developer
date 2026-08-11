@@ -162,7 +162,9 @@ export class SubagentManager implements SubagentHandle {
     const short = shortSubagentId(state.id);
 
     for (let round = 0; round <= SUBAGENT_MAX_ROUNDS; round += 1) {
-      const { message, tokens } = await this.deps.llm.chat(state.messages, state.toolDefs);
+      // 'subagent' is a WINDOW role — it holds tools and a history — so it sits at the base ceiling
+      // alongside its master, which is what `state.numCtx` records.
+      const { message, tokens } = await this.deps.llm.chat('subagent', state.messages, state.toolDefs);
       this.accumulate(state, tokens);
 
       const toolCalls = message.tool_calls;

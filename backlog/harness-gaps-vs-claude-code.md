@@ -53,7 +53,8 @@ By value per unit of work, not by importance:
 3. Letting `list_files` see a subdirectory — small, large. **Shipped**, together with its pair, the
    `search_in_files` context lines and cheaper modes.
 4. [small-model-lane-for-one-shots.md](small-model-lane-for-one-shots.md) — small, large, and already an open
-   question in `docs/open-questions.md`. Pairs with [per-window-num-ctx.md](per-window-num-ctx.md).
+   question in `docs/open-questions.md`. Its pair, the per-window `num_ctx` task, has **shipped**; this half
+   was deferred by decision once measurement showed the saving lives in the window sizes, not the weights.
 5. Refusing to write a file the window has not read — small, medium. **Shipped**, and wider than the entry
    asked for: `write_file` is gated too, branching on existence, because a full overwrite of an existing
    file is the most destructive thing the model can do and was the least guarded. The phase prompts now

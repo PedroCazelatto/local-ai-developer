@@ -28,10 +28,11 @@ hazard is already named in the code — for the third window, while the first tw
 
 ## It is also a prerequisite
 
-The per-window `num_ctx` work groups `debate-turn` and `debate-digest` as **unbounded one-shots** that
-cannot take a reduced ceiling, precisely because an uncapped input under a smaller ceiling is silent
-truncation. Capping `background` is what would let the debate windows join the bounded group. See
-[per-window-num-ctx.md](per-window-num-ctx.md).
+The per-window `num_ctx` work shipped with `debate-turn` and `debate-digest` pinned to the **base**
+ceiling as unbounded one-shots, precisely because an uncapped input under a smaller ceiling is silent
+truncation. Capping `background` is what would let them join the bounded group — the table and the
+reason are in `src/core/llm/resolve-window-ctx.ts`, and `DebateDeps.oneShot` says the same thing where
+the two roles are actually passed.
 
 ## Open decisions
 

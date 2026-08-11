@@ -155,11 +155,11 @@ export class WorkerWindow implements TurnContext {
 
   streamAsk(userInput: string): StreamHandle {
     this.messages.push({ role: 'user', content: userInput });
-    return this.deps.llm.stream(this.messages, this.workerTools);
+    return this.deps.llm.stream('worker', this.messages, this.workerTools);
   }
 
   streamContinue(): StreamHandle {
-    return this.deps.llm.stream(this.messages, this.workerTools);
+    return this.deps.llm.stream('worker', this.messages, this.workerTools);
   }
 
   onTokens(tokens: TokenCounts): void {

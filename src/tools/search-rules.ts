@@ -1,9 +1,10 @@
 // search_rules (V4/02) — resolve a free-text intent to matching coding-standard names WITHOUT ever
 // putting the catalog into the main context. It loads the {name, description} catalog (V4/01) and hands
-// it, with the intent, to a FRESH throwaway model call (ctx.oneShot — same model + num_ctx, never added
-// to any phase's memory). The reply is UNTRUSTED: we parse it as a JSON array of strings and keep only
-// names that actually exist in the catalog (a hallucinated name is dropped, never passed on). The model
-// then calls load_rule with a returned name to pull that one body in. An empty result is valid.
+// it, with the intent, to a FRESH throwaway model call (ctx.oneShot — same model, its own smaller
+// num_ctx, never added to any phase's memory). The reply is UNTRUSTED: we parse it as a JSON array of
+// strings and keep only names that actually exist in the catalog (a hallucinated name is dropped, never
+// passed on). The model then calls load_rule with a returned name to pull that one body in. An empty
+// result is valid.
 
 import { loadCatalog } from '../context/index.js';
 import type { StandardEntry } from '../context/index.js';
@@ -60,7 +61,10 @@ export const searchRulesTool: ToolModule = {
       { role: 'system', content: SEARCH_SYSTEM_PROMPT },
       { role: 'user', content: buildSearchUserPrompt(catalog, intent.trim()) },
     ];
-    const { content, tokens } = await ctx.oneShot(messages);
+    // 'search-rules' is a BOUNDED role and runs under a smaller ceiling than the calling window: the
+    // catalog is name+description lines only (530 tokens across today's nine standards, 611 with the
+    // intent), and load_rule — not this call — is what ever reads a body.
+    const { content, tokens } = await ctx.oneShot(messages, 'search-rules');
 
     const names = new Set(catalog.map((entry) => entry.name));
     const matches = validateMatches(content, names);

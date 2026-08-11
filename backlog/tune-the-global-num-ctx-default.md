@@ -2,10 +2,11 @@
 
 **Category:** Memory / context
 
-Held out of [per-window-num-ctx.md](per-window-num-ctx.md) on purpose — that task tunes *which window gets
-what*, and this one asks whether the number they are all measured against is right at all. Recorded here
-rather than in that file because a task file is deleted in the commit that ships it, and this is a decision
-for later.
+Held out of the per-window `num_ctx` task on purpose — that one tuned *which window gets what*, and this
+asks whether the number they are all measured against is right at all. Recorded here rather than in that
+file because a task file is deleted in the commit that ships it, and this is a decision for later. That
+task has now shipped: every **window** role runs at `OLLAMA_NUM_CTX`, so this number is still the one that
+governs the Worker, the Reviewer, Retro, sub-agents and the interactive phases alike.
 
 ## The measurement
 
@@ -33,8 +34,8 @@ often.
 `contexts.num_ctx` stamps the value every phase context was written under, and every `/resume` listing
 filters on it. **Changing `OLLAMA_NUM_CTX` hides every existing context in every project's `memory.db`** —
 nothing is deleted, nothing is reachable. That is the same rule the per-window work pins itself to, and it
-cuts both ways: the complaint in `per-window-num-ctx.md` that *"'I want more room for this task' costs the
-user every context they have"* is exactly what a global retune costs too.
+cuts both ways: the per-window task's own complaint that *"'I want more room for this task' costs the user
+every context they have"* is exactly what a global retune costs too.
 
 It also interacts with the fixed overhead. The per-turn floor — system prompt plus the rendered tool
 schemas — measures **5 432 tokens for the Worker and 7 128 for Discovery**, so halving the ceiling to 8 192

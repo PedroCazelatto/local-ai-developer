@@ -6,7 +6,7 @@
 // validated, executed, audited (V1/06), and turned into a `tool` message the model reads.
 
 import type { SandboxClient } from '../core/container/index.js';
-import type { Message, OneShotResult } from '../core/llm/index.js';
+import type { Message, OneShotResult, OneShotRole } from '../core/llm/index.js';
 import type { FileReadTracker } from '../core/session/read-tracker.type.js';
 import type { SubagentHandle } from '../core/session/subagents.type.js';
 import type { ToolCallDisplay } from '../core/ui/tool-call-display.type.js';
@@ -126,12 +126,17 @@ export interface ToolContext {
    */
   readonly readTracker: FileReadTracker;
   /**
-   * A fresh, HISTORY-FREE call to the session model (same model + num_ctx), returning content + exact
-   * tokens. search_rules (V4/02) uses it to resolve an intent against the standards catalog inside a
-   * throwaway context — those turns never enter any phase's memory. Bound to the session's OllamaClient
-   * by createToolContext; most tools ignore it.
+   * A fresh, HISTORY-FREE call to the session model, returning content + exact tokens. search_rules
+   * (V4/02) uses it to resolve an intent against the standards catalog inside a throwaway context —
+   * those turns never enter any phase's memory. Bound to the session's OllamaClient by
+   * createToolContext; most tools ignore it.
+   *
+   * `role` is an ARGUMENT rather than something createToolContext binds, because three tools share this
+   * one function and they do not all want the same ceiling: search_rules and the commit-message writer
+   * are bounded, while `debate` replays uncapped model-supplied material and must stay at the base. A
+   * ceiling fixed when the context was built could only have been right for one of them.
    */
-  oneShot(messages: Message[]): Promise<OneShotResult>;
+  oneShot(messages: Message[], role: OneShotRole): Promise<OneShotResult>;
   /**
    * The session's sub-agent manager (V5/01), present ONLY for the interactive master phases — they can
    * spawn/ask/dismiss sub-agents. Undefined inside spawned windows (Worker/Reviewer/Retro) and inside a

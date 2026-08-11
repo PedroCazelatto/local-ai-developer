@@ -13,9 +13,12 @@ used routinely before an expensive decision.
 comparison is to **split it**: a 1–3b model handles titling, commit messages, rule matching and
 summarization adequately, and on a 3060 the VRAM and latency saving per session is large.
 
-This is the sibling of [per-window-num-ctx.md](per-window-num-ctx.md) — that task gives each window its
-own ceiling, this one gives some of them a different model. They touch the same resolution point and are
-probably best built together.
+This is the sibling of the per-window `num_ctx` task, which has **shipped**: that one gave each call's
+role its own ceiling, this one would give some of them a different model. They were designed together and
+share a resolution point, so most of the work is already done — `CallRole` names all eleven call sites and
+`resolveWindowCtx` is where a second lane's model would be chosen. What remains is the model half, and it
+was deferred by decision rather than blocked; see the entry in `backlog/README.md` for the measurement
+that deferred it.
 
 ## Why this shape
 

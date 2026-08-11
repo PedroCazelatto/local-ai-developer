@@ -14,7 +14,7 @@ import path from 'node:path';
 
 import type { SandboxClient } from '../core/container/index.js';
 import { oneShot } from '../core/llm/index.js';
-import type { Message, OllamaClient, OneShotResult } from '../core/llm/index.js';
+import type { Message, OllamaClient, OneShotResult, OneShotRole } from '../core/llm/index.js';
 import type { FileReadTracker } from '../core/session/read-tracker.type.js';
 import type { SubagentHandle } from '../core/session/subagents.type.js';
 // Resolves a path through symlinks without requiring its leaf to exist yet.
@@ -78,7 +78,10 @@ export function createToolContext(init: ToolContextInit): ToolContext {
     resolve: (relative: string): string => resolveInProject(init.projectPath, relative),
     readTracker: init.readTracker, // the WINDOW's tracker, outliving this per-call context
 
-    oneShot: (messages: Message[]): Promise<OneShotResult> => oneShot(init.llm, messages),
+    // The ROLE comes from the calling tool, not from here — see ToolContext.oneShot for why binding one
+    // ceiling at construction could only ever have been right for one of the three tools that share it.
+    oneShot: (messages: Message[], role: OneShotRole): Promise<OneShotResult> =>
+      oneShot(init.llm, messages, role),
     subagents: init.subagents, // undefined for every context except the interactive master phases (V5/01)
   };
 }

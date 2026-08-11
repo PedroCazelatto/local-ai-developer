@@ -98,7 +98,12 @@ export const debateTool: ToolModule = {
       // runDebate: challenger ⇄ proponent for up to MAX_DEBATE_ROUNDS on throwaway one-shot contexts,
       // then a third context distils the transcript. onTurn renders each turn as it lands, so the user
       // reads the argument live; none of those turns enter this phase's memory.
-      outcome = await runDebate({ oneShot: (messages) => ctx.oneShot(messages), onTurn: renderDebateTurn }, request);
+      // The loop names its own role per call — 'debate-turn' for an argument, 'debate-digest' for the
+      // distillation — so this just forwards it rather than choosing a ceiling on the loop's behalf.
+      outcome = await runDebate(
+        { oneShot: (messages, role) => ctx.oneShot(messages, role), onTurn: renderDebateTurn },
+        request,
+      );
     } catch (err) {
       // A missing rules/prompts/debate-*.md file or a transport failure — a real fault, surfaced to the
       // model as recoverable so the turn continues without the pressure-test.

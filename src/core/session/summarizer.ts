@@ -50,7 +50,10 @@ export async function compactActivePhase(deps: CompactDeps): Promise<CompactResu
     { role: 'system', content: SUMMARY_SYSTEM_PROMPT },
     { role: 'user', content: buildTranscript(selected) },
   ];
-  const { content, tokens } = await oneShot(deps.llm, messages);
+  // 'summarize' deliberately resolves to the BASE ceiling, not a bounded one: the slice above is the
+  // oldest ~50% of a history that has just crossed the threshold, so a smaller window would make Ollama
+  // drop the front of it and the failsafe would corrupt the very turns it exists to preserve.
+  const { content, tokens } = await oneShot(deps.llm, messages, 'summarize');
 
   // Append the `summary` turn: it collapses every selected turn (addressed by `seq`, which is stable
   // whether or not the turn has reached the database yet) and carries THIS throwaway call's exact

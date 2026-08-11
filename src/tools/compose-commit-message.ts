@@ -65,7 +65,9 @@ export async function composeCommitMessage(input: ComposeCommitMessageInput): Pr
 
   // oneShot: one fresh call to the session model with NO history and NO tools; its turns are never
   // appended to any phase's memory, so this costs the committing phase nothing but wall-clock.
-  const { content } = await input.oneShot(messages);
+  // 'commit-message' is a BOUNDED role — safe under a smaller ceiling because the diff above is already
+  // capped at REVIEW_DIFF_BUDGET, whose 12 000 characters measure 3 298 prompt tokens at their worst.
+  const { content } = await input.oneShot(messages, 'commit-message');
   const lines = stripTrailers(unwrap(content).split(/\r?\n/)).map((line) => line.trimEnd());
 
   const subjectIndex = lines.findIndex((line) => line.trim() !== '');

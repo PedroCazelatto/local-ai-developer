@@ -9,7 +9,9 @@ import type { ChatResponse, Message, Tool, ToolCall } from 'ollama';
 
 import { beginModelCall } from './begin-model-call.js';
 import type { ModelCallLifetime } from './begin-model-call.type.js';
+import type { CallRole, WindowRole } from './call-role.type.js';
 import { ollamaWithSignal } from './ollama-with-signal.js';
+import { resolveWindowCtx } from './resolve-window-ctx.js';
 import { StreamFilter } from './stream-filter.js';
 import { recoverToolCalls } from './tool-call-recovery.js';
 import { TurnAbortedError } from './turn-aborted-error.js';
@@ -164,8 +166,13 @@ export class OllamaClient {
    * The whole response arrives at once, so there is nothing to touch() and the call's stall window acts
    * as a total timeout — the only thing measurable on this path. ollamaWithSignal is what makes the
    * abort reach the request at all: the package gives a `stream: false` call no signal of its own.
+   *
+   * `role` comes FIRST and is required, because it is what decides the ceiling this call is sent under
+   * and there is no sensible default for it — a call that could omit it would be a call whose ceiling
+   * nobody chose. It takes the full CallRole: this is the one method both a window (a sub-agent) and a
+   * one-shot reach.
    */
-  async chat(messages: Message[], tools?: Tool[]): Promise<ChatResult> {
+  async chat(role: CallRole, messages: Message[], tools?: Tool[]): Promise<ChatResult> {
     // requireModel throws a "no model selected, pull one" line if the session has none (see the field).
     const model = this.requireModel();
     const call = this.openCall();
@@ -176,7 +183,10 @@ export class OllamaClient {
         messages,
         tools,
         stream: false,
-        options: { num_ctx: this.baseNumCtx },
+        // resolveWindowCtx: this role's ceiling — baseNumCtx for every window role and for the one-shots
+        // whose input is window-sized, a smaller one for the bounded one-shots. The ONLY place a ceiling
+        // is chosen; see resolve-window-ctx.ts for why the base is structurally exact.
+        options: { num_ctx: resolveWindowCtx(role, this.baseNumCtx) },
       });
       return { message: recoverIfNeeded(response.message), tokens: this.captureTokens(response) };
     } catch (err) {
@@ -203,8 +213,12 @@ export class OllamaClient {
    * Streaming turn. Ports provider.stream() + orchestrator._stream. Yields only VISIBLE
    * (filtered) prose; the raw content and structured tool_calls are assembled into the final
    * message exposed via `result()` after the iterator is exhausted.
+   *
+   * `role` is a WindowRole, not the full CallRole: streaming exists to render a reply to the user as it
+   * arrives, and a one-shot has no reader — it is awaited whole where it is issued. So the narrower type
+   * is the honest one, and it makes "a one-shot streamed to nobody" unrepresentable.
    */
-  stream(messages: Message[], tools?: Tool[]): StreamHandle {
+  stream(role: WindowRole, messages: Message[], tools?: Tool[]): StreamHandle {
     let finalResult: ChatResult | null = null;
     // Resolved HERE, not inside the generator: an async generator's body doesn't run until its first
     // next(), so a throw from within would surface only once a caller started consuming deltas — long
@@ -249,7 +263,8 @@ export class OllamaClient {
           messages,
           tools,
           stream: true,
-          options: { num_ctx: this.baseNumCtx },
+          // Same single resolution point as chat() — a window role, so in practice this is baseNumCtx.
+          options: { num_ctx: resolveWindowCtx(role, this.baseNumCtx) },
         });
         // The `ollama` package exposes no per-request signal param for chat, so bridge the lifetime onto
         // the iterator's own abort() — the same bridge ollama-models.ts builds for a cancelled pull. The

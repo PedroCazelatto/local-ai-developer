@@ -5,16 +5,27 @@
 // the main context never holds it. Shared with summarization (V4/05) — both need "one Ollama call, off
 // to the side, not in session memory".
 //
-// It delegates to OllamaClient.chat (same model + num_ctx, NO tools) purely to reuse the exact token
-// capture (prompt_eval_count / eval_count) — never a length estimate (constitution). chat() is stateless
-// w.r.t. session memory, so nothing is persisted; the returned tokens are this call's own, exact counts.
+// It delegates to OllamaClient.chat (same model, NO tools) purely to reuse the exact token capture
+// (prompt_eval_count / eval_count) — never a length estimate (constitution). chat() is stateless w.r.t.
+// session memory, so nothing is persisted; the returned tokens are this call's own, exact counts.
+//
+// The `num_ctx` is NOT necessarily the session's: `role` decides it (resolve-window-ctx.ts). Three of
+// the six one-shot roles are bounded and run under a smaller ceiling; the other three take the base,
+// because their input is either window-sized (`summarize`) or uncapped (`debate-*`). Passing the role
+// rather than binding a ceiling here is what keeps that decision in one place instead of six.
 
 import type { OllamaClient } from './client.js';
+import type { OneShotRole } from './call-role.type.js';
 import type { OneShotResult } from './one-shot.type.js';
 import type { Message } from './types.js';
 
-export async function oneShot(client: OllamaClient, messages: Message[]): Promise<OneShotResult> {
-  // No tools: a one-shot is text-in / text-out. chat() returns the EXACT tokens for this single call.
-  const { message, tokens } = await client.chat(messages);
+export async function oneShot(
+  client: OllamaClient,
+  messages: Message[],
+  role: OneShotRole,
+): Promise<OneShotResult> {
+  // No tools: a one-shot is text-in / text-out. chat() returns the EXACT tokens for this single call,
+  // under the ceiling `role` resolves to.
+  const { message, tokens } = await client.chat(role, messages);
   return { content: message.content, tokens };
 }

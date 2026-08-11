@@ -2,8 +2,12 @@
 // token counts read from prompt_eval_count / eval_count (never estimated).
 export { OllamaClient } from './client.js';
 export type { StreamHandle } from './client.js';
-// V4/02: a fresh, history-free Ollama call (same model + num_ctx, not in session memory) — used by
-// search_rules and shared with summarization (V4/05).
+// Every model call names the ROLE it plays, and that role is what picks its num_ctx ceiling. The union
+// is closed, so a call site cannot invent one; resolveWindowCtx is the single place a ceiling is chosen.
+export type { CallRole, OneShotRole, WindowRole } from './call-role.type.js';
+export { resolveWindowCtx } from './resolve-window-ctx.js';
+// V4/02: a fresh, history-free Ollama call (same model, not in session memory, ceiling from its role) —
+// used by search_rules and shared with summarization (V4/05).
 export { oneShot } from './one-shot.js';
 export type { OneShotResult } from './one-shot.type.js';
 // V5/02: daemon model-management wrappers (list / pull / hasModel) for the `/models` command.

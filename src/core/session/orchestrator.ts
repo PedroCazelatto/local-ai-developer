@@ -39,6 +39,19 @@ const NO_TOKENS: TokenCounts = { promptTokens: null, evalTokens: null };
 export class SessionOrchestrator implements TurnContext {
   /** Read-only session facts for the status line (locked for the session's lifetime). */
   readonly project: string;
+  /**
+   * The ceiling this phase's turns are actually sent under — `config.numCtx`, i.e. OLLAMA_NUM_CTX
+   * unchanged. It survived per-window `num_ctx` untouched, and that is by CONSTRUCTION rather than
+   * coincidence: 'interactive' is a WINDOW role, and resolve-window-ctx.ts gives every window role the
+   * base by holding no table entry for it. There is no number to keep in step with, because there is no
+   * second number.
+   *
+   * That matters because of what reads this: the status line's `Ctx:` denominator, the summarization
+   * threshold below, and — through SessionMemory — the value stamped on every phase context and used to
+   * filter every `/resume` listing. A value derived per window reaching that last one would hide every
+   * context in every project. If a future change ever gives the interactive phases a ceiling of their
+   * own, this field is what must follow it, and memory.ts must NOT.
+   */
   readonly numCtx: number;
 
   /** Host path to projects/<active> — the ToolContext root and the sandbox's /workspace mount. */
@@ -389,11 +402,13 @@ export class SessionOrchestrator implements TurnContext {
     // so it must name the user's own turn and nothing earlier (see the field).
     this.exchangeStartSeq = this.memory.activeNextSeq;
     this.memory.add('user', userInput);
-    return this.llm.stream(this.buildMessages(), this.activeTools());
+    // 'interactive' is the role every planning-phase turn plays; it resolves to the base ceiling, which
+    // is what makes `this.numCtx` below a true statement about these calls (see the field).
+    return this.llm.stream('interactive', this.buildMessages(), this.activeTools());
   }
 
   streamContinue(): StreamHandle {
-    return this.llm.stream(this.buildMessages(), this.activeTools());
+    return this.llm.stream('interactive', this.buildMessages(), this.activeTools());
   }
 
   /**

@@ -60,8 +60,7 @@ Not parity gaps. Each is a place where the repo currently says something that is
       behavior.* `pickSmallestModel` sorts on disk bytes and never asks what the model can do, so the
       first-run path — no `state.json`, no model named at boot — can select a model whose `/api/tags`
       capabilities are `completion,insert`. Every phase here is a tool-calling loop. Found while measuring
-      for [per-window-num-ctx.md](per-window-num-ctx.md); the interesting half is the failure path, not the
-      filter.
+      for the per-window `num_ctx` work; the interesting half is the failure path, not the filter.
 - [ ] **[The required Node version is never enforced](node-version-is-not-enforced.md)** — *Repo hygiene.*
       `engines` says `>=24` because `node:sqlite` is unflagged there, and nothing checks it — the machine
       this repo is developed on runs v22.14.0. Expected to fail when the session opens `memory.db`, which
@@ -129,8 +128,18 @@ Where the window is also a clock. Two of these want measurement before design.
       demonstrated, not inferred. Pairs with the eviction item above: eviction bounds the tail-heavy case
       cheaply, and only a failsafe bounds the head-heavy one. **Nothing may lower a window's ceiling until
       this ships** — that ceiling is currently the only bound those windows have.
-- [ ] **[Give each window its own `num_ctx`](per-window-num-ctx.md)** — *Memory / context.* One global
-      ceiling serves the Worker and the 60-character context titler alike.
+- [x] ~~**Give each window its own `num_ctx`**~~ — *Memory / context.* Shipped, and narrower than the
+      file asked: every model call now names its **role** from a closed union, and one table resolves that
+      role to a ceiling. Only three roles differ from `OLLAMA_NUM_CTX` — the context titler,
+      `search_rules` and the commit-message writer, at 8 192 — because only those three have an input
+      with a known maximum. The measurement inverted the file's third bullet: `summarize` is handed ~half
+      a window by construction and a `debate`'s material is uncapped, so a smaller ceiling there is
+      silent truncation, not economy. Changing `num_ctx` rebuilds Ollama's runner (~3.3 s, against ~90 ms
+      when unchanged), so ceilings vary by a lot and seldom rather than finely and often; what 8 192 buys
+      is residency, not tokens. Every **window** role keeps the base by having no table entry at all, and
+      `memory.ts` never imports the resolver — so the ceiling stamped on a phase context cannot drift from
+      the one its turns ran under. The titler's transcript is head-bounded at 6 000 characters, which is
+      what makes its smaller ceiling safe on the `/resume` re-title path.
 - [ ] **[Run the one-shots on a small model](small-model-lane-for-one-shots.md)** — *Memory / context.*
       **Deferred by decision, not blocked.** Measured on the 3060: the session model at `num_ctx` 8192
       occupies 10.3 GB of 12 and only one model is ever resident, so every hop to a small model and back
@@ -141,8 +150,9 @@ Where the window is also a clock. Two of these want measurement before design.
 - [ ] **[Cap `debate`'s `background` parameter](cap-the-debate-background-parameter.md)** — *Memory /
       context.* The one model-supplied payload in the repo with no bound, replayed into two windows on
       every call — up to ten times in one debate. `run-debate.ts` already names the hazard for the third
-      window while leaving it uncapped for the first two. Prerequisite for letting the debate windows take
-      a reduced ceiling in [per-window-num-ctx.md](per-window-num-ctx.md).
+      window while leaving it uncapped for the first two. Prerequisite for letting `debate-turn` and
+      `debate-digest` take a reduced ceiling in `src/core/llm/resolve-window-ctx.ts`, where they are
+      pinned to the base for exactly this reason.
 - [ ] **[Is 16 384 the right `OLLAMA_NUM_CTX`?](tune-the-global-num-ctx-default.md)** — *Memory / context.*
       Held out of the per-window task on purpose: that one tunes which window gets what, this one asks
       whether the number they are measured against is right. 16 384 already offloads 1.93 GB to CPU while

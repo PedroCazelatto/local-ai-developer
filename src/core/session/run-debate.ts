@@ -3,8 +3,9 @@
 //
 // One model, many context windows (docs/mental-model.md). A CHALLENGER window attacks the claim, a
 // PROPONENT window defends it, and a third window distils where the argument landed. All three run on
-// `oneShot` — same model, same num_ctx, no tools, never appended to any phase's memory — so the calling
-// phase pays context for the DIGEST alone, not for the argument that produced it. Sequential by
+// `oneShot` — same model, no tools, never appended to any phase's memory — so the calling phase pays
+// context for the DIGEST alone, not for the argument that produced it. All three also stay at the BASE
+// num_ctx, because `background` is uncapped model-supplied text (see DebateDeps.oneShot). Sequential by
 // construction: no parallelism anywhere in this project (docs/product.md), and a 3060 could not hold
 // two slots anyway.
 //
@@ -76,7 +77,7 @@ export async function runDebate(deps: DebateDeps, request: DebateRequest): Promi
 
   for (let round = 1; round <= MAX_DEBATE_ROUNDS; round += 1) {
     challenger.push({ role: 'user', content: nextForChallenger });
-    const attack = await deps.oneShot(challenger);
+    const attack = await deps.oneShot(challenger, 'debate-turn');
     tokens = addTokenCounts(tokens, attack.tokens);
     challenger.push({ role: 'assistant', content: attack.content });
 
@@ -94,7 +95,7 @@ export async function runDebate(deps: DebateDeps, request: DebateRequest): Promi
       content: proponentSeeded ? nextObjection(status.body, round) : openingDefenceRequest(request, status.body),
     });
     proponentSeeded = true;
-    const defence = await deps.oneShot(proponent);
+    const defence = await deps.oneShot(proponent, 'debate-turn');
     tokens = addTokenCounts(tokens, defence.tokens);
     proponent.push({ role: 'assistant', content: defence.content });
 
@@ -136,7 +137,7 @@ async function distil(
     { role: 'system', content: prompt },
     { role: 'user', content: digestRequest(request, transcript) },
   ];
-  const first = await deps.oneShot(messages);
+  const first = await deps.oneShot(messages, 'debate-digest');
   let tokens = first.tokens;
   // parseDebateDigest: the untrusted reply validated into a digest — null when it carries no boolean
   // verdict, which is the one field that cannot be defaulted.
@@ -145,7 +146,7 @@ async function distil(
 
   messages.push({ role: 'assistant', content: first.content });
   messages.push({ role: 'user', content: REFORMAT_REQUEST });
-  const retry = await deps.oneShot(messages);
+  const retry = await deps.oneShot(messages, 'debate-digest');
   tokens = addTokenCounts(tokens, retry.tokens);
   return { digest: parseDebateDigest(retry.content), tokens };
 }

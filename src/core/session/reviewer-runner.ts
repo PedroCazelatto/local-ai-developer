@@ -202,11 +202,11 @@ class ReviewerWindow implements TurnContext {
 
   streamAsk(userInput: string): StreamHandle {
     this.messages.push({ role: 'user', content: userInput });
-    return this.deps.llm.stream(this.messages, this.reviewerTools);
+    return this.deps.llm.stream('reviewer', this.messages, this.reviewerTools);
   }
 
   streamContinue(): StreamHandle {
-    return this.deps.llm.stream(this.messages, this.reviewerTools);
+    return this.deps.llm.stream('reviewer', this.messages, this.reviewerTools);
   }
 
   onTokens(tokens: TokenCounts): void {

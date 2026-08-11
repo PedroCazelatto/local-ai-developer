@@ -297,7 +297,11 @@ export class SessionMemory {
       // `UNIQUE (context_id, seq)` and abort the next flush.
       nextSeq: maxSeq(this.db, contextId) + 1,
       title: summary?.title ?? null,
-      // A reopened context that still has no title gets one more chance from this session's first answer.
+      // A reopened context that still has no title gets one more chance, from the next answer in this
+      // session. Note what it is titled FROM: generateContextTitle reads the whole visible history, so
+      // that attempt sees the entire REPLAYED context, not only the turns added since the reopen. That
+      // is deliberate — a title says why the context exists, which its opening establishes and its
+      // latest turn does not — and it is why buildTranscript bounds what the titler is handed.
       titleAttempted: false,
     });
     return { contextId, turns: records.length, lastPromptTokens: lastPromptTokensOf(records) };
