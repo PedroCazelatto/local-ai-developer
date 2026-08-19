@@ -46,6 +46,13 @@ surface are one thing and cannot disagree. Hand-written inventories in the phase
 times before this: a phase file's job is to say *when* to reach for a tool, never *whether* it
 exists. The block costs roughly 100–200 tokens per turn — that is the price of the guarantee.
 
+The **tool definitions themselves** are the larger cost, and are easy to overlook because nothing in
+the prompt shows them: Ollama renders the `tools` array into the chat template, so they land in
+`prompt_eval_count` like everything else. Measured on `qwen2.5-coder:14b`, that is **2 671–4 107
+tokens per call**, against a system prompt of 2 148–3 176. Together the fixed floor of a turn is
+**29–44% of a 16 384 window** before a word of history — 7 128 tokens for Discovery, 5 432 for the
+Worker. It is the strongest argument for the throwaway one-shots, which send no tools at all.
+
 The planning phases (Discovery/Design/Breakdown) get no shell: `execute_command` and `run_in_project`
 are absent from their arrays, because planning writes documents and `read_file`/`list_files`/
 `search_in_files` already cover inspection. That last clause was untrue for as long as `list_files`

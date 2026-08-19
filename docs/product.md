@@ -44,6 +44,25 @@ still under the cursor and has not scrolled away — and transient widgets (the 
 spinner) repaint only their own frame and then collapse into one static, copyable summary. Finished
 history is append-only, forever.
 
+**Every tool call leaves a two-line record in the scrollback.** `→ read_file src/core/ui/theme.ts`
+before the call, naming it by the one argument that says what it did — the path, the command, the
+search pattern, never a dump of the arguments object — and `← 340 lines` after it returns. A failed
+call is red and says why, so a refused `edit_file` never reads like a successful one. `write_file` and
+`edit_file` add a compact +/- diff under their result line, which collapses to `+12 −3` with the path
+above 20 changed lines or 2,000 characters, because the scaffold written into a new project would
+otherwise flood the buffer. A sub-agent's calls are indented under the parent call they happened
+inside and marked `[sub:01JQ]`.
+
+This is a **record, not a confirmation prompt** — tools still run autonomously, with nothing to
+approve (see [constitution.md](../constitution.md)). The analogue is showing the diff after the fact,
+which is what makes an autonomous edit reviewable at a glance. Both lines are static the moment they
+are written: history, never a widget.
+
+> A path in these lines is **never truncated** — a row that does not fit wraps instead. Nothing
+> measures these rows and they move the cursor only by newline, so a wrapped row costs a row and
+> nothing else; a cut path would cost the file name, which is the part that identifies it. Everything
+> that is not a path — commands, search patterns, prose — is truncated to the width as usual.
+
 **The input box stays on screen while a turn runs.** Its rule, the `›` row, and the rule below it are
 rows reserved at the bottom of the terminal, so the reply streams above them and never disturbs them.
 Typing during a turn goes into that row rather than echoing into the reply.

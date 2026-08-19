@@ -18,6 +18,16 @@ There is exactly **one** local Ollama model. Everything else is context windows.
   challenger, a proponent and a distiller arguing a claim so the calling phase pays context for the
   conclusion alone ([phases.md](phases.md)). Two windows of the one model disagreeing is not a second
   opinion from a second model; it is the same weights reading a different `messages` array.
+
+  A one-shot is cheap for a reason worth stating plainly: it carries **no tool definitions and no phase
+  markdown**, which together are 29–44% of a 16 384 window on an ordinary turn — the schemas of a
+  phase's tools alone measure 2 671–4 107 tokens. That saving is structural and has nothing to do with
+  which model runs it.
+- **Every model call names the role it plays**, and that role decides its `num_ctx`. The set is closed
+  and lives in [src/core/llm/call-role.type.ts](../src/core/llm/call-role.type.ts); the ceiling is
+  chosen in one place, [resolve-window-ctx.ts](../src/core/llm/resolve-window-ctx.ts). Every **window**
+  role sits at `OLLAMA_NUM_CTX`, which is what keeps the rule below true. Three bounded one-shots run
+  smaller — see [cli.md](cli.md).
 - A **phase** is the unit of work and the unit of instruction. Each phase has an instruction set (its
   markdown under [rules/](../rules/)) that configures the window it runs in. Elsewhere these are
   called "skills" or "personas" — in this project the single word is **phase**.
@@ -31,8 +41,14 @@ Each phase has its **own isolated message history**. Switching phases saves the 
 loads the target's — no cross-phase leakage, no auto-clear. The user owns the decision to wipe
 history. Spawned execution windows (Worker/Reviewer/Retro) start from an **empty** history and are
 discarded after their task — except the Worker, whose history persists *across the fix loop* (so it
-remembers prior attempts and Reviewer feedback) and is discarded when the task closes. Those windows
-are RAM-only: they persist nothing, so everything below describes the interactive phases.
+remembers prior attempts and Reviewer feedback) and is discarded when the task closes. That persistence
+is load-bearing and is not traded away to save context; what bounds it instead is **tool-result
+eviction** — past `EVICTION_THRESHOLD_RATIO` of `OLLAMA_NUM_CTX` the Worker replaces its *older* results
+of look-only tools with a one-line stub naming the call, keeping the newest few verbatim and never
+touching a result from a tool that changed something. It costs no inference, and it never rewrites
+anything in the older half of the window, because rewriting a message forces Ollama to re-evaluate the
+prompt from that point on. Those windows are RAM-only: they persist nothing, so everything below
+describes the interactive phases.
 
 ### A phase context is a record, not a file
 
@@ -71,6 +87,10 @@ can be listed, described and reopened by address, which is what lets a phase —
   it, because the reads live in the context being swapped out and the model can no longer see them.
   `/swap` leaves it alone — a different phase is a different window, not a different context. It is the
   one piece of window state that is neither persisted nor process-lifetime: it is context-lifetime.
+  **Eviction is the one thing that does not empty it:** when a read's text is stubbed out of a window,
+  the record of the read survives, so the write tools still accept that file. The test the guard applies
+  is "did this window look at the file", not "can it still see the text" — `/clear` empties the tracker
+  because the *context* is gone, not merely because the bytes stopped being visible.
 - **A cancelled turn branches the exchange off.** Stopping a turn with Ctrl+C takes the whole exchange
   out of the live window at once — the user's message, every assistant turn it produced, the tool calls
   and their results, and the partial answer it was cut off in — so the prompt reopens where the exchange
@@ -88,7 +108,11 @@ can be listed, described and reopened by address, which is what lets a phase —
   reopenable — Ollama silently drops the oldest tokens past the ceiling, so replaying a 32k history
   into an 8k window would leave the phase reasoning from turns it can no longer see. Restoring the old
   value brings them back; `OLLAMA_NUM_CTX` is read once at boot, so the change can only ever be
-  detected there.
+  detected there. The per-role ceilings above cannot disturb this: an interactive turn is a **window**
+  role and so runs at `OLLAMA_NUM_CTX` exactly, and the recording path never consults the role table at
+  all — `SessionMemory` is handed the raw configured value, and `memory.ts` does not import the
+  resolver. The number stamped on a context is the number those turns really ran under, by
+  construction rather than by agreement.
 - **Which model wrote which turn is recorded per turn,** so a mid-session `/models use` is visible in
   the history rather than inferred. No model is blocked from reading another's turns.
 - **Documentation files** (rules, plans, specs) exist for one-time reference or human reading — they

@@ -29,6 +29,16 @@ The launcher also runs directly: `node scripts/run.mjs install | start <project>
   (`design/7a888b1f`) or from a numbered list. See the memory model in
   [mental-model.md](mental-model.md).
 - `/subagents` — list active sub-agents
+- `/tasks` — the backlog as an epic/story tree: each task's status, order and unmet dependencies, with
+  the one `/run next` would pick marked
+- `/blockers` — every open blocker with its task id, the Reviewer's question, and the `/answer` line
+  that resolves it
+- `/inbox [<phase> | all]` — open cross-phase inbox items: the active phase's, one named phase's, or
+  every phase's. Open items only
+- `/batch [n]` — re-print a persisted batch summary; `n` is the batch number the report itself prints
+  (`Batch #3`), and a bare `/batch` is the most recent
+- `/audit [n]` — the last N tool calls, one line each (`HH:mm:ss · phase · tool · exit · duration`).
+  Default 20, and a larger number is not capped
 - `/stop` · `/stop round` — wind a running `/run` down (see *Stopping a turn* below); typed into the
   fenced input box while the run is in flight, not at an idle prompt
 - `/help` — list every command · `/exit` — quit
@@ -37,6 +47,26 @@ These are **user commands, and the model never invokes them.** Where the model n
 capability, it gets a separate **tool with its own guardrails** — a `switch_phase` tool rather than
 access to `/swap` — so the orchestrator keeps control of what a phase can actually do, and each
 capability can be narrowed independently of the command the user drives.
+
+### The inspection commands
+
+`/tasks`, `/blockers`, `/inbox`, `/batch` and `/audit` are the **come-back half of the walk-away
+loop**: start a batch, walk away, come back and read what happened without quitting the session.
+Every one of them is a **pure read** of a file the orchestrator had already written under
+`projects/<name>/.orchestrator/` — no new persistence, no model call, nothing that can change a run.
+
+Two of them mark the boundary of what a phase may see, and the asymmetry is deliberate:
+
+- **`/inbox` has a model counterpart, narrowed.** A phase reads its own inbox with `inbox_read`, and
+  only its own — the recipient is derived from the active phase so a window can never name itself as
+  someone else. `/inbox all` is the user's view across every phase, which no phase gets.
+- **`/audit` has none at all.** The audit log is the user's record of autonomous, no-confirmation tool
+  calls, and no phase can read it. A window able to read the record of its own calls could reason
+  about how they look to the user, and the log's only job is to be a record the user trusts.
+
+Each degrades to one recoverable line when what it reads is not there — a project with no `backlog/`,
+a blocker file no blocker has ever been written to, a batch number that is not on disk — the way
+`/run` already degrades on a `BacklogError`.
 
 ## Composing a multi-line message
 
@@ -61,6 +91,32 @@ Binding Shift+Enter, per terminal:
 | VS Code terminal | `keybindings.json` | `{ "key": "shift+enter", "command": "workbench.action.terminal.sendSequence", "args": { "text": "\n" }, "when": "terminalFocus" }` |
 | iTerm2 | Settings → Keys → Key Bindings | Shift+↩ → *Send Hex Code* → `0x0a` |
 | kitty | `kitty.conf` | `map shift+enter send_text all \x0a` |
+
+## Completing a command or a task id
+
+**Tab cycles.** It replaces the word under the cursor with the first thing that could go there; each
+further press swaps in the next one, wrapping back to the first after the last — file-completion in
+`cmd.exe` or fish, not bash's "extend to the common prefix, then list". Candidates come in a stable
+alphabetical order, so the same number of presses always lands on the same word.
+
+Nothing is ever printed. There is no candidate list, which is why every press visibly changes the line
+instead: the pinned rows below the input are never disturbed and nothing enters the scrollback.
+
+| Where the cursor is | What Tab offers |
+|---|---|
+| the command word (`/re` + Tab) | every registered command — a new one completes the day it is added |
+| `/run <selector>` | `next`, `all`, and every task id that is not `done` |
+| `/answer <task-id>` | only tasks sitting at `blocked` — exactly the ones the command can act on |
+| `/swap <phase>` | the phase names |
+| `/models <subcommand>` | `list`, `pull`, `use` |
+| `/new-project <name> <stack>` | `node`, `python` (the name itself is free text) |
+
+Anywhere else Tab is inert — a chat message, an unknown command, an argument with nothing to suggest.
+**Model names are the deliberate omission:** listing them means asking the Ollama daemon, and completion
+has to answer on the keypress without waiting for anything, or the pinned rows blank until the next
+keystroke. `/models pull` names are arbitrary registry strings anyway.
+
+**Shift+Tab is unbound.** It is not a reverse cycle, and it no longer switches phase — use `/swap`.
 
 ## Typing while the model works
 
@@ -143,13 +199,28 @@ needs the installed list to decide anything, and a session without Ollama can do
 
 [.env.example](../.env.example) holds:
 
-- `OLLAMA_NUM_CTX` — the hard token ceiling per context window. **Changing it hides every phase
+- `OLLAMA_NUM_CTX` — the hard token ceiling for every **window**: the interactive phases, the Worker,
+  the Reviewer, Retro and sub-agents all run under exactly this value. **Changing it hides every phase
   context written under the old value** — they are not listed and cannot be reopened, because replaying
   a history built for a larger window would silently lose its oldest turns. Nothing is deleted:
   restoring the old value brings them back. It is read once at boot, so a change takes effect only on
   the next `run start`. See the memory model in [mental-model.md](mental-model.md).
+
+  Three **throwaway one-shots** run under a smaller ceiling of their own instead — the context titler,
+  `search_rules`, and the commit-message writer, at 8 192. Each has an input with a known hard maximum,
+  and at 8 192 the model stays fully resident in VRAM where at 16 384 part of it spills to the CPU. The
+  other three one-shots stay at `OLLAMA_NUM_CTX`: summarization is handed roughly half a full window by
+  construction, and a `debate`'s material is uncapped text the model writes, so neither could take a
+  smaller window without Ollama silently dropping the front of it. The values are not configurable —
+  they are a table keyed by the call's role in
+  [src/core/llm/resolve-window-ctx.ts](../src/core/llm/resolve-window-ctx.ts).
 - `SUMMARIZATION_THRESHOLD_RATIO` — compact a phase once its exact `prompt_eval_count` reaches this
   fraction of `OLLAMA_NUM_CTX`. Must be in `(0, 1]`.
+- `EVICTION_THRESHOLD_RATIO` — replace a spawned window's **older tool results** with a one-line stub
+  once its exact `prompt_eval_count` reaches this fraction of `OLLAMA_NUM_CTX` (default `0.6`; must be
+  in `(0, 1]`). Deliberately below the summarization ratio: eviction costs no inference, so it gets a
+  run first. It applies to the **Worker**, whose window persists across all five review rounds and has
+  no summarization failsafe of its own. `0.6` is a starting point, not a measured optimum.
 - `OLLAMA_TIMEOUT_MS` — how long one model call may go **silent** before it is abandoned (default
   `120000`). A **stall** window, not a limit on how long a turn may take: every chunk restarts it, so a
   slow-but-alive model is never killed for being slow, while a wedged or unreachable daemon surfaces as

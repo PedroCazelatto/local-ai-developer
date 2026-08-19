@@ -21,11 +21,23 @@ local-ai-developer/
 │   └── prompts/            # orchestrator-owned one-shot prompts; never searchable by the model
 ├── docs/                   # the docs indexed by CLAUDE.md
 ├── backlog/                # one markdown file per pending task; delete + commit on completion
-├── projects/               # each child is its own git repo, developed by the model
+├── projects/               # each child is its own git repo, developed by the model (one exception below)
 ├── scripts/
 │   └── run.mjs             # cross-platform launcher: install / start <project> / stop
 └── docker-compose.yml
 ```
+
+### The one exception under `projects/`
+
+`projects/` is git-ignored, so a project the model develops never lands in this repository — each is
+its own git repo, created by `/new-project`, and it stays outside this one. **`hello-world` is the
+single exception**: it is the example project, tracked here as ordinary files so a fresh clone has
+something to `run start` straight away. It is exactly what `/new-project hello-world node` produces —
+`README.md`, `PRODUCT_SPEC.md`, `docker-compose.yml`, `backlog/README.md`, and its own `.gitignore`,
+which keeps `.orchestrator/` out of this repository the same way it would out of its own. It has
+**no `.git` of its own**: nesting one would make this repository see a gitlink instead of the example.
+The root `.gitignore` implements the exception with `projects/*` (not `projects/`, which git could
+never descend into) plus `!projects/hello-world/`.
 
 ## Backlog
 
