@@ -12,3 +12,10 @@
 12. B
 13. B
 14. A
+15. Docker must use the node version of .nvmrc
+16. Start only
+17. C
+18. B
+19. A
+20. A
+21. No, you need to create a file with readme inconsistencies and I will fix them
