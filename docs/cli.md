@@ -15,6 +15,27 @@ The launcher also runs directly: `node scripts/run.mjs install | start <project>
 > **Never run the full app to test a change.** See the working rules in
 > [CLAUDE.md](../CLAUDE.md) — only `npm run setup` and `npm run typecheck` may be run.
 
+## Node version
+
+`.nvmrc` (`24.14.0`) is the **single source of truth** for the Node version this repo runs on.
+`package.json`'s `engines` range and the sandbox image tag both follow it; when the pin moves, they
+move with it. The floor stays at 24 — not because `node:sqlite` forces it (it demonstrably works
+unflagged on 22 as well), but because a repo that pins one version in four places and enforces none of
+them tells you nothing about what it was tested on.
+
+- **Making the shell honour `.nvmrc` is the real fix, and it is machine setup — no code.** A shell on
+  the wrong Node is a shell that was never switched; an `nvm use` on entering the repo (or the
+  equivalent for whatever version manager is installed) is what actually prevents the problem.
+- **The Docker sandbox runs the same version.** The root sandbox image tag is derived from `.nvmrc`,
+  so the Node a project's code is built and tested against is the Node the orchestrator itself runs
+  on — not a floating major tag free to drift a whole minor ahead of the pin. See
+  [sandboxing.md](sandboxing.md).
+- **`run.mjs` checks at the front, and treats its verbs differently.** `start` **refuses** on a Node
+  outside the range, naming the version required and the version found; `install` **warns and
+  continues**, because an install on the wrong Node still produces a usable `node_modules` and the
+  refusal belongs where a walk-away batch would otherwise fail hours later. `stop` is never gated:
+  shutting Docker down has to work on any Node.
+
 ## In-app commands (terminal)
 
 - `/swap <phase>` — switch the active phase
@@ -177,23 +198,60 @@ a stop asked for during one run never carries into the next.
 the user has actually pulled — a hard-coded default locks a fresh install to a model that isn't
 there, and every turn fails. The **installed set is the only ground truth**, so boot asks the Ollama
 daemon and picks from what exists
-([src/core/session/resolve-boot-model.ts](../src/core/session/resolve-boot-model.ts)):
+([src/core/session/resolve-boot-model.ts](../src/core/session/resolve-boot-model.ts)).
 
-1. `state.json`'s `activeModel`, **if it is installed** — the user's own explicit choice always wins.
-2. `state.json`'s `activeModel`, **if it is not installed** — offer to re-pull it (single-keypress y/n).
-3. Otherwise — the **smallest installed model**. VRAM is the binding constraint, so an unattended
-   boot lands on the model most likely to fit.
-4. **Nothing installed at all** — offer to pull `SUGGESTED_MODEL`, which exists *only* as this
+**Tool support is a gate; size is only the tie-break behind it.** Every phase in this product is a
+tool-calling loop, so a model without the `tools` capability cannot run any of it — a Worker that
+cannot call `edit_file` does nothing at all, and the phase burns its five rounds looking confused
+rather than failing. The pick therefore filters on the capability Ollama reports for each installed
+model first, and takes the smallest of whatever survives:
+
+1. `state.json`'s `activeModel`, **installed and tool-capable** — the user's own explicit choice wins.
+2. `state.json`'s `activeModel`, **installed but toolless** — **refused**, with a line saying why, and
+   boot falls through to the pick rule. An explicit choice outranks an inferred one only among models
+   that can actually run a phase.
+3. `state.json`'s `activeModel`, **not installed** — offer to re-pull it (single-keypress y/n). A model
+   that is not on disk reports no capabilities at all, so the gate is applied *after* the pull: a
+   re-pulled model that turns out to be toolless is refused too, and boot falls through to the pick
+   rule.
+4. Otherwise — the **smallest installed tool-capable model**. VRAM is the binding constraint, so an
+   unattended boot lands on the smallest model that can actually work.
+5. **Nothing installed at all** — offer to pull `SUGGESTED_MODEL`, which exists *only* as this
    download suggestion for a fresh machine and is never a value the session silently boots on.
-5. **Every offer declined** — no model. This is a valid session, not an error: the REPL still boots
-   (so the user can `/models pull`), the status line reads `no model`, and a turn fails with an
-   actionable "pull one" line instead of an Ollama 404.
+6. **Nothing tool-capable, or every offer declined** — no model. This is a valid session, not an
+   error: the REPL still boots (so the user can `/models pull` or `/models use`), the status line
+   reads `no model`, and a turn fails with an actionable line instead of an Ollama 404.
 
-A declined pull is never chased with a second offer for a different model — **one ask per boot**.
+When the reason is capability rather than an empty machine, that line **says to pull a model with tool
+support, and names none**. `SUGGESTED_MODEL` is a suggestion for a machine with nothing on it, and this
+machine is full; naming a model whose own tool support has not been verified would only move the
+problem one pull further along.
+
+Two invariants hold across all of it:
+
+- **Nothing is ever pulled without the user's approval.** Every pull path — both boot offers, `/models
+  pull`, and the inline offer inside `/models use` — is gated on an explicit keypress. And a declined
+  pull is never chased with a second offer for a different model: **one ask per boot**.
+- **The gate fails closed.** A daemon that does not report capabilities at all leaves every model
+  failing it, and the session boots model-less. That is the cheap direction to be wrong in: booting a
+  walk-away batch onto a model that cannot call a tool costs the whole batch, while a wrongly
+  model-less boot costs one `/models use` the user can drive from inside the app.
 
 Only an explicit `/models use` writes `state.json`, so an inferred boot pick never overwrites a
 stated choice. **An unreachable Ollama daemon is fatal at boot** — like a missing Docker daemon: boot
 needs the installed list to decide anything, and a session without Ollama can do nothing at all.
+
+### `/models` and the toolless case
+
+- **`/models list` marks tool support.** The list is where a user goes to ask why a model was skipped,
+  so it is where the answer belongs.
+- **`/models use <name>` on a toolless model asks before switching** — a single-keypress confirm
+  naming what will break, not a refusal. A deliberate choice is not an inferred default, and being
+  able to select the model is the only way to chat with it at all; the confirm just means nobody
+  arrives there by Tab-completion.
+- **An active toolless model is marked in the pinned status line** — `Model: <name> (no tools)`.
+  Boot's scrollback is wiped by the REPL's one-time `clearScreen`, so a warning printed there is a
+  warning the user cannot scroll back to. The status line is the only surface that survives it.
 
 ## Environment
 

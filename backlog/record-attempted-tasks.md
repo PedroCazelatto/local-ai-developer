@@ -34,14 +34,38 @@ It pairs naturally with [budget-ceilings-for-runs-and-batches.md](budget-ceiling
 which introduces a second way for a task to end without a verdict. Both need the same thing: an outcome the
 backlog can see and a reason it can distinguish.
 
-## Open decisions
+## Decisions (answered — OPEN-QUESTIONS.md #3–#6)
 
-- **Whether the status vocabulary grows, or the attempt count alone carries it.** A new status is clearer to
-  read in a task file; a count is less invasive to everything that switches on status.
-- **What re-running a failed task means.** Retry from scratch (today's behavior), or refuse without an explicit
-  override.
-- **Where the count is written, and by whom.** The Reviewer owns `mark_task_done` and is the only execution
-  actor that commits, so a counter written by the loop is a new writer of task files.
-- **Whether a `/run all` that skips previously-failed tasks is the default** or an opt-in flag. The
-  unattended-batch use case argues for skipping by default; the "I fixed the spec, try again" case argues the
-  other way.
+- **The loop writes the record into the task's frontmatter, *after* the stash, and the tree is left
+  dirty** (#4d). `stashTaskAttempt` is `git stash push -u` over the whole tree, so a frontmatter write
+  before it is reset to HEAD and lost with the attempt. The rejected alternatives: a second
+  orchestrator-side committer beside Retro's; the Reviewer, which is absent on exactly the MAX_ROUNDS
+  and error paths that need the record; and a git-ignored `.orchestrator/` file the committed backlog
+  can never show.
+- **`/run all` skips a previously-failed task by default** (#5a). No flag, no spelling to invent —
+  `resolveSelector` parses a bare selector and there is no precedent for `/run` flags.
+- **`/run <id>` retries from scratch** (#3a) — today's behaviour. A fresh Worker, the stash never
+  reused. Naming the task explicitly *is* the "I fixed the spec, try again" gesture.
+- **The apparently-unreachable empty-diff escalation is left alone** (#6c). `setTaskStatus('in_progress')`
+  dirties the backlog file for the whole loop, so `changed.files.length === 0` looks unreachable in
+  round 1 — confirmed by reading, not by execution. Not this task's problem.
+
+## Blocked on
+
+- **#2 — the shape of the record itself, which is the centre of the task.** A new `TaskStatus` member,
+  an `attempts: N` count, or both? Answered "I didn't understand"; re-stated in
+  [OPEN-QUESTIONS.md](../OPEN-QUESTIONS.md) #2. Nothing else here can be built without it: #5's
+  "skip by default" needs something to read, and #4's write needs something to write.
+
+## Falls out of #4d and needs a decision
+
+Choosing (d) leaves the project tree permanently dirty by one file, and **three separate gates refuse a
+dirty tree today**:
+
+- `preflightRefusal` (`batch.ts`) — refuses to *start* a batch at all;
+- the per-task check inside the batch loop — skips every task after the first failure;
+- `runOneTask`'s `HALT_DIRTY` in `run.ts`, and `git_branch`'s `switch` refusal.
+
+Each has to learn to tolerate exactly the backlog file the loop wrote, or a single escalation silently
+ends every subsequent run. How — a path allowlist, a "known-modified" set carried through the batch, or
+something else — is not decided.

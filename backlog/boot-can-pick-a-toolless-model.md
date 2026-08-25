@@ -17,19 +17,38 @@ the set it filters is simply not filtered enough.
 
 ## The shape of a fix
 
-Filter the boot pick on the `tools` capability, which `/api/tags` already reports, and keep "smallest"
-as the tie-break among the models that qualify. The interesting part is the failure path, not the happy
-one.
+Filter the pick on the `tools` capability Ollama reports, and keep "smallest" as the tie-break among
+the models that qualify. `listModels` currently projects the capability away before `pickSmallestModel`
+can see it, so `InstalledModel` grows the field first. There are **four call sites, not one** — the
+saved-model branch, the re-pull branch, the pick rule, and `/models use`.
 
-## Open decisions
+## Decisions (answered — OPEN-QUESTIONS.md #1, #7–#14)
 
-- **What happens when no installed model has `tools`.** Refuse to boot with a line naming the problem
-  and what to pull, or boot anyway and warn? Refusing is honest; booting keeps `/models` reachable so
-  the user can fix it from inside the app, which argues for booting with a loud, pinned warning.
-- **Does `/models use <name>` get the same check?** A deliberate choice is not the same as a default,
-  so this may want a warning rather than a refusal — but a user who picks a toolless model by hand has
-  the identical broken session.
-- **Is the capability cached or re-read?** `/api/tags` is cheap, but the boot path already has a
-  reason to be fast.
-- **Does this want a doc line?** `docs/cli.md`'s *Model selection* section describes the boot pick as
-  "the smallest installed model", which becomes wrong the moment it is filtered.
+- **No tool-capable model installed → boot model-less** (#7). The REPL still comes up, the status line
+  reads `no model`, and each turn fails with an actionable line — the machinery already works end to
+  end, and it is the only outcome that leaves `/models pull` reachable.
+- **The failure line names no model** (#8): "pull a model with tool support". `SUGGESTED_MODEL` is a
+  suggestion for an *empty* machine, and it has not itself been verified as tool-capable.
+- **A saved `activeModel` that is toolless is refused**, and boot falls through to the pick rule (#9).
+  The same for a saved-but-missing model offered for re-pull (#10) — capabilities are unknowable until
+  the blob is on disk, so the gate runs *after* the pull — the reading confirmed at **#71**.
+- **Nothing is pulled without approval** (#1). Boot's precedence is otherwise unchanged: a usable saved
+  model wins; an empty machine gets a suggestion, never a silent download.
+- **An absent `capabilities` field fails closed** (#13) — assume incapable. A pre-`capabilities` Ollama
+  daemon therefore boots model-less on a machine full of models; the recovery is one `/models use`.
+- **`/models list` marks tool support** (#14) — the list is where "why was that one skipped" is asked.
+- **The warning lives in the pinned status line**, `Model: <name> (no tools)` (#12). Boot scrollback is
+  wiped by the REPL's one-time `clearScreen`.
+- **`/models use <name>` on a toolless model takes a single-keypress confirm, then switches** (#11c).
+
+## Still open
+
+- **#69 (was #11 vs #7) — confirm, or refuse?** #7's answer says `/models use` should *refuse* a toolless model;
+  #11 answers `c`, a single-keypress confirm that then switches. Both cannot hold. The doc and the list
+  above follow **#11c**, because #12's `(no tools)` status marker only has a reason to exist if a
+  toolless model can become active. **Confirm before building it.**
+- **Is the capability cached or re-read?** (not numbered — not asked in the first pass) `/api/tags` is cheap, but the boot path already has a reason
+  to be fast, and a per-model `/api/show` at boot would be N round-trips rather than one.
+- **#72 — a minimum Ollama version now has to be stated somewhere.** Fail-closed (#13) turns "your daemon is
+  too old to report capabilities" into "no model can run this product", and the repo currently declares
+  no floor at all. This box runs 0.32.9, which reports it.

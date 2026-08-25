@@ -40,7 +40,10 @@ hand paths to git — and each validates those paths through the same `resolveIn
   session's project arg). Other projects and the host filesystem are **not mounted at all**, so the
   model cannot reach them no matter how a command is written (`..`, `$(...)`, variables, symlinks).
   `/workspace` IS the project root; `execute_command` runs there. It runs **plain shell commands**
-  (file operations, navigation, piping) without giving the model host access.
+  (file operations, navigation, piping) without giving the model host access. Its image is
+  `node:<version>-slim`, where the version is **the one pinned in [`.nvmrc`](../.nvmrc)** rather than
+  a floating major tag: the Node a project is built and tested against is the Node the orchestrator
+  itself runs on, and one pin moves both (see *Node version* in [cli.md](cli.md)).
 - **Per-project sandbox** — each project folder carries its own `docker-compose.yml` declaring a
   `runner` service with the language toolchain (Python, Node, Rust, …) and network access. The
   execution loop's **test/build/install steps** run against this container through the

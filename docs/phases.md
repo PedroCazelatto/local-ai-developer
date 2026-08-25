@@ -77,6 +77,32 @@ implement → test → review → fix → (loop, max 5 rounds)
     reverts to `pending` and is listed separately in the batch summary. Anything a Reviewer committed
     before the interruption stays committed, and what is left is stashed like any other non-pass.
 
+### A failed task remembers that it was tried
+
+A task that burns all five rounds is set back to `pending`, which makes it indistinguishable from a
+task nobody has ever touched — so the next `/run all` picks it up and spends another five rounds on
+it. Two unattended batches overnight can spend the second one re-failing the first one's tasks. The
+escalation *is* recorded, in the batch summary under `.orchestrator/batches/`, but nothing that
+schedules work reads that back. The attempt is therefore recorded **in the task's own frontmatter**,
+where the file that actually drives scheduling can see it.
+
+- **The loop writes the record, and writes it after the stash.** `stashTaskAttempt` is a `git stash
+  push -u` over the whole tree, so anything written into the frontmatter before it is reset to HEAD
+  and lost with the attempt. The write happens once the stash has been taken, which leaves the project
+  tree dirty by exactly that one file. That is the deliberate trade: the alternatives put the record
+  either in a git-ignored file the committed backlog can never show, or in the Reviewer's hands —
+  which is precisely where it is missing, since the MAX_ROUNDS and error paths that need a record are
+  the paths on which no Reviewer verdict exists. *(The dirty-tree pre-flights have to learn to tolerate
+  that one file, or every following task in the batch is skipped — see
+  [backlog/record-attempted-tasks.md](../backlog/record-attempted-tasks.md).)*
+- **`/run all` skips a previously-failed task by default.** The unattended batch is the case that
+  matters: the defect is coming back in the morning to find the night was spent re-failing yesterday's
+  work.
+- **`/run <id>` still retries it, and retries from scratch.** Naming a task explicitly is the "I fixed
+  the spec, try again" case and needs no flag to mean that. The retry starts blind — a fresh Worker,
+  with the stash deliberately never reused — which is today's behaviour and stays that way: a Worker
+  handed its own failed attempt converges on it instead of past it.
+
 ## Retro phase (automatic — fires after the user resolves a blocker)
 
 When the user answers a blocker, the orchestrator spawns a **Retro** window with `{the task, the
