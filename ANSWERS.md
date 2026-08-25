@@ -19,3 +19,9 @@
 19. A
 20. A
 21. No, you need to create a file with readme inconsistencies and I will fix them
+22. All six
+23. It is allowed to summarize.
+24. The seed rule is always protected, what is summarized is only the model-user and model-model messages
+25. Reuse 0.75
+26. Give it the hook.
+27. Yes for the sub-agent, but reuse summarization_fire
