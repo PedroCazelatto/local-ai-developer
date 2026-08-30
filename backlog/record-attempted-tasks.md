@@ -72,10 +72,12 @@ integrity*).
 The same commit updates [backlog/README.md](README.md)'s line for this task, which still describes the
 `pending` behaviour this removes.
 
-## Still open
+## Nothing is open — the ordering was confirmed by reading (#77a)
 
-- **#77 — does the Reviewer's `verdictGitConflict` see the escalation commit?** A `fail` on a clean
-  tree is legal and normal, and a `pass` may leave nothing uncommitted. The escalation commit happens
-  on the MAX_ROUNDS and error paths, *after* the last Reviewer has spoken, so on the reading of the
-  code it cannot collide — but that is inferred from ordering rather than confirmed, and it is the one
-  place a fourth committer could corrupt a verdict. See [OPEN-QUESTIONS.md](../OPEN-QUESTIONS.md) #77.
+`verdictGitConflict` cannot see the escalation commit. The commit happens on the MAX_ROUNDS and error
+paths, **after** the last Reviewer has spoken, so there is no live verdict to contradict. #77 accepted
+the reading rather than requiring a driven test.
+
+**Write the ordering down where it is enforced.** `run-task-loop.ts` gets a comment at the commit site
+saying *why* it is safe — the fourth committer is only ever reached once no Reviewer is running — so
+that a future edit moving the write earlier has to argue with it rather than discover the collision.

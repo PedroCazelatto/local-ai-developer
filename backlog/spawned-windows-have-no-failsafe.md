@@ -80,15 +80,28 @@ question: the cached prefix dies at the **first collapsed index** either way, so
 the front would not make compaction cheap. There is no saving to chase, and the ordering question is
 therefore purely about what the model reads — which #24a answers.
 
-## Still open
+## The summary is always persisted, resumable or not (#81)
 
-- **#81 — where does a spawned window's summary live?** The interactive failsafe summarizes into
-  `SessionMemory`, which is SQLite-backed, addressable and `/resume`-able. A spawned window persists
-  nothing: it holds a RAM-only `messages` array and is thrown away when the phase ends. #23a says it
-  summarizes; nothing says whether that summary is durable, and `contexts` is keyed on the interactive
-  phases. See [OPEN-QUESTIONS.md](../OPEN-QUESTIONS.md) #81.
-- **#82 — a debate window that compacts is a debate that forgot its own argument.** The two debate
-  windows are now in scope (#22a) but they are the one pair where compaction is not obviously safe: a
-  challenger whose earlier objections were summarized may re-raise them, and `MAX_DEBATE_ROUNDS` is 5,
-  so the window dies shortly after. Whether they compact, or simply end the debate at the threshold,
-  is not decided. See [OPEN-QUESTIONS.md](../OPEN-QUESTIONS.md) #82.
+> *"Always record whatever is generated into the database, even when the user cant resume from it."*
+
+This settles the objection in *"Why it is not simply add the hook"* above by rejecting its premise. That
+section argued a spawned summary *"has nowhere to live and nothing to `/resume` from, which is the whole
+reason the hook was only ever built on one side."* The rule is now that **durability and resumability
+are separate concerns**: everything a model generates is written down, and whether a human can replay it
+is a different question with a different answer.
+
+The practical consequence is that a Worker that compacted twice overnight leaves a readable trace of
+what it decided to forget — which is exactly the thing an unattended batch otherwise destroys silently.
+
+**Which table it lands in is not decided.** `contexts` is keyed on the interactive phases and carries
+the `/resume` machinery, which this explicitly does not need. It most likely belongs beside the two
+tables [move-the-logs-into-sqlite-tables.md](move-the-logs-into-sqlite-tables.md) is creating in the same
+`memory.db` — but that is a guess about a schema, so see [OPEN-QUESTIONS.md](../OPEN-QUESTIONS.md) #97.
+
+## The debate windows compact like the others (#82a)
+
+No special case. A challenger that has to re-derive an objection it already made is a worse debate than a
+short one, but it is still a debate; ending the loop at the threshold would let a large `background` (up
+to 12 000 characters, capped but not small) truncate the argument on round three. With `MAX_DEBATE_ROUNDS`
+at 5 and the cap in place, a compaction there should be rare — and when it fires it is recorded like any
+other (#27a), so its rarity is measurable rather than assumed.

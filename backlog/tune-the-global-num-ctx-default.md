@@ -86,21 +86,44 @@ keeps is right for the 32b and expensive on the 14b** — recorded here as #37a 
   `contexts.num_ctx = ?` to `<= ?` ships as its **own fix**, independent of whether the number ever
   moves. Strict equality already hides contexts that would replay perfectly safely into a larger
   window, which is a standalone defect.
-- **`OLLAMA_KV_CACHE_TYPE`** was declined as a fourth benchmark arm and is now more interesting than
-  when it was declined, since *neither* candidate ceiling turned out to be fully resident — a q8_0 KV
-  cache could halve the spill at 16 384 without giving up any room. **Not filed**, because nothing has
-  said to file it; see [OPEN-QUESTIONS.md](../OPEN-QUESTIONS.md) **#85**.
+- **`OLLAMA_KV_CACHE_TYPE` is folded into the residency rule, not filed separately** (#85c). Under
+  #84c it is the one knob that acts directly on the thing the rule cares about: a q8_0 KV cache halves
+  the *cache* spill without touching the weights, so it makes the rule easier to satisfy at any ceiling.
+  It belongs in the same note as the rule rather than in a file of its own.
 
-## Blocking its own closure
+## The residency rule, stated (#84c)
 
-- **#84 — "no model can be run on CPU" (#57) and "keep 16 384" (#68) cannot both be literal.** Meta I
-  says *the only bottleneck must be the size of VRAM so the model runs on GPU or NPU rather than CPU*,
-  and #57 says no model runs on CPU. But 16 384 puts **1.93 GB of the 14b on the CPU**, and 12 288 puts
-  0.92 GB there; only 8 192 is fully resident, and 8 192 is disproved three ways. Read strictly, meta I
-  rules out every ceiling this repo can actually use. The likely reading is that #57 forbids
-  *deliberately pinning* a model to CPU (the `num_gpu: 0` arm of task I), not partial KV offload — but
-  that is an inference about a rule, and this file will not close on one. See
-  [OPEN-QUESTIONS.md](../OPEN-QUESTIONS.md) #84.
+The collision between #57 (*no model can be run on CPU*) and #68 (*keep 16 384*, which spills 1.93 GB by
+construction) is resolved by naming what "runs on CPU" actually forbids:
 
-**This file is otherwise finished.** Once #84 is answered, it is deleted and its line in
-[backlog/README.md](README.md) is ticked in the same commit.
+> **Spill is acceptable while the weights stay resident and only KV cache offloads.**
+
+That is a rule with teeth, and it is what #57 was protecting: weights on the CPU means every token of
+every layer crosses the bus, while KV cache on the CPU costs only the attention reads. 16 384 satisfies
+it on the 14b — 10.49 GB in VRAM against ~9 GB of weights, so the 1.93 GB that spills is cache.
+
+**It also disqualifies most of the models on this box, which is worth knowing before the boot chooser
+ships.** Ollama caps VRAM use on this 12 GB card at ~10.4 GB (measured: `size_vram` was 10.49 GB for the
+14b and 10.35 GB for the 32b — the ceiling, not a coincidence). A model whose weights exceed that cannot
+satisfy the rule at **any** `num_ctx`:
+
+| model | on disk ≈ weights | weights resident? | tools? |
+|---|---|---|---|
+| qwen2.5-coder:14b | 8.99 GB | **yes** | **yes** |
+| deepseek-r1:14b | 8.99 GB | yes | no |
+| deepseek-coder-v2:16b | 8.91 GB | yes | no |
+| codestral:22b | 12.57 GB | no | no |
+| gpt-oss:20b | 13.79 GB | no | yes |
+| devstral:24b | 14.33 GB | no | yes |
+| qwen3.5:27b | 17.42 GB | no | yes |
+| qwen3-coder:30b | 18.56 GB | no | yes |
+| qwen2.5-coder:32b | 19.85 GB | no | yes |
+
+**`qwen2.5-coder:14b` is the only installed model that satisfies both gates.** The 32b's failure is
+measured (10.35 GB resident of 24.49 GB total — 14.13 GB of it weights on the CPU, which is exactly what
+makes it ~3 tok/s); the four between 12 and 19 GB are inferred from the same ~10.4 GB ceiling rather
+than each measured. Whether the boot chooser enforces or merely marks this is
+[OPEN-QUESTIONS.md](../OPEN-QUESTIONS.md) **#96**.
+
+**This file is finished.** It is deleted and its line in [backlog/README.md](README.md) ticked in the
+commit that carries the rule above into `docs/product.md` — a governance-doc edit, so review-gated.

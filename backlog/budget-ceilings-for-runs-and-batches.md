@@ -72,19 +72,27 @@ So an `over_budget` task that is left **not `done`** causes every dependent to b
 accurate reason, automatically, as the batch walks on. What has to be built is only the negative: an
 `over_budget` outcome must **not** `break` the loop the way `cancelled` does at `batch.ts:126`.
 
-## Still open
+## Wall clock only stands, on a different reason (#86a)
 
-- **#86 — #38's premise is false, and it is the reason the token half was dropped.** The answer reads
-  *"lets use only time as the summarization will never let the tokens trigger to trip."* Summarization
-  bounds **one prompt's size**, so no single window exceeds `num_ctx`. It does not bound a task's
-  **cumulative** spend, which is what a budget ceiling sums: `runTaskLoop` adds every Worker and
-  Reviewer turn across up to 5 rounds × 24 calls, monotonically, and summarization *adds* calls rather
-  than removing them. A token ceiling would therefore trip, and readily. Wall clock is defensible on
-  its own merits — it is the only thing that catches a wedged call, and the only unit that answers "it
-  must be done by morning" — so the answer may well stand; but it should stand on that reason and not
-  on this one. See [OPEN-QUESTIONS.md](../OPEN-QUESTIONS.md) #86.
-- **#87 — what does the wall clock measure?** With tokens out of scope, the ceiling has no definition
-  yet: elapsed time including the user's own idle time at an `ask_user` prompt, or model time only?
-  An overnight batch is unattended so the two coincide, but `/run <one-id>` attended is exactly where
-  they diverge, and a ceiling that counts thinking time will fire on a user who walked away from a
-  question. See [OPEN-QUESTIONS.md](../OPEN-QUESTIONS.md) #87.
+#38's stated reason — *"summarization will never let the tokens trigger to trip"* — does not hold:
+summarization bounds **one prompt's size**, not a task's **cumulative** spend, and cumulative is what a
+budget sums. `runTaskLoop` adds every Worker and Reviewer turn across up to 5 rounds x 24 calls,
+monotonically, and a compaction *adds* a call rather than removing one. A token ceiling would trip, and
+readily.
+
+**The decision stands anyway, and the real reason is better than the stated one:** wall clock is the
+only instrument that catches a call that is wedged rather than chatty, and it is the only unit that
+answers the question this task exists for — *will it be done by morning?* A 32b at ~3 tok/s is slow
+without being expensive in tokens, and a token ceiling would let it run all night.
+
+## The clock measures model time, and resets on every phase swap (#87)
+
+Not elapsed wall time: time the user spends thinking at an `ask_user` prompt is not spend, and a ceiling
+that counted it would fire on someone who walked away from a question. What is summed is the duration of
+the model calls themselves.
+
+**The reset is the part with consequences.** A phase swap zeroes the clock, so the budget bounds one
+phase's continuous work rather than a task's whole life. That is coherent for the interactive phases.
+It is not obviously what was meant for the execution loop, where the Worker→Reviewer handover is itself
+a phase swap (#46) and happens up to ten times per task — a per-task ceiling that resets ten times is
+not bounding the task. See [OPEN-QUESTIONS.md](../OPEN-QUESTIONS.md) **#95** before building the reset.

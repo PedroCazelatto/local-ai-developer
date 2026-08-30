@@ -76,10 +76,12 @@ developed against). Dropping the range would over-state the requirement; droppin
 the user with nothing to `nvm use`. It no longer names `node:sqlite`, since that is no longer the
 reason.
 
-## `engines` is now redundant, and that is a decision left over
+## `engines` is deleted (#80a)
 
-`package.json`'s `"engines": { "node": ">=24" }` is a **fourth** declaration of a number that #15 just
-made `.nvmrc`'s to own, and #75a routes the check around it. It is advisory unless `engine-strict` is
-set, so it enforces nothing either way — but leaving a second copy in place is the exact defect this
-task removes everywhere else. Whether it is deleted, left as npm-facing metadata, or generated from
-`.nvmrc` is not decided: see [OPEN-QUESTIONS.md](../OPEN-QUESTIONS.md) **#80**.
+`package.json`'s `"engines": { "node": ">=24" }` was a **fourth** declaration of a number `.nvmrc` now
+owns, and #75a routes the check around it. It enforces nothing regardless — `engines` is advisory
+unless `engine-strict` is set — so keeping it bought no safety and cost a copy that can drift. It goes.
+
+That takes the count from **four declarations, none enforced** to **one declaration, enforced in three
+places**: `.nvmrc` is the number, `run.mjs` refuses both verbs against it, and `docker-compose.yml`
+interpolates it.

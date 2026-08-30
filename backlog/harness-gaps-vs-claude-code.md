@@ -52,9 +52,11 @@ By value per unit of work, not by importance:
    KV-cache caveat before committing to the design; it is the one cost the original comparison missed.
 3. Letting `list_files` see a subdirectory — small, large. **Shipped**, together with its pair, the
    `search_in_files` context lines and cheaper modes.
-4. [small-model-lane-for-one-shots.md](small-model-lane-for-one-shots.md) — small, large, and already an open
-   question in `docs/open-questions.md`. Its pair, the per-window `num_ctx` task, has **shipped**; this half
-   was deferred by decision once measurement showed the saving lives in the window sizes, not the weights.
+4. A small-model lane for the one-shots — **closed, not shipped** (OPEN-QUESTIONS.md #90). Its pair, the
+   per-window `num_ctx` task, shipped. This half was dropped once the project's optimization target was
+   stated: *precision and accuracy over time taken*, with the acceptance test *the output must be better;
+   time is irrelevant*. Every argument for the lane was a time-and-residency argument, and a 1.5–3b model
+   does not write better titles, commit messages or summaries than the session model.
 5. Refusing to write a file the window has not read — small, medium. **Shipped**, and wider than the entry
    asked for: `write_file` is gated too, branching on existence, because a full overwrite of an existing
    file is the most destructive thing the model can do and was the least guarded. The phase prompts now

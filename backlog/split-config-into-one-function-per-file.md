@@ -32,9 +32,20 @@ bundling it into the budget work would hide it inside a feature commit.
 **Order matters:** ship this **before** the budget ceilings, so the new resolver is written into the
 shape that already exists rather than added to the exception and moved afterwards.
 
-## Not in scope
+## `ollama-models.ts` is split too (#94a)
 
-The other deliberate multi-function file, `src/core/llm/ollama-models.ts`, whose header argues for
-cohesion (*"a cohesive module (list / hasModel / pullModel over the one daemon), not one function per
-file"*). #47 was answered about `config.ts`. Whether the same ruling applies there has not been asked —
-see [OPEN-QUESTIONS.md](../OPEN-QUESTIONS.md) #94.
+The repo's other deliberate multi-function file goes the same way. `src/core/llm/ollama-models.ts` holds
+`listModels`, `hasModel` and `pullModel` behind a header arguing for cohesion — *"a cohesive module
+(list / hasModel / pullModel over the one daemon), not one function per file"* — which is the same
+argument `config.ts` was making about env resolution, and it loses for the same reason. Three files,
+plus the shared `daemon` client, which is a value rather than a function and belongs in its own module
+the three import.
+
+**The rule has no exceptions, and that is now stated where the rule is read.** #94's answer —
+*"this is a repo rule, say it on CLAUDE.md"* — means the one-function-per-file rule gets a line in
+[CLAUDE.md](../CLAUDE.md)'s working rules rather than living only in
+[constitution.md](../constitution.md)'s *Code structure & clarity*. Both are governance docs, so **those
+two edits are review-gated**: made in the shipping commit's working tree and handed over, not committed.
+
+After this task there are **no** multi-function files left in `src/`, which is what makes the rule
+checkable rather than aspirational.

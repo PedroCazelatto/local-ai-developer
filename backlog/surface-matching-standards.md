@@ -70,16 +70,33 @@ The structure now matches Claude Code's skills mechanism exactly — **names res
 retrieval initiated by whoever can see the names** — with `describe_rule` as the middle rung that
 mechanism gets for free from a one-line description in its listing.
 
-## Still open
+## `search_rules` stays a callable tool (#88a)
 
-- **#88 — does `search_rules` survive, and what is it for now?** With names resident at `ctx[0]` and
-  `describe_rule` answering "is this the right one", `search_rules` no longer holds the only door. #51
-  still gives it a job (always return a top-1 match), but nothing says whether a phase may still call
-  it directly, or whether it becomes purely the seed-time matcher. Its throwaway `search-rules` role
-  and its 8 192 ceiling entry both depend on the answer. See
-  [OPEN-QUESTIONS.md](../OPEN-QUESTIONS.md) #88.
-- **#89 — `worker.md` and `reviewer.md` already order an unconditional
-  `load_rule("simplified-technical-english")`.** With every name resident and a hint arriving too, that
-  standard can now be named three times in one seed. #52 was answered *"already answered"*, but the
-  duplicate-suppression half (#52b) was never decided and this design makes it more likely to fire, not
-  less. See [OPEN-QUESTIONS.md](../OPEN-QUESTIONS.md) #89.
+Three ways in, and the model chooses: the resident names it can already see, `describe_rule` to check
+one before paying for it, and `search_rules` to resolve an intent it cannot map to a name itself. The
+last is what a small model reaches for when it knows what it wants but not what the standard is called,
+and retiring it would have made the resident list the only vocabulary.
+
+Nothing else moves: `search_rules` keeps its `search-rules` `CallRole` and its 8 192 entry in
+`resolve-window-ctx.ts`, and `load_rule`'s description keeps working, though it should stop saying
+`search_rules` must be called **first** — under the resident list that is no longer true.
+
+## `simplified-technical-english` is conditional, not unconditional (#89)
+
+> *"Simplified technical english is a tool for writing docs and tasks, not code. But it is not required
+> to be loaded on all phases, only before writing a file. This rule is written in the phase prompt."*
+
+So the unconditional `load_rule("simplified-technical-english")` in `worker.md` and `reviewer.md` **goes
+away**, and is replaced by an instruction in the phase prompt: load it before writing prose — docs and
+task definitions — not before writing code. Two things follow:
+
+- **The triple-naming problem dissolves.** It was going to be named by the resident list, by the hint,
+  and by an unconditional load. Now it is named by the resident list and loaded on demand, like every
+  other standard. No suppression rule is needed, so #52's option (b) is moot.
+- **The `rules/` edits are committed like ordinary work** when this agent makes them — it is the *local
+  model* rewriting `rules/` at runtime, in Retro, that is left uncommitted for review.
+
+One wording judgement is left to the shipping commit: the answer says *"only before writing a file"*
+while also scoping the standard to *"docs and tasks, not code"*. The phase prompt should say the narrow
+thing — load it before writing **prose**, not before every `write_file` — since a Worker writing
+TypeScript has no use for it and the broad reading would load it on nearly every turn.

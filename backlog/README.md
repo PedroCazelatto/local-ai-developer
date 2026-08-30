@@ -1,6 +1,6 @@
 # Backlog checklist
 
-An index of the 22 open task files in this folder, in the order worth shipping, plus the 2 framing notes
+An index of the 21 open task files in this folder, in the order worth shipping, plus the 2 framing notes
 that are not tasks.
 
 **This file is not a task and is not deleted when work ships.** It is upkeep: when a task's file is deleted
@@ -145,13 +145,12 @@ Where the window is also a clock. Two of these want measurement before design.
       `memory.ts` never imports the resolver — so the ceiling stamped on a phase context cannot drift from
       the one its turns ran under. The titler's transcript is head-bounded at 6 000 characters, which is
       what makes its smaller ceiling safe on the `/resume` re-title path.
-- [ ] **[Run the one-shots on a small model](small-model-lane-for-one-shots.md)** — *Memory / context.*
-      **Recommended for closure, not deferral.** The project's optimization target is now stated — *precision
-      and accuracy over time taken* — and the acceptance test with it: *the output must be better; time is
-      irrelevant.* Every argument this file makes is a time-and-residency argument, and a 1.5–3b model does
-      not write better titles, commit messages or summaries than the session model. The CPU-pinned arm is
-      ruled out (no model runs on CPU) and the two small models were never pulled. Awaiting the user's call
-      on deleting it.
+- [x] ~~**Run the one-shots on a small model**~~ — *Memory / context.* **Closed without shipping**
+      (OPEN-QUESTIONS.md #90a). The project's optimization target is now stated — *precision and accuracy over
+      time taken* — and the acceptance test with it: *the output must be better; time is irrelevant.* Every
+      argument the file made was a time-and-residency argument, and a 1.5–3b model does not write better
+      titles, commit messages or summaries than the session model. The CPU-pinned arm was ruled out (#57) and
+      the two small models were never pulled, so no benchmark was spent on it either.
 - [ ] **[Cap `debate`'s `background` parameter](cap-the-debate-background-parameter.md)** — *Memory /
       context.* The one model-supplied payload in the repo with no bound, replayed into two windows on
       every call — up to ten times in one debate. `run-debate.ts` already names the hazard for the third
@@ -191,6 +190,13 @@ Where the window is also a clock. Two of these want measurement before design.
       per-iteration `unmet-deps` reload gives almost for free. Ships **after**
       [split-config-into-one-function-per-file.md](split-config-into-one-function-per-file.md). One premise
       behind the wall-clock-only answer does not hold — re-check it before building.
+- [ ] **[Steer a running turn](steer-a-running-turn.md)** — *Terminal UX.* **Authorized** (OPEN-QUESTIONS.md
+      #91a), promoted out of *Blocked on a decision*: #61's reason for `Phase: Design → Worker` was that *"the
+      input is also connected to the running interaction and I can send more messages to the model if I see it
+      diverging from the goal"* — which is this feature, not a status-line label. Cancel shipped, so its
+      prerequisite is met. Build it **after**
+      [in-turn-progress-reporting.md](in-turn-progress-reporting.md), which supplies the label that makes the
+      steering legible.
 - [ ] **[Show where a long task has got to](in-turn-progress-reporting.md)** — *Terminal UX.* Still
       reporter-side (zero model tokens), but **the scope grew to both halves**: the pinned rows *and* the
       scrollback, which must print what a `/run` is doing as it happens — one interleaved stream coloured per
@@ -231,8 +237,6 @@ These are questions for the user, not defaults for an implementer to pick.
       the task.**
 - [ ] **[A plan inside a task](task-plan-inside-a-task.md)** — is an in-window plan worth window at 16k?
       Lowest-confidence item on the harness list. Build the reporting half first, then decide with evidence.
-- [ ] **[Steer a running turn](steer-a-running-turn.md)** — build it at all? It serves the attended mode the
-      product deprioritized on purpose. Cancel first regardless.
 
 ## Framing notes — not tasks
 

@@ -85,8 +85,23 @@ prefills the text — measured at **4.8–5.4 s for 12 000 characters** on an al
 the full answer to the question raised alongside #28; see [OPEN-QUESTIONS.md](../OPEN-QUESTIONS.md)
 **§E-tokenizer**.
 
-## Still open
+## The budget is the material; the marker is extra (#83a)
 
-- **#83 — does the cap count characters before or after `truncateHeadTail`'s marker?** The marker is
-  itself characters in the window. Trivial, but it decides whether "12 000" is the budget or the total.
-  See [OPEN-QUESTIONS.md](../OPEN-QUESTIONS.md) #83.
+`truncateHeadTail`'s elision marker is not counted against the 12 000. The cap answers *how much of the
+model's material survives*, and a notice about the cut is not material. The window therefore receives
+12 000 characters plus a marker of fixed, known length — which is honest arithmetic, where counting the
+marker inside the budget would silently shrink the material by the length of the sentence explaining
+that it had been shrunk.
+
+## This cap is now a token budget, not a character one
+
+**#93b changed the unit under this task.** Every model-facing budget becomes an **exact token** count,
+and it turned out to be cheap: `/api/show` with `verbose: true` returns the model's full BPE vocabulary
+and merge table, so the orchestrator can tokenize locally — **verified to reproduce Ollama's own
+`prompt_eval_count` exactly, in ~2 ms for 12 000 characters.** See
+[derive-constants-from-one-ceiling.md](derive-constants-from-one-ceiling.md), which owns the mechanism.
+
+So #28's *"12k is a good cap"* survives as an intent rather than as a literal number: 12 000 characters
+measured **2 666 tokens** of prose and **2 964** of TypeScript, and the cap becomes whichever token
+figure is confirmed in that file's fraction table. **Ship this task after the tokenizer**, or the cap is
+written twice.

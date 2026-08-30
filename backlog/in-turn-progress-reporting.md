@@ -121,16 +121,33 @@ Two constraints on any drawing: the rows are **three idle, five with the input f
 (`status-bar.ts`), and adding a field means composing it into one of the two existing lines rather than
 taking a fourth row.
 
-## Still open
+## Steering is authorized, and sequenced behind this task (#91a)
 
-- **#91 — #61's second reason is [steer-a-running-turn.md](steer-a-running-turn.md), which is filed as
-  "build it at all?"** *"The input is also connected to the running interaction and I can send more
-  messages to the model if I see it diverging from the goal"* is not a status-line property — it is a
-  live-steering feature, listed under *Blocked on a decision* precisely because it serves the attended
-  mode the product deprioritized. #61b is buildable without it (the field is just a label). Whether the
-  steering half is now authorized is a separate answer. See
-  [OPEN-QUESTIONS.md](../OPEN-QUESTIONS.md) #91.
-- **#92 — does the interleaved scrollback change what `/batch` is for?** #65 makes the scrollback a
-  full narrative record of a run. `/batch` re-prints a persisted summary through the same renderer that
-  wrote it, and this file previously flagged that overlap as needing a decision about *which one is the
-  record*. It still does. See [OPEN-QUESTIONS.md](../OPEN-QUESTIONS.md) #92.
+#61's second reason — *"the input is also connected to the running interaction and I can send more
+messages to the model if I see it diverging from the goal"* — is
+[steer-a-running-turn.md](steer-a-running-turn.md), which has moved out of *Blocked on a decision* and
+into Tier 3. It builds **after** this task: the `Phase: Design → Worker T-042` label is what makes
+steering legible, because knowing which window is live is the difference between correcting the Worker
+and interrupting the Reviewer.
+
+This task ships without it. The field is a label; the steering is a separate feature that consumes it.
+
+## `/batch` is removed (#92)
+
+The scrollback becomes the record. With #65 printing what each round is doing and closing each round
+with its own line, `/batch` re-prints a worse copy of something the user already has — and two records
+of one run is the overlap this file has flagged since it was filed.
+
+**This is a deletion of shipped work**, so it is worth being explicit about what goes and what stays:
+
+- **Goes:** the `/batch [n]` command, its registry entry, its Tab completion, and its section in
+  `docs/cli.md` (a governance-doc edit — review-gated).
+- **Open:** whether `runBatch` keeps *writing* `.orchestrator/batches/`. It is still what
+  [record-attempted-tasks.md](record-attempted-tasks.md) calls "the only durable record of this was
+  tried and it failed", and a non-TTY run's scrollback is a pipe that may go nowhere. Removing the
+  reader while keeping the writer recreates exactly the shape that justified
+  [move-the-logs-into-sqlite-tables.md](move-the-logs-into-sqlite-tables.md) — *nothing reads
+  `events.jsonl`*. See [OPEN-QUESTIONS.md](../OPEN-QUESTIONS.md) **#98**.
+
+`backlog/README.md`'s shipped Tier-1 entry for the inspection commands describes `/batch` as one of
+five; correcting it is part of the commit that removes it.

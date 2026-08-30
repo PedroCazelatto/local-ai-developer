@@ -59,22 +59,25 @@ user*. Now nothing is.
 - **A saved `activeModel` that is toolless is refused** (#9), and boot falls through to the list.
 - **An absent `capabilities` field fails closed** (#13) — assume incapable. See #72 below for what that
   now obliges the repo to state.
-- **`/models list` marks tool support** (#14) — the list is where "why was that one skipped" is asked.
-- **The warning lives in the pinned status line**, `Model: <name> (no tools)` (#12). Boot scrollback is
-  wiped by the REPL's one-time `clearScreen`.
+- **`/models list` marks tool support** (#14), and so does the boot chooser — the list is where "why was
+  that one skipped" is asked, and it is the only place a `(no tools)` marker appears (#12, as clarified
+  by #78 below). Boot scrollback is wiped by the REPL's one-time `clearScreen`, which is why the marker
+  has to live on a surface the user can re-open rather than in a line printed once at startup.
 - **`/models use <name>` on a toolless model refuses, and offers to delete the model** (#69 — this
   overrides #11c, which was written into the docs on an inference that has now been corrected). The
   full shape: the chooser and `/models list` **show** toolless models, marked; they are **not
   selectable**; attempting to select one prints the reason it is unavailable and asks whether to delete
   it. So a toolless model is visible, explained, and disposable — never silently active.
 
-## The `(no tools)` status marker is now dead, and #12 needs re-deciding
+## The `(no tools)` marker belongs to the list, not the status line (#78)
 
-#69's refusal is what #69 itself warned about: `Model: <name> (no tools)` (#12) can only ever paint if
-a toolless model can become the active model, and under a refusal none can. The marker is unpaintable.
+#12 was read as putting `Model: <name> (no tools)` in the **pinned status line**, which #69's refusal
+then made unpaintable — no toolless model can ever be active. That reading was wrong: #12 was about the
+**model list** all along, and **#69 stands**.
 
-**Not resolved here** — #12 was answered and the answer is now unreachable, which is a decision for the
-user, not a default for an implementer. See [OPEN-QUESTIONS.md](../OPEN-QUESTIONS.md) **#78**.
+So there is exactly one place a `(no tools)` marker appears, and it is the same place in both surfaces
+that show models — `/models list` and the boot chooser. Nothing paints it in the pinned rows, and the
+status line needs no new field.
 
 ## Two sub-questions this file carried are now answered by measurement, not by decision
 
@@ -110,6 +113,13 @@ Since the design above reads `/api/tags`, **the floor is Ollama ≥ 0.9.1**. Thi
 far past it. The number is recorded in [README-INCONSISTENCIES.md](../README-INCONSISTENCIES.md) for
 the user to fold into `README.md`'s Requirements by hand (#72, #21).
 
-**Whether a boot-time version check also ships is not decided** — #72 offered "state it *and* check it"
-(a) against "state it only" (b), and the answer named only the statement. See
-[OPEN-QUESTIONS.md](../OPEN-QUESTIONS.md) **#79**.
+**A boot-time version check ships too** (#79b). Stating the floor is not enough on its own: without a
+check, a daemon older than 0.9.1 makes every installed model fail the capability gate, and the user is
+told "no model on this machine supports tools" when the truth is "your daemon cannot say". The check
+turns a misleading diagnosis into an accurate one.
+
+It sits beside the Node check task C is adding, and the two should read as one family — same shape, same
+place in the boot sequence, both naming what to do rather than only what is wrong. Unlike the Node check
+this one cannot live in `scripts/run.mjs`, because the daemon version is only knowable by asking it:
+`/api/version` is a single unauthenticated GET, and boot already fails hard on an unreachable daemon, so
+it belongs next to that existing check.
