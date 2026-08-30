@@ -32,7 +32,10 @@ model never reads this file. The split:
   intention-revealing names, no god objects, dependency inversion over hard-wired concretions.
 - **One function per file — least responsibility.** Each code file holds **exactly one function**,
   so its responsibility is as small as possible. The kebab-case file name names that function's job.
-  No exceptions: a file that would need a second function means a second file.
+  No exceptions: a file that would need a second function means a second file. **Cohesion is not an
+  exception** — "these three belong together" is an argument for a folder, not for a file. An
+  **assembler** file that imports single-function modules and re-exports them into one object is
+  allowed, because it holds no second function of its own.
 - **Types and schemas go in sibling files, never inline with a function.** Declare them beside the
   function they serve, named `<name>.type.<ext>` for types and `<name>.schema.<ext>` for schemas
   (e.g. `parse-config.ts` pairs with `parse-config.type.ts` and `parse-config.schema.ts`).

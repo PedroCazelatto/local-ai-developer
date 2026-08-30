@@ -29,6 +29,14 @@ that owns the topic.
   isolation. For rendering changes, replay the real renderer + readline through a terminal-grid
   emulator harness instead of launching the app.
 - **Read [constitution.md](constitution.md) before writing or changing any code, every session.**
+- **One function per file — and there are no exceptions.** Every code file under [src/](src/) holds
+  exactly one function, named by its kebab-case file name, with types and schemas in sibling
+  `.type.ts` / `.schema.ts` files. Cohesion is not a reason to keep two functions together: the two
+  files that argued it were `config.ts` (four env resolvers) and `ollama-models.ts` (three daemon
+  wrappers), and both are being split. A file that assembles others — re-exporting them into one
+  object — is not an exception, because it holds no second function. The rule is stated in full in
+  [constitution.md](constitution.md); it is repeated here because it is the one most often reasoned
+  around.
 - **Do not edit [README.md](README.md)** unless asked; validate it when requested.
 - **Keep these docs current.** If a change makes a doc wrong, fixing the doc is part of that change.
   Edits to this file, [constitution.md](constitution.md), and anything under [docs/](docs/) are
