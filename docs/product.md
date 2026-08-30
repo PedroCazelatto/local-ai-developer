@@ -22,6 +22,32 @@ code projects. Goals:
   batch and let it run unattended (e.g. overnight), not to run windows concurrently — a 3060's VRAM
   would not comfortably hold parallel slots anyway.
 
+## What it optimizes for
+
+**Precision and accuracy, not time taken.** The model running here is already far weaker than a cloud
+one, so spending its capacity to go faster spends the wrong thing. A change that makes a phase quicker
+but its output worse is a regression, and generation speed is not a reason to give a window less room:
+that is why `OLLAMA_NUM_CTX` stayed at 16 384 after the benchmark measured 16 384 costing 29 % of
+generation throughput on a 14b against 12 288 — the extra 4 096 tokens of working room is worth more
+than the seconds.
+
+**The one real bottleneck is VRAM, and the rule is about weights.**
+
+> Spill is acceptable while the **weights** stay resident and only **KV cache** offloads.
+
+Weights on the CPU means every token of every layer crosses the bus; KV cache on the CPU costs only the
+attention reads. The distinction is what separates a model that is merely slower from one that should
+not be used at all, and it is measurable per model: `/api/ps` reports `size` and `size_vram`, and
+`size_vram < size` is the spill. On the 12 GB card this repo is built for, VRAM tops out at 10.2–10.7 GB
+and only a ~9 GB model keeps its weights resident.
+
+Nothing is ever pinned to the CPU deliberately. A model whose weights will not fit is **marked in the
+model list, not refused** — a slow model is the user's choice to make; an unusable one is not.
+
+**One sub-agent at a time.** The non-goal below is about phases; this is the same reasoning one level
+down. There is no VRAM for a second concurrent window, so a `Subagents: N` count would never exceed one
+and is not built.
+
 ## Platform reach
 
 The orchestrator is **OS-agnostic**: it runs on Windows, macOS, and Linux from a single Node
