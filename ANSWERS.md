@@ -53,4 +53,29 @@ F. Lets unify all constants to just one, the maximum context available. Then all
 42. A. .env only.
 43. A. Unset = unlimited.
 44. B. Fail open, with a high alarm.
-45.
+45. A. Round boundaries only.
+46. While the worker is running, show his usage, and when changing to reviewer, change the usage too. There is a tool for swapping the phase so one phase can trigger another and loop back.
+47. Each function must be on its own file, and the config.ts just reexports them inside the config object.
+H. The name of all standard rules must be passed at ctx[0], thus every phase knows them.
+48. All phases know all rules names, and thus the rules must always have a semantic name. Before loading the rule, another tool must be called to get its description, so the model can evaluate if its the right rule or not, saving context.
+49. Every one.
+50. On all phases, match title or body.
+51. search-rule always return top1, even on no match.
+52. Already answered.
+53. Use the same context size for reviewer like the worker.
+54. Tell to the reviewer that the rule wasnt loaded.
+55. Every phase.
+56. Print just one line with the tool call.
+I. Using less than half of the context ceiling or smaller models for some task may be optimizing time, but that is not the goal of this project. As we are already using models way weaker than the cloud ones, we must focus on precision and accuracy rather than time taken. The only bottleneck must be the size of VRAM so the model runs on GPU or NPU rather than CPU.
+57. No model can be run on CPU.
+58. The output must be better, that is the measurement. Time is irrelevant.
+59. I dont care about the numbers.
+60. Create a new task.
+J. False: during a /run, the terminal must be printing whatever is being run. We will also edit the status line below the input to have this info, like what you proposed.
+61. B. Phase: Design -> Worker. This way, the input is also connected to the running interaction and I can send more messages to the model if I see it diverging from the goal.
+62. Lets make a list of everything that is usefull at the status line and then I will draw it for you.
+63. B. The constitution says to use 0%, as 0 tokens used of the 16k limit is 0%.
+64. The context must be only what is sent to the model (that is what the Ollama already returns).
+65. It must print what the round is doing but also a closing line per round (like your example). Although the history of each phase is independent, lets print the history of all phases toghether, with a transition line when swapping, and with different collors for each phase.
+66. The window name must be the phase with the task ID.
+67. As we are targeting precision and accuracy, maybe we dont need more than one subagent, as we wont have VRAM for more than one parallel subagent.
