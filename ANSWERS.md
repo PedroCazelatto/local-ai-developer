@@ -67,6 +67,10 @@ F. Lets unify all constants to just one, the maximum context available. Then all
 47. Each function must be on its own file, and the config.ts just reexports them inside the config object.
 86. A.
 87. Model time only, reset on every phase swap.
+95. B. Every swap resets.
+96. A. Never hardcoded. Both variables (model and num_ctx) are playable for showing a "too heavy" tag on the model list. But we must always probe the machine to know.
+97. Reuse the same table, so we can also read the full thinking/conversation process by reading the rows.
+98. A. Keep writing for audit purposes.
 H. The name of all standard rules must be passed at ctx[0], thus every phase knows them.
 48. All phases know all rules names, and thus the rules must always have a semantic name. Before loading the rule, another tool must be called to get its description, so the model can evaluate if its the right rule or not, saving context.
 49. Every one.
@@ -98,4 +102,5 @@ J. False: during a /run, the terminal must be printing whatever is being run. We
 93a. Maximum context available is the configured .env.
 93b. Make them exact.
 93c. No, keep the rounds and line caps.
+99. A. Use this proposal and we adjust later in testing.
 94. A. This is a repo rule, say it on CLAUDE.md

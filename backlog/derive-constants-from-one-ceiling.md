@@ -103,8 +103,11 @@ bound what a *human* reads, where a token count means nothing.
 
 Every proposal is chosen to **preserve today's effective budget**, not to retune it — this task is about
 where a number comes from, not about changing what it allows. `base × 3/16` and `base / 16` land
-slightly generous; the rest land mid-range. **Confirm or adjust the fractions:**
-[OPEN-QUESTIONS.md](../OPEN-QUESTIONS.md) **#99**.
+slightly generous; the rest land mid-range.
+
+**Taken as proposed** (#99a): *"use this proposal and we adjust later in testing."* So these fractions
+ship as written, and the point of the task is that adjusting them later is a one-line edit in one file
+rather than a hunt through eight.
 
 **Human-facing (leave in characters).**
 
@@ -114,7 +117,8 @@ slightly generous; the rest land mid-range. **Confirm or adjust the fractions:**
 | `OUTPUT_PREVIEW_LIMIT` | 1 024 | `session/audit.ts` | bounds an **audit-log** preview a person reads |
 
 Neither ever enters a prompt, so neither competes for window space. Converting them would make the
-ceiling govern something it has no relationship to. *(This split is a proposal — it is included in #99.)*
+ceiling govern something it has no relationship to. **The split is confirmed with the fractions**
+(#99a).
 
 ### Group 4 — out of scope (#93c)
 

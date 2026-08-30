@@ -127,12 +127,16 @@ Where the window is also a clock. Two of these want measurement before design.
       lives and where the least is reclaimed — and `read_file`'s `offset`/`limit` mean two reads of one
       path are usually different slices rather than duplicates. **The `docs/mental-model.md` and
       `docs/cli.md` diffs are review-gated and were left uncommitted.**
-- [ ] **[The spawned windows have no failsafe](spawned-windows-have-no-failsafe.md)** — *Memory / context.*
+- [ ] **[The spawned windows have no failsafe, and no record](spawned-windows-have-no-failsafe.md)** — *Memory / context.*
       `beforeModelCall` exists only on `SessionOrchestrator`, so the Worker, Reviewer, Retro and sub-agent
       windows have no compaction at all and Ollama silently drops their oldest tokens past `num_ctx` —
-      demonstrated, not inferred. Pairs with the eviction item above: eviction bounds the tail-heavy case
-      cheaply, and only a failsafe bounds the head-heavy one. **Nothing may lower a window's ceiling until
-      this ships** — that ceiling is currently the only bound those windows have.
+      demonstrated, not inferred. **All six windows are in scope** (the debate pair joined), they summarize
+      rather than drop, and `[0]`+`[1]` are protected because index 1 is the window's seed — its contract.
+      **The scope grew a second half:** spawned windows now persist their whole trace into `contexts` +
+      `messages`, so a Worker's reasoning is readable after the fact rather than destroyed with the window.
+      Pairs with the eviction item above: eviction bounds the tail-heavy case cheaply, and only a failsafe
+      bounds the head-heavy one. **Do not write the schema before #101** — `/swap worker` is legal today,
+      so spawned rows would surface in `/resume` as resumable when they are not.
 - [x] ~~**Give each window its own `num_ctx`**~~ — *Memory / context.* Shipped, and narrower than the
       file asked: every model call now names its **role** from a closed union, and one table resolves that
       role to a ceiling. Only three roles differ from `OLLAMA_NUM_CTX` — the context titler,
@@ -162,18 +166,23 @@ Where the window is also a clock. Two of these want measurement before design.
       throughput on the 14b and 6.8 % on the 32b, and 12 288 is *not* fully resident either, so the choice was
       never resident vs. hybrid. The room is worth more than the speed. Per-model ceilings deferred (they
       collide with `contexts.num_ctx` stamping); nothing to migrate. Spun out
-      [resume-across-num-ctx-changes.md](resume-across-num-ctx-changes.md). **Closes once the "no model runs
-      on CPU" vs. "keep 16 384" collision is resolved** — 16 384 spills 1.93 GB by construction.
+      [resume-across-num-ctx-changes.md](resume-across-num-ctx-changes.md). The CPU collision is resolved by
+      a rule — **spill is acceptable while the weights stay resident and only KV cache offloads** — which
+      also disqualifies six of the nine models installed here, leaving `qwen2.5-coder:14b` as the only one
+      that both fits and reports `tools`. The list marks that, nothing refuses it. **Closes once #100 says
+      how the machine is probed for VRAM** — the figure may never be hardcoded, and Ollama offers no route.
 - [ ] **[Make the standards visible](surface-matching-standards.md)** — *Model behavior.* **The shape
       changed: the resident catalog won.** All nine standard names sit at `ctx[0]` in every phase (~50 exact
       tokens, 0.3 % of the window), and a new `describe_rule` tool returns a one-line description so the model
       can judge a standard before paying for its body. The seed-time match survives as a hint — always top-1,
       every phase, escalated to the Reviewer when the Worker ignored it. No longer a user of the small lane.
 - [ ] **[Derive every budget from one ceiling](derive-constants-from-one-ceiling.md)** — *Memory / context.*
-      One ceiling, every sub-value a fraction of it: `BOUNDED_ONE_SHOT_NUM_CTX` becomes `base / 2` (which is
-      exactly 8 192 today). The file finds and groups all ~20 constants; the hard group is the **character**
-      budgets, which cannot be derived from a token ceiling without the chars-per-token estimate the
-      constitution forbids. Measured 4.04–4.50 chars/token; Ollama has no tokenize endpoint. Blocked on #93.
+      **Fully answered, and the widest-reaching item here** — six budgets across five files take their unit
+      from it, so it ships before the debate cap. One ceiling (the `.env` value), every sub-value a fraction:
+      `BOUNDED_ONE_SHOT_NUM_CTX` becomes `base / 2`, which is exactly 8 192 today. The character budgets
+      become **exact token** budgets, which turned out to be cheap rather than impossible: `/api/show` with
+      `verbose: true` serves the model's full BPE vocab and merges, and a tokenizer built from it reproduces
+      Ollama's own `prompt_eval_count` exactly in ~2 ms per 12 000 characters. Fractions taken as proposed.
 - [ ] **[`/resume` hides contexts written under a different ceiling](resume-across-num-ctx-changes.md)** —
       *Memory / context.* `num_ctx = ?` is strict equality, so anyone who ever changed `OLLAMA_NUM_CTX` has
       unreachable history right now, silently, in every project. Relax the read predicate to `<= ?` and warn:
@@ -183,13 +192,15 @@ Where the window is also a clock. Two of these want measurement before design.
       *Repo hygiene.* The four-function env-resolution exception ends; `config.ts` keeps the constants and the
       type and re-exports the resolvers into the config object. **Ship it before the budget ceilings**, so the
       new resolver is written into the shape that already exists rather than moved afterwards.
-- [ ] **[Budget ceilings for a task and a batch](budget-ceilings-for-runs-and-batches.md)** — *Execution
-      loop.* **Wall clock only** — no token ceiling ships, so this is entirely new plumbing rather than a
-      comparison against counts that already exist. A crossed ceiling produces a fifth outcome, `over_budget`;
-      the task's dependents stop with it and every independent task still runs, which the batch's existing
-      per-iteration `unmet-deps` reload gives almost for free. Ships **after**
-      [split-config-into-one-function-per-file.md](split-config-into-one-function-per-file.md). One premise
-      behind the wall-clock-only answer does not hold — re-check it before building.
+- [ ] **[Budget ceilings for a window and a batch](budget-ceilings-for-runs-and-batches.md)** — *Execution
+      loop.* **Wall clock only, on model time** — no token ceiling ships, so this is entirely new plumbing
+      rather than a comparison against counts that already exist. **Renamed:** every phase swap resets the
+      clock and the Worker→Reviewer handover is a swap, so it bounds a *window*, not a task — the rule is *no
+      single window may spend more than N minutes in one continuous stretch*, which is the wedged-call
+      detector. A crossed ceiling produces a fifth outcome, `over_budget`; the task's dependents stop with it
+      and every independent task still runs, which the batch's existing per-iteration `unmet-deps` reload
+      gives almost for free. Ships **after**
+      [split-config-into-one-function-per-file.md](split-config-into-one-function-per-file.md).
 - [ ] **[Steer a running turn](steer-a-running-turn.md)** — *Terminal UX.* **Authorized** (OPEN-QUESTIONS.md
       #91a), promoted out of *Blocked on a decision*: #61's reason for `Phase: Design → Worker` was that *"the
       input is also connected to the running interaction and I can send more messages to the model if I see it

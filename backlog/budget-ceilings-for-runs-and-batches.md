@@ -1,4 +1,4 @@
-# Budget ceilings for a task and a batch
+# Budget ceilings for a window and a batch
 
 **Category:** Execution loop
 
@@ -6,10 +6,10 @@ Cost is reported exactly and only afterwards. Nothing bounds it while it runs. `
 round is a Worker turn plus a fresh Reviewer window, and the only early exit is "the Worker produced no
 file changes". So an unattended batch can spend hours on task 3 of 12 and you find out in the morning.
 
-**What it needs, as the decisions below settled it.** A **per-task wall-clock ceiling**: crossing it
-ends the loop as a new `over_budget` outcome — not `escalated`, which asserts a judgement no Reviewer
-made — the task keeps its stash, its dependents are skipped, and every independent task in the batch
-still runs. A **per-batch ceiling**: crossing it stops the batch cleanly and persists the partial
+**What it needs, as the decisions below settled it.** A **per-window wall-clock ceiling** on model
+time: crossing it ends the loop as a new `over_budget` outcome — not `escalated`, which asserts a
+judgement no Reviewer made — the task keeps its stash, its dependents are skipped, and every
+independent task in the batch still runs. A **per-batch ceiling**: crossing it stops the batch cleanly and persists the partial
 summary, which `runBatch` already knows how to do for an infra fault. The budget reason carried into
 the batch summary buckets, so the morning-after report distinguishes "the Reviewer never passed it"
 from "we stopped paying for it". And the live half surfaced on the status line, which
@@ -38,9 +38,10 @@ cannot be budget-checked — surface that rather than treating an unknown as und
 - **The batch continues, minus the tasks that needed the stopped one** (#40b, as stated). Not "end the
   batch" and not "keep going regardless": the tasks that **depend on** the over-budget task end with
   it, every independent task still runs.
-- **The two ceilings are independent, and a single `/run <id>` is bounded by the task ceiling alone**
+- **The two ceilings are independent, and a single `/run <id>` is bounded by the window ceiling alone**
   (#41a). `runOneTask` never enters `runBatch`, and a "batch ceiling" that wrapped one task would be a
-  misnomer for what it bounds.
+  misnomer for what it bounds. Independence also means the **batch** clock does not reset on a phase
+  swap — #95b's reset is a property of the phase clock, and a batch is not a phase.
 - **`.env` only** (#42a). No `/run` argument, so the parser, the Tab completer and the usage string are
   untouched.
 - **Unset means unlimited** (#43a) — today's behaviour, no surprise on upgrade, and no shipped default
@@ -85,14 +86,22 @@ only instrument that catches a call that is wedged rather than chatty, and it is
 answers the question this task exists for — *will it be done by morning?* A 32b at ~3 tok/s is slow
 without being expensive in tokens, and a token ceiling would let it run all night.
 
-## The clock measures model time, and resets on every phase swap (#87)
+## The clock measures model time, and every swap resets it (#87, #95b)
 
 Not elapsed wall time: time the user spends thinking at an `ask_user` prompt is not spend, and a ceiling
 that counted it would fire on someone who walked away from a question. What is summed is the duration of
 the model calls themselves.
 
-**The reset is the part with consequences.** A phase swap zeroes the clock, so the budget bounds one
-phase's continuous work rather than a task's whole life. That is coherent for the interactive phases.
-It is not obviously what was meant for the execution loop, where the Worker→Reviewer handover is itself
-a phase swap (#46) and happens up to ten times per task — a per-task ceiling that resets ten times is
-not bounding the task. See [OPEN-QUESTIONS.md](../OPEN-QUESTIONS.md) **#95** before building the reset.
+**Every phase swap resets it, execution handovers included** (#95b). The Worker→Reviewer handover is a
+swap (#46), so the clock zeroes up to ten times in one task. That is a deliberate choice about what the
+ceiling *is*, and the file is renamed to match: **this bounds a window, not a task.**
+
+The rule it implements: *no single window may spend more than N minutes of model time in one
+continuous stretch.* That is precisely the wedged-call detector #86 kept the wall clock for — a Worker
+stuck on one call for half an hour trips it — while a task that legitimately needs five full rounds
+never does, because each round starts fresh.
+
+**What it deliberately does not bound** is a task's total cost. Ten rounds each finishing just under the
+ceiling is ten times the ceiling, and nothing stops it. The per-batch ceiling is the only thing that
+does, and it is unaffected by the reset: a batch is not a phase, and #41a already made the two ceilings
+independent.

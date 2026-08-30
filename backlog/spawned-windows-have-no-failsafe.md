@@ -93,10 +93,34 @@ is a different question with a different answer.
 The practical consequence is that a Worker that compacted twice overnight leaves a readable trace of
 what it decided to forget — which is exactly the thing an unattended batch otherwise destroys silently.
 
-**Which table it lands in is not decided.** `contexts` is keyed on the interactive phases and carries
-the `/resume` machinery, which this explicitly does not need. It most likely belongs beside the two
-tables [move-the-logs-into-sqlite-tables.md](move-the-logs-into-sqlite-tables.md) is creating in the same
-`memory.db` — but that is a guess about a schema, so see [OPEN-QUESTIONS.md](../OPEN-QUESTIONS.md) #97.
+**It reuses the existing tables** (#97): *"reuse the same table, so we can also read the full
+thinking/conversation process by reading the rows."*
+
+Read carefully, that is more than storing a summary. A spawned window gets a `contexts` row and its
+turns become `messages` rows, exactly as an interactive phase's do — so the Worker's whole reasoning
+trace, not just what it compacted away, becomes readable after the fact. **That is a scope increase on
+this task** and it is the point: an unattended overnight batch currently destroys every spawned window
+it opens, and the summary alone would only record what was forgotten, never what was done.
+
+**The schema barely moves.** `contexts` is `(id, phase, title, num_ctx, timestamps)` and `messages` is
+`(context_id, seq, role, content, model, tool_name, tool_calls, prompt_tokens, completion_tokens, …)`.
+`phase` is plain `TEXT` with no `CHECK`, and `role` already allows `'summary'`. A Worker window is a row
+with `phase = 'worker'`.
+
+**And that is exactly where the hazard is.** `/swap` validates against `availablePhases()`, which is
+every file in `rules/phases/` — **including `worker`, `reviewer` and `retro`**. So a user can already
+`/swap worker`, and once spawned windows write rows under those phase names, `/resume` would offer them
+the very rows #81 says are not resumable. Nothing in the current code separates the two, because until
+now no spawned window wrote anything. See [OPEN-QUESTIONS.md](../OPEN-QUESTIONS.md) **#101**.
+
+Two consequences worth pricing before building:
+
+- **Volume.** A Worker across 5 rounds x up to 24 calls is hundreds of `messages` rows per task, times
+  every task in a batch. `memory.db` stops being a record of a few interactive conversations.
+- **Overlap with the audit log**, which already records every tool call at its single choke point. The
+  two answer different questions — one *what was called*, one *what was said* — but they will grow
+  side by side, and [move-the-logs-into-sqlite-tables.md](move-the-logs-into-sqlite-tables.md) is
+  moving the audit log into this same database.
 
 ## The debate windows compact like the others (#82a)
 

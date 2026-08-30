@@ -122,8 +122,27 @@ satisfy the rule at **any** `num_ctx`:
 **`qwen2.5-coder:14b` is the only installed model that satisfies both gates.** The 32b's failure is
 measured (10.35 GB resident of 24.49 GB total — 14.13 GB of it weights on the CPU, which is exactly what
 makes it ~3 tok/s); the four between 12 and 19 GB are inferred from the same ~10.4 GB ceiling rather
-than each measured. Whether the boot chooser enforces or merely marks this is
-[OPEN-QUESTIONS.md](../OPEN-QUESTIONS.md) **#96**.
+than each measured.
+
+**The list marks it; nothing refuses it** (#96a). A "too heavy" tag beside a model, exactly like the
+`(no tools)` marker, and the user may still choose it — a slow model is a legitimate choice, an
+incapable one is not.
+
+**The VRAM figure is never hardcoded** (#96): *"we must always probe the machine to know."* Two further
+points from that answer shape the tag:
+
+- **It depends on both variables** — the model's weights *and* the configured `num_ctx`, since the KV
+  cache grows with the ceiling. The same model is "too heavy" at one ceiling and fine at another, so
+  the tag is recomputed when either changes, not stamped once.
+- **There is an exact after-the-fact check that needs no VRAM figure at all.** `/api/ps` reports both
+  `size` and `size_vram` for a loaded model: `size_vram < size` *is* the spill, measured rather than
+  predicted. So the tag is a prediction shown before loading, and the loaded state can always be
+  verified — and corrected — against the daemon.
+
+**How the machine is probed is not decided**, and it is the one part with no Ollama-native answer:
+`/api/status` reports nothing about the GPU, `/api/ps` is empty until something is loaded, and
+`/api/experimental/model-recommendations` returns a curated list with `vram_bytes` hints rather than
+this machine's capacity. See [OPEN-QUESTIONS.md](../OPEN-QUESTIONS.md) **#100**.
 
 **This file is finished.** It is deleted and its line in [backlog/README.md](README.md) ticked in the
 commit that carries the rule above into `docs/product.md` — a governance-doc edit, so review-gated.

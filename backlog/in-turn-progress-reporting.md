@@ -142,12 +142,20 @@ of one run is the overlap this file has flagged since it was filed.
 
 - **Goes:** the `/batch [n]` command, its registry entry, its Tab completion, and its section in
   `docs/cli.md` (a governance-doc edit — review-gated).
-- **Open:** whether `runBatch` keeps *writing* `.orchestrator/batches/`. It is still what
+- **Stays:** `runBatch` keeps writing `.orchestrator/batches/` (#98a), *"for audit purposes."* The
+  summary is a durable artifact whether or not a command prints it — and a non-TTY run's scrollback is
+  a pipe that may go nowhere, so the file is sometimes the only copy. It also remains what
   [record-attempted-tasks.md](record-attempted-tasks.md) calls "the only durable record of this was
-  tried and it failed", and a non-TTY run's scrollback is a pipe that may go nowhere. Removing the
-  reader while keeping the writer recreates exactly the shape that justified
-  [move-the-logs-into-sqlite-tables.md](move-the-logs-into-sqlite-tables.md) — *nothing reads
-  `events.jsonl`*. See [OPEN-QUESTIONS.md](../OPEN-QUESTIONS.md) **#98**.
+  tried and it failed".
+
+  This does knowingly recreate the shape that justified filing
+  [move-the-logs-into-sqlite-tables.md](move-the-logs-into-sqlite-tables.md) — *a record written to a
+  file no command surfaces* — which is an argument for folding the batch summaries into that task's
+  store rather than for not writing them.
+- **Undecided: does `/audit` follow `/batch` out?** It has the identical shape — a read-only reprint of
+  a persisted record — and the scrollback now shows every tool call live, which is the same duplication
+  argument that removed `/batch`. Nothing has said either way. See
+  [OPEN-QUESTIONS.md](../OPEN-QUESTIONS.md) **#102**.
 
 `backlog/README.md`'s shipped Tier-1 entry for the inspection commands describes `/batch` as one of
 five; correcting it is part of the commit that removes it.

@@ -4,9 +4,10 @@ Ten agents each read one backlog task and came back with 73 questions. This file
 place they live**: the follow-ups that used to sit in a separate `FOLLOW-UP-QUESTIONS.md` are folded
 into the sections they belong to, keeping their numbers.
 
-**#1–#94 are all answered.** #77–#94 were the follow-ups the first 76 opened; #95–#99 are what those in
-turn opened, and they are the only questions still marked ◻️. Every answer is folded into the task file
-it belongs to — those files, not this one, are what an implementer reads.
+**#1–#99 are all answered.** #77–#94 were the follow-ups the first 76 opened, #95–#99 what those opened
+in turn, and **#100–#102** are the three left — each one a mechanism question inside a task whose design
+is settled. Every answer is folded into the task file it belongs to; those files, not this one, are what
+an implementer reads.
 
 **Every question has been rewritten to explain itself.** The first pass assumed you were holding the
 codebase in your head, and it shows: #2 you told me outright you could not follow, and #15 was answered
@@ -41,20 +42,21 @@ Anything you skip stays blocked.
 | A | record-attempted-tasks | #2–#6, #70, #77 | **✅ complete — build it** |
 | B | boot-can-pick-a-toolless-model | #7–#14, #69, #71, #72, #78, #79 | **✅ complete — build it** |
 | C | node-version-is-not-enforced | #15–#21, #73–#76, #80 | **✅ complete — build it** |
-| D | spawned-windows-have-no-failsafe | #22–#27, #81, #82 | ✅ answered; **#97** picks the table before the schema is written |
+| D | spawned-windows-have-no-failsafe | #22–#27, #81, #82, #97 | ✅ answered — and the scope grew: spawned windows persist their **whole** trace; **#101** |
 | E | cap-the-debate-background-parameter | #28–#34, meta E, #83 | ✅ answered; the cap's *unit* now waits on K |
-| F | tune-the-global-num-ctx-default | #35–#37, #68, #84, #85 | **✅ closed — stays at 16 384**, residency rule stated; **#96** spun out |
-| G | budget-ceilings-for-runs-and-batches | #38–#47, #86, #87 | ✅ answered; **#95** decides what the clock actually bounds |
+| F | tune-the-global-num-ctx-default | #35–#37, #68, #84, #85, #96 | **✅ closed — stays at 16 384**, residency rule stated; **#100** is the last mechanism |
+| G | budget-ceilings-for-runs-and-batches | #38–#47, #86, #87, #95 | **✅ complete** — and renamed: it bounds a **window**, not a task |
 | H | surface-matching-standards | #48–#56, meta H, #88, #89 | **✅ complete — build it** |
 | I | small-model-lane-for-one-shots | #57–#60, meta I, #90 | **✅ closed without shipping**; the file is deleted |
-| J | in-turn-progress-reporting | #61–#67, meta J, #91, #92 | ✅ answered; **#62** needs your drawing, **#98** decides `/batch`'s writer |
-| K | derive-constants-from-one-ceiling | meta F, #93, **#99** | ✅ answered, and cheaper than expected; **#99** confirms the fractions |
+| J | in-turn-progress-reporting | #61–#67, meta J, #91, #92, #98 | ✅ answered; **#62** needs your drawing, **#102** decides `/audit`'s fate |
+| K | derive-constants-from-one-ceiling | meta F, #93, #99 | **✅ complete — build it.** Cheaper than expected; the fractions are taken as proposed |
 | L | split-config-into-one-function-per-file | #94 | **✅ complete — build it** |
 
 **Where the new numbers went:** #68 into F, #69/#71/#72 into B, #70 into A, #73–#76 into C, #77 into A,
 #78/#79 into B, #80 into C, #81/#82 into D, #83 into E, #84/#85 into F, #86/#87 into G, #88/#89 into H,
 #90 into I, #91/#92 into J, #93/#94 into the new sections K and L, then #95/#96/#97/#98 into G, F, D and
-J respectively, and #99 into K. Nothing was renumbered.
+J respectively, #99 into K, and then #100 into F, #101 into D and #102 into J. Nothing was
+renumbered.
 
 **The lettered meta-answers** (E, F, H, I, J) were given alongside the numbered ones and are answered or
 sited in their sections: **E** (the tokenizer question) is answered in full at the end of section E,
@@ -1523,7 +1525,10 @@ With tokens out of scope, the ceiling has no definition yet.
 *This matters because an attended run is exactly where the two diverge, and a ceiling that counts
 thinking time fires on a user who walked away from a question.*
 
-### ◻️ #95 — Does the Worker→Reviewer handover reset the budget clock?
+### ✅ #95 — Does the Worker→Reviewer handover reset the budget clock?
+
+**Your answer:** **b** — every swap resets, execution handovers included. So the ceiling bounds a **window**, not a task, and the task file is renamed to match. The rule it implements: *no single window may spend more than N minutes of model time in one continuous stretch* — which is the wedged-call detector, while a task that legitimately needs five full rounds never trips it. What it deliberately does not bound is a task's total cost; the batch ceiling is the only thing that does, and it does not reset (#41a made the two independent, and a batch is not a phase).
+
 
 **Today.** #87 answered *"model time only, reset on every phase swap."* Model time is unambiguous. The
 reset is not.
@@ -1541,7 +1546,10 @@ this whole task exists for is exactly the one it stops catching.
   task, and the file's "per-task ceiling" is renamed to match.
 - **c.** Both: a per-window ceiling that resets, plus a per-task ceiling that does not.
 
-### ◻️ #96 — Under #84c, does the boot chooser refuse a model whose weights will not fit?
+### ✅ #96 — Under #84c, does the boot chooser refuse a model whose weights will not fit?
+
+**Your answer:** **a**, plus two rulings the options did not offer: *"Never hardcoded. Both variables (model and num_ctx) are playable for showing a 'too heavy' tag on the model list. But we must always probe the machine to know."* So the list **marks**, nothing refuses; the tag depends on the weights **and** the configured ceiling, so it is recomputed rather than stamped; and the VRAM figure is probed, never compiled in. How to probe it is **#100**.
+
 
 **Why this exists.** #84c's rule — *weights resident, only KV cache offloads* — is measurable before a
 model is ever loaded: `/api/tags` reports each model's on-disk size, which for a GGUF is essentially its
@@ -1563,7 +1571,10 @@ That is a strong claim to bake into a chooser, and the ceiling is hardware-speci
 - *If (a) or (b): where does the ~10.4 GB come from? Hard-coded is wrong on another machine; probing it
   means loading a model to find out.*
 
-### ◻️ #97 — Which table does a spawned window's summary go in?
+### ✅ #97 — Which table does a spawned window's summary go in?
+
+**Your answer:** *"Reuse the same table, so we can also read the full thinking/conversation process by reading the rows."* — option **b**, and read carefully it is more than a summary: a spawned window gets a `contexts` row and its turns become `messages` rows, so the whole reasoning trace becomes readable after the fact. The schema barely moves (`phase` is plain TEXT, `role` already allows `'summary'`). The collision it creates with `/swap` is **#101**.
+
 
 **Why this exists.** #81 says *always record whatever is generated into the database, even when the user
 cant resume from it.* `contexts` is keyed on the interactive phases and carries the whole `/resume`
@@ -1577,7 +1588,10 @@ machinery, which this explicitly does not need.
 - **c.** The events log, as the payload of the `summarization_fire` row #27a already writes. *No new
   storage at all; the row grows a potentially large text column.*
 
-### ◻️ #98 — With `/batch` gone, does `runBatch` still write `.orchestrator/batches/`?
+### ✅ #98 — With `/batch` gone, does `runBatch` still write `.orchestrator/batches/`?
+
+**Your answer:** **a** — keep writing `.orchestrator/batches/` *"for audit purposes"*. The summary is a durable artifact whether or not a command prints it, and a non-TTY run's scrollback is a pipe that may go nowhere. The `/audit` half of this question was not answered and is now **#102**.
+
 
 **Why this exists.** #92 removes the reader. The writer is still what
 [record-attempted-tasks.md](backlog/record-attempted-tasks.md) calls *"the only durable record of this
@@ -1593,6 +1607,26 @@ writer without a reader recreates the exact shape that justified filing
   one reader.
 - *Does `/audit` follow `/batch` out, or is it kept? It has the same shape — a read-only reprint of a
   persisted record — and #92's reasoning would take it too, but nothing said so.*
+
+### ◻️ #102 — Does `/audit` follow `/batch` out?
+
+**Why this exists.** #92 removed `/batch` because the scrollback now carries the same information, and
+#98a kept its *writer* for audit. `/audit` has the identical shape — a read-only reprint of a persisted
+record — and since `show-tool-calls-in-the-scrollback` shipped, every tool call is already printed live
+as `→ <tool> <arg>` / `← <result>`. The duplication argument that removed `/batch` applies to it
+unchanged.
+
+**What is different about it.** `/audit [n]` reads the audit log, which is the repo's *single choke
+point* for every tool call — including the three runner-level refusals that never reach the scrollback
+as ordinary calls. And the scrollback is bounded by the terminal's buffer, while the log is not: after
+an overnight batch, `/audit` may be the only way to reach the first hour.
+
+- **a.** Keep it. The live print and the queryable record are different instruments, and `/audit` reaches
+  further back than any scrollback.
+- **b.** Remove it too, for consistency with `/batch` — the scrollback is the record, and the log stays
+  written for external inspection.
+- **c.** Keep it and narrow it — e.g. failures only, since a successful call is already visible where it
+  happened.
 
 ---
 
@@ -1768,6 +1802,42 @@ This design makes that collision more likely, not less.
 - **c.** Remove the unconditional `load_rule` from `worker.md` / `reviewer.md` and let the mechanism do
   its job. *A `rules/` edit, committed like ordinary work.*
 
+### ◻️ #100 — How is the machine probed for VRAM?
+
+**Why this exists.** #96 requires the "too heavy" tag to be computed from a **probed** figure, never a
+hardcoded one. There is no Ollama-native way to ask, and I checked all of them against the live daemon:
+
+| route | what it returns | usable? |
+|---|---|---|
+| `/api/status` | `{"cloud":{...}}` | no GPU information at all |
+| `/api/ps` | loaded models only | empty until something is loaded |
+| `/api/tags` | per-model `size`, `capabilities`, `context_length` | the model's size, not the machine's capacity |
+| `/api/experimental/model-recommendations` | a curated list with `vram_bytes` hints | recommendations, not this machine — and *experimental* |
+| `nvidia-smi` | `12288 MiB total, 991 MiB used` | **works, and is vendor-locked** |
+
+**The tension.** `docs/product.md` states OS-agnostic reach as a goal. A vendor CLI means one path for
+NVIDIA, another for AMD (`rocm-smi`), another for Apple unified memory, and no path at all for the rest
+— each needing its own parser and its own way to be absent.
+
+**One thing is exact and needs no VRAM figure whatsoever.** After a model is loaded, `/api/ps` reports
+both `size` and `size_vram`: `size_vram < size` **is** the spill, measured rather than predicted. So the
+*verification* is free and portable; only the *prediction shown before loading* needs the machine's
+capacity.
+
+- **a.** Vendor CLIs, with a documented fallback: when VRAM cannot be determined, **show no tag** rather
+  than guess. *Cosmetic marker fails open; the exact `/api/ps` check still catches it after loading.*
+- **b.** No prediction at all — drop the pre-load tag, and mark a model as too heavy only **after** it
+  has been loaded once and `/api/ps` proved it, remembering the result. *Fully portable and always
+  exact, but the first load of a 30b still happens.*
+- **c.** Probe by loading each installed model once at first boot and recording the outcome. *Exact and
+  portable; costs minutes on a machine with nine models.*
+- **d.** Something else.
+
+*(Incidental find, for the boot chooser rather than this question:
+`/api/experimental/model-recommendations` returns a curated list with per-model `vram_bytes`, which is a
+candidate source for #10's "print some recommendations" on an empty machine — better than a hardcoded
+`SUGGESTED_MODEL`, but it is an experimental endpoint and its list includes cloud models.)*
+
 ---
 
 ## I. small-model-lane-for-one-shots — Tier 3, Memory / context
@@ -1855,6 +1925,31 @@ approval and that approval was never given.
 - **b.** Keep it open, and pull `qwen2.5-coder:1.5b` and a 3b to run the quality comparison #58 asks
   for. *This is the approval #1 requires; say so explicitly if you mean it.*
 - **c.** Keep the file open as a record with no work attached, the way the framing notes are kept.
+
+### ◻️ #101 — Spawned windows in `contexts` collide with `/swap`
+
+**Why this exists.** #97 puts spawned windows into `contexts` + `messages`, and #81 says they are
+recorded but **not resumable**. Those two only coexist if `/resume` can tell them apart from an
+interactive phase's rows — and today nothing can.
+
+**The mechanism, precisely.** `/swap` validates its argument against `availablePhases()`, which is every
+`.md` file in `rules/phases/` — `breakdown`, `design`, `discovery`, **`retro`**, **`reviewer`**,
+**`worker`**. So `/swap worker` is legal right now and gives the user an interactive window on the
+Worker's system prompt. Once spawned Worker windows write rows with `phase = 'worker'`, `/resume` in
+that phase lists them, because its only filters are `phase = ?` and `num_ctx = ?`.
+
+Until now this could not happen: no spawned window wrote anything.
+
+- **a.** A column on `contexts` — `resumable INTEGER NOT NULL DEFAULT 1`, or a `kind` of
+  `interactive | spawned` — and `/resume`'s two queries filter on it. *Explicit, and it survives someone
+  adding a seventh phase file.*
+- **b.** Namespace the phase names — a spawned Worker writes `phase = 'worker:spawned'` or similar, so
+  it can never equal what `/swap` accepts. *No schema change; relies on a naming convention holding.*
+- **c.** Restrict `/swap` to the three interactive phases, so `worker`/`reviewer`/`retro` are never
+  active and their rows are unreachable by construction. *Smallest data change, but it removes an
+  ability that exists today — and `rules/phases/` stops being the list of what a user may select.*
+- *Worth saying either way: should `/swap worker` be legal at all? It is currently possible to hold an
+  interactive conversation on the Worker's prompt, outside any task, which no doc describes.*
 
 ---
 
@@ -2043,7 +2138,10 @@ fractions themselves need confirming in **#99**.
 window space — a bigger ceiling does not make a 500-entry listing more useful. The task file proposes
 excluding them; confirm, or say which belong.
 
-### ◻️ #99 — Confirm the proposed fractions
+### ✅ #99 — Confirm the proposed fractions
+
+**Your answer:** **a** — *"use this proposal and we adjust later in testing."* The fractions ship as written, including the split that leaves `DIFF_MAX_CHARS` and `OUTPUT_PREVIEW_LIMIT` in characters. Adjusting them later is the point: a one-line edit in one file rather than a hunt through eight.
+
 
 This is meta F's *"you will help me finding these values"*, delivered. Every fraction is chosen to
 **preserve today's effective budget**, not to retune it — the task is about where a number comes from.
@@ -2118,32 +2216,33 @@ five questions remain.
 - **A** — `failed` status, written after the stash, committed by the loop with `commitPaths`.
 - **B** — delete the pick rule; a marked, non-selectable list; the Ollama 0.9.1 floor stated and checked.
 - **C** — `.nvmrc` as the only source of truth, both verbs refusing, `engines` deleted.
+- **G** — a per-**window** wall-clock ceiling on model time, `over_budget`, dependents stopped.
 - **H** — resident names at `ctx[0]`, `describe_rule`, the hint, and the conditional STE load.
+- **K** — the local tokenizer, then the fraction table.
 - **L** — split `config.ts` **and** `ollama-models.ts`.
 
 **Closed, not built:** **F** (16 384 stays; the residency rule goes to `docs/product.md`) and **I** (the
 small-model lane, deleted).
 
-**The five open questions, and what each actually gates:**
+**The three open questions.** None of them is a design decision any more — each is a *mechanism* inside
+a task whose design is settled, and each is the kind that would be wrong to guess:
 
-- **#95** — whether the Worker→Reviewer handover resets the budget clock. Decides whether G's ceiling
-  bounds a *task* or a *window*; a per-task ceiling that resets ten times per task is not one.
-- **#96** — whether the boot chooser marks or refuses a model whose weights will not fit. Falls out of
-  #84c and matters because, applied here, it leaves one usable model out of nine.
-- **#97** — which table a spawned window's summary goes in. Worth settling *with*
-  [move-the-logs-into-sqlite-tables.md](backlog/move-the-logs-into-sqlite-tables.md) so `memory.db`
-  takes one schema change rather than two.
-- **#98** — whether `runBatch` keeps writing `.orchestrator/batches/` now that `/batch` is gone.
-- **#99** — confirm the proposed fraction table. The last thing K needs.
+- **#100** — how the machine is probed for VRAM. #96 requires a probed figure and forbids a hardcoded
+  one; Ollama offers no route, and every alternative trades portability, accuracy or a model load.
+  **F cannot close without it.**
+- **#101** — spawned windows written into `contexts` collide with `/swap worker`, which is legal today.
+  Without a way to tell the two apart, `/resume` would offer exactly the rows #81 says are not
+  resumable. **D's schema should not be written before this.**
+- **#102** — whether `/audit` follows `/batch` out, on the same duplication argument.
 
-Plus **#62**, which is not a question so much as a handoff: the status-line field list you asked for is
-in [backlog/in-turn-progress-reporting.md](backlog/in-turn-progress-reporting.md), waiting on your
-drawing.
+Plus **#62**, which is a handoff rather than a question: the status-line field list you asked for is in
+[backlog/in-turn-progress-reporting.md](backlog/in-turn-progress-reporting.md), waiting on your drawing.
 
 **Sequencing that came out of the answers:**
 
 - **K's tokenizer ships before E**, or the `background` cap is written twice — once in characters, once
-  in tokens.
+  in tokens. K is now the widest-reaching item on the list: six budgets across five files take their
+  unit from it.
 - **L ships before G**, so the budget resolver is written into the one-function-per-file shape rather
   than added to an exception and moved afterwards.
 - **J ships before `steer-a-running-turn`**, which #91a authorized: the live-window label is what makes
