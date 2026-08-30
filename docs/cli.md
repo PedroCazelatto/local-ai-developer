@@ -200,25 +200,27 @@ there, and every turn fails. The **installed set is the only ground truth**, so 
 daemon and picks from what exists
 ([src/core/session/resolve-boot-model.ts](../src/core/session/resolve-boot-model.ts)).
 
-**Tool support is a gate; size is only the tie-break behind it.** Every phase in this product is a
+**Tool support is a gate, and nothing infers a model behind it.** Every phase in this product is a
 tool-calling loop, so a model without the `tools` capability cannot run any of it — a Worker that
 cannot call `edit_file` does nothing at all, and the phase burns its five rounds looking confused
-rather than failing. The pick therefore filters on the capability Ollama reports for each installed
-model first, and takes the smallest of whatever survives:
+rather than failing. And **there is no size heuristic**: sorting the installed set on disk bytes and
+taking the smallest was a rule that chose for the user, which is how a benchmark download could
+silently re-point an unattended boot onto a 1.5b model. It is gone. The ladder is:
 
-1. `state.json`'s `activeModel`, **installed and tool-capable** — the user's own explicit choice wins.
+1. `state.json`'s `activeModel`, **installed and tool-capable** — the user's own explicit choice wins,
+   with no prompt.
 2. `state.json`'s `activeModel`, **installed but toolless** — **refused**, with a line saying why, and
-   boot falls through to the pick rule. An explicit choice outranks an inferred one only among models
-   that can actually run a phase.
-3. `state.json`'s `activeModel`, **not installed** — offer to re-pull it (single-keypress y/n). A model
-   that is not on disk reports no capabilities at all, so the gate is applied *after* the pull: a
-   re-pulled model that turns out to be toolless is refused too, and boot falls through to the pick
-   rule.
-4. Otherwise — the **smallest installed tool-capable model**. VRAM is the binding constraint, so an
-   unattended boot lands on the smallest model that can actually work.
-5. **Nothing installed at all** — offer to pull `SUGGESTED_MODEL`, which exists *only* as this
-   download suggestion for a fresh machine and is never a value the session silently boots on.
-6. **Nothing tool-capable, or every offer declined** — no model. This is a valid session, not an
+   boot falls through to the chooser.
+3. `state.json`'s `activeModel`, **not installed** — boot falls through to the chooser. There is no
+   re-pull offer: with no pick rule left to fall through *to*, a missing saved model is simply an
+   unresolved boot like any other.
+4. **Otherwise — the user chooses.** Boot lists every installed model and waits. Toolless models are
+   **shown, marked, and not selectable** (see below), so the list explains itself rather than hiding
+   its own omissions.
+5. **Nothing installed at all** — print recommendations and how to install one. Nothing is downloaded.
+   `SUGGESTED_MODEL` exists *only* as this suggestion for a fresh machine and is never a value the
+   session silently boots on.
+6. **Nothing tool-capable, or the chooser declined** — no model. This is a valid session, not an
    error: the REPL still boots (so the user can `/models pull` or `/models use`), the status line
    reads `no model`, and a turn fails with an actionable line instead of an Ollama 404.
 
@@ -229,29 +231,32 @@ problem one pull further along.
 
 Two invariants hold across all of it:
 
-- **Nothing is ever pulled without the user's approval.** Every pull path — both boot offers, `/models
-  pull`, and the inline offer inside `/models use` — is gated on an explicit keypress. And a declined
-  pull is never chased with a second offer for a different model: **one ask per boot**.
+- **Nothing is ever pulled without the user's approval**, and nothing is ever *selected* without it
+  either. Every pull path — the boot suggestion, `/models pull`, and the inline offer inside
+  `/models use` — is gated on an explicit keypress.
 - **The gate fails closed.** A daemon that does not report capabilities at all leaves every model
   failing it, and the session boots model-less. That is the cheap direction to be wrong in: booting a
   walk-away batch onto a model that cannot call a tool costs the whole batch, while a wrongly
-  model-less boot costs one `/models use` the user can drive from inside the app.
+  model-less boot costs one `/models use` the user can drive from inside the app. **This is why the
+  repo has a minimum Ollama version** — capabilities reached `/api/tags` in 0.9.1, and a daemon older
+  than that makes every model look incapable.
 
-Only an explicit `/models use` writes `state.json`, so an inferred boot pick never overwrites a
-stated choice. **An unreachable Ollama daemon is fatal at boot** — like a missing Docker daemon: boot
-needs the installed list to decide anything, and a session without Ollama can do nothing at all.
+Only an explicit `/models use` writes `state.json`, so a boot-time choice never overwrites a stated
+one. **An unreachable Ollama daemon is fatal at boot** — like a missing Docker daemon: boot needs the
+installed list to decide anything, and a session without Ollama can do nothing at all.
 
 ### `/models` and the toolless case
 
 - **`/models list` marks tool support.** The list is where a user goes to ask why a model was skipped,
-  so it is where the answer belongs.
-- **`/models use <name>` on a toolless model asks before switching** — a single-keypress confirm
-  naming what will break, not a refusal. A deliberate choice is not an inferred default, and being
-  able to select the model is the only way to chat with it at all; the confirm just means nobody
-  arrives there by Tab-completion.
-- **An active toolless model is marked in the pinned status line** — `Model: <name> (no tools)`.
-  Boot's scrollback is wiped by the REPL's one-time `clearScreen`, so a warning printed there is a
-  warning the user cannot scroll back to. The status line is the only surface that survives it.
+  so it is where the answer belongs. The same marking is what the boot chooser shows.
+- **A toolless model is visible but never selectable.** `/models use <name>` on one **refuses**: it
+  says the model cannot call tools and is therefore unavailable, and **asks whether to delete it**. So
+  a toolless model is shown, explained, and disposable — never quietly active, and never a thing the
+  user has to remember about.
+
+  *(This reverses an earlier reading of these answers, which had `/models use` take a single-keypress
+  confirm and then switch. It also leaves the `Model: <name> (no tools)` status marker with no way to
+  paint — see OPEN-QUESTIONS.md #78, which is open.)*
 
 ## Environment
 
