@@ -145,9 +145,11 @@ invalidation-free cache could not otherwise survive. Keyed on the digest, a re-p
 has never been seen, so it re-probes on its own. `/api/tags` already returns `digest` in the same call
 that returns `capabilities` and `size`, so this costs nothing.
 
-**Still to decide when this ships:** whether a newly pulled model is probed immediately after
-`/models pull` — the moment the user is already waiting — or at the next boot. Not asked; the smaller
-question, and either is defensible.
+**Delegated to the implementer:** whether a newly pulled model is probed immediately after
+`/models pull` — the moment the user is already waiting anyway — or at the next boot. Either is
+defensible, the cost is one ≈18 s load either way, and the user has explicitly left this to build time.
+**Decide it and move on; do not stop to ask.** The only hard constraint is the one above: the probe
+cannot run while a session is mid-turn.
 
 ## Two sub-questions this file carried are now answered by measurement, not by decision
 

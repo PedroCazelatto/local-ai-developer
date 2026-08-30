@@ -121,6 +121,14 @@ Two constraints on any drawing: the rows are **three idle, five with the input f
 (`status-bar.ts`), and adding a field means composing it into one of the two existing lines rather than
 taking a fourth row.
 
+**The layout and the drop order are delegated to whoever builds this.** #62 originally reserved the
+drawing for the user; that reservation has since been lifted — *"let the 62 handoff and minor questions
+now to be decided when implementing."* So pick a layout from the table above and a drop order to go with
+it, and **do not stop to ask**. The proposed drop order, right to left, remains a reasonable default:
+spend → task title → batch position → task id → round, with Model and Project dropped last. This is a
+narrow, reversible presentation choice; the constraints that are *not* negotiable are the two above,
+plus exact-or-absent token figures and the append-only scrollback.
+
 ## Steering is authorized, and sequenced behind this task (#91a)
 
 #61's second reason — *"the input is also connected to the running interaction and I can send more

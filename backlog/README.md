@@ -154,8 +154,13 @@ Where the window is also a clock. Two of these want measurement before design.
       (OPEN-QUESTIONS.md #90a). The project's optimization target is now stated — *precision and accuracy over
       time taken* — and the acceptance test with it: *the output must be better; time is irrelevant.* Every
       argument the file made was a time-and-residency argument, and a 1.5–3b model does not write better
-      titles, commit messages or summaries than the session model. The CPU-pinned arm was ruled out (#57) and
-      the two small models were never pulled, so no benchmark was spent on it either.
+      titles, commit messages or summaries than the session model. The CPU-pinned arm was ruled out (#57)
+      and the two small models were never pulled, so no benchmark was spent on it either. **The rest of
+      section I survives only here:** the acceptance test was **output quality, with latency irrelevant**
+      (#58), the latency numbers were **not worth recording** (#59), and if the lane is ever revived the
+      build is **re-filed as its own task** (#60b) rather than smuggled into a measurement pass — it would
+      need a second model resolution point, a second `activeModel`-shaped setting, a second `/models use`
+      form, and token counts summed across two tokenizers.
 - [ ] **[Cap `debate`'s `background` parameter](cap-the-debate-background-parameter.md)** — *Memory /
       context.* The one model-supplied payload in the repo with no bound, replayed into two windows on
       every call — up to ten times in one debate. `run-debate.ts` already names the hazard for the third
@@ -167,12 +172,17 @@ Where the window is also a clock. Two of these want measurement before design.
       14b and 6.8 % on the 32b, and 12 288 is *not* fully resident either, so the choice was never
       resident vs. hybrid. The room is worth more than the speed, which is now the project's stated
       optimization target in `docs/product.md` along with the rule that resolved the CPU collision —
-      *spill is acceptable while the weights stay resident and only KV cache offloads.* Per-model ceilings
-      deferred (they collide with `contexts.num_ctx` stamping); nothing to migrate. Spun out
-      [resume-across-num-ctx-changes.md](resume-across-num-ctx-changes.md), and handed the residency
-      measurements and the boot probe to
+      *spill is acceptable while the weights stay resident and only KV cache offloads* (#84c). Nothing to
+      migrate. Spun out [resume-across-num-ctx-changes.md](resume-across-num-ctx-changes.md), and handed
+      the residency measurements and the boot probe to
       [boot-can-pick-a-toolless-model.md](boot-can-pick-a-toolless-model.md), which is where the tag is
-      painted.
+      painted. **Three decisions survive only here, so do not re-open them without reading this line:**
+      **per-model ceilings are deferred** (#37a) — one global number is demonstrably wrong for one of the
+      two models, 29.1 % against 6.8 %, but a ceiling that follows `/models use` changes *mid-session*
+      while `contexts.num_ctx` is stamped *once at creation*, so it would drag the stamping design with
+      it; **16 384 is the number that is right for the 32b** and expensive on the 14b, which #37a asked to
+      be recorded; and **`OLLAMA_KV_CACHE_TYPE` is not a backlog item** (#85c) — it folds into the
+      residency rule, being the one knob that shrinks the *cache* spill without touching the weights.
 - [ ] **[Make the standards visible](surface-matching-standards.md)** — *Model behavior.* **The shape
       changed: the resident catalog won.** All nine standard names sit at `ctx[0]` in every phase (~50 exact
       tokens, 0.3 % of the window), and a new `describe_rule` tool returns a one-line description so the model

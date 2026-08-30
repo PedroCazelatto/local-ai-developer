@@ -9,9 +9,11 @@ into the sections they belong to, keeping their numbers.
 **those files, not this one, are what an implementer reads.** This file is now a record of how each
 decision was reached, kept because the reasoning behind a decision outlives the decision.
 
-The one thing still outstanding is not a question: **#62** asked for a list of everything useful on the
-status line so you could draw the row, and that list is in
-[backlog/in-turn-progress-reporting.md](backlog/in-turn-progress-reporting.md).
+**Nothing is outstanding.** #62's status-line field list was delivered — twelve fields, each with its
+source, at the end of [backlog/in-turn-progress-reporting.md](backlog/in-turn-progress-reporting.md) —
+and the drawing was then delegated to build time along with the two smaller judgement calls that were
+noted but never asked. Those three, and only those three, are the implementer's to settle without
+asking; CLAUDE.md's *do not assume, ask* still governs everything else.
 
 **Every question has been rewritten to explain itself.** The first pass assumed you were holding the
 codebase in your head, and it shows: #2 you told me outright you could not follow, and #15 was answered
@@ -2045,7 +2047,9 @@ context while a Worker runs. Overwriting it hides a true fact to show another on
 
 ### ✅ #62 — Field priority when the row will not fit?
 
-**Your answer:** *"Lets make a list of everything that is usefull at the status line and then I will draw it for you."* — folded into the task file.
+**Your answer:** *"Lets make a list of everything that is usefull at the status line and then I will draw it for you."* — the list was delivered: twelve candidate fields, each with its source and what it costs, at the end of [backlog/in-turn-progress-reporting.md](backlog/in-turn-progress-reporting.md).
+
+**Since superseded:** *"let the 62 handoff and minor questions now to be decided when implementing."* The drawing is no longer reserved — whoever builds task J picks the layout and the drop order from that table and does not stop to ask.
 
 
 Proposed drop order, right to left: `Σ` → task title → batch position → task id → round, with

@@ -125,9 +125,11 @@ Two implementation notes that follow:
   from the namespaced name back to the base. Keep that map in one place; two spellings of the same
   phase is exactly the kind of thing that drifts.
 - **`/swap worker` stays legal and is now harmless** — it holds an interactive conversation on the
-  Worker's prompt, under `phase = 'worker'`, which no spawned row can collide with. It is an ability
-  no doc describes, and it is out of scope here; worth a line in `docs/cli.md` whenever that file is
-  next touched.
+  Worker's prompt, under `phase = 'worker'`, which no spawned row can collide with. Whether to keep it,
+  restrict `/swap` to the three planning phases, or simply document it is **delegated to whoever builds
+  this**: the user has left it to build time, so decide it in the shipping commit rather than asking.
+  Nothing here depends on the answer — #101b's namespace is what makes the rows safe, not the
+  restriction. If it stays, it deserves a line in `docs/cli.md`, which no doc currently gives it.
 
 Two consequences worth pricing before building:
 
