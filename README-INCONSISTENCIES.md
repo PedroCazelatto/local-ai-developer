@@ -120,13 +120,32 @@ answers a blocker**, not after a review.
 **Truth:** *Node version* in [docs/cli.md](docs/cli.md),
 [backlog/node-version-is-not-enforced.md](backlog/node-version-is-not-enforced.md).
 
-## 12. The "Models used" list is unverified, and one entry is misleading.
+## 12. The "Models used" list was unverified, and three entries cannot run a phase.
 
-- `qwen3.5:27b` does not appear to be a real Ollama tag — likely meant `qwen3:32b` or `qwen2.5:32b`.
-- `deepseek-coder-v2:16b` is **confirmed toolless** on this box (`completion,insert`, no `tools`), so
-  it cannot run any phase. Listing it beside models that work, with no marker, is the exact trap
-  [backlog/boot-can-pick-a-toolless-model.md](backlog/boot-can-pick-a-toolless-model.md) exists to
-  close.
+The list has now been checked against the daemon rather than reasoned about. `/api/tags` reports
+`capabilities` per model, so this is measured, not inferred:
+
+| model | capabilities | verdict |
+|---|---|---|
+| `qwen2.5-coder:14b` | `completion, tools, insert` | fine |
+| `qwen2.5-coder:32b` | `completion, tools, insert` | fine |
+| `qwen3-coder:30b` | `completion, tools` | fine |
+| `devstral:24b` | `completion, tools` | fine |
+| `gpt-oss:20b` | `completion, tools, thinking` | fine |
+| `qwen3.5:27b` | `vision, completion, tools, thinking` | fine — **and it is a real tag** |
+| `deepseek-coder-v2:16b` | `completion, insert` | **cannot run any phase** |
+| `deepseek-r1:14b` | `completion, thinking` | **cannot run any phase** |
+| `codestral:22b` | `completion, insert` | **cannot run any phase** |
+
+Two corrections to what this file previously said:
+
+- **`qwen3.5:27b` is real.** This file called it "not a real Ollama tag — likely meant `qwen3:32b`".
+  It is installed on this box at 17.42 GB and reports four capabilities including `tools`. The earlier
+  claim was wrong and is withdrawn.
+- **Three of the nine models are toolless, not one.** `deepseek-r1:14b` and `codestral:22b` join
+  `deepseek-coder-v2:16b`. Listing any of them beside models that work, with no marker, is the exact
+  trap [backlog/boot-can-pick-a-toolless-model.md](backlog/boot-can-pick-a-toolless-model.md) exists
+  to close.
 
 ## 13. `projects/` — the `hello-world` exception is not mentioned.
 
@@ -135,6 +154,52 @@ The two stated reasons for the folder are still right. What is missing: `project
 immediately.
 
 **Truth:** [docs/repo-layout.md](docs/repo-layout.md).
+
+## 14. Requirements state no minimum Ollama version, and there now is one.
+
+The Requirements section names Ollama with no floor. There has to be one, because the boot-time
+tool-capability gate **fails closed** (OPEN-QUESTIONS.md #13): a daemon too old to report
+`capabilities` leaves every installed model failing the check, so a machine full of working models
+boots model-less with no hint that the daemon is the reason.
+
+**The floor is Ollama `0.9.1` or newer** (released 2025-06-09). Researched rather than guessed, and the
+two endpoints differ:
+
+| field | endpoint | first release | date |
+|---|---|---|---|
+| `capabilities` | `/api/show` | `v0.6.4` | 2025-04-02 |
+| `capabilities` | `/api/tags` | **`v0.9.1`** | 2025-06-09 |
+
+(`ollama/ollama` PR #10066 merged 2025-04-01, first contained in the `v0.6.4` tag; PR #10174 *"Server:
+Enhance API/tag with Capability Information"* merged 2025-06-04, first contained in `v0.9.1`.) The boot
+gate reads `/api/tags`, because that returns every model's capabilities in **one** round trip where
+`/api/show` would need one call per model. So `0.9.1` is the number.
+
+This box runs **0.33.2**, far past it.
+
+**Suggested wording for Requirements:** *"Ollama 0.9.1 or newer — earlier versions do not report model
+capabilities, and the orchestrator refuses any model it cannot confirm supports tool calling."*
+
+**Truth:** OPEN-QUESTIONS.md #13 and #72,
+[backlog/boot-can-pick-a-toolless-model.md](backlog/boot-can-pick-a-toolless-model.md).
+
+## 15. Nothing warns that `docker compose` by hand will not work correctly.
+
+Once the Node version is derived from [.nvmrc](.nvmrc) (OPEN-QUESTIONS.md #15, #76), the launcher
+exports it and [docker-compose.yml](docker-compose.yml)'s `image:` interpolates it — the same pattern
+`ACTIVE_PROJECT` already uses in that file.
+
+The consequence is worth stating plainly, because it is invisible until it bites: **`docker compose up`
+/ `docker compose run` typed by hand, without `scripts/run.mjs`, no longer resolves to the right
+image** — and `ACTIVE_PROJECT` already fails closed to `__no_project__` under exactly the same
+circumstances, so a hand-run compose also mounts no project.
+
+The supported entry points are `npm run start` / `node scripts/run.mjs start <project>`, and the README
+should say so where it shows any compose command.
+
+**Truth:** OPEN-QUESTIONS.md #76,
+[backlog/node-version-is-not-enforced.md](backlog/node-version-is-not-enforced.md),
+[docker-compose.yml](docker-compose.yml).
 
 ---
 

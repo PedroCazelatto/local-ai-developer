@@ -20,8 +20,9 @@ It is only escalation that forgets.
 sits in a file the tool cannot show, while the backlog file that actually drives scheduling says `pending`. Two
 `/run all` invocations overnight can spend the second half of the night re-failing the first half's tasks.
 
-The shape of a fix is a distinct status plus an attempt count in the task's frontmatter, so `/run all` skips it
-by default while `/run <id>` still retries deliberately.
+The shape of a fix is a distinct status in the task's frontmatter, so `/run all` skips it by default while
+`/run <id>` still retries deliberately. (This originally proposed *status plus an attempt count*; #2 answered
+the status alone — see the decisions below.)
 
 ## Not a parity gap
 
@@ -34,15 +35,25 @@ It pairs naturally with [budget-ceilings-for-runs-and-batches.md](budget-ceiling
 which introduces a second way for a task to end without a verdict. Both need the same thing: an outcome the
 backlog can see and a reason it can distinguish.
 
-## Decisions (answered — OPEN-QUESTIONS.md #3–#6)
+## Decisions (answered — OPEN-QUESTIONS.md #2–#6, #70)
 
-- **The loop writes the record into the task's frontmatter, *after* the stash, and the tree is left
-  dirty** (#4d). `stashTaskAttempt` is `git stash push -u` over the whole tree, so a frontmatter write
-  before it is reset to HEAD and lost with the attempt. The rejected alternatives: a second
-  orchestrator-side committer beside Retro's; the Reviewer, which is absent on exactly the MAX_ROUNDS
-  and error paths that need the record; and a git-ignored `.orchestrator/` file the committed backlog
-  can never show.
-- **`/run all` skips a previously-failed task by default** (#5a). No flag, no spelling to invent —
+- **A fifth `TaskStatus`, `failed`** (#2). `TaskStatus` is `pending | in_progress | done | blocked`
+  today (`src/core/session/types.ts`); it grows one member, and `TASK_STATUSES` grows with it. This is
+  the shape of the record the rest of the file needed: `resolveSelector('all')` gets something to skip
+  on, and the frontmatter write gets something to write. An `attempts: N` count was **not** asked for
+  and is not in scope — a status alone answers "was this tried and did it fail".
+- **The loop commits the frontmatter itself, via `commitPaths`** (#4 — *changed*; this answer replaces
+  the earlier `d`). Order is forced by the stash: `stashTaskAttempt` is `git stash push -u` over the
+  whole tree, so the write happens **after** the stash and the commit immediately after the write. The
+  precedent is exact — `retro-runner.ts:463` already calls `commitPaths` with a single-element pathspec
+  for a rule file, and `commitPaths` stages only the paths it is given and refuses any that escape the
+  repo. It is never a bare `git commit`.
+- **Nothing needs to tolerate a dirty tree** (#70c, which follows from #4). Because the loop commits,
+  the tree is clean again before the next task starts, so `preflightRefusal`, the per-task check inside
+  the batch loop, `runOneTask`'s `HALT_DIRTY` and `git_branch`'s switch refusal are all **left exactly
+  as they are**. The path allowlist (a) and the threaded known-modified set (b) are both dropped — they
+  existed only to accommodate a dirty tree that no longer happens.
+- **`/run all` skips a `failed` task by default** (#5a). No flag, no spelling to invent —
   `resolveSelector` parses a bare selector and there is no precedent for `/run` flags.
 - **`/run <id>` retries from scratch** (#3a) — today's behaviour. A fresh Worker, the stash never
   reused. Naming the task explicitly *is* the "I fixed the spec, try again" gesture.
@@ -50,22 +61,21 @@ backlog can see and a reason it can distinguish.
   dirties the backlog file for the whole loop, so `changed.files.length === 0` looks unreachable in
   round 1 — confirmed by reading, not by execution. Not this task's problem.
 
-## Blocked on
+## What this now costs elsewhere
 
-- **#2 — the shape of the record itself, which is the centre of the task.** A new `TaskStatus` member,
-  an `attempts: N` count, or both? Answered "I didn't understand"; re-stated in
-  [OPEN-QUESTIONS.md](../OPEN-QUESTIONS.md) #2. Nothing else here can be built without it: #5's
-  "skip by default" needs something to read, and #4's write needs something to write.
+`docs/phases.md`'s **"Who may commit"** list has three entries and none of them is the task loop. It
+grows a fourth — *the execution loop commits the backlog file, and only the backlog file, to record an
+escalation* — which is a **governance-doc edit and therefore review-gated**: make it in the shipping
+commit's working tree and hand the diff over rather than committing it (constitution, *Instruction
+integrity*).
 
-## Falls out of #4d and needs a decision
+The same commit updates [backlog/README.md](README.md)'s line for this task, which still describes the
+`pending` behaviour this removes.
 
-Choosing (d) leaves the project tree permanently dirty by one file, and **three separate gates refuse a
-dirty tree today**:
+## Still open
 
-- `preflightRefusal` (`batch.ts`) — refuses to *start* a batch at all;
-- the per-task check inside the batch loop — skips every task after the first failure;
-- `runOneTask`'s `HALT_DIRTY` in `run.ts`, and `git_branch`'s `switch` refusal.
-
-Each has to learn to tolerate exactly the backlog file the loop wrote, or a single escalation silently
-ends every subsequent run. How — a path allowlist, a "known-modified" set carried through the batch, or
-something else — is not decided.
+- **#77 — does the Reviewer's `verdictGitConflict` see the escalation commit?** A `fail` on a clean
+  tree is legal and normal, and a `pass` may leave nothing uncommitted. The escalation commit happens
+  on the MAX_ROUNDS and error paths, *after* the last Reviewer has spoken, so on the reading of the
+  code it cannot collide — but that is inferred from ordering rather than confirmed, and it is the one
+  place a fourth committer could corrupt a verdict. See [OPEN-QUESTIONS.md](../OPEN-QUESTIONS.md) #77.

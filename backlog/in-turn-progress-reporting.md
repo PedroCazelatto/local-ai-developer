@@ -40,13 +40,97 @@ also removes one of the arguments for the in-window plan, leaving that decision 
   per-round summary line probably is; a per-tool-call one is
   [show-tool-calls-in-the-scrollback.md](show-tool-calls-in-the-scrollback.md)'s job.
 
-## Open decisions
+## Decisions (answered — OPEN-QUESTIONS.md meta J, #61–#67)
 
-- **What gets dropped at narrow widths.** The status lines already truncate; adding fields makes the priority
-  order matter, and it has never been stated. Phase and model are presumably last to go.
-- **Whether the execution windows take over the `Phase:` field or add to it.** Showing `Phase: Worker` while the
-  interactive phase is still Design is either exactly right or actively misleading, depending on how the user
-  reads that field.
-- **Whether a per-round line also lands in the scrollback.** The status rows are live and vanish; a batch that
-  ran overnight leaves nothing behind unless something was printed. This overlaps with `/batch` in
-  [inspection-commands.md](inspection-commands.md) — decide which one is the record.
+**The scope grew.** The file was filed as *status-line only* and explicitly argued the scrollback was
+already rich enough. Meta J overturns that half:
+
+> False: during a `/run`, the terminal must be printing whatever is being run. We will also edit the
+> status line below the input to have this info, like what you proposed.
+
+So this task now has two halves — the pinned rows **and** the scrollback.
+
+### The pinned rows
+
+- **`Phase: Design → Worker`** (#61b). The live window is **appended, not substituted**: the
+  interactive phase is still selected and still holds a context while a Worker runs, and overwriting it
+  hides a true fact to show another one. The answer names a second reason the shorter option (a) would
+  have cost: *"this way, the input is also connected to the running interaction and I can send more
+  messages to the model if I see it diverging from the goal."* See #91 below — that is a different
+  feature wearing this one's clothes.
+- **The live window's name is the phase plus the task id** (#66) — `Worker T-042`. Not
+  `ctx.activePhase` at the existing hook (a) and not two new reporter methods (b), but what the field
+  reads: the phase, identified by which task it is on.
+- **`Ctx: N%` follows the live window** (#63b) — its exact fill over **its own** ceiling, switching
+  from Worker to Reviewer as the round hands over (#46). **Before the window's first response it reads
+  `0%`**, and that is exact rather than invented: zero tokens of a 16 384 ceiling *is* 0 %. No `?%`, no
+  blank, no omitted field.
+- **`Ctx` counts only what is sent to the model** (#64) — the figure Ollama already returns
+  (`prompt_eval_count`), not a locally accumulated notion of history. This also settles the seam
+  question by implication: the field is the live window's own reported count, so **this task owns it**
+  and [budget-ceilings-for-runs-and-batches.md](budget-ceilings-for-runs-and-batches.md) consumes it.
+- **The clamp folds in here** (*already answered* #9). Neither status line is width-clamped today.
+- **The drop order is not decided yet** (#62) — see *What #62 needs from this file* below.
+
+### The scrollback
+
+- **Both: live per-round output and a closing line per round** (#65). What the round is *doing* is
+  printed as it happens; each round then closes with a summary line of the shape
+  `⏱ round 3/5 · 14m22s · 12 tool calls · 48,231 tokens`. This is also what gives a **redirected,
+  non-TTY run** any progress at all — pinned rows do not exist without a TTY, so the scrollback is the
+  only channel a piped log has.
+- **One interleaved stream, coloured per phase, with a transition line on every swap** (#65). The
+  phases' *histories* stay independent — that is the memory model and does not change — but their
+  *output* is printed together in one chronological scrollback, so an overnight run reads as one
+  narrative. Colour is per phase, and per the constitution the palette lives in `theme.ts` alone; the
+  model never chooses a colour.
+
+### Sub-agents
+
+- **One sub-agent at a time, and `Subagents: N` is therefore not built** (#67): *"as we are targeting
+  precision and accuracy, maybe we dont need more than one subagent, as we wont have VRAM for more than
+  one parallel subagent."* `orchestrator.ts:175` carries a comment describing a `Subagents: N` field
+  that no code paints; under a hard limit of one, the count is never interesting. **The comment is
+  deleted** — #67c's "leaving both as they are is the one option that should not survive" still holds,
+  and deleting is now the right half of it. A running sub-agent shows as the `[sub:01JQ]` marker the
+  scrollback already uses (#67b).
+
+## What #62 needs from this file
+
+#62 asked for a drop order and the answer was *"lets make a list of everything that is usefull at the
+status line and then I will draw it for you."* The complete candidate list, with what each costs and
+where it comes from — **nothing here needs a model call; every field is already known to the
+orchestrator**:
+
+| field | example | source | notes |
+|---|---|---|---|
+| interactive phase | `Design` | `ctx.activePhase` | true whether or not a run is live |
+| live window | `→ Worker T-042` | task loop reporter (#61b, #66) | absent when no run is in flight |
+| round | `round 3/5` | `MAX_ROUNDS` + loop | Worker/Reviewer pair per round |
+| batch position | `task 3/12` | `BatchPosition` | absent for `/run <one-id>` |
+| task title | `add pagination to /notes` | backlog | the widest field, and the most droppable |
+| context fill | `Ctx: 71%` | live window's `prompt_eval_count` / its ceiling (#63b, #64) | `0%` before the first response |
+| elapsed | `14m22s` | wall clock | new plumbing; also what task G's ceiling measures |
+| task budget | `12m/30m` | task G | only when a ceiling is set (#43a: unset = unlimited) |
+| model | `qwen2.5-coder:14b` | `orch.model` | `no model` when none is active |
+| project | `notes-api` | config | fixed for the session's whole lifetime |
+| sub-agent | `[sub:01JQ]` | `listSubagents()` | at most one (#67) |
+| blockers | `⚠ 2 blocked` | backlog | not previously proposed; `/blockers` already computes it |
+
+Two constraints on any drawing: the rows are **three idle, five with the input fence up**
+(`status-bar.ts`), and adding a field means composing it into one of the two existing lines rather than
+taking a fourth row.
+
+## Still open
+
+- **#91 — #61's second reason is [steer-a-running-turn.md](steer-a-running-turn.md), which is filed as
+  "build it at all?"** *"The input is also connected to the running interaction and I can send more
+  messages to the model if I see it diverging from the goal"* is not a status-line property — it is a
+  live-steering feature, listed under *Blocked on a decision* precisely because it serves the attended
+  mode the product deprioritized. #61b is buildable without it (the field is just a label). Whether the
+  steering half is now authorized is a separate answer. See
+  [OPEN-QUESTIONS.md](../OPEN-QUESTIONS.md) #91.
+- **#92 — does the interleaved scrollback change what `/batch` is for?** #65 makes the scrollback a
+  full narrative record of a run. `/batch` re-prints a persisted summary through the same renderer that
+  wrote it, and this file previously flagged that overlap as needing a decision about *which one is the
+  record*. It still does. See [OPEN-QUESTIONS.md](../OPEN-QUESTIONS.md) #92.

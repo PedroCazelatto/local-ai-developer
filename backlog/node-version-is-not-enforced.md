@@ -30,35 +30,56 @@ part of the shipping commit** — the same commit that deletes this file.
 front-of-process check in `scripts/run.mjs`, which already runs before anything else and imports
 nothing.
 
-## Decisions (answered — OPEN-QUESTIONS.md #15–#21)
+## Decisions (answered — OPEN-QUESTIONS.md #15–#21, #73–#76)
 
-- **`.nvmrc` is the source of truth, and Docker follows it** (#15). The root sandbox image tag is
-  derived from `.nvmrc` rather than being a floating `node:24-slim`, so the Node a project is built and
-  tested against is the Node the orchestrator runs on.
-- **Making the shell honour `.nvmrc` is the real fix** (#19a) — machine setup, no code. The in-process
-  check is the backstop, not the remedy.
-- **`start` is gated; `install` warns; `stop` is untouched** (#16 + #17c). `start` refuses outright,
-  because that is where a walk-away batch would otherwise fail hours later; `install` on the wrong Node
-  still produces a usable `node_modules`, so it warns and continues.
-- **The refusal line is drafted for review, not written blind** (#18b) — see
-  [OPEN-QUESTIONS.md](../OPEN-QUESTIONS.md) #74. It no longer names `node:sqlite`, since that is
-  no longer the reason.
+- **`.nvmrc` is the single source of truth** (#15a), and everything else derives from it. It pins
+  `24.14.0`.
+- **`run.mjs` reads `.nvmrc` directly** (#75a) — a dependency-free `readFileSync`, no second copy of
+  the version to drift. The `SAFE_NAME` precedent (a deliberate inline duplicate carrying a "change
+  one, change the other" comment) is **not** followed here: duplication is the defect this task exists
+  to remove. `run.mjs` has to cope with `.nvmrc` being absent or malformed — decide *how* in the
+  shipping commit, but it must not be a silent pass.
+- **Both `start` and `install` refuse** (#73 — *changed*; this replaces "`start` refuses, `install`
+  warns and continues"). `stop` is never gated: tearing containers down must work on any Node, and
+  gating it would strand a user who cannot bring the stack down without first switching runtimes.
+- **The version test keeps the range, and reads the number from `.nvmrc`** (#74). Both parts matter and
+  they are not in tension: `.nvmrc`'s `24.14.0` is where the number comes from, and the **major** is
+  what is compared — so v24.1.0 passes, v22.14.0 fails. A user on any Node 24 can run the repo; the pin
+  says which one it was developed against, not which one is mandatory.
+- **Making the shell honour `.nvmrc` is still the real remedy** (#19c — *changed from a to c*, "use
+  both"). The in-process check is the backstop for a shell nobody switched, not a substitute for
+  switching it.
+- **`docker-compose.yml` interpolates the version from an env var the launcher exports** (#76a) —
+  `image: node:${NODE_VERSION:-...}-slim`, following the `ACTIVE_PROJECT` pattern already in that file.
+  The cost is real and accepted: **`docker compose up` run by hand, without `run.mjs`, no longer
+  resolves to the right image.** That warning is recorded in
+  [README-INCONSISTENCIES.md](../README-INCONSISTENCIES.md) (#76).
 - **The stale premises are corrected in the shipping commit, and this file is then deleted** (#20a).
 - **`README.md` is not touched by the agent** (#21). Its Node line — and every other thing in it that
   has drifted — is listed in [README-INCONSISTENCIES.md](../README-INCONSISTENCIES.md) for the user to
   fix by hand.
 
-## Still open
+## The refusal wording (#74a, taken as drafted, with the two-numbers question answered)
 
-- **#19a vs #16/#17 — does a check ship at all?** #19 answers **a**, "machine setup, no code", where
-  **c** was "both"; #16 and #17 both describe a check. This file and the docs assume **both**: the
-  shell fix is the remedy, the `run.mjs` check is the backstop for a shell nobody switched. Confirm
-  before building it ([OPEN-QUESTIONS.md](../OPEN-QUESTIONS.md) #73).
-- **Where `run.mjs` gets the range from.** Reading `.nvmrc` is a dependency-free `readFileSync` and
-  keeps the single source of truth honest; duplicating the range inline follows the `SAFE_NAME`
-  precedent, which is already a deliberate copy carrying a "change one, change the other" comment.
-  Not asked in the first pass; now **#75**.
-- **How `docker-compose.yml` reads `.nvmrc`.** Compose cannot read a file into an image tag on its own:
-  either `run.mjs` exports the version as an env var that `image:` interpolates
-  (`node:${NODE_VERSION}-slim`), or the tag is written into the file. The first keeps one source of
-  truth; the second keeps `docker compose up` working without the launcher. Now **#76**.
+Both verbs refuse now, so `install` gets the refusal shape rather than the warning shape:
+
+```
+✗ Node 24 is required — found v22.14.0.
+
+  This repo pins 24.14.0 in .nvmrc. Run `nvm use` in this directory (or the equivalent
+  for your version manager) and try again.
+```
+
+It names both numbers on purpose, and #74 settled which does what: **`24` is the requirement**
+(the comparison), **`24.14.0` is the pin** (where the requirement is read from, and what the repo was
+developed against). Dropping the range would over-state the requirement; dropping the pin would leave
+the user with nothing to `nvm use`. It no longer names `node:sqlite`, since that is no longer the
+reason.
+
+## `engines` is now redundant, and that is a decision left over
+
+`package.json`'s `"engines": { "node": ">=24" }` is a **fourth** declaration of a number that #15 just
+made `.nvmrc`'s to own, and #75a routes the check around it. It is advisory unless `engine-strict` is
+set, so it enforces nothing either way — but leaving a second copy in place is the exact defect this
+task removes everywhere else. Whether it is deleted, left as npm-facing metadata, or generated from
+`.nvmrc` is not decided: see [OPEN-QUESTIONS.md](../OPEN-QUESTIONS.md) **#80**.

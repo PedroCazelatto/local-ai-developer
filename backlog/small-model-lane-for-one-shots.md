@@ -36,17 +36,44 @@ Two consequences of that design are worth copying:
   messages are obviously mechanical. Summarization is not obviously either way — it decides what a phase
   remembers.
 
-## Open decisions
+## Answered — and the acceptance test the lane now has to pass is one it cannot
 
-Carried over, plus one the comparison surfaced:
+**The project's optimization target is stated** (OPEN-QUESTIONS.md meta I), and it is the thing this
+file was implicitly arguing against:
 
-- **Whether the debate windows count as throwaway.** The digest is cheap; the argument itself is the part
-  with actual judgement in it, and running a challenger on a 1b model produces a challenge not worth
-  answering. This may be the line: the debate turns stay on the session model, the digest drops.
-- **Whether summarization is throwaway.** A bad summary silently rewrites what a phase knows, and the
-  failsafe fires precisely when the window is most loaded. This is the riskiest one to demote.
-- **What happens when the small model is not installed.** Falling back to the session model silently is
-  wrong for the same reason a hard-coded default model is wrong; it should be a visible state — the status
-  line already carries `no model` for the session case and can carry this.
-- **Whether the user picks it.** `/models use` sets the session model; there is no equivalent for the
-  small lane, and inventing one means a second piece of `state.json` and a second thing on the status line.
+> Using less than half of the context ceiling or smaller models for some task may be optimizing time,
+> but that is not the goal of this project. As we are already using models way weaker than the cloud
+> ones, we must focus on precision and accuracy rather than time taken. The only bottleneck must be
+> the size of VRAM so the model runs on GPU or NPU rather than CPU.
+
+Every open decision in this file followed from that:
+
+- **The CPU-pinned arm (`options.num_gpu: 0`) is excluded** (#57): *no model can be run on CPU.* That
+  removes the one design where the session model is never evicted from VRAM at all — and it was the
+  most interesting arm, since it has no hop in either direction.
+- **The measurement is output quality, and latency is not a factor** (#58): *the output must be better,
+  that is the measurement. Time is irrelevant.*
+- **The latency numbers are not worth recording** (#59): *I don't care about the numbers.*
+- **If the lane is ever built, it is filed as its own task** (#60b) — a second model resolution point, a
+  second `activeModel`-shaped setting, a second `/models use` form, and token counts summed across two
+  tokenizers is not a thing to smuggle into a measurement pass.
+
+**Which leaves the lane failing its own test by construction.** Every argument in this file — the VRAM
+saving, the eviction avoided, the latency per session, the "13–22 s is really hop − 6.6 s" correction,
+the 32b's ~33 s bounded-one-shot rebuild — is a **time and residency** argument. Under #58 none of them
+count. The remaining claim would have to be that a 1.5–3b model writes *better* context titles, commit
+messages, rule matches and summaries than the 14–32b session model, and nothing in the record suggests
+it does. The one role where quality was already flagged as the risk — summarization, which "silently
+rewrites what a phase knows" — is the one that would be demoted onto the weakest model.
+
+**The two small models were never pulled.** Task I's benchmark was authorized but held on #1, and #1's
+answer is *nothing is pulled without approval*, which this request never received.
+
+## Status
+
+**Recommended for closure, not deferral.** The earlier entry in [backlog/README.md](README.md) called
+this *"deferred by decision, not blocked"* on a latency measurement; meta I supersedes that with a
+reason that does not expire. Closing it means deleting this file and striking its line.
+
+That is not done here, because closing a task is the user's call and #60 reads as *keep the possibility
+alive*: see [OPEN-QUESTIONS.md](../OPEN-QUESTIONS.md) **#90**.

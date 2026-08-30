@@ -1,6 +1,6 @@
 # Backlog checklist
 
-An index of the 19 open task files in this folder, in the order worth shipping, plus the 2 framing notes
+An index of the 22 open task files in this folder, in the order worth shipping, plus the 2 framing notes
 that are not tasks.
 
 **This file is not a task and is not deleted when work ships.** It is upkeep: when a task's file is deleted
@@ -53,14 +53,19 @@ Cheapest work per unit of value, and the two gaps both framing notes call physic
 Not parity gaps. Each is a place where the repo currently says something that is not true.
 
 - [ ] **[Stop a failed task looking untouched](record-attempted-tasks.md)** — *Execution loop.* An escalated
-      task reverts to `pending`, so a second overnight `/run all` re-fails the first one's tasks. Pairs with
-      [budget-ceilings-for-runs-and-batches.md](budget-ceilings-for-runs-and-batches.md) — both need an
-      outcome the backlog can see.
+      task reverts to `pending`, so a second overnight `/run all` re-fails the first one's tasks. **Fully
+      answered and ready to build:** a fifth `TaskStatus` (`failed`), written after the stash and committed by
+      the loop via `commitPaths`, so no dirty-tree gate has to learn an exception. Pairs with
+      [budget-ceilings-for-runs-and-batches.md](budget-ceilings-for-runs-and-batches.md) — both ship the same
+      vocabulary for "ended without a verdict". Its `docs/phases.md` "Who may commit" edit is review-gated.
 - [ ] **[Boot can pick a model that cannot call tools](boot-can-pick-a-toolless-model.md)** — *Model
       behavior.* `pickSmallestModel` sorts on disk bytes and never asks what the model can do, so the
       first-run path — no `state.json`, no model named at boot — can select a model whose `/api/tags`
-      capabilities are `completion,insert`. Every phase here is a tool-calling loop. Found while measuring
-      for the per-window `num_ctx` work; the interesting half is the failure path, not the filter.
+      capabilities are `completion,insert`. **The answer is now to delete the pick rule, not filter it:** a
+      saved `activeModel` wins, otherwise the user chooses from a marked list, and toolless models are shown
+      but never selectable. Re-measured live — 3 of the 9 models installed here have no `tools`, and
+      `/api/tags` carries `capabilities` in one round trip (Ollama >= 0.9.1, researched). Two follow-ups are
+      open: the now-unpaintable `(no tools)` status marker, and whether a version check ships.
 - [ ] **[The required Node version is never enforced](node-version-is-not-enforced.md)** — *Repo hygiene.*
       `engines` says `>=24` because `node:sqlite` is unflagged there, and nothing checks it — the machine
       this repo is developed on runs v22.14.0. Expected to fail when the session opens `memory.db`, which
@@ -141,12 +146,12 @@ Where the window is also a clock. Two of these want measurement before design.
       the one its turns ran under. The titler's transcript is head-bounded at 6 000 characters, which is
       what makes its smaller ceiling safe on the `/resume` re-title path.
 - [ ] **[Run the one-shots on a small model](small-model-lane-for-one-shots.md)** — *Memory / context.*
-      **Deferred by decision, not blocked.** Measured on the 3060: the session model at `num_ctx` 8192
-      occupies 10.3 GB of 12 and only one model is ever resident, so every hop to a small model and back
-      is two reloads of the big one — 2.6 s at best, 13–22 s typically — to save a 60-character title. The
-      saving the file wants turns out to live in the window sizes rather than the weights: a one-shot sends
-      no tools and no phase markdown, so it already skips the 29–44% fixed overhead whichever model runs
-      it. Revisit only with a dedicated big→small→big benchmark.
+      **Recommended for closure, not deferral.** The project's optimization target is now stated — *precision
+      and accuracy over time taken* — and the acceptance test with it: *the output must be better; time is
+      irrelevant.* Every argument this file makes is a time-and-residency argument, and a 1.5–3b model does
+      not write better titles, commit messages or summaries than the session model. The CPU-pinned arm is
+      ruled out (no model runs on CPU) and the two small models were never pulled. Awaiting the user's call
+      on deleting it.
 - [ ] **[Cap `debate`'s `background` parameter](cap-the-debate-background-parameter.md)** — *Memory /
       context.* The one model-supplied payload in the repo with no bound, replayed into two windows on
       every call — up to ten times in one debate. `run-debate.ts` already names the hazard for the third
@@ -154,17 +159,44 @@ Where the window is also a clock. Two of these want measurement before design.
       `debate-digest` take a reduced ceiling in `src/core/llm/resolve-window-ctx.ts`, where they are
       pinned to the base for exactly this reason.
 - [ ] **[Is 16 384 the right `OLLAMA_NUM_CTX`?](tune-the-global-num-ctx-default.md)** — *Memory / context.*
-      Held out of the per-window task on purpose: that one tunes which window gets what, this one asks
-      whether the number they are measured against is right. 16 384 already offloads 1.93 GB to CPU while
-      8 192 is fully resident — but it also leaves the Worker ~2.8k of working room after fixed overhead,
-      and changing it hides every existing context. **Benchmark generation throughput first.**
-- [ ] **[Hint the matching standard](surface-matching-standards.md)** — *Model behavior.* One throwaway
-      match at seed time so standards that exist are actually read. A natural first user of the small lane.
+      **Answered: it stays at 16 384.** The benchmark ran on both models — 16 384 costs 29.1 % of generation
+      throughput on the 14b and 6.8 % on the 32b, and 12 288 is *not* fully resident either, so the choice was
+      never resident vs. hybrid. The room is worth more than the speed. Per-model ceilings deferred (they
+      collide with `contexts.num_ctx` stamping); nothing to migrate. Spun out
+      [resume-across-num-ctx-changes.md](resume-across-num-ctx-changes.md). **Closes once the "no model runs
+      on CPU" vs. "keep 16 384" collision is resolved** — 16 384 spills 1.93 GB by construction.
+- [ ] **[Make the standards visible](surface-matching-standards.md)** — *Model behavior.* **The shape
+      changed: the resident catalog won.** All nine standard names sit at `ctx[0]` in every phase (~50 exact
+      tokens, 0.3 % of the window), and a new `describe_rule` tool returns a one-line description so the model
+      can judge a standard before paying for its body. The seed-time match survives as a hint — always top-1,
+      every phase, escalated to the Reviewer when the Worker ignored it. No longer a user of the small lane.
+- [ ] **[Derive every budget from one ceiling](derive-constants-from-one-ceiling.md)** — *Memory / context.*
+      One ceiling, every sub-value a fraction of it: `BOUNDED_ONE_SHOT_NUM_CTX` becomes `base / 2` (which is
+      exactly 8 192 today). The file finds and groups all ~20 constants; the hard group is the **character**
+      budgets, which cannot be derived from a token ceiling without the chars-per-token estimate the
+      constitution forbids. Measured 4.04–4.50 chars/token; Ollama has no tokenize endpoint. Blocked on #93.
+- [ ] **[`/resume` hides contexts written under a different ceiling](resume-across-num-ctx-changes.md)** —
+      *Memory / context.* `num_ctx = ?` is strict equality, so anyone who ever changed `OLLAMA_NUM_CTX` has
+      unreachable history right now, silently, in every project. Relax the read predicate to `<= ?` and warn:
+      a context built for a smaller window replays safely into a larger one, never the reverse. Ships on its
+      own merits — the global ceiling is not moving.
+- [ ] **[Split `config.ts` into one function per file](split-config-into-one-function-per-file.md)** —
+      *Repo hygiene.* The four-function env-resolution exception ends; `config.ts` keeps the constants and the
+      type and re-exports the resolvers into the config object. **Ship it before the budget ceilings**, so the
+      new resolver is written into the shape that already exists rather than moved afterwards.
 - [ ] **[Budget ceilings for a task and a batch](budget-ceilings-for-runs-and-batches.md)** — *Execution
-      loop.* The exact counts already exist; what is missing is a ceiling and what to do at it. Compare
-      against summed exact counts, never an estimate.
-- [ ] **[Show where a long task has got to](in-turn-progress-reporting.md)** — *Terminal UX.*
-      Reporter-side only, so it costs zero tokens and cannot compete with the code the Worker is reading.
+      loop.* **Wall clock only** — no token ceiling ships, so this is entirely new plumbing rather than a
+      comparison against counts that already exist. A crossed ceiling produces a fifth outcome, `over_budget`;
+      the task's dependents stop with it and every independent task still runs, which the batch's existing
+      per-iteration `unmet-deps` reload gives almost for free. Ships **after**
+      [split-config-into-one-function-per-file.md](split-config-into-one-function-per-file.md). One premise
+      behind the wall-clock-only answer does not hold — re-check it before building.
+- [ ] **[Show where a long task has got to](in-turn-progress-reporting.md)** — *Terminal UX.* Still
+      reporter-side (zero model tokens), but **the scope grew to both halves**: the pinned rows *and* the
+      scrollback, which must print what a `/run` is doing as it happens — one interleaved stream coloured per
+      phase, a transition line on every swap, a closing line per round. `Phase: Design → Worker T-042` appends
+      rather than replaces, and `Ctx: N%` follows the live window, reading an exact `0%` before its first
+      response. `Subagents: N` is not built — one sub-agent at a time — and its orphaned comment is deleted.
       Build it before deciding [task-plan-inside-a-task.md](task-plan-inside-a-task.md) — it removes one of
       that task's two justifications.
 

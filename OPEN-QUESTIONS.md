@@ -2,7 +2,8 @@
 
 Ten agents each read one backlog task and came back with 73 questions. This file is now the **single
 place they live**: the follow-ups that used to sit in a separate `FOLLOW-UP-QUESTIONS.md` are folded
-into the sections they belong to, keeping their numbers.
+into the sections they belong to, keeping their numbers. **#1–#76 are all answered**; #77–#94 are the
+follow-ups that answering them opened, folded into their sections the same way.
 
 **Every question has been rewritten to explain itself.** The first pass assumed you were holding the
 codebase in your head, and it shows: #2 you told me outright you could not follow, and #15 was answered
@@ -33,20 +34,28 @@ Anything you skip stays blocked.
 
 | § | Task | Questions | State |
 |---|---|---|---|
-| ⚠ | benchmark pull vs. the boot pick | #1 | answered; the actual pull is still undecided |
-| A | record-attempted-tasks | #2–#6, #70 | **#2 open and it is the centre of the task**; #4 opened #70 |
-| B | boot-can-pick-a-toolless-model | #7–#14, #69, #71, #72 | answered; two answers collide, three follow-ups |
-| C | node-version-is-not-enforced | #15–#21, #73–#76 | answered; #15 is still unanswered in fact, four follow-ups |
-| D | spawned-windows-have-no-failsafe | #22–#27 | open — the sequencing keystone for E, F, H, I |
-| E | cap-the-debate-background-parameter | #28–#34 | open |
-| F | tune-the-global-num-ctx-default | #35–#37, #68 | open — benchmark finished, number not chosen |
-| G | budget-ceilings-for-runs-and-batches | #38–#47 | open — follows A, which sets its vocabulary |
-| H | surface-matching-standards | #48–#56 | open |
-| I | small-model-lane-for-one-shots | #57–#60 | open — held on #1 |
-| J | in-turn-progress-reporting | #61–#67 | open |
+| ⚠ | benchmark pull vs. the boot pick | #1 | answered — the pick rule is deleted, so the pull no longer changes anything |
+| A | record-attempted-tasks | #2–#6, #70, **#77** | **fully answered and ready to build**; #77 is a confirmation, not a blocker |
+| B | boot-can-pick-a-toolless-model | #7–#14, #69, #71, #72, **#78, #79** | answered; #69's refusal orphaned #12's marker (#78) |
+| C | node-version-is-not-enforced | #15–#21, #73–#76, **#80** | answered and buildable; #80 is a leftover fourth copy |
+| D | spawned-windows-have-no-failsafe | #22–#27, **#81, #82** | answered — all six windows, summarize, seed protected at `[1]` |
+| E | cap-the-debate-background-parameter | #28–#34, **meta E**, **#83** | answered — 12 000 chars, head+tail, ship the cap only |
+| F | tune-the-global-num-ctx-default | #35–#37, #68, **#84, #85** | answered — **stays at 16 384**; blocked on #84 to close |
+| G | budget-ceilings-for-runs-and-batches | #38–#47, **#86, #87** | answered — wall clock, `over_budget`; **#38's stated reason is false** |
+| H | surface-matching-standards | #48–#56, **meta H**, **#88, #89** | answered — resident names at `ctx[0]` + a `describe_rule` tool |
+| I | small-model-lane-for-one-shots | #57–#60, **meta I**, **#90** | answered — the lane fails its own acceptance test; closure pending |
+| J | in-turn-progress-reporting | #61–#67, **meta J**, **#91, #92** | answered — scrollback is in scope now; #62 needs your drawing |
+| K | derive-constants-from-one-ceiling | **meta F**, **#93** | new task, from meta F — blocked on #93 |
+| L | split-config-into-one-function-per-file | **#94** | new task, from #47 — buildable; #94 asks how far the rule reaches |
 
-**Where the new numbers went:** #68 into F, #69/#71/#72 into B, #70 into A, #73–#76 into C. Nothing
-was renumbered.
+**Where the new numbers went:** #68 into F, #69/#71/#72 into B, #70 into A, #73–#76 into C, #77 into A,
+#78/#79 into B, #80 into C, #81/#82 into D, #83 into E, #84/#85 into F, #86/#87 into G, #88/#89 into H,
+#90 into I, #91/#92 into J, and #93/#94 into the two new sections K and L. Nothing was renumbered.
+
+**The lettered meta-answers** (E, F, H, I, J) were given alongside the numbered ones and are answered or
+sited in their sections: **E** (the tokenizer question) is answered in full at the end of section E,
+**F** became the new section K, **H** reshaped section H, **I** is now the project's stated optimization
+target and reshaped section I, and **J** widened section J's scope to the scrollback.
 
 ---
 
@@ -275,6 +284,24 @@ remove, in a new costume.
   `docs/phases.md`'s "Who may commit" gets amended.
 - **d.** Something else.
 
+### ◻️ #77 — Does the escalation commit collide with `verdictGitConflict`?
+
+**Today.** #4's new answer makes the **task loop** a committer: after `stashTaskAttempt`, it writes
+`status: failed` into the task's frontmatter and commits that one path with `commitPaths`. That is a
+fourth committer, beside the planning phases, the Reviewer and Retro.
+
+The Reviewer's verdict is checked against the real repo: a `pass` may leave **nothing** uncommitted, a
+`fail` must name every uncommitted file. A `fail` on a clean tree is legal and normal.
+
+**Why this is a question.** The escalation commit happens on the MAX_ROUNDS and error paths, *after*
+the last Reviewer has spoken, so by ordering it cannot reach a live verdict check. That is read off the
+code rather than executed, and it is the one place a fourth committer could corrupt a judgement.
+
+- **a.** Confirmed by reading; ship it and note the ordering in `run-task-loop.ts`.
+- **b.** Prove it with a driven test before building — the constitution does not require tests, but this
+  is an invariant the repo already protects with `verdictGitConflict`.
+- **c.** Something else guards it — *name it.*
+
 ---
 
 ## B. boot-can-pick-a-toolless-model — Tier 2, Model behavior
@@ -465,6 +492,42 @@ works fine — and the repo currently states no Ollama floor at all, so nobody w
 - **c.** Neither. The model-less boot plus its "pull a model with tool support" line is explanation enough.
 - *If (a) or (b): **what version?** I have not verified which Ollama release first reported
   `capabilities`, and that needs checking rather than guessing — say the word and I will find it.*
+
+### ◻️ #78 — #69's refusal makes #12's `(no tools)` status marker unpaintable
+
+**Today.** #12 was answered **b**: an active toolless model is marked in the pinned status line,
+`Model: <name> (no tools)`. #69 has now answered that `/models use` **refuses** a toolless model and
+offers to delete it instead.
+
+Those cannot both stand. If no toolless model can ever become active, nothing can ever paint that
+marker — it is dead code the moment it is written. #69 itself flagged this: option (b) said *"refuse
+outright, and #12's status marker is dropped"*, and option (c) said *"refuse, but keep the marker for
+some other case — name the case."* The answer chose the refusal without saying which.
+
+- **a.** Drop the marker. `/models list` already marks tool support (#14), which is where the user asks.
+- **b.** Keep it for the **boot** case — a saved `activeModel` that is toolless is refused at boot too
+  (#9), so there is still no active toolless model. *This only works if some path can leave one active;
+  name it.*
+- **c.** Repurpose it: the status line reads `Model: no model` plus a reason when boot refused
+  everything, so the surface survives while the toolless-active case does not.
+
+### ◻️ #79 — Does a minimum-Ollama-version check ship, or only the statement?
+
+**Why this exists.** #72 offered **(a)** state a floor in `README.md` *and* check it at boot, the way an
+unreachable daemon is already fatal at boot; **(b)** state it in the docs only. The answer — *"research
+the minimum Ollama version and state it on README-INCONSISTENCIES.md"* — settles the number and the
+place, and names no check.
+
+**The number is now researched** (see section B's task file): `capabilities` reached `/api/show` in
+**v0.6.4** (2025-04-02) and `/api/tags` in **v0.9.1** (2025-06-09). The design reads `/api/tags`, so the
+floor is **Ollama >= 0.9.1**. This box runs 0.33.2.
+
+- **a.** Statement only — a too-old daemon boots model-less, which is a valid session, and the line
+  telling the user to pull a tool-capable model is explanation enough.
+- **b.** Statement **and** a boot check, so "your daemon is too old" is never mistaken for "none of your
+  nine models works".
+- *Note this interacts with #73: task C is already adding a version check for Node. Two version checks
+  in one launcher is either consistent or noise, depending on your taste — say which.*
 
 ---
 
@@ -659,6 +722,20 @@ with a fail-closed `:-__no_project__` default — so the pattern exists.
 - **c.** Leave the major-only `node:24-slim` tag and accept the drift from `.nvmrc`'s minor. *Free, and it
   gives up the part of #15 that motivated it.*
 
+### ◻️ #80 — `package.json`'s `engines` is now a fourth copy of a number `.nvmrc` owns
+
+**Today.** `"engines": { "node": ">=24" }`. #15 made `.nvmrc` the source of truth and #75a routes the
+`run.mjs` check straight at `.nvmrc`, so `engines` is now read by nobody in this repo — and it enforces
+nothing regardless, being advisory unless `engine-strict` is set.
+
+**Why this is a question.** Leaving a second copy of the version is the exact defect this task removes
+from `docker-compose.yml` and `run.mjs`. But `engines` is also npm-facing metadata that a consumer or a
+CI runner may read, and deleting it is not free either.
+
+- **a.** Delete it — `.nvmrc` is the source of truth, full stop.
+- **b.** Keep it as npm-facing metadata, and accept that one copy stays hand-maintained.
+- **c.** Generate it from `.nvmrc` in the same place the compose tag is generated.
+
 ---
 
 ## D. spawned-windows-have-no-failsafe — Tier 3, Memory / context
@@ -795,6 +872,37 @@ precisely because of that one row.
 - *And for a sub-agent: does the row carry `subagentId`, the way `subagent_spawn` does? Without it, two
   concurrent sub-agents' rows are indistinguishable.*
 
+### ◻️ #81 — Where does a spawned window's summary live?
+
+**Today.** The interactive failsafe summarizes into `SessionMemory` — SQLite-backed, addressable,
+`/resume`-able. A spawned window persists **nothing**: a RAM-only `messages` array, thrown away when the
+phase ends. That asymmetry is the whole reason the hook was only ever built on one side.
+
+**Why this is a question.** #23a says a spawned window summarizes with `oneShot('summarize')`. Nothing
+says whether the result is durable. `contexts` is keyed on the interactive phases, and a Worker summary
+is not a phase context.
+
+- **a.** RAM only — the summary lives in the window's own array and dies with it. *Simplest, and honest:
+  a spawned window was never resumable. Nothing records that a Worker compacted mid-task except the
+  events-log row (#27).*
+- **b.** Persisted to `contexts`, which means `contexts` grows a notion of a non-interactive phase, and
+  `/resume` grows something it can list but not restore into.
+- **c.** Persisted somewhere new — a spawned-window table beside the two the logs are moving into
+  ([move-the-logs-into-sqlite-tables.md](backlog/move-the-logs-into-sqlite-tables.md)).
+
+### ◻️ #82 — Should a debate window compact at all, or just end the debate?
+
+**Why this exists.** #22a put both debate windows in scope. They are the one pair where compaction is
+not obviously safe: a challenger whose earlier objections were summarized may re-raise them, and the
+digest reads a transcript whose middle has been condensed by a *different* call. `MAX_DEBATE_ROUNDS` is
+5, so the window dies shortly after any compaction anyway.
+
+- **a.** Compact like the others (what #22a + #23a imply literally).
+- **b.** End the debate at the threshold and digest what exists — a short debate beats a debate that
+  forgot its own argument.
+- **c.** Neither: capping `background` (#28) plus 5 rounds is bound enough, and the debate pair drops
+  back out of scope.
+
 ---
 
 ## E. cap-the-debate-background-parameter — Tier 3, Memory / context
@@ -909,6 +1017,45 @@ two debate roles hold a *growing* window: each round adds a turn.
 - **b.** Ship both if the measurement clears.
 - **c.** Drop the ceiling half permanently — a growing window does not belong in a group whose defining
   property is "input has a known hard maximum", cap or no cap.
+
+### ✅ Meta E — *"Why cant we use the Ollama's tokenizer, just like we calculate the tokens used in the normal conversation?"*
+
+**Because those two things are not the same operation.** The counts the repo relies on are `prompt_eval_count`
+and `eval_count`: fields Ollama *returns in a response*, after it has already tokenized and prefilled the
+prompt. They are the **result of a completed call**. Capping `background` needs the size **before** anything
+is sent — a service to ask, not a receipt to read.
+
+**Ollama exposes no such service.** There is no `/api/tokenize` and no `/api/detokenize` on `main`:
+the routes are `/api/generate`, `/api/chat`, `/api/embed`, `/api/embeddings`, `/api/show`, `/api/tags`,
+`/api/ps`, `/api/pull|push|create|copy|delete|blobs`, `/api/version`, `/api/status`, the OpenAI and
+Anthropic compatibility shims, and three experimental endpoints. The request has been open since 2024
+(issue #3582, reopened as #12031) and PR #12030 is still unmerged. That is why `run-debate.ts` says
+"there is no tokenizer in the repo" — it is not an omission, there is nothing to call.
+
+**There is one workaround, and it costs a real prefill.** `/api/generate` with `num_predict: 1` returns
+an exact `prompt_eval_count` having generated a single token. Measured here on `qwen2.5-coder:14b`,
+already loaded:
+
+| material | chars | exact tokens | chars/token | wall |
+|---|---|---|---|---|
+| English prose | 12 000 | 2 666 | 4.50 | 4.84 s |
+| TypeScript source | 11 970 | 2 964 | 4.04 | 5.40 s |
+
+So an exact pre-send count is *available*, at roughly 5 seconds per 12 000 characters plus a runner
+rebuild whenever the probe's `num_ctx` differs from the session's. **`num_predict: 0` does not work** —
+Ollama treats it as unset and generates to the ceiling; a 12 000-character probe ran over ten minutes
+before it was killed.
+
+**What this changes:** nothing about #28 — a character cap costs nothing and the exact token count still
+arrives in the response that follows. It does bear on
+[derive-constants-from-one-ceiling.md](backlog/derive-constants-from-one-ceiling.md) #93, where the
+question is whether a *character* budget may be derived from a *token* ceiling at all.
+
+### ◻️ #83 — Does the 12 000 count include `truncateHeadTail`'s elision marker?
+
+Trivial, and it decides whether 12 000 is the budget for the material or the total that reaches the
+window. **a.** Budget is the material; the marker is extra. · **b.** 12 000 is the total, marker
+included.
 
 ---
 
@@ -1035,6 +1182,40 @@ you declined it, since neither candidate ceiling turned out to be fully resident
 halve the spill at 16 384 without giving up any room. Say if you want it filed as its own backlog item
 rather than dropped.)*
 
+### ◻️ #84 — "No model can be run on CPU" (#57) and "keep 16 384" (#68) collide
+
+**Why this exists.** Meta I says *the only bottleneck must be the size of VRAM so the model runs on GPU
+or NPU rather than CPU*, and #57 says **no model can be run on CPU**. But the benchmark in this section
+measured, on the RTX 3060 12 GB with the 14b:
+
+| `num_ctx` | in VRAM | total | spilled to CPU |
+|---|---|---|---|
+| 8 192 | 10.28 GB | 10.28 GB | **none** |
+| 12 288 | 10.69 GB | 11.61 GB | 0.92 GB |
+| **16 384 — kept by #68** | 10.49 GB | 12.42 GB | **1.93 GB** |
+
+Read strictly, #57 permits only 8 192 — and 8 192 is disproved three ways, most sharply by its
+summarization threshold (6 144) falling below Breakdown's 7 283-token fixed overhead, so both failsafes
+would fire on turn one.
+
+The likely reading is that #57 forbids **deliberately pinning** a model to CPU — the `options.num_gpu: 0`
+arm of task I — and says nothing about partial KV-cache offload, which every usable ceiling entails. But
+that is an inference about a rule, and section F will not close on one.
+
+- **a.** Correct: #57 rules out the CPU-pinned arm only. Partial offload is expected and fine, and
+  `docs/product.md` records the distinction.
+- **b.** Literal: full residency is a hard requirement, which forces 8 192 and reopens #68.
+- **c.** Something between — *state the rule.* (E.g. "spill is acceptable while the **weights** stay
+  resident and only KV cache offloads", which is what is actually happening here.)
+
+### ◻️ #85 — File `OLLAMA_KV_CACHE_TYPE` as its own backlog item?
+
+It was declined as a fourth benchmark arm, and it is more interesting now than when it was declined:
+**neither** candidate ceiling turned out to be fully resident, so a q8_0 KV cache could halve the spill
+at 16 384 without giving up any window room. That bears directly on #84.
+
+**a.** File it. · **b.** Drop it for good. · **c.** Fold it into #84's answer rather than a separate file.
+
 ---
 
 ## G. budget-ceilings-for-runs-and-batches — Tier 3, Execution loop
@@ -1150,6 +1331,38 @@ existing, deliberate exception for env resolution.
 - **a.** Add the budget resolver there, for local consistency with the other env resolvers.
 - **b.** Split it into its own file, per the rule.
 
+### ◻️ #86 — #38's stated reason does not hold; does the answer still stand?
+
+**The answer.** *"B. Lets use only time as the summarization will never let the tokens trigger to trip."*
+
+**The premise is false.** Summarization bounds **one prompt's size** — it is what keeps any single
+window under `num_ctx`. A budget ceiling sums **cumulative** spend: `runTaskLoop` adds every Worker and
+Reviewer turn across up to 5 rounds x 24 calls, monotonically, and a compaction *adds* a call rather
+than removing one. So a token ceiling would trip, and readily — it is the cumulative sum, not the
+window fill, that it compares against.
+
+**Why this may not change anything.** Wall clock is defensible on its own merits: it is the only
+instrument that catches a call that is wedged rather than chatty, it is what "must be done by morning"
+actually means, and a 32b at ~3 tok/s is slow without being expensive in tokens. The answer may well be
+right for reasons other than the one given.
+
+- **a.** Wall clock only stands — the reason changes, the decision does not.
+- **b.** Both, as two independent ceilings (#38c) now that the token half is known to be live.
+- **c.** Both, whichever trips first (#38d).
+
+### ◻️ #87 — What does the wall clock actually measure?
+
+With tokens out of scope, the ceiling has no definition yet.
+
+- **a.** Elapsed wall time, full stop — including time the user spends thinking at an `ask_user` prompt.
+  *Simple, and correct for an unattended overnight batch where the two coincide.*
+- **b.** Model time only — the sum of call durations, excluding time waiting on a human. *Correct for an
+  attended `/run <one-id>`, and more plumbing.*
+- **c.** (a) for a batch, (b) for a single task.
+
+*This matters because an attended run is exactly where the two diverge, and a ceiling that counts
+thinking time fires on a user who walked away from a question.*
+
 ---
 
 ## H. surface-matching-standards — Tier 3, Model behavior
@@ -1261,6 +1474,36 @@ exactly what the tool-call record exists to prevent.
   and under #53(b) that wait is up to 33 s.
 - **c.** Neither.
 
+### ◻️ #88 — Does `search_rules` survive, and what is it for now?
+
+**Today, after meta H.** Every standard's name is resident at `ctx[0]` in every phase, and a new
+`describe_rule` answers "is this the right one" before `load_rule` pays for a body. `search_rules` used
+to be the only door into the catalog; it no longer is.
+
+#51 still gives it a job — *always return a top-1, even on no match* — but that describes the seed-time
+matcher, not necessarily a tool a phase may call.
+
+- **a.** Keep it as a callable tool as well as the seed-time matcher. *Three ways in; the model chooses.*
+- **b.** Retire it as a tool; the match survives only as the seed-time hint. *Then its `search-rules`
+  `CallRole` and its 8 192 ceiling entry in `resolve-window-ctx.ts` belong to the hint, and `load_rule`'s
+  description — "call `search_rules` FIRST to get valid names" — is wrong and must change.*
+- **c.** Retire it entirely; the resident names plus `describe_rule` are the whole mechanism.
+
+### ◻️ #89 — `simplified-technical-english` can now be named three times in one seed
+
+**Today.** `worker.md` and `reviewer.md` **already order an unconditional
+`load_rule("simplified-technical-english")`**. Under meta H the same standard is also in the resident
+name list, and the #50 match may also hint it.
+
+#52 was answered *"already answered"*, which settles the body-injection question (name only). It does
+not settle #52's second option: **suppress the hint when it duplicates the already-hardcoded standard.**
+This design makes that collision more likely, not less.
+
+- **a.** Suppress the hint when it names a standard the phase file already loads unconditionally.
+- **b.** Let it duplicate — a repeated name costs a few tokens and reinforces the instruction.
+- **c.** Remove the unconditional `load_rule` from `worker.md` / `reviewer.md` and let the mechanism do
+  its job. *A `rules/` edit, committed like ordinary work.*
+
 ---
 
 ## I. small-model-lane-for-one-shots — Tier 3, Memory / context
@@ -1316,6 +1559,23 @@ Not asked by the agent, but it follows. Building it means: a **second** model re
 tokenizers**.
 
 - **a.** Build it. · **b.** Record the finding and re-file the build as its own task.
+
+### ◻️ #90 — Is the small-model lane closed, or kept open?
+
+**Why this exists.** #60 answered **b** — *"create a new task"* — which keeps the possibility alive: if
+the benchmark favours the lane, the build is re-filed rather than smuggled into the measurement pass.
+But meta I and #58 together set an acceptance test the lane cannot pass: *the output must be better;
+time is irrelevant.* Every argument in the file is a time-and-residency argument, and nothing suggests a
+1.5–3b model writes better titles, commit messages, rule matches or summaries than the session model.
+The benchmark that #60 is conditional on is also still held, because #1 says nothing is pulled without
+approval and that approval was never given.
+
+- **a.** Close it — delete
+  [small-model-lane-for-one-shots.md](backlog/small-model-lane-for-one-shots.md) and strike its line,
+  recording meta I as the reason.
+- **b.** Keep it open, and pull `qwen2.5-coder:1.5b` and a 3b to run the quality comparison #58 asks
+  for. *This is the approval #1 requires; say so explicitly if you mean it.*
+- **c.** Keep the file open as a record with no work attached, the way the framing notes are kept.
 
 ---
 
@@ -1405,6 +1665,85 @@ zero" — and **no code paints it**. The field has been claimed in a comment and
 - **c.** The `Subagents: N` field as originally commented. *Which means either building it or deleting the
   comment; leaving both as they are is the one option that should not survive.*
 
+### ◻️ #91 — #61's second reason authorizes [steer-a-running-turn.md](backlog/steer-a-running-turn.md)
+
+**The answer.** *"B. Phase: Design -> Worker. This way, the input is also connected to the running
+interaction and I can send more messages to the model if I see it diverging from the goal."*
+
+The first sentence is a status-line decision and is being built. **The second is a different feature**:
+sending messages into a turn that is already running is
+[steer-a-running-turn.md](backlog/steer-a-running-turn.md), which sits under *Blocked on a decision —
+build it at all?* precisely because it serves the attended mode `docs/product.md` deprioritized on
+purpose. #61b is buildable without it — the field is only a label.
+
+- **a.** Yes, steering is authorized; move that file out of *Blocked on a decision* and into a tier.
+- **b.** No — #61b is a label, and the sentence describes a wish rather than a commitment.
+- **c.** Authorized but sequenced behind this task, since the label is what makes the steering legible.
+
+### ◻️ #92 — With an interleaved scrollback, what is `/batch` for?
+
+**Why this exists.** #65 makes the scrollback a full narrative record of a run: every round's activity,
+a closing line per round, all phases interleaved with transition lines. `/batch` re-prints a persisted
+summary through the same renderer that wrote it. Two records of the same run, and this file has flagged
+the overlap since it was filed without ever deciding which one is authoritative.
+
+- **a.** The scrollback is the live view, `/batch` is the durable record; overlap is fine and expected.
+- **b.** `/batch` becomes the only summary and the scrollback prints activity but no closing lines.
+- **c.** The closing lines *are* what `/batch` replays, so there is one format written once and shown
+  twice.
+
+*Note the non-TTY case: a piped log has no pinned rows, so the scrollback is its only channel.*
+
+---
+
+## K. derive-constants-from-one-ceiling — Tier 3, Memory / context (new, from meta F)
+
+**What the task is.** One ceiling; every sub-value a fraction of it. The full inventory of ~20 constants,
+grouped by whether they can be derived at all, is in
+[backlog/derive-constants-from-one-ceiling.md](backlog/derive-constants-from-one-ceiling.md).
+
+### ◻️ #93 — Three decisions this task cannot start without
+
+**a. What does "the maximum context available" name?** Three different numbers, and they disagree by two
+orders of magnitude:
+
+- the configured `OLLAMA_NUM_CTX` (16 384 — one number for whatever model is loaded);
+- the **model's own** `context_length`, which `/api/tags` now reports per model — 32 768 for
+  `qwen2.5-coder:14b`, 163 840 for `deepseek-coder-v2:16b`, 262 144 for `qwen3-coder:30b`;
+- what actually fits in 12 GB of VRAM, which is what the F benchmark measured and is smaller than both.
+
+**b. How may a character budget be derived from a token ceiling?** Eight of the constants are in
+**characters** (`REVIEW_DIFF_BUDGET` 12 000, `TRANSCRIPT_BUDGET` 6 000, `READ_FILE_CHAR_LIMIT` 5 000,
+and five more). Converting between the two needs a chars-per-token constant — measured here at
+4.04–4.50 — and the constitution's correctness invariant is that token counts are **always exact and
+never length-derived**. Options: derive them anyway and document the ratio as a budgeting heuristic
+rather than a token count; leave the character budgets alone and derive only the token constants; or
+make them exact with a `num_predict: 1` probe, at ~5 s per 12 000 characters (see meta E above).
+
+**c. Are rounds and line caps excluded?** `WORKER_MAX_ROUNDS`, `MAX_DEBATE_ROUNDS`,
+`READ_FILE_LINE_LIMIT`, `list_files`' 500 entries and the rest bound *effort* and *readability*, not
+window space — a bigger ceiling does not make a 500-entry listing more useful. The task file proposes
+excluding them; confirm, or say which belong.
+
+---
+
+## L. split-config-into-one-function-per-file — Tier 2, Repo hygiene (new, from #47)
+
+### ◻️ #94 — Does #47's ruling reach `ollama-models.ts` too?
+
+**Today.** Two files hold more than one function on purpose. `config.ts` holds four, and #47 has now
+ended that exception. `src/core/llm/ollama-models.ts` holds three (`listModels`, `hasModel`,
+`pullModel`) behind a header that argues the opposite case: *"a cohesive module (list / hasModel /
+pullModel over the one daemon), not one function per file."*
+
+#47 was answered about `config.ts` and named nothing else.
+
+- **a.** Split it too — the rule has no exceptions, and the header's argument is exactly the argument
+  `config.ts` was making.
+- **b.** Leave it — cohesion around one daemon connection is a real reason, and `config.ts`'s four env
+  resolvers were not cohesive in the same way.
+- **c.** Leave it for now, and file it separately.
+
 ---
 
 ## Already answered — the nine meta-decisions
@@ -1427,10 +1766,35 @@ These settled before the numbered pass and are not up for re-answering unless yo
 
 ## What is blocking what
 
-- **#2** blocks the whole of task A, and A blocks G's vocabulary (#39).
-- **#1** blocks task I's benchmark, and task F's #68 is answerable without it.
-- **#69** blocks the `/models use` half of task B; the boot half is decided and written up.
-- **#73** blocks task C's check; the `.nvmrc`-as-source-of-truth half is decided and written up.
-- **#22–#27** (section D) gate the ceiling work in E, F, H and I — a ceiling is only safe to lower once
-  something bounds what fills the window.
-- **#48** reshapes most of section H depending on which way it goes.
+Every original blocker is cleared. What remains is a shorter list, and none of it blocks a whole task.
+
+**Ready to build now, nothing outstanding:** A (`failed` status, committed by the loop), C (`.nvmrc` as
+the source of truth, both verbs refusing), D (all six windows, summarize, `[0]`+`[1]` protected), E (the
+12 000-character cap; the ceiling half is deliberately deferred), H (resident names + `describe_rule`),
+L (split `config.ts`).
+
+**Blocked on one answer each:**
+
+- **#84** is the only thing keeping section F open. The decision is made — 16 384 stays — but "no model
+  runs on CPU" and "keep 16 384" cannot both be literal, and the file will not close on an inference.
+- **#93** blocks the whole of K. Nothing can be derived until "the maximum context available" names a
+  number, and the character budgets cannot be derived at all without ruling on the exact-counts
+  invariant.
+- **#90** blocks closing I. The work is decided (there is none); what is undecided is whether the file
+  goes.
+- **#62** blocks the last of J — you asked for the field list before drawing the row, and the list is
+  now in [backlog/in-turn-progress-reporting.md](backlog/in-turn-progress-reporting.md).
+
+**Worth answering before the code is written, not before the work starts:**
+
+- **#78** — B ships either way, but building the `(no tools)` marker before answering this means
+  building dead code.
+- **#86** — G's shape depends on it. Wall clock alone and both-ceilings are different amounts of work.
+- **#91** — J ships either way; the answer decides whether a *second* task leaves *Blocked on a
+  decision*.
+- **#77, #79, #80, #82, #83, #85, #87, #88, #89, #92, #94** — each is one decision inside a task that is
+  otherwise settled.
+
+**Sequencing that came out of the answers:** L (`config.ts` split) ships **before** G (budget ceilings),
+so the new resolver is written into the shape that already exists. A and G ship the same vocabulary for
+"ended without a verdict" (`failed`, `over_budget`) and should be read together.
