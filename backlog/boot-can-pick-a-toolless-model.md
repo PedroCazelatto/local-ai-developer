@@ -79,6 +79,76 @@ So there is exactly one place a `(no tools)` marker appears, and it is the same 
 that show models — `/models list` and the boot chooser. Nothing paints it in the pinned rows, and the
 status line needs no new field.
 
+## The "too heavy" tag, and the boot probe behind it
+
+Inherited from the `OLLAMA_NUM_CTX` task (OPEN-QUESTIONS.md §F), which closed with the rule that
+motivates this — now stated in [docs/product.md](../docs/product.md), *What it optimizes for*:
+
+> Spill is acceptable while the **weights** stay resident and only **KV cache** offloads.
+
+Weights on the CPU means every token of every layer crosses the bus; KV cache on the CPU costs only the
+attention reads. So the list carries a **second** marker beside `(no tools)` — a **too heavy** tag — and
+unlike the capability gate it **marks without refusing** (#96a): a slow model is the user's choice to
+make, an incapable one is not.
+
+**Measured on this box**, each model loaded at `num_ctx` 16 384 with `/api/ps` read directly:
+
+| model | weights (on disk) | in VRAM | spilled | weights resident? |
+|---|---|---|---|---|
+| qwen2.5-coder:14b | 8.99 GB | 10.49 GB | 1.93 GB | **yes** — the spill is all KV cache |
+| codestral:22b | 12.57 GB | 10.70 GB | 5.89 GB | no — ~1.9 GB of *weights* on the CPU |
+| gpt-oss:20b | 13.79 GB | 10.20 GB | 3.87 GB | no |
+| qwen3-coder:30b | 18.56 GB | 10.61 GB | 9.82 GB | no |
+| qwen2.5-coder:32b | 19.85 GB | 10.35 GB | 14.13 GB | no |
+
+The VRAM ceiling is **10.2–10.7 GB** on this 12 GB card — a ceiling rather than a coincidence, since
+five models of very different sizes all stop within half a gigabyte of it. Combined with the capability
+gate, **`qwen2.5-coder:14b` is the only installed model that can run this product**: three of the nine
+have no `tools`, and six cannot keep their weights resident. (`qwen3.5:27b` is the one model not probed,
+and it is larger than two that already fail.)
+
+### How the machine is probed (#100c)
+
+**By loading each installed model once at boot**, never by a hardcoded figure and never by a vendor CLI.
+`/api/ps` reports `size` and `size_vram`, and `size_vram < size` **is** the spill — measured, not
+predicted, and portable to any card. Ollama offers no way to ask the machine its capacity: `/api/status`
+carries no GPU data, `/api/ps` is empty until something loads, and
+`/api/experimental/model-recommendations` is a curated list with generic `vram_bytes` hints.
+
+Cold-load cost was measured at **11.4 s** (codestral:22b), **16.4 s** (qwen3-coder:30b) and **26.0 s**
+(gpt-oss:20b) — ≈18 s each, so **≈2.7 minutes for nine models**, once.
+
+**It cannot run while a session is live.** Probing *is* loading, so a background probe would evict the
+session model mid-turn — the one thing `docs/product.md`'s no-parallelism rule exists to prevent.
+
+**The verdict depends on `num_ctx` as well as the model** (#96), because the KV cache is the part that
+grows with the ceiling. The same model is "too heavy" at one ceiling and fine at another.
+
+### The probe cache (#103)
+
+> *"Cache it in a different file, so if the user changes a driver or the GPU, it can safely delete and
+> regenerate all values. Also, we dont need to invalidate, we can start mapping values for different
+> num_ctx's as if the user changes it back to a known value, we dont need to reprobe."*
+
+So: **its own file**, not `state.json` — deleting it is the reset gesture, and it must be safe to delete
+at any time because nothing in the repo can detect a driver or GPU change. It lives beside `state.json`
+in the user's home directory, since this is a property of the **machine**, not of a project.
+
+And it **accumulates rather than invalidates**: a growing map of `(model, num_ctx) → verdict`. Changing
+`OLLAMA_NUM_CTX` to a new value probes at that ceiling and keeps the old rows; changing it back costs
+nothing. The file only ever grows, and only ever by entries that were true when measured.
+
+**One implementation point makes "no invalidation" correct rather than merely convenient: key the model
+half on its `digest`, not its name.** A tag like `:latest` can be re-pulled as different bytes, and a
+name-keyed row would then describe a model that no longer exists — the one stale case an
+invalidation-free cache could not otherwise survive. Keyed on the digest, a re-pull is simply a key that
+has never been seen, so it re-probes on its own. `/api/tags` already returns `digest` in the same call
+that returns `capabilities` and `size`, so this costs nothing.
+
+**Still to decide when this ships:** whether a newly pulled model is probed immediately after
+`/models pull` — the moment the user is already waiting — or at the next boot. Not asked; the smaller
+question, and either is defensible.
+
 ## Two sub-questions this file carried are now answered by measurement, not by decision
 
 **Capabilities cost exactly one round trip, and `/api/tags` is the right endpoint.** The file's earlier

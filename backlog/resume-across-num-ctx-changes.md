@@ -12,9 +12,9 @@ and nothing is listed; restoring the old value brings it all back. Silently, in 
 ## Why this is a defect on its own, not a migration step
 
 It was found while asking what would happen to existing contexts *if* the global ceiling moved
-([tune-the-global-num-ctx-default.md](tune-the-global-num-ctx-default.md), OPEN-QUESTIONS.md #35). The
-ceiling then stayed at 16 384 (#68b), so nothing needs migrating — and this remains broken regardless,
-which is why #36 answered **"yes, ship it as its own fix."**
+(OPEN-QUESTIONS.md §F, #35). The ceiling then stayed at 16 384 (#68b) and that task has since closed, so
+nothing needs migrating — and this remains broken regardless, which is why #36 answered **"yes, ship it
+as its own fix."**
 
 The asymmetry is what makes the fix correct rather than convenient: **a context built for a smaller
 window replays safely into a larger one; the reverse does not.** A history that fitted 8 192 fits

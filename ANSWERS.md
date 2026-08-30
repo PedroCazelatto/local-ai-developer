@@ -55,6 +55,7 @@ F. Lets unify all constants to just one, the maximum context available. Then all
 37. A.
 84. C. spill is acceptable while the weights stay resident and only KV cache offloads.
 85. C.
+103. Cache it in a different file, so if the user changes a driver or the GPU, it can safely delete and regenerate all values. Also, we dont need to invalidate, we can start mapping values for different num_ctx's as if the user changes it back to a known value, we dont need to reprobe.
 38. B. Lets use only time as the summarization will never let the tokens trigger to trip.
 39. C. A fifth outcome as 'over_budget'.
 40. B. End the batch that requires the stopped tasks to continue. All other tasks must be kept.

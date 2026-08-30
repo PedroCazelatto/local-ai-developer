@@ -1,6 +1,6 @@
 # Backlog checklist
 
-An index of the 21 open task files in this folder, in the order worth shipping, plus the 2 framing notes
+An index of the 20 open task files in this folder, in the order worth shipping, plus the 2 framing notes
 that are not tasks.
 
 **This file is not a task and is not deleted when work ships.** It is upkeep: when a task's file is deleted
@@ -162,18 +162,17 @@ Where the window is also a clock. Two of these want measurement before design.
       window while leaving it uncapped for the first two. Prerequisite for letting `debate-turn` and
       `debate-digest` take a reduced ceiling in `src/core/llm/resolve-window-ctx.ts`, where they are
       pinned to the base for exactly this reason.
-- [ ] **[Is 16 384 the right `OLLAMA_NUM_CTX`?](tune-the-global-num-ctx-default.md)** — *Memory / context.*
-      **Answered: it stays at 16 384.** The benchmark ran on both models — 16 384 costs 29.1 % of generation
-      throughput on the 14b and 6.8 % on the 32b, and 12 288 is *not* fully resident either, so the choice was
-      never resident vs. hybrid. The room is worth more than the speed. Per-model ceilings deferred (they
-      collide with `contexts.num_ctx` stamping); nothing to migrate. Spun out
-      [resume-across-num-ctx-changes.md](resume-across-num-ctx-changes.md). The CPU collision is resolved by
-      a rule — **spill is acceptable while the weights stay resident and only KV cache offloads** — which
-      also disqualifies six of the nine models installed here, leaving `qwen2.5-coder:14b` as the only one
-      that both fits and reports `tools`; that is now measured, not inferred, with the VRAM ceiling
-      confirmed at 10.2–10.7 GB across five models. The list marks it, nothing refuses it, and the machine
-      is probed by loading each model once at boot (≈18 s each, ≈2.7 min for nine). **Everything is
-      answered — the file closes with the `docs/product.md` diff that carries the rule.**
+- [x] ~~**Is 16 384 the right `OLLAMA_NUM_CTX`?**~~ — *Memory / context.* **Answered and closed: it stays
+      at 16 384.** The benchmark ran on both models — 16 384 costs 29.1 % of generation throughput on the
+      14b and 6.8 % on the 32b, and 12 288 is *not* fully resident either, so the choice was never
+      resident vs. hybrid. The room is worth more than the speed, which is now the project's stated
+      optimization target in `docs/product.md` along with the rule that resolved the CPU collision —
+      *spill is acceptable while the weights stay resident and only KV cache offloads.* Per-model ceilings
+      deferred (they collide with `contexts.num_ctx` stamping); nothing to migrate. Spun out
+      [resume-across-num-ctx-changes.md](resume-across-num-ctx-changes.md), and handed the residency
+      measurements and the boot probe to
+      [boot-can-pick-a-toolless-model.md](boot-can-pick-a-toolless-model.md), which is where the tag is
+      painted.
 - [ ] **[Make the standards visible](surface-matching-standards.md)** — *Model behavior.* **The shape
       changed: the resident catalog won.** All nine standard names sit at `ctx[0]` in every phase (~50 exact
       tokens, 0.3 % of the window), and a new `describe_rule` tool returns a one-line description so the model

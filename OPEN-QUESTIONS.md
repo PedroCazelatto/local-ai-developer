@@ -4,10 +4,14 @@ Ten agents each read one backlog task and came back with 73 questions. This file
 place they live**: the follow-ups that used to sit in a separate `FOLLOW-UP-QUESTIONS.md` are folded
 into the sections they belong to, keeping their numbers.
 
-**#1–#102 are all answered.** Each round of follow-ups has been smaller than the last — 76, then 18,
-then 5, then 3 — and **#103** is the only one still open: a caching rule inside a design that is
-otherwise settled. Every answer is folded into the task file it belongs to; those files, not this one,
-are what an implementer reads.
+**Every question is answered — #1 through #103.** Each round of follow-ups was smaller than the last:
+76, then 18, then 5, then 3, then 1, then none. Every answer is folded into the task file it belongs to;
+**those files, not this one, are what an implementer reads.** This file is now a record of how each
+decision was reached, kept because the reasoning behind a decision outlives the decision.
+
+The one thing still outstanding is not a question: **#62** asked for a list of everything useful on the
+status line so you could draw the row, and that list is in
+[backlog/in-turn-progress-reporting.md](backlog/in-turn-progress-reporting.md).
 
 **Every question has been rewritten to explain itself.** The first pass assumed you were holding the
 codebase in your head, and it shows: #2 you told me outright you could not follow, and #15 was answered
@@ -44,7 +48,7 @@ Anything you skip stays blocked.
 | C | node-version-is-not-enforced | #15–#21, #73–#76, #80 | **✅ complete — build it** |
 | D | spawned-windows-have-no-failsafe | #22–#27, #81, #82, #97, #101 | **✅ complete** — and the scope grew: spawned windows persist their **whole** trace |
 | E | cap-the-debate-background-parameter | #28–#34, meta E, #83 | ✅ answered; the cap's *unit* now waits on K |
-| F | tune-the-global-num-ctx-default | #35–#37, #68, #84, #85, #96, #100 | **✅ closed — stays at 16 384**; the residency rule is written into `docs/product.md`. **#103** is the probe's cache |
+| F | tune-the-global-num-ctx-default | #35–#37, #68, #84, #85, #96, #100, #103 | **✅ closed and shipped** — 16 384 stays, the residency rule is in `docs/product.md`, the file is deleted |
 | G | budget-ceilings-for-runs-and-batches | #38–#47, #86, #87, #95 | **✅ complete** — and renamed: it bounds a **window**, not a task |
 | H | surface-matching-standards | #48–#56, meta H, #88, #89 | **✅ complete — build it** |
 | I | small-model-lane-for-one-shots | #57–#60, meta I, #90 | **✅ closed without shipping**; the file is deleted |
@@ -55,8 +59,15 @@ Anything you skip stays blocked.
 **Where the new numbers went:** #68 into F, #69/#71/#72 into B, #70 into A, #73–#76 into C, #77 into A,
 #78/#79 into B, #80 into C, #81/#82 into D, #83 into E, #84/#85 into F, #86/#87 into G, #88/#89 into H,
 #90 into I, #91/#92 into J, #93/#94 into the new sections K and L, then #95/#96/#97/#98 into G, F, D and
-J respectively, #99 into K, then #100 into F, #101 into D and #102 into J, and finally #103 into F.
-Nothing was renumbered.
+J respectively, #99 into K, then #100 into F, #101 into D, #102 into J, and #103 into F. Nothing was
+renumbered.
+
+**Where section F's content went**, since its task file is now deleted: the residency rule and the
+optimization target are in [docs/product.md](docs/product.md); the benchmark tables stay here; the
+per-model residency measurements and the boot probe moved to
+[backlog/boot-can-pick-a-toolless-model.md](backlog/boot-can-pick-a-toolless-model.md), which is where
+the tag is painted; and the `/resume` predicate became
+[backlog/resume-across-num-ctx-changes.md](backlog/resume-across-num-ctx-changes.md).
 
 **The lettered meta-answers** (E, F, H, I, J) were given alongside the numbered ones and are answered or
 sited in their sections: **E** (the tokenizer question) is answered in full at the end of section E,
@@ -1342,7 +1353,10 @@ at 16 384 without giving up any window room. That bears directly on #84.
 
 **a.** File it. · **b.** Drop it for good. · **c.** Fold it into #84's answer rather than a separate file.
 
-### ◻️ #103 — What caches the boot probe, and what invalidates it?
+### ✅ #103 — What caches the boot probe, and what invalidates it?
+
+**Your answer:** *"Cache it in a different file, so if the user changes a driver or the GPU, it can safely delete and regenerate all values. Also, we dont need to invalidate, we can start mapping values for different num_ctx's as if the user changes it back to a known value, we dont need to reprobe."* — its **own file** beside `state.json` (a property of the machine, not a project), where deleting it *is* the reset gesture, because nothing in the repo can detect a driver or GPU change. And it **accumulates rather than invalidates**: a growing map of `(model, num_ctx) → verdict`, so changing the ceiling and changing it back costs one probe rather than two. One point makes the no-invalidation rule correct rather than merely convenient — **key the model half on its `digest`, not its name**, so a re-pulled `:latest` is a key never seen before and re-probes on its own. `/api/tags` already returns `digest` in the same call as `capabilities` and `size`.
+
 
 **Why this exists.** #100c probes by loading every installed model once — ≈2.7 minutes here. That is
 fine as a one-time cost and unacceptable on every boot, so the result is cached; and #96 established
@@ -2263,12 +2277,21 @@ five questions remain.
 **Closed, not built:** **F** (16 384 stays; the residency rule goes to `docs/product.md`) and **I** (the
 small-model lane, deleted).
 
-**One open question.** **#103** — what caches the boot probe and what invalidates it. The probe itself
-is decided and measured (≈18 s per model, ≈2.7 minutes for nine); what is not is where the result is
-kept and when it stops being true. It does not block building the rest of F's consumer, only the cache.
+**Nothing is blocked.** Every task in the list is either shipped, closed, or fully specified and
+waiting to be built.
 
-Plus **#62**, which is a handoff rather than a question: the status-line field list you asked for is in
+**Closed without shipping code:** **F** (the ceiling stays at 16 384; the rule it produced is in
+`docs/product.md`) and **I** (the small-model lane, which failed the acceptance test its own section
+set).
+
+**One handoff, not a question:** **#62** — the status-line field list is in
 [backlog/in-turn-progress-reporting.md](backlog/in-turn-progress-reporting.md), waiting on your drawing.
+Task J can be built without it; only the drop order for a narrow terminal depends on it.
+
+**Two small things were noted but never asked**, and either answer is defensible — they are recorded in
+their task files rather than raised here: whether a newly pulled model is probed immediately after
+`/models pull` or at the next boot (section B), and whether `/swap worker` should be legal at all now
+that #101b has made it harmless (section D).
 
 **Sequencing that came out of the answers:**
 
