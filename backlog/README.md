@@ -135,8 +135,9 @@ Where the window is also a clock. Two of these want measurement before design.
       **The scope grew a second half:** spawned windows now persist their whole trace into `contexts` +
       `messages`, so a Worker's reasoning is readable after the fact rather than destroyed with the window.
       Pairs with the eviction item above: eviction bounds the tail-heavy case cheaply, and only a failsafe
-      bounds the head-heavy one. **Do not write the schema before #101** — `/swap worker` is legal today,
-      so spawned rows would surface in `/resume` as resumable when they are not.
+      bounds the head-heavy one. Spawned rows are namespaced `worker:spawned`, which a filename-derived
+      phase name can never equal, so `/resume`'s existing filter excludes them by construction — no column
+      and no migration. **Fully answered; ready to build.**
 - [x] ~~**Give each window its own `num_ctx`**~~ — *Memory / context.* Shipped, and narrower than the
       file asked: every model call now names its **role** from a closed union, and one table resolves that
       role to a ceiling. Only three roles differ from `OLLAMA_NUM_CTX` — the context titler,
@@ -169,8 +170,10 @@ Where the window is also a clock. Two of these want measurement before design.
       [resume-across-num-ctx-changes.md](resume-across-num-ctx-changes.md). The CPU collision is resolved by
       a rule — **spill is acceptable while the weights stay resident and only KV cache offloads** — which
       also disqualifies six of the nine models installed here, leaving `qwen2.5-coder:14b` as the only one
-      that both fits and reports `tools`. The list marks that, nothing refuses it. **Closes once #100 says
-      how the machine is probed for VRAM** — the figure may never be hardcoded, and Ollama offers no route.
+      that both fits and reports `tools`; that is now measured, not inferred, with the VRAM ceiling
+      confirmed at 10.2–10.7 GB across five models. The list marks it, nothing refuses it, and the machine
+      is probed by loading each model once at boot (≈18 s each, ≈2.7 min for nine). **Everything is
+      answered — the file closes with the `docs/product.md` diff that carries the rule.**
 - [ ] **[Make the standards visible](surface-matching-standards.md)** — *Model behavior.* **The shape
       changed: the resident catalog won.** All nine standard names sit at `ctx[0]` in every phase (~50 exact
       tokens, 0.3 % of the window), and a new `describe_rule` tool returns a one-line description so the model

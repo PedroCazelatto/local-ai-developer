@@ -71,6 +71,7 @@ F. Lets unify all constants to just one, the maximum context available. Then all
 96. A. Never hardcoded. Both variables (model and num_ctx) are playable for showing a "too heavy" tag on the model list. But we must always probe the machine to know.
 97. Reuse the same table, so we can also read the full thinking/conversation process by reading the rows.
 98. A. Keep writing for audit purposes.
+102. A. Audit reaches older messages.
 H. The name of all standard rules must be passed at ctx[0], thus every phase knows them.
 48. All phases know all rules names, and thus the rules must always have a semantic name. Before loading the rule, another tool must be called to get its description, so the model can evaluate if its the right rule or not, saving context.
 49. Every one.
@@ -83,12 +84,14 @@ H. The name of all standard rules must be passed at ctx[0], thus every phase kno
 56. Print just one line with the tool call.
 88. A.
 89. Simplified technical english is a tool for writing docs and tasks, not code. But it is not required to be loaded on all phases, only before writing a file. This rule is written in the phase prompt.
+100. C. Probe at boot.
 I. Using less than half of the context ceiling or smaller models for some task may be optimizing time, but that is not the goal of this project. As we are already using models way weaker than the cloud ones, we must focus on precision and accuracy rather than time taken. The only bottleneck must be the size of VRAM so the model runs on GPU or NPU rather than CPU.
 57. No model can be run on CPU.
 58. The output must be better, that is the measurement. Time is irrelevant.
 59. I dont care about the numbers.
 60. Create a new task.
 90. A.
+101. B. Use worker:spawned to differentiate.
 J. False: during a /run, the terminal must be printing whatever is being run. We will also edit the status line below the input to have this info, like what you proposed.
 61. B. Phase: Design -> Worker. This way, the input is also connected to the running interaction and I can send more messages to the model if I see it diverging from the goal.
 62. Lets make a list of everything that is usefull at the status line and then I will draw it for you.

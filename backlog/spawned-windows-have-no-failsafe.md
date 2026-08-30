@@ -107,11 +107,27 @@ it opens, and the summary alone would only record what was forgotten, never what
 `phase` is plain `TEXT` with no `CHECK`, and `role` already allows `'summary'`. A Worker window is a row
 with `phase = 'worker'`.
 
-**And that is exactly where the hazard is.** `/swap` validates against `availablePhases()`, which is
-every file in `rules/phases/` — **including `worker`, `reviewer` and `retro`**. So a user can already
-`/swap worker`, and once spawned windows write rows under those phase names, `/resume` would offer them
-the very rows #81 says are not resumable. Nothing in the current code separates the two, because until
-now no spawned window wrote anything. See [OPEN-QUESTIONS.md](../OPEN-QUESTIONS.md) **#101**.
+**The one hazard is closed by a naming rule** (#101b). `/swap` validates against
+`availablePhases()`, which is every file in `rules/phases/` — **including `worker`, `reviewer` and
+`retro`** — so `/swap worker` is legal today, and a spawned window writing `phase = 'worker'` would put
+its rows in front of `/resume` as though they were resumable.
+
+So a spawned window writes a **namespaced** phase: **`worker:spawned`**, `reviewer:spawned`,
+`retro:spawned`, `subagent:spawned`, and the two debate roles likewise. A colon can never appear in a
+phase name that came from a filename, so the namespace is unforgeable and `/resume`'s existing
+`phase = ?` filter excludes spawned rows **by construction** — no new column, no migration, and no
+predicate to remember to update.
+
+Two implementation notes that follow:
+
+- **The record name and the prompt name come apart.** A spawned Worker records `worker:spawned` but
+  still loads its system prompt from `rules/phases/worker.md`, so the write path needs a one-line map
+  from the namespaced name back to the base. Keep that map in one place; two spellings of the same
+  phase is exactly the kind of thing that drifts.
+- **`/swap worker` stays legal and is now harmless** — it holds an interactive conversation on the
+  Worker's prompt, under `phase = 'worker'`, which no spawned row can collide with. It is an ability
+  no doc describes, and it is out of scope here; worth a line in `docs/cli.md` whenever that file is
+  next touched.
 
 Two consequences worth pricing before building:
 

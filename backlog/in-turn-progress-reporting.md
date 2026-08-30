@@ -152,10 +152,14 @@ of one run is the overlap this file has flagged since it was filed.
   [move-the-logs-into-sqlite-tables.md](move-the-logs-into-sqlite-tables.md) — *a record written to a
   file no command surfaces* — which is an argument for folding the batch summaries into that task's
   store rather than for not writing them.
-- **Undecided: does `/audit` follow `/batch` out?** It has the identical shape — a read-only reprint of
-  a persisted record — and the scrollback now shows every tool call live, which is the same duplication
-  argument that removed `/batch`. Nothing has said either way. See
-  [OPEN-QUESTIONS.md](../OPEN-QUESTIONS.md) **#102**.
+- **`/audit` stays** (#102a): *"audit reaches older messages."* The duplication argument that removed
+  `/batch` does not reach it, and the reason is the one thing the scrollback cannot do — it is bounded
+  by the terminal's buffer, while the log is not. After an overnight batch, `/audit` is the only way
+  back to the first hour. It is also the single choke point that records the runner-level refusals
+  which never appear as ordinary tool-call rows.
+
+  So the pair splits cleanly: `/batch` printed something the scrollback already holds in full, and
+  `/audit` prints something it no longer holds.
 
 `backlog/README.md`'s shipped Tier-1 entry for the inspection commands describes `/batch` as one of
 five; correcting it is part of the commit that removes it.

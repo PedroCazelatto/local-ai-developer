@@ -4,10 +4,10 @@ Ten agents each read one backlog task and came back with 73 questions. This file
 place they live**: the follow-ups that used to sit in a separate `FOLLOW-UP-QUESTIONS.md` are folded
 into the sections they belong to, keeping their numbers.
 
-**#1–#99 are all answered.** #77–#94 were the follow-ups the first 76 opened, #95–#99 what those opened
-in turn, and **#100–#102** are the three left — each one a mechanism question inside a task whose design
-is settled. Every answer is folded into the task file it belongs to; those files, not this one, are what
-an implementer reads.
+**#1–#102 are all answered.** Each round of follow-ups has been smaller than the last — 76, then 18,
+then 5, then 3 — and **#103** is the only one still open: a caching rule inside a design that is
+otherwise settled. Every answer is folded into the task file it belongs to; those files, not this one,
+are what an implementer reads.
 
 **Every question has been rewritten to explain itself.** The first pass assumed you were holding the
 codebase in your head, and it shows: #2 you told me outright you could not follow, and #15 was answered
@@ -42,21 +42,21 @@ Anything you skip stays blocked.
 | A | record-attempted-tasks | #2–#6, #70, #77 | **✅ complete — build it** |
 | B | boot-can-pick-a-toolless-model | #7–#14, #69, #71, #72, #78, #79 | **✅ complete — build it** |
 | C | node-version-is-not-enforced | #15–#21, #73–#76, #80 | **✅ complete — build it** |
-| D | spawned-windows-have-no-failsafe | #22–#27, #81, #82, #97 | ✅ answered — and the scope grew: spawned windows persist their **whole** trace; **#101** |
+| D | spawned-windows-have-no-failsafe | #22–#27, #81, #82, #97, #101 | **✅ complete** — and the scope grew: spawned windows persist their **whole** trace |
 | E | cap-the-debate-background-parameter | #28–#34, meta E, #83 | ✅ answered; the cap's *unit* now waits on K |
-| F | tune-the-global-num-ctx-default | #35–#37, #68, #84, #85, #96 | **✅ closed — stays at 16 384**, residency rule stated; **#100** is the last mechanism |
+| F | tune-the-global-num-ctx-default | #35–#37, #68, #84, #85, #96, #100 | **✅ closed — stays at 16 384**; the residency rule is written into `docs/product.md`. **#103** is the probe's cache |
 | G | budget-ceilings-for-runs-and-batches | #38–#47, #86, #87, #95 | **✅ complete** — and renamed: it bounds a **window**, not a task |
 | H | surface-matching-standards | #48–#56, meta H, #88, #89 | **✅ complete — build it** |
 | I | small-model-lane-for-one-shots | #57–#60, meta I, #90 | **✅ closed without shipping**; the file is deleted |
-| J | in-turn-progress-reporting | #61–#67, meta J, #91, #92, #98 | ✅ answered; **#62** needs your drawing, **#102** decides `/audit`'s fate |
+| J | in-turn-progress-reporting | #61–#67, meta J, #91, #92, #98, #102 | **✅ complete**; only **#62** waits, and that is your drawing rather than a question |
 | K | derive-constants-from-one-ceiling | meta F, #93, #99 | **✅ complete — build it.** Cheaper than expected; the fractions are taken as proposed |
 | L | split-config-into-one-function-per-file | #94 | **✅ complete — build it** |
 
 **Where the new numbers went:** #68 into F, #69/#71/#72 into B, #70 into A, #73–#76 into C, #77 into A,
 #78/#79 into B, #80 into C, #81/#82 into D, #83 into E, #84/#85 into F, #86/#87 into G, #88/#89 into H,
 #90 into I, #91/#92 into J, #93/#94 into the new sections K and L, then #95/#96/#97/#98 into G, F, D and
-J respectively, #99 into K, and then #100 into F, #101 into D and #102 into J. Nothing was
-renumbered.
+J respectively, #99 into K, then #100 into F, #101 into D and #102 into J, and finally #103 into F.
+Nothing was renumbered.
 
 **The lettered meta-answers** (E, F, H, I, J) were given alongside the numbered ones and are answered or
 sited in their sections: **E** (the tokenizer question) is answered in full at the end of section E,
@@ -1342,6 +1342,34 @@ at 16 384 without giving up any window room. That bears directly on #84.
 
 **a.** File it. · **b.** Drop it for good. · **c.** Fold it into #84's answer rather than a separate file.
 
+### ◻️ #103 — What caches the boot probe, and what invalidates it?
+
+**Why this exists.** #100c probes by loading every installed model once — ≈2.7 minutes here. That is
+fine as a one-time cost and unacceptable on every boot, so the result is cached; and #96 established
+that the answer depends on **both** the model and the configured `num_ctx`, so the cache is keyed on
+the pair. Neither the store nor the invalidation rule is decided, and guessing wrong gives either a
+stale tag or a three-minute boot every morning.
+
+**Where it could live.** `state.json` already holds `activeModel` and is the natural home for
+machine-local facts. `memory.db` is per project, and this is a property of the machine, not the
+project — so a per-project store would re-probe once per project, which is wrong.
+
+**What must invalidate it.** At least: a **newly pulled model** (nothing is known about it), and a
+**changed `num_ctx`** (the KV cache is the part that grew). Possibly also a driver or GPU change, which
+nothing in the repo can currently detect.
+
+- **a.** Cache in `state.json`, keyed on `(model digest, num_ctx)`. Invalidate an entry when either
+  changes; probe only the entries that are missing. *A new pull costs one load, not nine, and a
+  `num_ctx` change costs the full 2.7 minutes.*
+- **b.** Cache the machine's measured VRAM ceiling instead of a per-model verdict — one number
+  (10.2–10.7 GB here), derived from the probe, against which any model's size is compared arithmetically.
+  *One probe run ever; a new pull needs no load at all. But it re-introduces a predicted tag rather than
+  a measured one, which is what #100c chose against.*
+- **c.** No cache — probe every boot, and accept ~2.7 minutes before the REPL comes up. *Always correct,
+  and the cost lands on exactly the person who chose (c).*
+- *Whichever: is a **newly pulled** model probed immediately after `/models pull`, or at the next boot?
+  Probing straight after the pull is the moment the user is already waiting.*
+
 ---
 
 ## G. budget-ceilings-for-runs-and-batches — Tier 3, Execution loop
@@ -1608,7 +1636,10 @@ writer without a reader recreates the exact shape that justified filing
 - *Does `/audit` follow `/batch` out, or is it kept? It has the same shape — a read-only reprint of a
   persisted record — and #92's reasoning would take it too, but nothing said so.*
 
-### ◻️ #102 — Does `/audit` follow `/batch` out?
+### ✅ #102 — Does `/audit` follow `/batch` out?
+
+**Your answer:** **a** — *"audit reaches older messages."* The duplication argument that removed `/batch` does not reach `/audit`: the scrollback is bounded by the terminal's buffer and the log is not, so after an overnight batch `/audit` is the only way back to the first hour. The pair splits cleanly — `/batch` printed what the scrollback already holds, `/audit` prints what it no longer holds.
+
 
 **Why this exists.** #92 removed `/batch` because the scrollback now carries the same information, and
 #98a kept its *writer* for audit. `/audit` has the identical shape — a read-only reprint of a persisted
@@ -1802,7 +1833,10 @@ This design makes that collision more likely, not less.
 - **c.** Remove the unconditional `load_rule` from `worker.md` / `reviewer.md` and let the mechanism do
   its job. *A `rules/` edit, committed like ordinary work.*
 
-### ◻️ #100 — How is the machine probed for VRAM?
+### ✅ #100 — How is the machine probed for VRAM?
+
+**Your answer:** **c** — *"probe at boot."* Load each installed model once and record what `/api/ps` reports. It is the only option that is both exact and portable: no vendor CLI, no hardcoded figure, nothing to be wrong about on another card. **It costs less than the option warned:** cold loads measured 11.4 s (codestral:22b), 16.4 s (qwen3-coder:30b) and 26.0 s (gpt-oss:20b) — ≈18 s each, so ≈2.7 minutes for all nine models here, once. It cannot run in the background while a session is live, because probing *is* loading and would evict the session model mid-turn. What caches and invalidates the result is **#103**.
+
 
 **Why this exists.** #96 requires the "too heavy" tag to be computed from a **probed** figure, never a
 hardcoded one. There is no Ollama-native way to ask, and I checked all of them against the live daemon:
@@ -1926,7 +1960,10 @@ approval and that approval was never given.
   for. *This is the approval #1 requires; say so explicitly if you mean it.*
 - **c.** Keep the file open as a record with no work attached, the way the framing notes are kept.
 
-### ◻️ #101 — Spawned windows in `contexts` collide with `/swap`
+### ✅ #101 — Spawned windows in `contexts` collide with `/swap`
+
+**Your answer:** **b** — *"use `worker:spawned` to differentiate."* A colon can never appear in a phase name derived from a `rules/phases/*.md` filename, so the namespace is unforgeable and `/resume`'s existing `phase = ?` filter excludes spawned rows **by construction** — no column, no migration, no predicate to remember. The write path needs a one-line map back to the base name, since a spawned Worker still loads `rules/phases/worker.md`.
+
 
 **Why this exists.** #97 puts spawned windows into `contexts` + `messages`, and #81 says they are
 recorded but **not resumable**. Those two only coexist if `/resume` can tell them apart from an
@@ -2216,24 +2253,19 @@ five questions remain.
 - **A** — `failed` status, written after the stash, committed by the loop with `commitPaths`.
 - **B** — delete the pick rule; a marked, non-selectable list; the Ollama 0.9.1 floor stated and checked.
 - **C** — `.nvmrc` as the only source of truth, both verbs refusing, `engines` deleted.
+- **D** — the failsafe, plus spawned windows persisting their whole trace under `<phase>:spawned`.
 - **G** — a per-**window** wall-clock ceiling on model time, `over_budget`, dependents stopped.
 - **H** — resident names at `ctx[0]`, `describe_rule`, the hint, and the conditional STE load.
+- **J** — the pinned rows and the interleaved scrollback; `/batch` out, `/audit` kept.
 - **K** — the local tokenizer, then the fraction table.
 - **L** — split `config.ts` **and** `ollama-models.ts`.
 
 **Closed, not built:** **F** (16 384 stays; the residency rule goes to `docs/product.md`) and **I** (the
 small-model lane, deleted).
 
-**The three open questions.** None of them is a design decision any more — each is a *mechanism* inside
-a task whose design is settled, and each is the kind that would be wrong to guess:
-
-- **#100** — how the machine is probed for VRAM. #96 requires a probed figure and forbids a hardcoded
-  one; Ollama offers no route, and every alternative trades portability, accuracy or a model load.
-  **F cannot close without it.**
-- **#101** — spawned windows written into `contexts` collide with `/swap worker`, which is legal today.
-  Without a way to tell the two apart, `/resume` would offer exactly the rows #81 says are not
-  resumable. **D's schema should not be written before this.**
-- **#102** — whether `/audit` follows `/batch` out, on the same duplication argument.
+**One open question.** **#103** — what caches the boot probe and what invalidates it. The probe itself
+is decided and measured (≈18 s per model, ≈2.7 minutes for nine); what is not is where the result is
+kept and when it stops being true. It does not block building the rest of F's consumer, only the cache.
 
 Plus **#62**, which is a handoff rather than a question: the status-line field list you asked for is in
 [backlog/in-turn-progress-reporting.md](backlog/in-turn-progress-reporting.md), waiting on your drawing.

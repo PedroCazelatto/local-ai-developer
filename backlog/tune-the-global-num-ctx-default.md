@@ -119,10 +119,21 @@ satisfy the rule at **any** `num_ctx`:
 | qwen3-coder:30b | 18.56 GB | no | yes |
 | qwen2.5-coder:32b | 19.85 GB | no | yes |
 
-**`qwen2.5-coder:14b` is the only installed model that satisfies both gates.** The 32b's failure is
-measured (10.35 GB resident of 24.49 GB total — 14.13 GB of it weights on the CPU, which is exactly what
-makes it ~3 tok/s); the four between 12 and 19 GB are inferred from the same ~10.4 GB ceiling rather
-than each measured.
+**`qwen2.5-coder:14b` is the only installed model that satisfies both gates**, and this is now
+measured rather than inferred. Each model was loaded at `num_ctx` 16 384 and `/api/ps` read directly:
+
+| model | weights (on disk) | in VRAM | spilled | weights resident? |
+|---|---|---|---|---|
+| qwen2.5-coder:14b | 8.99 GB | 10.49 GB | 1.93 GB | **yes** — the spill is all KV cache |
+| codestral:22b | 12.57 GB | **10.70 GB** | 5.89 GB | no — ~1.9 GB of *weights* on the CPU |
+| gpt-oss:20b | 13.79 GB | **10.20 GB** | 3.87 GB | no |
+| qwen3-coder:30b | 18.56 GB | **10.61 GB** | 9.82 GB | no |
+| qwen2.5-coder:32b | 19.85 GB | **10.35 GB** | 14.13 GB | no |
+
+The VRAM ceiling is confirmed at **10.2–10.7 GB** on this 12 GB card, and it is a ceiling rather than a
+coincidence — five models of wildly different sizes all stop within half a gigabyte of the same figure.
+`codestral:22b` was the borderline case the earlier note only inferred; it fails. `qwen3.5:27b` (17.42
+GB) is the one model still un-probed, and it is larger than two that already fail.
 
 **The list marks it; nothing refuses it** (#96a). A "too heavy" tag beside a model, exactly like the
 `(no tools)` marker, and the user may still choose it — a slow model is a legitimate choice, an
@@ -139,10 +150,31 @@ points from that answer shape the tag:
   predicted. So the tag is a prediction shown before loading, and the loaded state can always be
   verified — and corrected — against the daemon.
 
-**How the machine is probed is not decided**, and it is the one part with no Ollama-native answer:
-`/api/status` reports nothing about the GPU, `/api/ps` is empty until something is loaded, and
-`/api/experimental/model-recommendations` returns a curated list with `vram_bytes` hints rather than
-this machine's capacity. See [OPEN-QUESTIONS.md](../OPEN-QUESTIONS.md) **#100**.
+**The machine is probed by loading each installed model once at boot** (#100c). No vendor CLI, no
+hardcoded figure, and nothing to be wrong about on another card: `/api/ps` reports `size` and
+`size_vram` for whatever is loaded, and `size_vram < size` **is** the spill — measured, not predicted.
+It is the only option that is both exact and portable, since Ollama exposes no way to ask the machine
+its capacity (`/api/status` carries no GPU data, `/api/ps` is empty until something loads, and
+`/api/experimental/model-recommendations` is a curated list with generic `vram_bytes` hints).
 
-**This file is finished.** It is deleted and its line in [backlog/README.md](README.md) ticked in the
-commit that carries the rule above into `docs/product.md` — a governance-doc edit, so review-gated.
+**It costs less than the option feared.** Load time was measured on the three models probed above:
+
+| model | cold load |
+|---|---|
+| codestral:22b | 11.4 s |
+| qwen3-coder:30b | 16.4 s |
+| gpt-oss:20b | 26.0 s |
+
+≈18 s each, so **≈2.7 minutes for all nine models on this box**, once. The option was written as
+"costs minutes on a machine with nine models"; that is accurate and it is a one-time boot cost.
+
+**Two constraints on when it runs.** It cannot run in the background while a session is live — probing
+*is* loading, so it would evict the session model mid-turn, which is the one thing `docs/product.md`'s
+no-parallelism rule exists to prevent. And the result depends on `num_ctx` as well as the model (#96),
+so it is keyed on both. What caches it and what invalidates it is
+[OPEN-QUESTIONS.md](../OPEN-QUESTIONS.md) **#103**.
+
+**This file is finished — every question in section F is answered.** It is deleted and its line in
+[backlog/README.md](README.md) ticked in the commit that carries the residency rule into
+[docs/product.md](../docs/product.md). That doc edit is **review-gated**, so it is made in the working
+tree and handed over; the deletion rides along once it is approved.
