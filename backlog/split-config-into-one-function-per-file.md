@@ -62,11 +62,27 @@ means a second file. This is not a new severity: `config.ts`'s three resolvers w
 that is precisely what made it a violation. Judging by exports instead would leave 68 of the 96 files
 untouched while claiming the rule holds.
 
-**An inline arrow counts as a declaration too, with no threshold.** Every arrow used as a property
-value — `run: (ctx) => showAudit(...)`, `fetch: (input, init) => {...}` — is a declaration. There is no
-"small enough" exemption, because the one-declaration bar already does that work: **one inline arrow in
-a file is fine; two is a violation, and one beside a function is a violation.** An arrow in a *type*
-position is not a declaration — `work: () => T` in a parameter list declares nothing.
+**The complete bar, in one sentence.** A declaration is a top-level `function`, a top-level arrow
+const, a `class`, or **an arrow property of an object literal**. Nothing else counts.
+
+**Arrow properties count with no threshold** — `run: (ctx) => showAudit(...)`,
+`fetch: (input, init) => {...}`. There is no "small enough" exemption, because the one-declaration bar
+already does that work: one arrow in a file is fine, two is a violation, and one beside a function is a
+violation. The hole this closes is a file moving its functions into an object literal to score zero,
+which is exactly what `swap.ts` does.
+
+**Three things that look like arrows and are not declarations.** Read this before counting, or you will
+over-report by a wide margin — nested arrows are everywhere:
+
+- an arrow **local to a function body**: `const onAbort = (): void => iterator.abort();` inside
+  `pullModel` is not a second declaration;
+- an arrow **passed as an argument**: a callback at a call site declares nothing;
+- an arrow in a **type position**: `work: () => T` in a parameter list declares nothing. Four of the 45
+  raw regex hits at the baseline were this, which is why the measured figure is 41.
+
+Scoped this way the bar is measurable: **41** arrow properties repo-wide at the baseline. The repo has
+**zero** top-level arrow consts — that clause costs nothing today and is in the bar only to keep the
+obvious way around it closed.
 
 **A `class` counts as a declaration too** — one class *or* one function per file, never one of each.
 The corollary is worth stating because three agents have now reached it independently and each first
@@ -101,10 +117,24 @@ saves 13 of the 16 files in `src/interface/commands/` from deletion — they pai
 the type describing it — and it settles the `SessionConfig` question this brief used to park.
 
 **Duplicated helpers are deduped as the sweep goes, not afterwards.** Two have a home already:
-`write` → `src/core/ui/write.ts` and `errMessage` → `src/core/err-message.ts`, both created by the
-`commands` wave. **Each later wave replaces its own copies as it reaches them.** Nobody runs a migration
-pass across directories afterwards — that would be one agent editing every other agent's files, which is
-the thing the partition exists to prevent.
+`write` → `src/core/ui/write.ts` and `errMessage` → `src/core/err-message.ts`. **Each later wave
+replaces its own copies as it reaches them.** Nobody runs a migration pass across directories
+afterwards — that would be one agent editing every other agent's files, which is the thing the
+partition exists to prevent.
+
+**A shared destination is created once, by the first wave that needs it, and named here before a second
+wave can invent a rival.** This rule has a scar. `b63092e` committed
+`src/core/container/message-of.ts`, and the `commands` wave then wrote `src/core/err-message.ts` with
+the identical body — one function, two homes, because neither wave knew the other was writing it. **The
+ruling is `src/core/err-message.ts`**; the container copy is deleted and repointed in a follow-up. Worth
+knowing before anyone re-opens it: `messageOf` is the *dominant* spelling by a distance — 14 files at the
+baseline, 16 now, against 2 — **and it lost anyway.** Frequency is not the argument.
+
+**"Update your barrel in place" means repointing lines it already carries. It never means adding one.**
+A newly created shared file gets a **direct import** from its callers and no barrel entry.
+`src/core/index.ts` re-exports one thing and has zero importers; `src/core/ui/index.ts` has 32 export
+lines and zero importers. A new line in either mints a re-export whose only future is to be deleted by
+the final barrel pass. So neither `src/core/err-message.ts` nor `src/core/ui/write.ts` gets one.
 
 **A re-export barrel left behind is not an acceptable intermediate state, even temporarily.** A
 barrel-then-cleanup two-pass was put to the user precisely because it would have let all nine directories

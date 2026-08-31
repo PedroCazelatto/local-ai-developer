@@ -42,11 +42,26 @@ along: types leave their `.type.ts` siblings for the file that owns the function
 deleted, **including all 9 directory `index.ts` barrels**, in one final pass once every directory is
 swept; and a split file survives only by assembling its parts into an object.
 
-**Governance is settled and the sweep is running.** The amendment landed in `d0176cf` after the user
-reviewed it, and three waves have committed since: `core/llm` (`6e1c3f9`), `core/container` (`b63092e`)
-and `src/context` (`daf08cf`). A further round of clauses — classes, inline arrows, the barrel wording
-and the type-export carve-out — is drafted and waiting on the user. The task file carries the census, the
-barrel table, the import-graph analysis, the partition and the open follow-ups.
+**Governance is settled and wave A is closed.** The amendment landed in `d0176cf` after the user
+reviewed it. Wave A then committed four directories in parallel — `core/llm` (`6e1c3f9`),
+`core/container` (`b63092e`), `src/context` (`daf08cf`) and `src/commands` (`f08c47c`) — alongside
+[2](test-the-invariant-functions.md)'s 195 tests (`973adce`).
+
+| | files | declarations |
+|---|---:|---:|
+| baseline | 106 | 528 |
+| **cleared by wave A** | **13** | **50** |
+| **remaining** | **93** | **478** |
+
+Left to sweep: `core/session` 29/187, `interface/commands` 20/111, `core/ui` 14/80, `tools` 20/62,
+`interface` 7/31, plus two single-file rows that **still have no wave assigned** — `src/` (root,
+`index.ts` itself) 1/3 and `src/phases` 1/2 — and a one-file follow-up in the otherwise-finished
+`core/llm`: `ollama-with-signal.ts` (1/2), which the inline-arrow ruling caught after `6e1c3f9` had
+already committed. `core/ui` is the hub and cannot share a wave with anything.
+
+A further round of governance clauses — classes, inline arrows, the barrel wording, the type-export
+carve-out and the *Testing* rewrite — is drafted and waiting on the user. The task file carries the
+census, the barrel table, the import-graph analysis, the partition and the open follow-ups.
 
 **Why first:** unchanged in substance and now much stronger. Stated in its own file and in
 [item 12](budget-ceilings-for-runs-and-batches.md): ship it **before** the budget ceilings, so the new
@@ -319,6 +334,59 @@ only drift when the pin's major moves. It is filed rather than folded into
 [1](split-config-into-one-function-per-file.md) deliberately: that sweep rewrites `sandbox.ts`, and burying
 a behaviour change inside a no-behaviour-change refactor is how a defect stops being reviewable. **Item 1
 carries `DEFAULT_IMAGE` across unchanged and reports where it lands.**
+
+### 22. [`truncateToWidth` measures code units, not columns](truncate-to-width-measures-code-units.md)
+*Terminal UX.* `src/core/ui/truncate-to-width.ts` promises columns in its header and counts UTF-16 code
+units in its body — the **only** member of the width layer that never calls `visibleWidth`.
+`truncateToWidth('日本語', 3)` returns the string unchanged at **6** columns wide; `('😀ab', 2)` returns a
+lone high surrogate.
+
+**Why it is not a formatting nit.** Its sole caller, `render-question-panel.ts`, redraws by moving the
+cursor up by its own line count, so it needs exactly one terminal row per logical line. An over-wide line
+wraps, the panel's idea of its own height is short by one, and the redraw smears the panel down the
+screen on every repaint — **the exact failure the function exists to prevent**, reachable in normal use
+by any question panel quoting a non-Latin path, title or model sentence. The fix is to iterate by code
+point through `codePointWidth`, the tested machinery it already declines to call.
+
+### 23. [`taskBranchName` produces refs git rejects, and silently drops titles](task-branch-name-produces-invalid-refs.md)
+*Execution loop.* Its comment claims it strips what *"git could choke on … rather than discover it at
+checkout time"*. Discovery happens at checkout time. An interior `..` survives `safeIdPath`, so
+`id: 'a..b'` yields `task/a..b-go`, which `git check-ref-format` **rejects** — verified against the real
+tool, not inferred from the rules. The branch cannot be created, so the task cannot start.
+
+Second defect: the leaf check is a plain `endsWith` rather than a segment match, so `id: '01-latest'`
+with title `'Test'` produces `task/01-latest` and **drops the title silently**. That is *literally*
+consistent with the header, which describes a suffix match — which is why it is filed rather than simply
+fixed. Fix the code and the comment together, or the next reader re-derives the ambiguity.
+
+### 24. [Three drifts between `backlog.ts` and its own documentation](backlog-reader-drifts-from-its-own-docs.md)
+*Execution loop.* The file the scheduler reads the world through disagrees with its own comments in three
+places. They share a file, a reviewer and a test suite — **not a cause**.
+
+**The first may be a documentation defect rather than a behaviour one, and that is the point of filing
+it.** `nextRunnableTasks`'s JSDoc says both `/run` paths *"skip identically"*; they diverge on
+`in_progress`, which the batch driver filters out and `taskSkipReason` calls runnable. So `/run <id>`
+starts a task the batch driver would never pick — which is probably the *useful* behaviour, and is how
+[5](record-attempted-tasks.md) already rules a named id should differ from a bare selector. One of the
+two is wrong and nobody has said which. **Do not answer it by making them agree.** The others: a
+`readme.md` becomes a phantom task, because the extension test is case-insensitive and the level-doc test
+is not — a Windows and macOS defect against the OS-agnostic reach `docs/product.md` commits to; and
+`replaceStatus` normalises a whole mixed-ending file despite promising to preserve the rest verbatim,
+which matters once [5](record-attempted-tasks.md) has the loop committing that file.
+
+---
+
+**Items 22, 23 and 24 were all found by [2](test-the-invariant-functions.md)** while pinning the
+invariant functions, and they share two properties that make them safe to pick up later.
+
+- **The tests already assert the current, wrong behaviour**, deliberately and with a comment saying so.
+  Fixing any of these means changing its test — that is the mechanism working, not a surprise. Item 2 was
+  told to pin what the code does, flag the discrepancy, and neither fix it nor promote a bug to a
+  requirement.
+- **None of them may ride along in a sweep commit.** A behaviour change inside a mechanical refactor is a
+  change nobody reviews. [22](truncate-to-width-measures-code-units.md) is the sharpest case: `core/ui` is
+  the next wave and will be moving the very file that needs fixing. Land the sweep, then the fix, against
+  the settled file.
 
 ---
 
