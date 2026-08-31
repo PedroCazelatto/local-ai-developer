@@ -4,6 +4,7 @@
 // diff-capture is an orchestrator action, never a model tool call. Non-mutating, and BOUNDED.
 
 import { truncateHeadTail } from '../../tools/truncate.js';
+import { hasHead } from './has-head.js';
 import type { ChangedPaths } from './list-changed-paths.js';
 import { porcelainPath } from './porcelain-path.js';
 import { renderNewFile } from './render-new-file.js';
@@ -30,8 +31,8 @@ export function captureChangedFiles(projectPath: string, budget: number = REVIEW
   const files = lines.map(porcelainPath).filter((p) => p !== '');
   const untracked = lines.filter((l) => l.startsWith('??')).map(porcelainPath).filter((p) => p !== '');
 
-  const hasHead = runGit(projectPath, ['rev-parse', '--verify', 'HEAD']).ok;
-  const trackedDiff = hasHead ? runGit(projectPath, ['--no-pager', 'diff', 'HEAD']).stdout.trim() : '';
+  // hasHead: `git rev-parse --verify HEAD` — false on a repo with no commit yet, where diff HEAD fails.
+  const trackedDiff = hasHead(projectPath) ? runGit(projectPath, ['--no-pager', 'diff', 'HEAD']).stdout.trim() : '';
   // renderNewFile: reads an untracked file off the host fs as a `--- new file: <rel> ---` block.
   const newFiles = untracked.map((p) => renderNewFile(projectPath, p)).filter((s) => s !== '');
 

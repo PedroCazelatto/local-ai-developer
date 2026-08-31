@@ -96,7 +96,7 @@ test('the fail path does not care whether the task is marked done', () => {
   assert.deepEqual(both, [null, null]);
 });
 
-// ---------------------------------------------------------------------- path matching (toPosix)
+// --------------------------------------------------------------- path matching (toPosixTrimmed)
 
 test('a backslash path in the verdict covers the same file reported with slashes', () => {
   // The model echoes whatever separator it saw; normalizing is what keeps a real issue from being

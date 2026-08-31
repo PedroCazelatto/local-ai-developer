@@ -2,6 +2,7 @@
 // which is what the commit-message writer reads — never the committing phase's description of it.
 
 import { truncateHeadTail } from '../../tools/truncate.js';
+import { hasHead } from './has-head.js';
 import { porcelainPath } from './porcelain-path.js';
 import { renderNewFile } from './render-new-file.js';
 import { REVIEW_DIFF_BUDGET } from './review-diff-budget.js';
@@ -21,8 +22,8 @@ export function diffPaths(projectPath: string, paths: readonly string[], budget:
   // porcelainPath: strips the 2-char XY status, and keeps the NEW path of a rename.
   const untracked = statusLines.filter((l) => l.startsWith('??')).map(porcelainPath).filter((p) => p !== '');
 
-  const hasHead = runGit(projectPath, ['rev-parse', '--verify', 'HEAD']).ok;
-  const trackedDiff = hasHead ? runGit(projectPath, ['--no-pager', 'diff', 'HEAD', '--', ...paths]).stdout.trim() : '';
+  // hasHead: `git rev-parse --verify HEAD` — false on a repo with no commit yet, where diff HEAD fails.
+  const trackedDiff = hasHead(projectPath) ? runGit(projectPath, ['--no-pager', 'diff', 'HEAD', '--', ...paths]).stdout.trim() : '';
   // renderNewFile: reads an untracked file off the host fs as a `--- new file: <rel> ---` block.
   const newFiles = untracked.map((p) => renderNewFile(projectPath, p)).filter((s) => s !== '');
 

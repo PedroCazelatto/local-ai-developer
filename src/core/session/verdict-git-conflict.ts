@@ -12,7 +12,7 @@
 // wrote and still fail the task for work that is missing entirely.
 
 import { issueCoversFile } from './issue-covers-file.js';
-import { toPosix } from './to-posix.js';
+import { toPosixTrimmed } from './to-posix-trimmed.js';
 import type { ReviewVerdict } from './types.js';
 import { SEVERITIES } from './types.js';
 
@@ -32,8 +32,8 @@ export interface VerdictGitState {
  * straight back to the Reviewer as a recoverable error, so it names the offending files and the fix.
  */
 export function verdictGitConflict(state: VerdictGitState): string | null {
-  // toPosix: backslashes to slashes, trimmed — the model may echo either separator.
-  const outstanding = state.outstanding.map(toPosix).filter((file) => file !== '');
+  // toPosixTrimmed: backslashes to slashes, trimmed — the model may echo either separator.
+  const outstanding = state.outstanding.map(toPosixTrimmed).filter((file) => file !== '');
 
   if (state.verdict.result === 'pass') {
     if (outstanding.length > 0) {
@@ -53,7 +53,7 @@ export function verdictGitConflict(state: VerdictGitState): string | null {
   }
 
   // fail — every file left behind must carry a note, so the Worker knows why it came back.
-  const named = state.verdict.issues.map((issue) => toPosix(issue.file)).filter((file) => file !== '');
+  const named = state.verdict.issues.map((issue) => toPosixTrimmed(issue.file)).filter((file) => file !== '');
   // issueCoversFile: an exact match, or a directory named in an issue that contains the file.
   const unexplained = outstanding.filter((file) => !named.some((path) => issueCoversFile(path, file)));
   if (unexplained.length > 0) {
