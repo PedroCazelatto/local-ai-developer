@@ -48,17 +48,30 @@ reviewed it. Wave A then committed four directories in parallel — `core/llm` (
 `core/container` (`b63092e`), `src/context` (`daf08cf`) and `src/commands` (`f08c47c`) — alongside
 [2](test-the-invariant-functions.md)'s 195 tests (`973adce`).
 
+**Wave B took `core/ui`, the hub, alone** — `4daa490` for the pure half (8 files, all 11 `.type.ts`
+folds, `prompts.ts` deleted) and `1c3b1cb` for the six singletons as assemblers over `<name>-state.ts`
+value modules (92 files, **all 179 member call sites byte-identical**, 43 importers changing one import
+line each). The directory is at **zero violations**: 122 files holding 103 declarations, counted with a
+TypeScript-parser census rather than a regex — and its independent measurement of the 14/77 row in this
+table matched exactly. Two agents, two instruments, one number.
+
 | | files | declarations |
 |---|---:|---:|
 | baseline | 104 | 504 |
-| **cleared by wave A** | **13** | **50** |
-| **remaining** | **91** | **454** |
+| cleared by wave A | 13 | 50 |
+| cleared by wave B | 14 | 77 |
+| **remaining** | **77** | **377** |
 
-Left to sweep: `core/session` 28/181, `interface/commands` 20/103, `core/ui` 14/77, `tools` 20/60,
-`interface` 7/28, plus two single-file rows that **still have no wave assigned** — `src/` (root,
-`index.ts` itself) 1/3 and `src/phases` 1/2. `core/ui` is the hub and cannot share a wave with anything;
-wave B has it. **`core/llm` is complete** — the `ollama-with-signal.ts` follow-up this table used to
-carry was withdrawn once the arrow rule was scoped to top-level object literals.
+**Wave C is running:** `core/session` (28/181 — the largest directory in the repo, expected to take
+several commits) and `src/index.ts` (1/3), one agent each. **`core/llm` is complete** — the
+`ollama-with-signal.ts` follow-up this table used to carry was withdrawn once the arrow rule was scoped
+to top-level object literals.
+
+**Wave D is shaped and not started:** `tools` + `phases` (21/62) as **one** agent, and `interface` +
+`interface/commands` (27/131) as **one** agent. Each pair is mutually coupled — 15 and 4 edges between
+`interface` and `interface/commands`, and `phases` imports 7 files from `tools` — so each gets a single
+owner rather than two agents fighting over the same files. **Wave E is the final barrel pass**, deleting
+all nine `index.ts` re-export modules at once.
 
 The baseline was **106 / 528** until wave B found that an arrow property only counts when its object
 literal is at module top level. Twenty-two arrows across ten files sit inside a function body instead —

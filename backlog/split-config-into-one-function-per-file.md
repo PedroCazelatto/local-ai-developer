@@ -368,7 +368,25 @@ top-level inline arrows together, which is the bar as it now stands.
   one class beside one function. It is a single small file, which is exactly why nobody will notice it
   is unowned.
 
-Neither can be assumed to belong to whoever is nearby. **Assign both deliberately.**
+Neither can be assumed to belong to whoever is nearby. **Assign both deliberately.** Both now are:
+`src/index.ts` to its own agent in wave C, `src/phases` to wave D riding with `tools`.
+
+### The wave plan
+
+Recorded here rather than held by whoever is coordinating, so it survives a handover.
+
+| wave | who | files / decls | why this shape |
+|---|---|---:|---|
+| **A** | `core/llm`, `core/container`, `context`, `commands` — four agents | 13 / 50 | the quiet corners: 1, 1, 2 and 1 files reached from outside, no overlap |
+| **B** | `core/ui` — one agent, alone | 14 / 77 | the hub: 26 files reached deeply from five directories |
+| **C** | `core/session`; `src/index.ts` — two agents | 29 / 184 | the largest directory in the repo, several commits; root is nearly free |
+| **D** | `tools`+`phases`; `interface`+`interface/commands` — two agents | 48 / 193 | each pair is mutually coupled, so one owner each |
+| **E** | the final barrel pass — one agent | 9 barrels | all nine `index.ts` re-export modules deleted at once, after every directory is final |
+
+**Why the pairs in wave D are pairs, not four agents.** `interface` ↔ `interface/commands` is mutual, 15
+edges one way and 4 the other; `phases` imports 7 files from `tools`. Splitting either pair across two
+agents puts both of them in the same files. One owner per pair is not a convenience — it is the only
+shape that does not create the contention the partition exists to avoid.
 
 ## `__tests__` is not a sweep target — but it is an importer
 
