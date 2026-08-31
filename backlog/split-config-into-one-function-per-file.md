@@ -35,6 +35,22 @@ A census of the tree after the first increment:
 - **27** export more than one — worst: `memory-db.ts` 11, `renderer.ts` 10, `project-git.ts` 8,
   `backlog.ts` 8, `status-bar.ts` 7, `status-activity.ts` 6, `project-git-stash.ts` 6,
   `project-git-branch.ts` 6.
+- **Once a `class` counts as a declaration too, it is 99 files and 482 declarations.** Only **three**
+  files join the list on that account — `src/context/load-prompt.ts`, `src/core/session/orchestrator.ts`
+  and `src/phases/resolve-phase-tools.ts`, each one class beside one function. The other 16 of the 19
+  classes in the tree either sit alone in their file, which conforms, or sit in a file that was already
+  violating.
+
+- **Once inline arrows count as well, it is 106 files and 528 declarations.** 41 arrow properties, 40 of
+  them in files already violating. Seven more files join: `core/llm/ollama-with-signal.ts`,
+  `core/session/subagents.ts`, `interface/commands/audit.ts`, `interface/commands/new-project.ts`,
+  `interface/commands/swap.ts`, `interface/commands/tasks.ts` and `tools/debate.ts`.
+
+> **These figures are the baseline. They are measured at commit `a0e9e31`, before any wave landed, and
+> they will NOT reproduce against a live tree** — by wave C, `HEAD` is several swept directories away
+> from them. **To re-measure, check out `a0e9e31` and count there.** Counting `HEAD` and finding a
+> smaller number is the sweep working, not the census being broken. These numbers are deliberately not
+> decremented as waves land; the status reports track what is left.
 
 `config.ts` and `ollama-models.ts` were not the only violations. They were the only two that had
 *written the exception down*, which is why they were visible and the other 93 were not.
@@ -43,15 +59,29 @@ A census of the tree after the first increment:
 
 **Any function declaration counts, not just an exported one.** A private helper is a second function and
 means a second file. This is not a new severity: `config.ts`'s three resolvers were never exported, and
-that is precisely what made it a violation. Judging by exports instead would leave 68 of the 95 files
+that is precisely what made it a violation. Judging by exports instead would leave 68 of the 96 files
 untouched while claiming the rule holds.
+
+**An inline arrow counts as a declaration too, with no threshold.** Every arrow used as a property
+value — `run: (ctx) => showAudit(...)`, `fetch: (input, init) => {...}` — is a declaration. There is no
+"small enough" exemption, because the one-declaration bar already does that work: **one inline arrow in
+a file is fine; two is a violation, and one beside a function is a violation.** An arrow in a *type*
+position is not a declaration — `work: () => T` in a parameter list declares nothing.
+
+**A `class` counts as a declaration too** — one class *or* one function per file, never one of each.
+The corollary is worth stating because three agents have now reached it independently and each first
+reached for the wrong reason: a file holding **only** a class — `client.ts`, `stream-filter.ts`,
+`sandbox.ts`, `turn-aborted-error.ts` — conforms **not because a class is exempt**. Nothing exempts a
+class. It conforms because it passes the same one-declaration test as every other file.
 
 Not violations, and not to be "fixed":
 
 - an **assembler** that composes the extracted functions into one object value — but see the next
   section, which narrows this sharply;
 - a file that holds only **constants** (the new `config.ts`);
-- a file that holds only a **value** (the new `daemon.ts`).
+- a file that holds only a **value** (the new `daemon.ts`);
+- a file that holds only a **class** — one declaration, like any other single declaration;
+- anything under `src/**/__tests__/**`, which is exempt outright — see the test-file rules below.
 
 ## What happens to the file that was split
 
@@ -63,6 +93,18 @@ An assembler composes the extracted functions into **one object value** that cal
 thing. A file that would survive merely by listing the names again — `export * from`, or
 `export { a, b, c }` — is **not** an assembler. **Delete it and repoint every importer, in the same
 commit.**
+
+**An assembler may export types beside its object.** "Exports that object and nothing else" bounds
+*values*, not declarations: a type erases at compile time and costs the import surface nothing, so
+`export type { Foo }` next to the object is fine and a second exported *value* is not. This is what
+saves 13 of the 16 files in `src/interface/commands/` from deletion — they pair a command object with
+the type describing it — and it settles the `SessionConfig` question this brief used to park.
+
+**Duplicated helpers are deduped as the sweep goes, not afterwards.** Two have a home already:
+`write` → `src/core/ui/write.ts` and `errMessage` → `src/core/err-message.ts`, both created by the
+`commands` wave. **Each later wave replaces its own copies as it reaches them.** Nobody runs a migration
+pass across directories afterwards — that would be one agent editing every other agent's files, which is
+the thing the partition exists to prevent.
 
 **A re-export barrel left behind is not an acceptable intermediate state, even temporarily.** A
 barrel-then-cleanup two-pass was put to the user precisely because it would have let all nine directories
@@ -225,27 +267,36 @@ outside. They are the only directories that could safely run beside another wave
 
 ## The partition
 
-Multi-function files and the functions inside them, per directory:
+Violating files and the declarations inside them, per directory — **counting classes**, so these are
+the numbers to partition on:
 
-| directory | files | functions |
+| directory | files | declarations |
 |---|---:|---:|
-| `src/core/session` | 27 | 172 |
-| `src/interface/commands` | 16 | 84 |
-| `src/core/ui` | 14 | 77 |
-| `src/tools` | 19 | 58 |
-| `src/interface` | 7 | 28 |
-| `src/core/container` | 4 | 16 |
-| `src/core/llm` | 4 | 11 |
-| `src/commands` | 1 | 8 |
-| `src/context` | 3 | 7 |
+| `src/core/session` | 29 | 187 |
+| `src/interface/commands` | 20 | 111 |
+| `src/core/ui` | 14 | 80 |
+| `src/tools` | 20 | 62 |
+| `src/interface` | 7 | 31 |
+| `src/core/container` | 4 | 17 |
+| `src/core/llm` | 5 | 15 |
+| `src/context` | 4 | 11 |
+| `src/commands` | 1 | 9 |
 | `src/` (root — `index.ts` itself) | 1 | 3 |
+| `src/phases` | 1 | 2 |
 
-Ten rows, summing to the **96** files and **464** functions counted above. The root row is
-`src/index.ts`: it is exempt from barrel deletion but not from the split, so whoever takes it extracts
-`fail`, `resolveOrExit` and `main` and leaves the entry point holding its imports and the
-`main().catch(...)` call. It has no directory of its own, so it must be assigned deliberately rather
-than assumed to belong to whoever is nearby — it is the last file in the tree anyone would notice was
-missed.
+Eleven rows, summing to the **106** files and **528** declarations above — functions, classes and
+inline arrows together, which is the bar as it now stands.
+
+**Two rows have no wave assigned, and both are easy to lose.**
+
+- **`src/` (root)** is `src/index.ts`. It is exempt from barrel deletion but not from the split, so
+  whoever takes it extracts `fail`, `resolveOrExit` and `main` and leaves the entry point holding its
+  imports and the `main().catch(...)` call. It has no directory of its own.
+- **`src/phases`** entered the table only when classes began to count: `resolve-phase-tools.ts` holds
+  one class beside one function. It is a single small file, which is exactly why nobody will notice it
+  is unowned.
+
+Neither can be assumed to belong to whoever is nearby. **Assign both deliberately.**
 
 ## `__tests__` is not a sweep target — but it is an importer
 
@@ -271,6 +322,16 @@ one-line status instead and it will be folded in for you.
 
 The same goes for this brief. If you find something in it wrong or missing — and the first increment
 found the last three such things — **report the correction rather than applying it.**
+
+**And the same goes for the governance docs.** `constitution.md` and `CLAUDE.md` have **one drafting
+owner**, for exactly the reason `backlog/README.md` does. If your work needs a rule changed or clarified
+in either file, **report the wording; do not edit the file.** This rule exists because it was once
+broken: two agents held uncommitted edits to the same `constitution.md` bullet at the same time, and
+nothing was lost only because the second one re-read the file from disk before writing.
+
+Which is the general rule worth stating on its own: **in a shared tree, re-read a file immediately
+before you edit it.** Never write it out from your own last-known state — between your read and your
+write, someone else may have landed in the same paragraph.
 
 ## Hazards found during the first increment
 
@@ -309,12 +370,26 @@ reasoned about:
    from one file and the value from another for a single concept. **This is worth a decision rather than
    a default** — see the note below.
 
-### The one open question left
+### Settled: `SessionConfig` rides along with the object
 
-`SessionConfig`'s split import surface. Options: leave it in `load-config.ts` (the function that builds
-it owns it, per the type rule); or move it to `src/core/session/types.ts` on the grounds that the config
-vocabulary is now folder-level; or accept the split as the unavoidable cost of a value-only export.
-Nobody has ruled on it. **Ask before writing the reshape.**
+The question this section used to park — whether a value-only export forces callers to take the type
+from one file and the value from another — is answered by the type-export ruling above. **An assembler
+may export types beside its object**, so `config.ts` exports the `config` object *and*
+`export type { SessionConfig }`. One import site, one concept. `SessionConfig` itself stays declared in
+`load-config.ts`, with the function that builds it.
+
+## Open follow-ups
+
+**A directory that looks swept in the table above is not necessarily finished.** Three items are
+outstanding:
+
+- **`src/core/llm` is not done, despite `6e1c3f9`.** The inline-arrow ruling landed *after* that wave
+  committed, and `ollama-with-signal.ts` still holds one function plus one inline arrow property
+  (`fetch: (input, init) => {`) — two declarations. It needs a follow-up pass, and the row above counts
+  it as still violating.
+- **Tests for `StreamFilter` and `recoverToolCalls`** — item 2 deferred them while `core/llm` was
+  mid-split. That directory has landed, so they are unblocked.
+- **Tests for `src/context/`** — likewise deferred; the directory landed in `daf08cf`.
 
 ## Order
 

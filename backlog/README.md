@@ -34,15 +34,19 @@ increment, not its completion**, which is why this line is not struck and the ta
 `project-git.ts` and `backlog.ts` 8 each. `config.ts` and `ollama-models.ts` were only the two that had
 *written the exception down*.
 
-**So item 1 is now the whole sweep, at the wider bar — any function declaration, not just an exported
-one**, which is the bar `config.ts` was judged by, since its three resolvers were private. It absorbs a
-second reversal: **types no longer live in `.type.ts` siblings**, they live in the file that owns the
-function, so the **55** sibling type files fold in as the sweep reaches them. It absorbs a third: every
-pure re-export module is deleted, **including all 9 directory `index.ts` barrels**, so an import names
-the file that serves it. `constitution.md` and `CLAUDE.md` state the opposite of all three today; the
-amendment is drafted, review-gated, and **must be reviewed and committed before any sweep work begins**.
-The task file carries the per-directory census, the barrel table and the import-graph analysis that
-decide how the sweep is partitioned and why it is mostly sequential.
+**So item 1 is now the whole sweep, at the wider bar — any *declaration*, not just an exported
+function.** Private helpers count, which is what made `config.ts` a violation; so do classes, and so do
+inline arrow properties. At the baseline that is **106 files and 528 declarations**. Three reversals ride
+along: types leave their `.type.ts` siblings for the file that owns the function, or the folder's
+`types.ts` where no function owns one (**55** siblings to fold in); every pure re-export module is
+deleted, **including all 9 directory `index.ts` barrels**, in one final pass once every directory is
+swept; and a split file survives only by assembling its parts into an object.
+
+**Governance is settled and the sweep is running.** The amendment landed in `d0176cf` after the user
+reviewed it, and three waves have committed since: `core/llm` (`6e1c3f9`), `core/container` (`b63092e`)
+and `src/context` (`daf08cf`). A further round of clauses — classes, inline arrows, the barrel wording
+and the type-export carve-out — is drafted and waiting on the user. The task file carries the census, the
+barrel table, the import-graph analysis, the partition and the open follow-ups.
 
 **Why first:** unchanged in substance and now much stronger. Stated in its own file and in
 [item 12](budget-ceilings-for-runs-and-batches.md): ship it **before** the budget ceilings, so the new
