@@ -109,16 +109,16 @@ answers a blocker**, not after a review.
 
 **Truth:** [docs/phases.md](docs/phases.md).
 
-## 11. Requirements are incomplete, and the Node line will move.
+## 11. Requirements are incomplete, and the Node line is the last stale copy of the version.
 
 - **Git is missing.** The git tools shell out to a host `git`; without it the execution loop cannot
   commit anything.
-- **"Node 24 LTS"** is one of four places the version is declared (`package.json` `engines`, `.nvmrc`,
-  `docker-compose.yml`, here). `.nvmrc` is becoming the single source of truth, so this line should
-  point at it rather than restate a major version.
+- **"Node 24 LTS"** was one of four places the version was declared. The other three are settled:
+  `package.json`'s `engines` is **deleted**, [docker-compose.yml](docker-compose.yml) **interpolates**
+  the pin, and [.nvmrc](.nvmrc) is the single source of truth `scripts/run.mjs` refuses against. This
+  line is the one copy left, so it should point at `.nvmrc` rather than restate a major version.
 
-**Truth:** *Node version* in [docs/cli.md](docs/cli.md),
-[backlog/node-version-is-not-enforced.md](backlog/node-version-is-not-enforced.md).
+**Truth:** *Node version* in [docs/cli.md](docs/cli.md), [.nvmrc](.nvmrc), `scripts/run.mjs`.
 
 ## 12. The "Models used" list was unverified, and three entries cannot run a phase.
 
@@ -185,9 +185,9 @@ capabilities, and the orchestrator refuses any model it cannot confirm supports 
 
 ## 15. Nothing warns that `docker compose` by hand will not work correctly.
 
-Once the Node version is derived from [.nvmrc](.nvmrc) (OPEN-QUESTIONS.md #15, #76), the launcher
-exports it and [docker-compose.yml](docker-compose.yml)'s `image:` interpolates it — the same pattern
-`ACTIVE_PROJECT` already uses in that file.
+The Node version is now derived from [.nvmrc](.nvmrc) (OPEN-QUESTIONS.md #15, #76): the launcher
+exports it as `NODE_VERSION` and [docker-compose.yml](docker-compose.yml)'s `image:` interpolates it —
+the same pattern `ACTIVE_PROJECT` already uses in that file.
 
 The consequence is worth stating plainly, because it is invisible until it bites: **`docker compose up`
 / `docker compose run` typed by hand, without `scripts/run.mjs`, no longer resolves to the right
@@ -197,8 +197,7 @@ circumstances, so a hand-run compose also mounts no project.
 The supported entry points are `npm run start` / `node scripts/run.mjs start <project>`, and the README
 should say so where it shows any compose command.
 
-**Truth:** OPEN-QUESTIONS.md #76,
-[backlog/node-version-is-not-enforced.md](backlog/node-version-is-not-enforced.md),
+**Truth:** OPEN-QUESTIONS.md #76, *Node version* in [docs/cli.md](docs/cli.md),
 [docker-compose.yml](docker-compose.yml).
 
 ---
