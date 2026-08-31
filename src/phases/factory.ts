@@ -4,7 +4,8 @@
 // (V1/01) so instructions are re-read FRESH on every activation and a missing file fails loud
 // with a typed error naming the expected path.
 
-import { availablePhaseNames, loadPhasePrompt } from '../context/phase-prompt.js';
+import { availablePhaseNames } from '../context/available-phase-names.js';
+import { loadPhasePrompt } from '../context/load-phase-prompt.js';
 import { PHASE_TOOL_NAMES } from './phase-tool-names.js';
 import type { Phase } from './phase.js';
 
