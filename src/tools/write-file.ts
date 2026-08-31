@@ -10,7 +10,7 @@
 // `ctx.resolve` still runs first, as the scoping check: a path that leaves the project is refused
 // here with a message the model can act on, before anything reaches the container.
 
-import type { ToolCallDisplay } from '../core/ui/tool-call-display.type.js';
+import type { ToolCallDisplay } from '../core/ui/types.js';
 // The compact +/- diff shown in the scrollback; null when the change is too large to count exactly.
 import { buildFileDiff } from './build-file-diff.js';
 import { decodeUtf8Strict } from './fs-support.js';

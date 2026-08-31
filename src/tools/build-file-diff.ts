@@ -16,7 +16,7 @@
 // there this returns null — the caller then reports the file's before/after line totals, which are
 // facts, instead of inventing a count.
 
-import type { ToolDiffDisplay } from '../core/ui/tool-call-display.type.js';
+import type { ToolDiffDisplay } from '../core/ui/types.js';
 
 /** Above this many changed lines (added + removed) the diff collapses to counts. */
 export const DIFF_MAX_CHANGED_LINES = 20;

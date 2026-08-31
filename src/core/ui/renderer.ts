@@ -19,7 +19,7 @@ import * as activityLine from './activity-line.js';
 import { createMarkdownStream } from './create-markdown-stream.js';
 import { echoedRows } from './echoed-rows.js';
 import { INPUT_PROMPT } from './input-prompt.js';
-import type { MarkdownStream } from './markdown-stream.type.js';
+import type { MarkdownStream } from './types.js';
 import { terminalColumns } from './terminal-columns.js';
 import { theme } from './theme.js';
 import { userMessageBars } from './user-message-bars.js';

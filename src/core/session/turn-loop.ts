@@ -8,7 +8,7 @@
 
 import { TurnAbortedError } from '../llm/index.js';
 import type { Message, StreamHandle, TokenCounts, ToolCall, TurnAbortReason } from '../llm/index.js';
-import type { MarkdownStream } from '../ui/markdown-stream.type.js';
+import type { MarkdownStream } from '../ui/types.js';
 import { printToolCall } from '../ui/print-tool-call.js';
 import * as renderer from '../ui/renderer.js';
 import * as statusActivity from '../ui/status-activity.js';

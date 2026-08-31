@@ -15,7 +15,7 @@ import { TurnAbortedError } from '../llm/index.js';
 import { getTool, toolNames } from '../../tools/registry.js';
 import type { JSONSchema, JsonObject, ToolAuditExtra, ToolContext, ToolResult } from '../../tools/types.js';
 import { toolError } from '../../tools/types.js';
-import type { ToolCallDisplay } from '../ui/tool-call-display.type.js';
+import type { ToolCallDisplay } from '../ui/types.js';
 
 /** Raw materials for one audit row, handed to the audit sink (V1/06 formats + writes the JSONL). */
 export interface ToolCallRecord {

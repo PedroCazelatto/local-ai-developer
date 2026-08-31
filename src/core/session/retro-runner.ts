@@ -27,7 +27,7 @@ import { applyPhaseRuleEdit, EDIT_PHASE_RULE } from '../../tools/edit-phase-rule
 import { READ_PHASE_RULE, readPhaseRule } from '../../tools/read-phase-rule.js';
 import { parseRetroSubmission, SUBMIT_RETRO } from '../../tools/submit-retro.js';
 import type { Message, StreamHandle, TokenCounts, Tool, ToolCall } from '../llm/index.js';
-import type { ToolCallDisplay } from '../ui/tool-call-display.type.js';
+import type { ToolCallDisplay } from '../ui/types.js';
 import { addTokenCounts } from './add-token-counts.js';
 import { recordToolCall } from './record-tool-call.js';
 import type { ToolCallRecord } from './dispatch.js';

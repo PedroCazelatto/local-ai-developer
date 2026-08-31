@@ -12,9 +12,20 @@
 // a bold cyan `### Round 1`. The syntax was only ever the model's way of naming the role.
 
 import { renderInlineMarkdown } from './render-inline-markdown.js';
-import type { RenderedMarkdownLine } from './render-markdown-line.type.js';
 import { terminalColumns } from './terminal-columns.js';
 import { theme } from './theme.js';
+
+/** One rendered markdown line plus the fence state the NEXT line must be rendered with. */
+export interface RenderedMarkdownLine {
+  /** The line, styled with ANSI — ready to write verbatim. */
+  readonly text: string;
+  /**
+   * Whether the line AFTER this one falls inside a ``` fenced block. Markdown is line-based except
+   * for fences, so this one bit is the entire carried state: the caller threads it back in on the
+   * next call (create-markdown-stream.ts owns it for a turn).
+   */
+  readonly insideFence: boolean;
+}
 
 /** A ``` (or ~~~) fence marker, opening or closing, with an optional language tag. */
 const FENCE = /^\s*(?:```|~~~)/;

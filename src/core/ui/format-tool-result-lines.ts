@@ -20,33 +20,41 @@
 // and a 30-second build does. Whole seconds only: a sub-second call reads `· 0s`, which is honest
 // ("under a second") in a way that rounding it up to 1s would not be.
 
-import { theme } from './theme.js';
-import type { ToolResultLinesInput } from './format-tool-result-lines.type.js';
+import { elapsedSuffix } from './elapsed-suffix.js';
 import { RIGHT_MARGIN, SUBAGENT_INDENT } from './format-tool-call-line.js';
-import { stripControlChars } from './strip-control-chars.js';
 import { singleLine } from './single-line.js';
+import { stripControlChars } from './strip-control-chars.js';
+import { theme } from './theme.js';
 import { truncateToWidth } from './truncate-to-width.js';
+import type { ToolCallDisplay } from './types.js';
 import { visibleWidth } from './visible-width.js';
 
-/** The tools whose elapsed time is worth a column: the ones you actually wait on. */
-const TIMED_TOOLS: ReadonlySet<string> = new Set([
-  'execute_command',
-  'run_in_project',
-  'debate',
-  'spawn_subagent',
-  'ask_subagent',
-]);
+// The input is deliberately a flat view of ToolCallRecord rather than the record itself: the formatter
+// is pure and belongs to the UI layer, and it has no business reading a session type.
+
+/** One finished tool call, about to be recorded in the scrollback. */
+export interface ToolResultLinesInput {
+  /** Tool name as dispatched — decides whether the elapsed time is worth showing. */
+  readonly tool: string;
+  /** 0 success, the real code for shell/container tools, -1 for any failure. */
+  readonly exitStatus: number;
+  /** null on success; the error message on failure — the fallback summary when the tool set none. */
+  readonly error: string | null;
+  /** Wall-clock around the call, in milliseconds. */
+  readonly durationMs: number;
+  /** What the tool itself wants said about the result. Absent for tools that say nothing. */
+  readonly display?: ToolCallDisplay;
+  /** Terminal width in columns; everything but a path is truncated to fit it. */
+  readonly width: number;
+  /** The SHORT id of the sub-agent that made the call — indents the block and marks it. */
+  readonly subagentShortId?: string;
+}
 
 /** How far a diff's body sits under the `← ` marker it belongs to. */
 const DIFF_INDENT = '    ';
 
 /** What a call with no display of its own and no error has to say for itself. */
 const NOTHING_TO_REPORT = 'ok';
-
-/** `· 12s` for a tool worth timing, otherwise nothing. Whole seconds — never a fabricated precision. */
-function elapsed(tool: string, durationMs: number): string {
-  return TIMED_TOOLS.has(tool) ? ` · ${Math.round(Math.max(0, durationMs) / 1000)}s` : '';
-}
 
 /** The styled lines recording one finished tool call: the `←` row, then any diff body under it. */
 export function formatToolResultLines(input: ToolResultLinesInput): string[] {
@@ -69,7 +77,8 @@ export function formatToolResultLines(input: ToolResultLinesInput): string[] {
   // It is appended untruncated and the row wraps if it must, exactly as on the `→` line.
   const budget = input.width - visibleWidth(head) - visibleWidth(marker) - RIGHT_MARGIN;
   const summaryText = truncateToWidth(stripControlChars(singleLine(summary)), budget);
-  const lines = [style(`${head}${summaryText}${elapsed(input.tool, input.durationMs)}${path}${marker}`)];
+  // elapsedSuffix: ` · 12s` for a tool whose wait is the point, and nothing for the rest.
+  const lines = [style(`${head}${summaryText}${elapsedSuffix(input.tool, input.durationMs)}${path}${marker}`)];
 
   for (const row of diff?.lines ?? []) {
     const added = row.startsWith('+');

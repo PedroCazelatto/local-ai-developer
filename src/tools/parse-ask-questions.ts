@@ -10,7 +10,7 @@
 // so it comes back as a recoverable error naming exactly what to send instead.
 
 import { loadsOrRepair } from '../core/llm/index.js';
-import type { AskQuestion } from '../core/ui/ask-questions.type.js';
+import type { AskQuestion } from '../core/ui/ask-questions.js';
 import type { AskQuestionsParse } from './parse-ask-questions.type.js';
 
 /**

@@ -15,40 +15,27 @@
 // Nothing here throws or validates: an argument of the wrong type simply yields an empty subject, and
 // the dispatcher is what turns a bad call into an error the model can read.
 
-import { singleLine } from './single-line.js';
-import { stripControlChars } from './strip-control-chars.js';
-import type { ToolCallSubject } from './tool-call-subject.type.js';
+import { arrayCount } from './array-count.js';
+import { cleanSubjectText } from './clean-subject-text.js';
+import { NO_SUBJECT } from './no-subject.js';
+import { pathSubject } from './path-subject.js';
+import { textSubject } from './text-subject.js';
+import { verbAndObject } from './verb-and-object.js';
 
-/** Nothing to show — the tool name alone identifies the call (list_changes, git_push, …). */
-const NONE: ToolCallSubject = { text: '', isPath: false };
-
-/** A model-supplied string, folded to one row and stripped of anything that could move the cursor. */
-function text(value: unknown): string {
-  return typeof value === 'string' ? stripControlChars(singleLine(value)).trim() : '';
-}
-
-/** A subject that must survive at full length whatever the terminal width is. */
-function asPath(value: unknown): ToolCallSubject {
-  const path = text(value);
-  return path === '' ? NONE : { text: path, isPath: true };
-}
-
-/** A subject that may be truncated to fit the row. */
-function asText(value: string): ToolCallSubject {
-  return value === '' ? NONE : { text: value, isPath: false };
-}
-
-/** `action`/`what` plus its object, when it has one: `save wip-auth`, `create task/01-x`, `log`. */
-function verbAndObject(verb: unknown, object: unknown): ToolCallSubject {
-  const head = text(verb);
-  const tail = text(object);
-  if (head === '') return NONE;
-  return asText(tail === '' ? head : `${head} ${tail}`);
-}
-
-/** How many entries an array argument holds; 0 when it is not an array. */
-function countOf(value: unknown): number {
-  return Array.isArray(value) ? value.length : 0;
+/** The identifying argument of a tool call, plus whether it is a path (paths are never truncated). */
+export interface ToolCallSubject {
+  /**
+   * The subject as it should read after the tool name, already stripped of control characters and
+   * folded onto one line. EMPTY for a tool that takes no arguments (list_changes, git_push,
+   * mark_task_done) — those are fully identified by their name alone.
+   */
+  readonly text: string;
+  /**
+   * True when `text` is a filesystem path. A path is NEVER truncated: it is the one string on the line
+   * whose tail carries the meaning, and a cut path is worse than a wrapped row. Everything else — a
+   * command, a search pattern, a prose claim — goes through truncateToWidth as usual.
+   */
+  readonly isPath: boolean;
 }
 
 /**
@@ -62,33 +49,33 @@ export function toolCallSubject(name: string, args: Record<string, unknown>): To
     case 'read_file':
     case 'write_file':
     case 'edit_file':
-      return asPath(args['path']);
+      return pathSubject(args['path']);
     case 'list_files': {
-      const path = text(args['path']);
+      const path = cleanSubjectText(args['path']);
       return { text: path === '' ? '.' : path, isPath: true };
     }
     case 'search_in_files': {
-      const pattern = text(args['pattern']);
-      if (pattern === '') return NONE;
-      const glob = text(args['glob']);
-      return asText(glob === '' ? `"${pattern}"` : `"${pattern}" in ${glob}`);
+      const pattern = cleanSubjectText(args['pattern']);
+      if (pattern === '') return NO_SUBJECT;
+      const glob = cleanSubjectText(args['glob']);
+      return textSubject(glob === '' ? `"${pattern}"` : `"${pattern}" in ${glob}`);
     }
 
     // ----------------------------------------------------------------------------- shell + container
     case 'execute_command':
     case 'run_in_project':
-      return asText(text(args['command']));
+      return textSubject(cleanSubjectText(args['command']));
 
     // ---------------------------------------------------------------------------------- project git
     case 'list_changes':
     case 'git_push':
-      return NONE; // both take no arguments at all
+      return NO_SUBJECT; // both take no arguments at all
     case 'commit_changes': {
       // One path IS the subject; several are not, and listing them would be the unbounded dump this
       // record exists to avoid. `intent` is prose and never the subject.
       const paths = args['paths'];
-      if (!Array.isArray(paths) || paths.length === 0) return NONE;
-      return paths.length === 1 ? asPath(paths[0]) : asText(`${paths.length} paths`);
+      if (!Array.isArray(paths) || paths.length === 0) return NO_SUBJECT;
+      return paths.length === 1 ? pathSubject(paths[0]) : textSubject(`${paths.length} paths`);
     }
     case 'git_stash':
       return verbAndObject(args['action'], args['label']);
@@ -99,49 +86,49 @@ export function toolCallSubject(name: string, args: Record<string, unknown>): To
 
     // ----------------------------------------------------------------------------------- the inbox
     case 'inbox_read': {
-      const status = text(args['status']);
-      return asText(status === '' ? 'open' : status);
+      const status = cleanSubjectText(args['status']);
+      return textSubject(status === '' ? 'open' : status);
     }
     case 'inbox_post':
-      return asText(text(args['to'])); // the recipient phase, never the body
+      return textSubject(cleanSubjectText(args['to'])); // the recipient phase, never the body
     case 'inbox_resolve':
-      return asText(text(args['id']));
+      return textSubject(cleanSubjectText(args['id']));
 
     // ------------------------------------------------------------------------------------- standards
     case 'search_rules':
-      return asText(text(args['intent'])); // prose fallback — search_rules has nothing else
+      return textSubject(cleanSubjectText(args['intent'])); // prose fallback — search_rules has nothing else
     case 'load_rule':
-      return asText(text(args['name']));
+      return textSubject(cleanSubjectText(args['name']));
 
     // ------------------------------------------------------------------------------------ sub-agents
     case 'spawn_subagent':
-      return asText(text(args['task'])); // prose fallback — initial_context is longer still
+      return textSubject(cleanSubjectText(args['task'])); // prose fallback — initial_context is longer still
     case 'ask_subagent':
     case 'dismiss_subagent':
-      return asText(text(args['id']));
+      return textSubject(cleanSubjectText(args['id']));
 
     // ------------------------------------------------------------------- deliberation + questioning
     case 'debate':
-      return asText(text(args['claim'])); // prose fallback — the claim IS the call
+      return textSubject(cleanSubjectText(args['claim'])); // prose fallback — the claim IS the call
     case 'ask_user': {
-      const count = countOf(args['questions']);
-      return count === 0 ? NONE : asText(`${count} question${count === 1 ? '' : 's'}`);
+      const count = arrayCount(args['questions']);
+      return count === 0 ? NO_SUBJECT : textSubject(`${count} question${count === 1 ? '' : 's'}`);
     }
 
     // ------------------------------------------------------------------------ phase-scoped exits
     case 'submit_verdict':
-      return asText(text(args['result'])); // pass | fail — never the summary prose
+      return textSubject(cleanSubjectText(args['result'])); // pass | fail — never the summary prose
     case 'raise_blocker':
-      return asText(text(args['question'])); // prose fallback — the question IS the call
+      return textSubject(cleanSubjectText(args['question'])); // prose fallback — the question IS the call
     case 'mark_task_done':
-      return NONE; // takes no arguments: it always means the task under review
+      return NO_SUBJECT; // takes no arguments: it always means the task under review
     case 'submit_retro':
-      return asText(text(args['scope'])); // systemic | task-specific — never the rootCause prose
+      return textSubject(cleanSubjectText(args['scope'])); // systemic | task-specific — never the rootCause prose
     case 'read_phase_rule':
     case 'edit_phase_rule':
-      return asText(text(args['phase'])); // a phase NAME, not a path — rules/phases/<phase>.md is implied
+      return textSubject(cleanSubjectText(args['phase'])); // a phase NAME, not a path — rules/phases/<phase>.md is implied
 
     default:
-      return NONE;
+      return NO_SUBJECT;
   }
 }

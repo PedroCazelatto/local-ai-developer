@@ -7,46 +7,31 @@
 // call, where the transient activity line owns the cursor row — interjectLine lifts it, writes, and puts
 // it back. Writing to stdout directly here would print through that line.
 
-import type { DebateTurnView } from './render-debate-turn.type.js';
-import { renderMarkdownLine } from './render-markdown-line.js';
+import { debateBodyRows } from './debate-body-rows.js';
 import * as renderer from './renderer.js';
-import { terminalColumns } from './terminal-columns.js';
 import { theme } from './theme.js';
-import { wordWrap } from './word-wrap.js';
 
-/** Two spaces, so a turn's prose reads as subordinate to its header without a drawn gutter. */
-const INDENT = '  ';
+/**
+ * The view this file prints. Declared HERE, not imported from core/session, so the renderer stays a
+ * leaf: ui/ knows how to draw a labeled block of markdown and nothing about how a debate runs. It is
+ * structurally the session layer's DebateTurn, so a turn passes straight through with no mapping.
+ */
+export interface DebateTurnView {
+  readonly role: 'proponent' | 'challenger';
+  /** 1-based round number, shown in the header. */
+  readonly round: number;
+  /** The turn's prose, as plain markdown. */
+  readonly body: string;
+  /** True on the challenger turn that ended the debate — marked in the header, not in the body. */
+  readonly conceded: boolean;
+}
 
 /** Print `turn` as one block: blank line, header, indented body. */
 export function renderDebateTurn(turn: DebateTurnView): void {
   const style = turn.role === 'challenger' ? theme.debate.challenger : theme.debate.proponent;
   const suffix = turn.conceded ? ' · conceded' : '';
   const header = style(`${turn.role} ▸ round ${turn.round}${suffix}`);
-  renderer.interjectLine(['', header, ...bodyRows(turn.body)].join('\n'));
-}
-
-/**
- * The body as finished terminal rows: each line classified and styled by the SAME renderer the streamed
- * reply uses (so a list in an objection renders as a list), then word-wrapped with a hanging indent.
- *
- * `insideFence` is threaded across lines because it is the only state markdown carries — and a line
- * inside a ``` fence is left unwrapped, since its spaces are significant.
- */
-function bodyRows(body: string): string[] {
-  const rows: string[] = [];
-  let insideFence = false;
-  for (const line of body.split(/\r?\n/)) {
-    if (line.trim() === '' && !insideFence) {
-      rows.push(''); // a paragraph break stays a bare blank row, never an indent full of spaces
-      continue;
-    }
-    const wasInsideFence = insideFence;
-    const rendered = renderMarkdownLine(line, insideFence);
-    insideFence = rendered.insideFence;
-    const indented = `${INDENT}${rendered.text}`;
-    // wordWrap re-applies the leading indent to every wrapped row and closes/reopens styling across the
-    // break; code inside a fence is written verbatim instead, spaces intact.
-    rows.push(...(wasInsideFence ? [indented] : wordWrap(indented, terminalColumns())));
-  }
-  return rows;
+  // debateBodyRows: the turn's markdown, styled by the same renderer the streamed reply uses and
+  // word-wrapped under a two-space indent.
+  renderer.interjectLine(['', header, ...debateBodyRows(turn.body)].join('\n'));
 }
