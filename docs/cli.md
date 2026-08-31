@@ -17,24 +17,39 @@ The launcher also runs directly: `node scripts/run.mjs install | start <project>
 
 ## Node version
 
-`.nvmrc` (`24.14.0`) is the **single source of truth** for the Node version this repo runs on.
-`package.json`'s `engines` range and the sandbox image tag both follow it; when the pin moves, they
-move with it. The floor stays at 24 — not because `node:sqlite` forces it (it demonstrably works
-unflagged on 22 as well), but because a repo that pins one version in four places and enforces none of
-them tells you nothing about what it was tested on.
+`.nvmrc` (`24.14.0`) is the **single source of truth** for the Node version this repo runs on — after
+`package.json`'s `engines` was deleted, the only place the version is declared at all. `engines`
+enforced nothing (it is advisory unless `engine-strict` is set) and nothing in the repo read it, so it
+was a copy that could only drift. The launcher's check and the sandbox image tag both read the pin
+instead; when it moves, they move with it. The floor stays at 24 — not because `node:sqlite` forces it
+(it demonstrably works unflagged on 22 as well), but because a repo that pins one version in four
+places and enforces none of them tells you nothing about what it was tested on.
 
 - **Making the shell honour `.nvmrc` is the real fix, and it is machine setup — no code.** A shell on
   the wrong Node is a shell that was never switched; an `nvm use` on entering the repo (or the
-  equivalent for whatever version manager is installed) is what actually prevents the problem.
+  equivalent for whatever version manager is installed) is what actually prevents the problem. The
+  in-process check below is the **backstop** for a shell nobody switched, not a substitute for
+  switching it.
 - **The Docker sandbox runs the same version.** The root sandbox image tag is derived from `.nvmrc`,
   so the Node a project's code is built and tested against is the Node the orchestrator itself runs
-  on — not a floating major tag free to drift a whole minor ahead of the pin. See
-  [sandboxing.md](sandboxing.md).
-- **`run.mjs` checks at the front, and treats its verbs differently.** `start` **refuses** on a Node
-  outside the range, naming the version required and the version found; `install` **warns and
-  continues**, because an install on the wrong Node still produces a usable `node_modules` and the
-  refusal belongs where a walk-away batch would otherwise fail hours later. `stop` is never gated:
-  shutting Docker down has to work on any Node.
+  on — not a floating major tag free to drift a whole minor ahead of the pin. The mechanism is an env
+  var: the launcher exports the pin as `NODE_VERSION` and `docker-compose.yml` interpolates it into
+  `image:`, exactly as `ACTIVE_PROJECT` already works there. The cost is real and accepted —
+  **`docker compose` run by hand, without the launcher, does not resolve to the pinned image**, the
+  same way it already mounts no project. See [sandboxing.md](sandboxing.md).
+- **`run.mjs` checks at the front, and both gated verbs refuse.** `start` and `install` both
+  **refuse**, naming the version required and the version found; an install on the wrong Node builds a
+  `node_modules` against the wrong major, and leaving that for `start` to discover only moves the
+  failure later. `stop` is never gated: tearing the stack down has to work on any Node, and gating it
+  would strand a user who cannot bring Docker down without first switching runtimes.
+- **The comparison is the major, and the number comes from the pin.** `24.14.0` in `.nvmrc` is where
+  the requirement is read from, and `24` is what is tested — so v24.1.0 passes where v22.14.0 fails.
+  Any Node 24 can run the repo; the pin says which one it was developed against, not which one is
+  mandatory. The refusal names both numbers for that reason: drop the range and it over-states the
+  requirement, drop the pin and there is nothing to `nvm use`.
+- **A `.nvmrc` that is missing or malformed refuses the same two verbs.** It is the only declaration
+  left, so with it unreadable there is nothing to check against — and a check that cannot run must not
+  report a pass. `stop` still works, so a broken pin can never leave containers up with no way down.
 
 ## In-app commands (terminal)
 
@@ -47,7 +62,9 @@ them tells you nothing about what it was tested on.
 - `/models list | pull <name> | use <name>` — manage the active model
 - `/clear` — start the active phase on a new context (the old one is kept, not wiped)
 - `/resume [<address>]` — reopen one of the active phase's earlier contexts, by address
-  (`design/7a888b1f`) or from a numbered list. See the memory model in
+  (`design/7a888b1f`) or from a numbered list. A context written under a **smaller** `OLLAMA_NUM_CTX`
+  than this session's is listed with a `⚠ num_ctx <n>` mark and warns again when it is reopened; one
+  written under a **larger** ceiling is not listed at all. See the memory model in
   [mental-model.md](mental-model.md).
 - `/subagents` — list active sub-agents
 - `/tasks` — the backlog as an epic/story tree: each task's status, order and unmet dependencies, with
@@ -263,11 +280,14 @@ installed list to decide anything, and a session without Ollama can do nothing a
 [.env.example](../.env.example) holds:
 
 - `OLLAMA_NUM_CTX` — the hard token ceiling for every **window**: the interactive phases, the Worker,
-  the Reviewer, Retro and sub-agents all run under exactly this value. **Changing it hides every phase
-  context written under the old value** — they are not listed and cannot be reopened, because replaying
-  a history built for a larger window would silently lose its oldest turns. Nothing is deleted:
-  restoring the old value brings them back. It is read once at boot, so a change takes effect only on
-  the next `run start`. See the memory model in [mental-model.md](mental-model.md).
+  the Reviewer, Retro and sub-agents all run under exactly this value. **Lowering it hides every phase
+  context written above the new value** — they are not listed and cannot be reopened, because replaying
+  a history built for a larger window would silently lose its oldest turns. **Raising it hides
+  nothing:** a history built for a smaller window replays into a larger one safely, so those contexts
+  stay listed — marked as written under the smaller ceiling, and warned about again when one is
+  reopened. Nothing is deleted either way: restoring the old value brings the hidden ones back. It is
+  read once at boot, so a change takes effect only on the next `run start`. See the memory model in
+  [mental-model.md](mental-model.md).
 
   Three **throwaway one-shots** run under a smaller ceiling of their own instead — the context titler,
   `search_rules`, and the commit-message writer, at 8 192. Each has an input with a known hard maximum,
