@@ -91,8 +91,12 @@ export interface ReplOrchestrator {
   clearActivePhase(): ClearResult;
   /** /resume listing: the active phase's last `limit` contexts, most recently active first (no LLM call). */
   activePhaseContexts(limit: number): ContextSummary[];
-  /** /resume reopen: replay a context's turns into the active phase; false if the address matches none. */
-  reopenActiveContext(address: string): boolean;
+  /**
+   * /resume reopen: replay a context's turns into the active phase — the reopened context, or null if
+   * the address matches none. The row comes back so `/resume <address>` can warn when the restored
+   * history was written under a smaller num_ctx (there is no listing on that path to read it from).
+   */
+  reopenActiveContext(address: string): ContextSummary | null;
 }
 
 /** Run the REPL until the user types `/exit` (or EOF). */

@@ -120,8 +120,10 @@ export class SessionOrchestrator implements TurnContext {
     this.llm = llm;
     this.sandbox = sandbox;
     // SQLite-backed (memory.db under the project's .orchestrator/). numCtx is stamped on every context
-    // this session creates and filters every listing: a context written under a different ceiling is
-    // hidden rather than replayed into a window that would silently drop its oldest tokens.
+    // this session creates and is the ceiling every listing filters against, with `<=` rather than `=`:
+    // a context written under a SMALLER ceiling is listed and reopenable (its history fits this window),
+    // while one written under a LARGER ceiling is hidden rather than replayed into a window that would
+    // silently drop its oldest tokens.
     this.memory = new SessionMemory(config.projectPath, config.numCtx);
     this.phase = PhaseFactory.get(config.initialPhase);
     // Every boot starts a phase on a FRESH context (docs/mental-model.md): activatePhase reads nothing
@@ -285,17 +287,21 @@ export class SessionOrchestrator implements TurnContext {
 
   /**
    * `/resume` reopen: replay a chosen context's visible turns into the active phase, addressed by its
-   * UUID or a unique prefix. Returns false when the address matches no single context of this phase, so
+   * UUID or a unique prefix. Returns null when the address matches no single context of this phase, so
    * the command reports a recoverable line instead of acting on a guess.
+   *
+   * On success it hands back the reopened context's listing row rather than a bare `true`, because
+   * `/resume <address>` never went through the listing and still has to tell the user when the history
+   * it just restored was written under a smaller `num_ctx` than this session runs.
    */
-  reopenActiveContext(address: string): boolean {
+  reopenActiveContext(address: string): ContextSummary | null {
     const load = this.memory.reopenActiveContext(address);
-    if (load === null) return false;
+    if (load === null) return null;
     // Same rule as `/clear`: a different context is a different window's worth of reads. Dropped only
     // once the reopen has actually succeeded — a failed address changes nothing.
     this.readTrackers.delete(this.phase.name);
     this.emitMemoryLoad(load);
-    return true;
+    return load.summary;
   }
 
   /**

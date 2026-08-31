@@ -34,11 +34,14 @@ PRAGMA synchronous = FULL;
 /**
  * The tables, indexes and triggers, all `IF NOT EXISTS` so opening an existing DB is a no-op.
  *
- * `contexts.num_ctx` is the EXACT `OLLAMA_NUM_CTX` the context was written under. A context written
- * under a different ceiling is hidden from every listing (never deleted — memory-db.ts filters on this
- * column), because Ollama silently drops the oldest tokens past `num_ctx`: replaying a 32k history
- * into an 8k window loses turns with no error, and a phase that resumed one would be reasoning from a
- * history it cannot actually see.
+ * `contexts.num_ctx` is the EXACT `OLLAMA_NUM_CTX` the context was written under, stamped once at
+ * creation and never rewritten — the column always states the row's own history, never the ceiling of
+ * whoever is reading it. What the READERS do with it is asymmetric (memory-db.ts filters on
+ * `num_ctx <= ?`): a context written under a SMALLER ceiling is listed and reopenable, because a
+ * history that fitted 8k fits 16k, while one written under a LARGER ceiling is hidden from every
+ * listing — never deleted — because Ollama silently drops the oldest tokens past `num_ctx`: replaying
+ * a 32k history into an 8k window loses turns with no error, and a phase that resumed one would be
+ * reasoning from a history it cannot actually see.
  *
  * `messages.replaced_by` points at the `summary` turn standing in for a collapsed one, so the visible
  * history is `WHERE replaced_by IS NULL` — one indexable predicate rather than a JSON array parsed and

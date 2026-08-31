@@ -72,15 +72,21 @@ the launcher, no longer resolves to the pinned image, and `README.md`'s "Node 24
 stale copy — [README-INCONSISTENCIES.md](../README-INCONSISTENCIES.md) #15 and #11. The
 `docs/cli.md` diff is review-gated and was left uncommitted.
 
-### 4. [`/resume` hides contexts written under a different ceiling](resume-across-num-ctx-changes.md)
-*Memory / context.* Relax `num_ctx = ?` to `num_ctx <= ?` in `listContexts` and `resolveContextId`, and
-warn when a restored context was written under a smaller ceiling. The asymmetry is the fix: a history
-built for 8 192 replays safely into 16 384; the reverse silently loses its front.
+### 4. ~~`/resume` hides contexts written under a different ceiling~~ — shipped
+*Memory / context.* **Shipped.** `listContexts` and `resolveContextId` filter on `num_ctx <= ?`, so a
+context written under a **smaller** ceiling is listed and reopenable again while one written under a
+**larger** one stays hidden. The asymmetry is the fix: a history built for 8 192 replays safely into
+16 384; the reverse silently loses its front. Only the **read** predicate moved — the stamp is still the
+exact raw `OLLAMA_NUM_CTX`, and `memory.ts` still imports no resolver.
 
-**Why here:** the cheapest live defect in the folder — two read predicates and a warning. Anyone who has
-ever changed `OLLAMA_NUM_CTX` has unreachable history **right now**, silently, in every project. It
-depends on nothing and nothing depends on it; it is early because it is cheap, not because it unblocks.
-Two small presentation decisions are still open in the file.
+**Both presentation decisions were answered, and both were taken.** The warning **names the old ceiling
+and the current one** — `⚠ Written under OLLAMA_NUM_CTX 8,192; this session runs at 16,384.` — accepting
+the risk that it reads as an invitation to set the env var back. And the **listing marks** every
+mismatched context (`⚠ num_ctx 8,192` on the row, with a legend below it) **as well as** the restore
+warning: the listing is where the choice is made, so the mismatch has to be visible before it, and the
+warning fires on top. To make the second half reach `/resume <address>`, which never sees a listing,
+`reopenActiveContext` now returns the reopened `ContextSummary` instead of a bare boolean.
+`docs/mental-model.md` and `docs/cli.md` were corrected in the same change (review-gated).
 
 ### 5. [Stop a failed task looking untouched](record-attempted-tasks.md)
 *Execution loop.* A fifth `TaskStatus` (`failed`), written after the stash and committed by the loop via
@@ -464,7 +470,7 @@ Kept in full. Several carry decisions that survive **only** here, and those are 
       resident vs. hybrid. The room is worth more than the speed, which is now the project's stated
       optimization target in `docs/product.md` along with the rule that resolved the CPU collision —
       *spill is acceptable while the weights stay resident and only KV cache offloads* (#84c). Nothing to
-      migrate. Spun out [resume-across-num-ctx-changes.md](resume-across-num-ctx-changes.md), and handed
+      migrate. Spun out **item 4**, since shipped, and handed
       the residency measurements and the boot probe to
       [boot-can-pick-a-toolless-model.md](boot-can-pick-a-toolless-model.md), which is where the tag is
       painted. **Three decisions survive only here, so do not re-open them without reading this line:**
