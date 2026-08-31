@@ -33,8 +33,8 @@ import type { OllamaClient, Message, StreamHandle, TokenCounts, Tool, ToolCall }
 import { addTokenCounts } from './add-token-counts.js';
 import { recordToolCall } from './record-tool-call.js';
 import { BACKLOG_DIRNAME, setTaskStatus } from './backlog.js';
-import { raiseBlocker } from './blocker-store.js';
-import type { RaisedBlocker } from './blocker-store.type.js';
+import { raiseBlocker } from './raise-blocker.js';
+import type { RaisedBlocker } from './types.js';
 import type { ToolCallRecord } from './dispatch.js';
 import { dispatchToolCall } from './dispatch.js';
 import { createReadTracker } from './read-tracker.js';

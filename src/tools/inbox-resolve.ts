@@ -4,7 +4,8 @@
 // so ANY phase may resolve an item it did not receive. Unknown or already-resolved ids are STRUCTURED,
 // recoverable errors — never a thrown/killed turn. Part of the AGENT_NOTES.md replacement (ROADMAP V3).
 
-import { canonicalizePhase, resolveInboxItem } from '../core/session/inbox-store.js';
+import { canonicalizePhase } from '../core/session/canonicalize-phase.js';
+import { resolveInboxItem } from '../core/session/resolve-inbox-item.js';
 import { toolError } from './types.js';
 import type { ToolModule, ToolResult } from './types.js';
 

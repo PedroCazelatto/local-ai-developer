@@ -15,8 +15,9 @@
 // inbox_read(status) already uses "all" for "including resolved", and one word meaning two things
 // across the product is exactly the drift the closed phase set exists to prevent.
 
-import { canonicalizePhase, readInbox } from '../../core/session/inbox-store.js';
-import type { InboxItem, Phase } from '../../core/session/inbox-store.type.js';
+import { canonicalizePhase } from '../../core/session/canonicalize-phase.js';
+import { readInbox } from '../../core/session/read-inbox.js';
+import type { InboxItem, Phase } from '../../core/session/types.js';
 import { renderer } from '../../core/ui/renderer.js';
 import { theme } from '../../core/ui/theme.js';
 import type { Command } from '../command-registry.js';

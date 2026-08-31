@@ -14,7 +14,7 @@
 // and re-offered by /questions whenever the user chooses, and their answers are injected into this
 // phase's context on its next turn.
 
-import { saveUnansweredQuestions } from '../core/session/question-store.js';
+import { saveUnansweredQuestions } from '../core/session/save-unanswered-questions.js';
 import { askQuestions } from '../core/ui/ask-questions.js';
 import { parseAskQuestions } from './parse-ask-questions.js';
 import { toolError } from './types.js';

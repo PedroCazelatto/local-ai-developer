@@ -1,8 +1,9 @@
 // core/session/ — session orchestrator, per-phase isolated memory, and config.
 export * from './config.js';
 // V5/02: host-global app state (~/.local-ai-developer/state.json) — the persisted `/models use` choice.
-export { loadAppState, saveAppState } from './app-state.js';
-export type { AppState } from './app-state.type.js';
+export { loadAppState } from './load-app-state.js';
+export { saveAppState } from './save-app-state.js';
+export type { AppState } from './types.js';
 // Boot model resolution against what Ollama actually has installed (replaces the old hard-coded default).
 export { resolveBootModel } from './resolve-boot-model.js';
 export { SessionOrchestrator } from './orchestrator.js';
@@ -26,13 +27,11 @@ export { shortSubagentId } from './short-subagent-id.js';
 export { appendJsonlLine } from './append-jsonl-line.js';
 // Questions the user skipped during an ask_user round (V6/01) — durable, re-asked by /questions, and
 // delivered back to the phase that asked on its next turn.
-export {
-  saveUnansweredQuestions,
-  readPendingQuestions,
-  answerQuestion,
-  drainAnsweredQuestions,
-} from './question-store.js';
-export type { PendingQuestion, AnsweredQuestion, QuestionRow } from './question-store.type.js';
+export { saveUnansweredQuestions } from './save-unanswered-questions.js';
+export { readPendingQuestions } from './read-pending-questions.js';
+export { answerQuestion } from './answer-question.js';
+export { drainAnsweredQuestions } from './drain-answered-questions.js';
+export type { PendingQuestion, AnsweredQuestion, QuestionRow } from './types.js';
 export { appendEvent } from './events-log.js';
 export type { OrchestratorEvent, OrchestratorEventInput, OrchestratorEventType } from './events-log.type.js';
 export {
@@ -125,8 +124,11 @@ export type {
 export { RunStopSignal } from './run-stop-signal.js';
 export type { StopScope } from './run-stop-signal.type.js';
 export { rulesPhasesDirty } from './rules-phases-dirty.js';
-export { raiseBlocker, resolveBlocker, openBlockerForTask, readBlockerRows } from './blocker-store.js';
-export type { RaisedBlocker, ResolvedBlocker, BlockerRow } from './blocker-store.type.js';
+export { raiseBlocker } from './raise-blocker.js';
+export { resolveBlocker } from './resolve-blocker.js';
+export { openBlockerForTask } from './open-blocker-for-task.js';
+export { readBlockerRows } from './read-blocker-rows.js';
+export type { RaisedBlocker, ResolvedBlocker, BlockerRow } from './types.js';
 export { spawnRetro, RetroError } from './retro-runner.js';
 export type { RetroInput, RetroResult, RetroScope, RetroDeps, RetroSubmission } from './retro-runner.type.js';
 // Model-to-model deliberation (backlog/model-to-model-dialogue.md): challenger ⇄ proponent on throwaway
