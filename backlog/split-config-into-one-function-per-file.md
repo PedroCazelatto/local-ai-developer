@@ -27,7 +27,8 @@ assembly holds `load-config.ts`, and `config.ts` keeps the `DEFAULT_*` constants
 #94's answer closed with *"After it, no multi-function files remain in `src/`."* **That was never true.**
 A census of the tree after the first increment:
 
-- **213** code files under `src/` (excluding `.type.ts` and `.schema.ts`).
+- **213** code files under `src/` (excluding `.type.ts`, `.schema.ts`, and anything under
+  `__tests__` — see the test-file rules below).
 - **96** of them declare more than one function, holding **464** functions between them. The first
   census said 95 and 461: it excluded every `index.ts`, which hid `src/index.ts` and its three
   functions (`fail`, `resolveOrExit`, `main`). No other `index.ts` declares a function.
@@ -245,6 +246,21 @@ Ten rows, summing to the **96** files and **464** functions counted above. The r
 `main().catch(...)` call. It has no directory of its own, so it must be assigned deliberately rather
 than assumed to belong to whoever is nearby — it is the last file in the tree anyone would notice was
 missed.
+
+## `__tests__` is not a sweep target — but it is an importer
+
+Backlog item 2 lands tests under `src/**/__tests__/`, on `node:test` + `node:assert`, in parallel with the
+early waves. Two rules follow from that, and they pull in opposite directions:
+
+- **Test files are not sweep targets, and they are not in the census.** The 96 files and 464 functions
+  above, and every row of the partition table, count production files only. A test file is many `test(...)`
+  calls and may declare helpers besides; one function per file was never aimed at it, and the exemption is
+  being written into [constitution.md](../constitution.md) and [CLAUDE.md](../CLAUDE.md) separately. **Do
+  not split a test file**, and do not report the census as having drifted when `__tests__` grows.
+- **A test file is an importer like any other.** Waves B and C relocate almost every function item 2 pins.
+  When you move a function, **update its test's import in the same commit**, exactly as you would any other
+  importer. A test left importing a path you deleted is a broken build — and it is broken for the agent who
+  deleted the path, not for whoever wrote the test.
 
 ## Do not update the progress ledger
 
