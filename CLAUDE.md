@@ -30,13 +30,29 @@ that owns the topic.
   emulator harness instead of launching the app.
 - **Read [constitution.md](constitution.md) before writing or changing any code, every session.**
 - **One function per file — and there are no exceptions.** Every code file under [src/](src/) holds
-  exactly one function, named by its kebab-case file name, with types and schemas in sibling
-  `.type.ts` / `.schema.ts` files. Cohesion is not a reason to keep two functions together: the two
-  files that argued it were `config.ts` (four env resolvers) and `ollama-models.ts` (three daemon
-  wrappers), and both are being split. A file that assembles others — re-exporting them into one
-  object — is not an exception, because it holds no second function. The rule is stated in full in
-  [constitution.md](constitution.md); it is repeated here because it is the one most often reasoned
-  around.
+  exactly one function, named by its kebab-case file name, with **the types it needs declared in that
+  same file** — or, when no function owns a type, in the folder's `types.ts` — and schemas in a sibling
+  `.schema.ts`. **The bar is any function declaration, not any exported one** — a private helper is a
+  second function and means a second file; `config.ts`'s three env resolvers were all private, and that
+  is what made it a violation. Cohesion is not a reason to keep two functions together: the two files
+  that argued it were `config.ts` (four env resolvers) and `ollama-models.ts` (three daemon wrappers),
+  and **both have been split** — `config.ts` is now the `DEFAULT_*` constants over `load-config.ts` and
+  its three resolvers, and `ollama-models.ts` is gone, into `list-models.ts`, `has-model.ts` and
+  `pull-model.ts` over a shared `daemon.ts`. A file holding only constants, or only a value, is not a
+  violation either. **A split file survives only if it assembles the parts into an object** — one value
+  callers use as a single thing, exporting that object and nothing else. A file that would survive
+  merely by re-exporting the names is deleted and its importers repointed at the file that owns the
+  function — **including every directory `index.ts` barrel**, which get no exception; an import names
+  its file, not its folder. The lone survivor is [src/index.ts](src/index.ts), which exports nothing and
+  is the entry point rather than a barrel. A leftover `export * from` is not an acceptable end state, or
+  even a temporary one. The rule is stated in full in [constitution.md](constitution.md); it is
+  repeated here because it is the one most often reasoned around.
+- **`src/` does not satisfy that rule yet — the sweep that makes it true is backlog item 1.** Two files
+  were split when the exception was formally ended, and a survey then found the rule had never held
+  repo-wide: **96** files declare more than one function — **464** functions between them, 27 of the
+  files exporting more than one — plus **55** `.type.ts` siblings to fold into their function files and
+  **9** pure re-export barrels to delete. Until the sweep lands, a multi-function file you meet is a
+  violation not yet reached — never a precedent to copy.
 - **Do not edit [README.md](README.md)** unless asked; validate it when requested.
 - **Keep these docs current.** If a change makes a doc wrong, fixing the doc is part of that change.
   Edits to this file, [constitution.md](constitution.md), and anything under [docs/](docs/) are
