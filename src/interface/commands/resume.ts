@@ -20,8 +20,8 @@ import type { Interface as ReadlineInterface } from 'node:readline/promises';
 
 import type { ContextSummary } from '../../core/session/index.js';
 import { shortContextId } from '../../core/session/index.js';
-import * as renderer from '../../core/ui/renderer.js';
-import * as statusBar from '../../core/ui/status-bar.js';
+import { renderer } from '../../core/ui/renderer.js';
+import { statusBar } from '../../core/ui/status-bar.js';
 import { theme } from '../../core/ui/theme.js';
 import type { Command } from '../command-registry.js';
 

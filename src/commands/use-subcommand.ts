@@ -4,7 +4,7 @@
 import { hasModel } from '../core/llm/index.js';
 import { confirmKey } from '../core/ui/confirm-key.js';
 import { pullWithSpinner } from '../core/ui/pull-with-spinner.js';
-import * as renderer from '../core/ui/renderer.js';
+import { renderer } from '../core/ui/renderer.js';
 import type { CommandContext } from '../interface/command-registry.js';
 import { applyModel } from './apply-model.js';
 

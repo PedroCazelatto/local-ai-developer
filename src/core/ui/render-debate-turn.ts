@@ -8,7 +8,7 @@
 // it back. Writing to stdout directly here would print through that line.
 
 import { debateBodyRows } from './debate-body-rows.js';
-import * as renderer from './renderer.js';
+import { renderer } from './renderer.js';
 import { theme } from './theme.js';
 
 /**

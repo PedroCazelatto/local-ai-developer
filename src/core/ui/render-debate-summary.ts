@@ -7,7 +7,7 @@
 
 import { debateCostText } from './debate-cost-text.js';
 import { debateVerdictText } from './debate-verdict-text.js';
-import * as renderer from './renderer.js';
+import { renderer } from './renderer.js';
 import { theme } from './theme.js';
 
 /**

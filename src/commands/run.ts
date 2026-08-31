@@ -2,7 +2,7 @@
 // prints the usage line. The Tab candidate list lives beside the command object in models.ts; keep it
 // and the switch below in step.
 
-import * as renderer from '../core/ui/renderer.js';
+import { renderer } from '../core/ui/renderer.js';
 import type { CommandContext } from '../interface/command-registry.js';
 import { listSubcommand } from './list-subcommand.js';
 import { modelsCommand } from './models.js';

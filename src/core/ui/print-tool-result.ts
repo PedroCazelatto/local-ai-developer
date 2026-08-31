@@ -6,7 +6,7 @@
 
 import { formatToolResultLines } from './format-tool-result-lines.js';
 import type { ToolResultLinesInput } from './format-tool-result-lines.js';
-import * as renderer from './renderer.js';
+import { renderer } from './renderer.js';
 import { terminalColumns } from './terminal-columns.js';
 
 /** What printToolResult needs, minus the width it reads from the terminal itself. */

@@ -29,12 +29,13 @@ import type {
   TaskLoopResult,
 } from '../core/session/index.js';
 import { SUGGESTED_MODEL } from '../core/session/index.js';
-import * as renderer from '../core/ui/renderer.js';
-import * as statusActivity from '../core/ui/status-activity.js';
-import * as statusBar from '../core/ui/status-bar.js';
-import * as activityLine from '../core/ui/activity-line.js';
-import * as inputFence from '../core/ui/input-fence.js';
-import * as messageQueue from '../core/ui/message-queue.js';
+import { INPUT_PROMPT } from '../core/ui/input-prompt.js';
+import { renderer } from '../core/ui/renderer.js';
+import { statusActivity } from '../core/ui/status-activity.js';
+import { statusBar } from '../core/ui/status-bar.js';
+import { activityLine } from '../core/ui/activity-line.js';
+import { inputFence } from '../core/ui/input-fence.js';
+import { messageQueue } from '../core/ui/message-queue.js';
 import { bindNewlineKey } from '../core/ui/bind-newline-key.js';
 import { theme } from '../core/ui/theme.js';
 import { getCommand } from './command-registry.js';
@@ -204,7 +205,7 @@ export async function runRepl(orch: ReplOrchestrator): Promise<void> {
         if (!firstPrompt) renderer.blankLine();
         firstPrompt = false;
         renderer.inputRuleTop();
-        const answer = rl.question(renderer.INPUT_PROMPT);
+        const answer = rl.question(INPUT_PROMPT);
         // Anything typed while the turn ran was held in the fenced row rather than echoed into the
         // reply (input-fence.ts). Hand it to readline as if it had just been typed here, so the box
         // opens where the user left off — with full editing back, and Enter working again.

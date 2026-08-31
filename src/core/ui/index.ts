@@ -1,9 +1,9 @@
 // core/ui/ — persistent-REPL renderer, theme, spinner, and discrete prompts. Streaming output
 // that preserves scrollback (never clears / never grabs the alt-buffer). Foundation task 05.
 export { theme } from './theme.js';
-export * as renderer from './renderer.js';
-export * as statusBar from './status-bar.js';
-export * as activityLine from './activity-line.js';
+export { renderer } from './renderer.js';
+export { statusBar } from './status-bar.js';
+export { activityLine } from './activity-line.js';
 export { confirm } from './confirm.js';
 export { select } from './select.js';
 export type { SelectChoice } from './select.js';
@@ -12,7 +12,7 @@ export { confirmKey } from './confirm-key.js';
 // Multi-line composition: Shift+Enter breaks the line instead of submitting it (repl.ts binds it).
 export { bindNewlineKey } from './bind-newline-key.js';
 // The input box stays fenced on screen while a turn runs, holding what is typed until the next prompt.
-export * as inputFence from './input-fence.js';
+export { inputFence } from './input-fence.js';
 export { formatSize } from './format-size.js';
 export { terminalColumns } from './terminal-columns.js';
 // The tool-call record in the scrollback: `→ <tool> <what it did>` before the call, `← <result>` (plus

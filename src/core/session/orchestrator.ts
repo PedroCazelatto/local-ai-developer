@@ -10,7 +10,7 @@ import { createToolContext } from '../../tools/index.js';
 import type { SandboxClient } from '../container/index.js';
 import { OllamaClient } from '../llm/index.js';
 import type { Message, StreamHandle, TokenCounts, Tool, ToolCall, TurnAbortReason } from '../llm/index.js';
-import * as renderer from '../ui/renderer.js';
+import { renderer } from '../ui/renderer.js';
 import { addTokenCounts } from './add-token-counts.js';
 import { recordToolCall } from './record-tool-call.js';
 import type { SessionConfig } from './config.js';

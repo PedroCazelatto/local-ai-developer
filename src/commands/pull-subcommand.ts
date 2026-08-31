@@ -2,7 +2,7 @@
 // daemon. BLOCKS until the pull finishes.
 
 import { pullWithSpinner } from '../core/ui/pull-with-spinner.js';
-import * as renderer from '../core/ui/renderer.js';
+import { renderer } from '../core/ui/renderer.js';
 import type { CommandContext } from '../interface/command-registry.js';
 
 /**

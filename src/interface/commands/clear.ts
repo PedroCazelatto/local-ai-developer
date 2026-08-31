@@ -8,7 +8,7 @@
 
 import type { ClearResult } from '../../core/session/index.js';
 import { shortContextId } from '../../core/session/index.js';
-import * as renderer from '../../core/ui/renderer.js';
+import { renderer } from '../../core/ui/renderer.js';
 import type { Command } from '../command-registry.js';
 
 /** The slice of the orchestrator /clear needs — satisfied structurally by SessionOrchestrator. */

@@ -12,8 +12,8 @@
 import { answerQuestion, readPendingQuestions } from '../../core/session/index.js';
 import type { PendingQuestion } from '../../core/session/index.js';
 import { askQuestions } from '../../core/ui/ask-questions.js';
-import * as renderer from '../../core/ui/renderer.js';
-import * as statusBar from '../../core/ui/status-bar.js';
+import { renderer } from '../../core/ui/renderer.js';
+import { statusBar } from '../../core/ui/status-bar.js';
 import type { Command } from '../command-registry.js';
 
 /** The slice of the orchestrator /questions needs — satisfied structurally by SessionOrchestrator. */

@@ -21,7 +21,7 @@ import {
   setTaskStatus,
 } from '../../core/session/index.js';
 import type { RetroInput, RetroResult } from '../../core/session/index.js';
-import * as renderer from '../../core/ui/renderer.js';
+import { renderer } from '../../core/ui/renderer.js';
 import { renderRetroResult } from '../retro-prompt.js';
 import type { Command, CompletionContext } from '../command-registry.js';
 

@@ -4,7 +4,7 @@
 
 import { listModels, matchesModelName } from '../core/llm/index.js';
 import { formatSize } from '../core/ui/format-size.js';
-import * as renderer from '../core/ui/renderer.js';
+import { renderer } from '../core/ui/renderer.js';
 import { theme } from '../core/ui/theme.js';
 import { write } from '../core/ui/write.js';
 import type { CommandContext } from '../interface/command-registry.js';

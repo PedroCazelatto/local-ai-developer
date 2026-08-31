@@ -4,7 +4,7 @@
 
 import { errMessage } from '../core/err-message.js';
 import { saveAppState } from '../core/session/index.js';
-import * as renderer from '../core/ui/renderer.js';
+import { renderer } from '../core/ui/renderer.js';
 import type { CommandContext } from '../interface/command-registry.js';
 
 /**

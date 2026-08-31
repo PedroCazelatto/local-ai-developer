@@ -7,7 +7,7 @@ import ora from 'ora';
 import { errMessage } from '../err-message.js';
 import { pullModel } from '../llm/pull-model.js';
 import { pullProgressText } from './pull-progress-text.js';
-import * as renderer from './renderer.js';
+import { renderer } from './renderer.js';
 
 /**
  * Whatever emits `SIGINT` for the Ctrl-C that aborts a pull. Two callers, two emitters: inside the REPL

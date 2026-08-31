@@ -7,7 +7,7 @@
 // interjectLine lifts whatever owns the row — a reply in flight or the activity line — and lays it
 // back down afterwards.
 
-import * as renderer from './renderer.js';
+import { renderer } from './renderer.js';
 import { formatToolCallLine } from './format-tool-call-line.js';
 import { terminalColumns } from './terminal-columns.js';
 
