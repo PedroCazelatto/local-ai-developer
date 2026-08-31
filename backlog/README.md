@@ -36,7 +36,8 @@ increment, not its completion**, which is why this line is not struck and the ta
 
 **So item 1 is now the whole sweep, at the wider bar — any *declaration*, not just an exported
 function.** Private helpers count, which is what made `config.ts` a violation; so do classes, and so do
-inline arrow properties. At the baseline that is **106 files and 528 declarations**. Three reversals ride
+inline arrow properties **on a top-level object literal**. At the baseline that is **104 files and 504
+declarations**. Three reversals ride
 along: types leave their `.type.ts` siblings for the file that owns the function, or the folder's
 `types.ts` where no function owns one (**55** siblings to fold in); every pure re-export module is
 deleted, **including all 9 directory `index.ts` barrels**, in one final pass once every directory is
@@ -49,15 +50,19 @@ reviewed it. Wave A then committed four directories in parallel — `core/llm` (
 
 | | files | declarations |
 |---|---:|---:|
-| baseline | 106 | 528 |
+| baseline | 104 | 504 |
 | **cleared by wave A** | **13** | **50** |
-| **remaining** | **93** | **478** |
+| **remaining** | **91** | **454** |
 
-Left to sweep: `core/session` 29/187, `interface/commands` 20/111, `core/ui` 14/80, `tools` 20/62,
-`interface` 7/31, plus two single-file rows that **still have no wave assigned** — `src/` (root,
-`index.ts` itself) 1/3 and `src/phases` 1/2 — and a one-file follow-up in the otherwise-finished
-`core/llm`: `ollama-with-signal.ts` (1/2), which the inline-arrow ruling caught after `6e1c3f9` had
-already committed. `core/ui` is the hub and cannot share a wave with anything.
+Left to sweep: `core/session` 28/181, `interface/commands` 20/103, `core/ui` 14/77, `tools` 20/60,
+`interface` 7/28, plus two single-file rows that **still have no wave assigned** — `src/` (root,
+`index.ts` itself) 1/3 and `src/phases` 1/2. `core/ui` is the hub and cannot share a wave with anything;
+wave B has it. **`core/llm` is complete** — the `ollama-with-signal.ts` follow-up this table used to
+carry was withdrawn once the arrow rule was scoped to top-level object literals.
+
+The baseline was **106 / 528** until wave B found that an arrow property only counts when its object
+literal is at module top level. Twenty-two arrows across ten files sit inside a function body instead —
+`renderer.ts` alone accounted for three — and two files left the violation list outright.
 
 A further round of governance clauses — classes, inline arrows, the barrel wording, the type-export
 carve-out and the *Testing* rewrite — is drafted and waiting on the user. The task file carries the

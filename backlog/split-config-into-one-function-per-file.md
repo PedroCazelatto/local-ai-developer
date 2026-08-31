@@ -41,10 +41,17 @@ A census of the tree after the first increment:
   classes in the tree either sit alone in their file, which conforms, or sit in a file that was already
   violating.
 
-- **Once inline arrows count as well, it is 106 files and 528 declarations.** 41 arrow properties, 40 of
-  them in files already violating. Seven more files join: `core/llm/ollama-with-signal.ts`,
-  `core/session/subagents.ts`, `interface/commands/audit.ts`, `interface/commands/new-project.ts`,
-  `interface/commands/swap.ts`, `interface/commands/tasks.ts` and `tools/debate.ts`.
+- **Once top-level inline arrows count as well, it is 104 files and 504 declarations.** **19** arrow
+  properties qualify. Five files join on their account: `interface/commands/audit.ts`,
+  `interface/commands/new-project.ts`, `interface/commands/swap.ts`, `interface/commands/tasks.ts` and
+  `tools/debate.ts`.
+
+  An earlier count said 106 / 528 and seven files. It counted arrow properties wherever they appeared;
+  only those on an object literal **at module top level** are declarations. Ten files hold arrows inside
+  a function body — `run.ts` 8 of its 9, `renderer.ts` all 3, `repl.ts` 3, `context.ts` 2, and one each
+  in `orchestrator.ts`, `retro-runner.ts`, `reviewer-runner.ts`, `subagents.ts`, `worker-runner.ts` and
+  `ollama-with-signal.ts` — **22 arrows in all**. Two of the seven, `subagents.ts` and
+  `ollama-with-signal.ts`, leave the violation list entirely as a result.
 
 > **These figures are the baseline. They are measured at commit `a0e9e31`, before any wave landed, and
 > they will NOT reproduce against a live tree** — by wave C, `HEAD` is several swept directories away
@@ -78,11 +85,22 @@ over-report by a wide margin — nested arrows are everywhere:
   `pullModel` is not a second declaration;
 - an arrow **passed as an argument**: a callback at a call site declares nothing;
 - an arrow in a **type position**: `work: () => T` in a parameter list declares nothing. Four of the 45
-  raw regex hits at the baseline were this, which is why the measured figure is 41.
+  raw regex hits at the baseline were this;
+- **the subtlest one** — an arrow on an object a function **builds and returns**. `renderer.ts`'s
+  `assistantStream()` returns `{ push: (delta) => …, end: () => …, interject: (block) => … }`; that is a
+  closure-based handle, and its arrows are the function's implementation exactly as a local would be.
+  The dodge the user closed was a file moving its **top-level** functions into an exported object
+  literal — `swap.ts` — which is a different thing. **22 of the 41 raw property-arrows at the baseline
+  are inside a function body**, so getting this wrong overstates the work by more than half the arrows.
 
-Scoped this way the bar is measurable: **41** arrow properties repo-wide at the baseline. The repo has
-**zero** top-level arrow consts — that clause costs nothing today and is in the bar only to keep the
-obvious way around it closed.
+**A class's methods do not count either.** A class is one declaration however many methods it carries,
+for the same reason locals do not count: the methods are its implementation. That leaves a known hole —
+free functions moved onto a class score one instead of many — and it is **accepted rather than closed**.
+Do not invent a class to duck the bar; nothing in the counter will stop you, and the reviewer will.
+
+Scoped this way the bar is measurable: **19** qualifying arrow properties repo-wide at the baseline. The
+repo has **zero** top-level arrow consts — that clause costs nothing today and is in the bar only to keep
+the obvious way around it closed.
 
 **A `class` counts as a declaration too** — one class *or* one function per file, never one of each.
 The corollary is worth stating because three agents have now reached it independently and each first
@@ -109,6 +127,30 @@ An assembler composes the extracted functions into **one object value** that cal
 thing. A file that would survive merely by listing the names again — `export * from`, or
 `export { a, b, c }` — is **not** an assembler. **Delete it and repoint every importer, in the same
 commit.**
+
+**An assembler is not only for files born holding an object.** A module already consumed as a single
+namespace — `import * as renderer` — *is* the thing the rule describes, and turning it into an assembler
+keeps every call site byte-identical because callers already write `renderer.paint()`. Only the one
+import line moves. This is the second time the rule has been reached for by a file that did not already
+export an object, so it is written down: **when a directory's files are consumed as a namespace, the
+assembler is the expected shape, not a special case.** The six `core/ui` singletons — `renderer`,
+`status-bar`, `input-fence`, `status-activity`, `activity-line`, `message-queue` — take it, holding 179
+call sites still.
+
+**Singleton state moves to a `<name>-state.ts` value module**, since the functions that shared a
+module-private variable no longer share a module. **The cost is real and was accepted knowingly**: six
+sets of module-private state become six exported mutable objects, and the invariant that only the owning
+assembler's functions write them stops being enforced by the language and starts being enforced by
+convention. The alternative offered — threading state as a parameter with the assembler holding it in a
+closure — was declined. Each state file's header carries the invariant, because a header is now the only
+place it lives.
+
+**A file-name collision is a signal to reach for the assembler — never a licence to rename an exported
+name.** In a flat directory, one file per function is sometimes *impossible*: `repaint` is exported by
+both `status-bar.ts` and `activity-line.ts`, `reset` by both `input-fence.ts` and `status-activity.ts`.
+Later waves will meet this harder — `interface/commands` has 20 files of near-identical shape and
+`run`, `complete` and `usage` recur across all of them. Renaming an exported name to dodge a collision
+changes the API to satisfy a file system; the assembler is the answer the rule already provides.
 
 **An assembler may export types beside its object.** "Exports that object and nothing else" bounds
 *values*, not declarations: a type erases at compile time and costs the import surface nothing, so
@@ -302,20 +344,20 @@ the numbers to partition on:
 
 | directory | files | declarations |
 |---|---:|---:|
-| `src/core/session` | 29 | 187 |
-| `src/interface/commands` | 20 | 111 |
-| `src/core/ui` | 14 | 80 |
-| `src/tools` | 20 | 62 |
-| `src/interface` | 7 | 31 |
+| `src/core/session` | 28 | 181 |
+| `src/interface/commands` | 20 | 103 |
+| `src/core/ui` | 14 | 77 |
+| `src/tools` | 20 | 60 |
+| `src/interface` | 7 | 28 |
 | `src/core/container` | 4 | 17 |
-| `src/core/llm` | 5 | 15 |
+| `src/core/llm` | 4 | 13 |
 | `src/context` | 4 | 11 |
 | `src/commands` | 1 | 9 |
 | `src/` (root — `index.ts` itself) | 1 | 3 |
 | `src/phases` | 1 | 2 |
 
-Eleven rows, summing to the **106** files and **528** declarations above — functions, classes and
-inline arrows together, which is the bar as it now stands.
+Eleven rows, summing to the **104** files and **504** declarations above — functions, classes and
+top-level inline arrows together, which is the bar as it now stands.
 
 **Two rows have no wave assigned, and both are easy to lose.**
 
@@ -410,16 +452,16 @@ may export types beside its object**, so `config.ts` exports the `config` object
 
 ## Open follow-ups
 
-**A directory that looks swept in the table above is not necessarily finished.** Three items are
-outstanding:
+Two items are outstanding, and one that was listed here has been **withdrawn**:
 
-- **`src/core/llm` is not done, despite `6e1c3f9`.** The inline-arrow ruling landed *after* that wave
-  committed, and `ollama-with-signal.ts` still holds one function plus one inline arrow property
-  (`fetch: (input, init) => {`) — two declarations. It needs a follow-up pass, and the row above counts
-  it as still violating.
 - **Tests for `StreamFilter` and `recoverToolCalls`** — item 2 deferred them while `core/llm` was
   mid-split. That directory has landed, so they are unblocked.
 - **Tests for `src/context/`** — likewise deferred; the directory landed in `daf08cf`.
+- ~~`src/core/llm` needs a follow-up for `ollama-with-signal.ts`~~ — **withdrawn, and worth knowing why.**
+  It read as one function plus an inline arrow, but the arrow is `fetch: (input, init) => {` on the
+  object passed to `new Ollama({…})` **inside the function body**. Under the corrected rule that is not
+  a declaration. `core/llm` is complete and owes nothing. The entry survives struck rather than deleted
+  because the mistake is instructive: the arrow rule was applied before it was scoped.
 
 ## Order
 
