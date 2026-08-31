@@ -26,16 +26,33 @@ sequence; the identical hazard one line away — a cut landing between the two h
 
 ## Why this is worse than a formatting nit
 
-`truncateToWidth`'s sole caller is `render-question-panel.ts`, and that panel **redraws by moving the
-cursor up by its own line count**. The contract it needs is exactly one terminal row per logical line.
-When a line comes back wider than the budget, the terminal wraps it, the panel's idea of its own height
-is now short by one, and the redraw moves the cursor to the wrong row — smearing the panel down the
-screen on every repaint.
+**Correction to this file's first draft, which said the function had a single caller.** It never did.
+At `f08c47c` **six** files called it; after backlog item 1's `core/ui` sweep **eleven** do:
+`format-tool-call-line.ts`, `format-tool-result-lines.ts`, `input-fence-row.ts`,
+`write-question-transcript.ts`, the six `panel-*.ts` row builders, and
+`interface/commands/write-fitted-line.ts`. Two further files name it in a comment without calling it —
+`tail-to-width.ts`, whose header explains why it is *not* this function, and `tool-call-subject.ts`.
 
-So the function's purpose is to prevent a specific rendering failure, and for CJK, emoji and every
-other wide glyph it does not prevent it. `docs/product.md`'s OS-agnostic reach makes this reachable in
-normal use, not a curiosity: a question panel quoting a path, a task title or a model's own prose in
-any non-Latin script hits it.
+**The sweep did not widen the blast radius; it made it visible.** The proof is that the number of call
+sites did not move: **16 before, 16 after.** Only their distribution changed —
+`render-question-panel.ts`'s eight calls became the six `panel-*.ts` builders, and `ask-questions.ts`'s
+three became `write-question-transcript.ts`. **Scope the fix against 16 call sites across 11 files, not
+against one.**
+
+The sharpest symptom is still the question panel, and it is worth stating exactly. The six `panel-*.ts`
+row builders feed a panel that **redraws by moving the cursor up by its own line count**. The contract
+it needs is exactly one terminal row per logical line. When a row comes back wider than its budget the
+terminal wraps it, the panel's idea of its own height is short by one, and the redraw moves the cursor
+to the wrong row — smearing the panel down the screen on every repaint.
+
+But every other caller has its own version of the same failure. `format-tool-call-line.ts` and
+`format-tool-result-lines.ts` feed the scrollback, where an over-wide row costs an unwanted wrap rather
+than a corrupted redraw; `input-fence-row.ts` feeds the pinned rows, where it is as bad as the panel.
+
+So the function's purpose is to prevent a specific class of rendering failure, and for CJK, emoji and
+every other wide glyph it does not prevent it. `docs/product.md`'s OS-agnostic reach makes this
+reachable in normal use, not a curiosity: any of these paths quoting a path, a task title or the
+model's own prose in a non-Latin script hits it.
 
 ## The shape of a fix
 
@@ -69,7 +86,14 @@ of scope in its own header.
 
 ## Why it sits where it does
 
-It is small, it is well understood, and the tests that will have to change are already written. It is
-**not** folded into backlog item 1's sweep of `src/core/ui/`: that sweep is a no-behaviour-change
-refactor, and a live rendering fix buried inside a 77-declaration mechanical diff is a fix nobody can
-review. Land the sweep first, then this against the settled file.
+It is small, it is well understood, and the tests that will have to change are already written. It was
+deliberately **not** folded into backlog item 1's sweep of `src/core/ui/` — that sweep was a
+no-behaviour-change refactor, and a live rendering fix buried inside a 77-declaration mechanical diff
+is a fix nobody can review.
+
+**That sweep has since landed (`4daa490`, `1c3b1cb`), so the blocker is gone and the ground is now
+better than it was.** The panel's per-row truncation budgets — `width-1`, `width-4`, `width-5`,
+`width-7` — used to sit inside one 130-line file; they now sit one per file beside the row each belongs
+to, with `panel-indent.ts` pinning the margin they are all derived from. So "does this row still fit
+once truncation starts costing 2 columns for a wide glyph" becomes a per-file review rather than a
+whole-file read. `truncate-to-width.ts` itself was carried across untouched.
