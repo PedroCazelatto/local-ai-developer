@@ -4,8 +4,8 @@
 // fix direction. It is also what the loop returns as `lastFeedback` when a task escalates, so a
 // human sees exactly why five rounds could not pass it.
 
-import type { ReviewVerdict } from './review-types.js';
-import { SEVERITIES } from './review-types.js';
+import type { ReviewVerdict } from './types.js';
+import { SEVERITIES } from './types.js';
 
 /** Render a fail verdict's summary + issues (blocker→major→minor) as one actionable feedback block. */
 export function formatReviewFeedback(verdict: ReviewVerdict): string {

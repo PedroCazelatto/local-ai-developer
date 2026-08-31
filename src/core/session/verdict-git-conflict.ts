@@ -11,17 +11,20 @@
 // A "fail" on a CLEAN tree is legal and deliberate: the Reviewer may commit everything the Worker
 // wrote and still fail the task for work that is missing entirely.
 
-import { SEVERITIES } from './review-types.js';
-import type { VerdictGitState } from './verdict-git-conflict.type.js';
+import { issueCoversFile } from './issue-covers-file.js';
+import { toPosix } from './to-posix.js';
+import type { ReviewVerdict } from './types.js';
+import { SEVERITIES } from './types.js';
 
-/** Normalize for comparison — the model may echo a path with either separator. */
-function toPosix(value: string): string {
-  return value.replace(/\\/g, '/').trim();
-}
-
-/** True when `file` is named by the issue path `named` (exact file, or a directory containing it). */
-function covers(named: string, file: string): boolean {
-  return named === file || (named !== '' && file.startsWith(`${named.replace(/\/+$/, '')}/`));
+export interface VerdictGitState {
+  /** The parsed, shape-valid verdict the Reviewer just submitted. */
+  readonly verdict: ReviewVerdict;
+  /** Project-relative paths still uncommitted after the Reviewer's own commits this round. */
+  readonly outstanding: readonly string[];
+  /** True once the Reviewer called mark_task_done for the task under review. */
+  readonly taskMarkedDone: boolean;
+  /** Backlog id of the task under review — named in the error so the Reviewer knows what to close. */
+  readonly taskId: string;
 }
 
 /**
@@ -29,6 +32,7 @@ function covers(named: string, file: string): boolean {
  * straight back to the Reviewer as a recoverable error, so it names the offending files and the fix.
  */
 export function verdictGitConflict(state: VerdictGitState): string | null {
+  // toPosix: backslashes to slashes, trimmed — the model may echo either separator.
   const outstanding = state.outstanding.map(toPosix).filter((file) => file !== '');
 
   if (state.verdict.result === 'pass') {
@@ -50,7 +54,8 @@ export function verdictGitConflict(state: VerdictGitState): string | null {
 
   // fail — every file left behind must carry a note, so the Worker knows why it came back.
   const named = state.verdict.issues.map((issue) => toPosix(issue.file)).filter((file) => file !== '');
-  const unexplained = outstanding.filter((file) => !named.some((path) => covers(path, file)));
+  // issueCoversFile: an exact match, or a directory named in an issue that contains the file.
+  const unexplained = outstanding.filter((file) => !named.some((path) => issueCoversFile(path, file)));
   if (unexplained.length > 0) {
     return (
       `you left ${unexplained.length} file(s) uncommitted with no issue explaining why: ${unexplained.join(', ')}. ` +

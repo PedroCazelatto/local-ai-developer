@@ -11,9 +11,9 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import type { ReviewIssue, ReviewVerdict } from '../review-types.js';
+import type { ReviewIssue, ReviewVerdict } from '../types.js';
 import { verdictGitConflict } from '../verdict-git-conflict.js';
-import type { VerdictGitState } from '../verdict-git-conflict.type.js';
+import type { VerdictGitState } from '../verdict-git-conflict.js';
 
 /** A shape-valid verdict; every case overrides only what it is about. */
 function verdict(result: 'pass' | 'fail', issues: readonly ReviewIssue[] = []): ReviewVerdict {

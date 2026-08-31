@@ -29,9 +29,10 @@ import type {
   BatchSkipped,
   BatchSummary,
 } from './batch.type.js';
-import { isWorkingTreeDirty, stashTaskAttempt } from './project-git.js';
+import { isWorkingTreeDirty } from './is-working-tree-dirty.js';
 import { rulesPhasesDirty } from './rules-phases-dirty.js';
 import type { TaskLoopResult } from './run-task-loop.type.js';
+import { stashTaskAttempt } from './stash-task-attempt.js';
 
 /** Folder under .orchestrator/ holding one JSON file per batch (git-ignored session state). */
 export const BATCHES_DIRNAME = 'batches';

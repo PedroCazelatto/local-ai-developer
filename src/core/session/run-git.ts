@@ -1,5 +1,5 @@
 // runGit — the ONE way anything host-side talks to a project's git repo. Extracted from
-// project-git.ts so the stash / branch / push / inspect modules share a single invocation with a
+// the host-side git modules so the stash / branch / push / inspect halves share a single invocation with a
 // single guarantee, instead of each re-deriving it.
 //
 // The guarantee: an explicit `-C <projectPath>` with an ARGV and NO SHELL. Nothing the model supplies
@@ -18,7 +18,16 @@
 
 import { spawnSync } from 'node:child_process';
 
-import type { GitRun } from './run-git.type.js';
+// The outcome of one git invocation. Never an exception: a non-zero exit is data, because every
+// caller here turns a git failure into a structured recoverable message for the model rather than
+// letting it kill the turn.
+export interface GitRun {
+  /** True when git exited 0. */
+  readonly ok: boolean;
+  readonly stdout: string;
+  /** git's stderr, trimmed. Populated on failure — and on success for commands that report there. */
+  readonly stderr: string;
+}
 
 /** Run one git command against the project repo. Never throws — a non-zero exit is captured. */
 export function runGit(projectPath: string, args: readonly string[]): GitRun {

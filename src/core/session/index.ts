@@ -59,36 +59,53 @@ export { formatEvictedStub } from './format-evicted-stub.js';
 export { runReviewerTask, ReviewerVerdictError } from './reviewer-runner.js';
 export type { ReviewerDeps, ReviewerInput, ReviewerOutcome, ReviewerCommit } from './reviewer-runner.js';
 export { verdictGitConflict } from './verdict-git-conflict.js';
-export type { VerdictGitState } from './verdict-git-conflict.type.js';
+export type { VerdictGitState } from './verdict-git-conflict.js';
 export { runTaskLoop, MAX_ROUNDS } from './run-task-loop.js';
 export type { TaskLoopResult, TaskLoopOutcome, TaskLoopDeps, TaskLoopReporter } from './run-task-loop.type.js';
-export type { ReviewVerdict, ReviewIssue, Severity, ReviewDecision } from './review-types.js';
-export { SEVERITIES } from './review-types.js';
-export {
-  isWorkingTreeDirty,
-  captureChangedFiles,
-  listChangedPaths,
-  diffPaths,
-  commitPaths,
-  stashTaskAttempt,
-  readTaskStashDiff,
-  dropTaskStash,
-  REVIEW_DIFF_BUDGET,
-} from './project-git.js';
-export type { ChangedFiles, ChangedPaths, CommitResult } from './project-git.js';
+export type { ReviewVerdict, ReviewIssue, Severity, ReviewDecision } from './types.js';
+export { SEVERITIES } from './types.js';
+export { isWorkingTreeDirty } from './is-working-tree-dirty.js';
+export { captureChangedFiles } from './capture-changed-files.js';
+export type { ChangedFiles } from './capture-changed-files.js';
+export { listChangedPaths } from './list-changed-paths.js';
+export type { ChangedPaths } from './list-changed-paths.js';
+export { diffPaths } from './diff-paths.js';
+export { commitPaths } from './commit-paths.js';
+export type { CommitResult } from './commit-paths.js';
+export { stashTaskAttempt } from './stash-task-attempt.js';
+export { readTaskStashDiff } from './read-task-stash-diff.js';
+export { dropTaskStash } from './drop-task-stash.js';
+export { REVIEW_DIFF_BUDGET } from './review-diff-budget.js';
 export { runGit } from './run-git.js';
-export type { GitRun } from './run-git.type.js';
+export type { GitRun } from './run-git.js';
 // The model-facing git operations behind git_stash / git_branch / git_push / git_inspect. The shelf
-// prefix is deliberately disjoint from project-git.ts's task-keyed `lad-stash:` — see
-// project-git-stash.ts.
-export { saveShelf, listShelves, popShelf, dropShelf, isValidShelfLabel, shelfLabelError, SHELF_LABEL_PREFIX } from './project-git-stash.js';
-export type { Shelf, ShelfResult } from './project-git-stash.type.js';
-export { createBranch, switchBranch, listBranches, branchExists, currentBranch, branchNameError } from './project-git-branch.js';
-export type { BranchList, BranchResult } from './project-git-branch.type.js';
-export { pushCurrentBranch } from './project-git-push.js';
-export type { PushResult } from './project-git-push.type.js';
-export { inspectDiff, inspectLog, inspectShow, refError, DEFAULT_LOG_COUNT, MAX_LOG_COUNT } from './project-git-inspect.js';
-export type { InspectResult } from './project-git-inspect.type.js';
+// prefix is deliberately disjoint from the task loop's `lad-stash:` — see shelf-label.ts and
+// task-stash-label-prefix.ts.
+export { saveShelf } from './save-shelf.js';
+export { listShelves } from './list-shelves.js';
+export type { Shelf } from './list-shelves.js';
+export { popShelf } from './pop-shelf.js';
+export { dropShelf } from './drop-shelf.js';
+export { isValidShelfLabel } from './is-valid-shelf-label.js';
+export { shelfLabelError } from './shelf-label-error.js';
+export { SHELF_LABEL_PREFIX } from './shelf-label.js';
+export type { ShelfResult } from './types.js';
+export { createBranch } from './create-branch.js';
+export { switchBranch } from './switch-branch.js';
+export { listBranches } from './list-branches.js';
+export type { BranchList } from './list-branches.js';
+export { branchExists } from './branch-exists.js';
+export { currentBranch } from './current-branch.js';
+export { branchNameError } from './branch-name-error.js';
+export type { BranchResult } from './types.js';
+export { pushCurrentBranch } from './push-current-branch.js';
+export type { PushResult } from './push-current-branch.js';
+export { inspectDiff } from './inspect-diff.js';
+export { inspectLog } from './inspect-log.js';
+export { inspectShow } from './inspect-show.js';
+export { refError } from './ref-error.js';
+export { DEFAULT_LOG_COUNT, MAX_LOG_COUNT } from './inspect-log-count.js';
+export type { InspectResult } from './types.js';
 // The branch a task is developed on — one task, one branch (docs/phases.md).
 export { taskBranchName } from './task-branch-name.js';
 export { runBatch, batchSummaryFileName, BATCHES_DIRNAME } from './batch.js';

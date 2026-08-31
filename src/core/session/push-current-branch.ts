@@ -1,6 +1,6 @@
-// Model-facing push — backs the git_push tool. Deliberately takes NO arguments: it always pushes the
-// CHECKED-OUT branch to `origin` with `-u`, and there is no force, no remote argument and no refspec
-// for a model to get wrong.
+// Model-facing push — backs the git_push tool. Deliberately takes NO arguments beyond the project: it
+// always pushes the CHECKED-OUT branch to `origin` with `-u`, and there is no force, no remote
+// argument and no refspec for a model to get wrong.
 //
 // The asymmetry the task turns on:
 //
@@ -10,34 +10,24 @@
 //   destination fails with a recoverable message that tells it to ask the user to create the repo —
 //   and the user does it. That is the whole point of distinguishing the two.
 
-import { currentBranch } from './project-git-branch.js';
+import { currentBranch } from './current-branch.js';
+import { hasOrigin } from './has-origin.js';
+import { isMissingRepository } from './is-missing-repository.js';
+import { REMOTE } from './push-remote.js';
 import { runGit } from './run-git.js';
-import type { PushResult } from './project-git-push.type.js';
 
-/** The remote every push targets. Not configurable by the model — see the file header. */
-const REMOTE = 'origin';
-
-/**
- * git's several ways of saying "that repository is not there". HTTPS answers "Repository not found",
- * SSH answers "Could not read from remote repository" after the host rejects it, and a bad path
- * answers "does not appear to be a git repository". All three mean the same thing to the model: the
- * destination does not exist and a human has to create it.
- */
-function isMissingRepository(stderr: string): boolean {
-  const text = stderr.toLowerCase();
-  return (
-    text.includes('repository not found') ||
-    text.includes('does not appear to be a git repository') ||
-    text.includes('could not read from remote repository')
-  );
-}
-
-/** True when `origin` is configured at all. Its absence is the other half of "no destination". */
-function hasOrigin(projectPath: string): boolean {
-  return runGit(projectPath, ['remote'])
-    .stdout.split('\n')
-    .map((line) => line.trim())
-    .includes(REMOTE);
+export interface PushResult {
+  readonly ok: boolean;
+  /** The branch that was pushed — always the checked-out one; the model never names it. */
+  readonly branch: string;
+  /** True when this push CREATED the branch on the remote (allowed; creating the repo is not). */
+  readonly createdRemoteBranch: boolean;
+  /** True when the remote already had every commit — a no-op push, not a failure. */
+  readonly upToDate: boolean;
+  /** Structured, recoverable reason when ok === false. */
+  readonly error?: string;
+  /** What the model should do about `error` — for a missing repo, that means asking the user. */
+  readonly hint?: string;
 }
 
 /**
@@ -58,6 +48,7 @@ export function pushCurrentBranch(projectPath: string): PushResult {
     };
   }
 
+  // hasOrigin: `git remote` lists `origin` — false when the project was never given a destination.
   if (!hasOrigin(projectPath)) {
     return {
       ok: false,
@@ -76,6 +67,7 @@ export function pushCurrentBranch(projectPath: string): PushResult {
   const output = `${push.stdout}\n${push.stderr}`;
 
   if (!push.ok) {
+    // isMissingRepository: git's three phrasings for "that repository is not there" — see its header.
     if (isMissingRepository(push.stderr)) {
       return {
         ok: false,
