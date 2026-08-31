@@ -5,11 +5,16 @@
 // non-streamed one-shot — so a single `instanceof` check at the turn loop covers every window: the
 // interactive phases, the Worker, the Reviewer, Retro, sub-agents, and the throwaway one-shot callers.
 
-import type { TurnAbortReason } from './turn-aborted-error.type.js';
+/**
+ * Why a model call stopped early. The two are handled DIFFERENTLY and must never be collapsed into one
+ * "the call failed": a `user` abort is a deliberate act that unwinds to the prompt with no error styling,
+ * while a `timeout` is a fault worth reporting as one — an unreachable or wedged daemon, not a choice.
+ */
+export type TurnAbortReason = 'user' | 'timeout';
 
 /** A model call that ended because it was cancelled or timed out, never because Ollama itself failed. */
 export class TurnAbortedError extends Error {
-  /** `user` (Ctrl+C) or `timeout` (no bytes within the configured window) — see the type's own note. */
+  /** `user` (Ctrl+C) or `timeout` (no bytes within the configured window) — see the type above. */
   readonly reason: TurnAbortReason;
 
   constructor(reason: TurnAbortReason, timeoutMs: number) {
