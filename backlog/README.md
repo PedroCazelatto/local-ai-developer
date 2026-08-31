@@ -295,6 +295,27 @@ decision to rest on whether it helps the **model**, which needs a measurement th
 The lowest-confidence item in the folder, and the one most likely to end in a deletion rather than a
 build. Measure rounds-to-pass with and without, on the same tasks, before keeping it.
 
+### 21. [The Node version is still hardcoded in the sandbox and the runner](node-version-hardcoded-in-the-images.md)
+*Repo hygiene.* [3](node-version-is-not-enforced.md) closed on *"four declarations, none enforced, become
+one declaration enforced in three places."* The arithmetic was wrong: **three more survive**, all spelling
+the tag by hand — `sandbox.ts:35`'s `DEFAULT_IMAGE`, `project-templates.ts:43`'s runner scaffold, and
+`projects/hello-world/docker-compose.yml:3` — plus four comments naming the tag descriptively.
+
+**It is not one cleanup, and that is the whole point of the file.** Under the two-tier Docker model,
+`sandbox.ts`'s `DEFAULT_IMAGE` is plainly the same declaration item 3 was consolidating — the root sandbox
+is the orchestrator's own tool-execution container, and *the Node a project is built against is the Node
+the orchestrator runs on* applies to it verbatim. **The per-project `runner` is a different container**,
+and whether a project the model is building inherits the orchestrator's pin is the user's decision, not an
+oversight to sweep up. Two of the four comments reason about the image being Debian-based rather than about
+its version, and may be right as they stand. Ask; do not assume the second follows from the first.
+
+**Why last, and why it is not urgent:** nothing depends on it, and the defect is **latent rather than
+live** — `.nvmrc` is `24.14.0` and every hardcoded tag is `node:24-slim`, so the majors agree today and
+only drift when the pin's major moves. It is filed rather than folded into
+[1](split-config-into-one-function-per-file.md) deliberately: that sweep rewrites `sandbox.ts`, and burying
+a behaviour change inside a no-behaviour-change refactor is how a defect stops being reviewable. **Item 1
+carries `DEFAULT_IMAGE` across unchanged and reports where it lands.**
+
 ---
 
 ## Framing notes — not tasks
