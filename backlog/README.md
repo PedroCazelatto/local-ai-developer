@@ -22,16 +22,35 @@ the answer can **delete** the task rather than shape it.
 ## The order
 
 ### 1. [Split `config.ts` into one function per file](split-config-into-one-function-per-file.md)
-*Repo hygiene.* The four-function env-resolution exception ends; `config.ts` keeps the constants and the
-type and re-exports the resolvers into the config object. `ollama-models.ts` is split the same way
-(#94a), and the one-function-per-file rule gains a line in `CLAUDE.md` — a review-gated edit.
+*Repo hygiene.* **Widened, and partly landed.** The four-function env-resolution exception is over:
+`resolveNumCtx`, `resolveRatio`, `resolveTimeoutMs` and `loadConfig` each hold their own file, `config.ts`
+keeps the `DEFAULT_*` constants and re-exports them, and `ollama-models.ts` is gone — `list-models.ts`,
+`has-model.ts` and `pull-model.ts` over a shared `daemon.ts` value module. That is item 1's **first
+increment, not its completion**, which is why this line is not struck and the task file is still here.
 
-**Why first:** a pure refactor with no behaviour change, and three later items are written into the shape
-it creates. Stated in its own file and in [item 12](budget-ceilings-for-runs-and-batches.md): ship it
-**before** the budget ceilings, so the new resolver is written into the shape that already exists rather
-than added to the exception and moved afterwards. The same argument reaches
-[item 6](boot-can-pick-a-toolless-model.md) through the second file — that item rewrites `listModels` to
-stop projecting `capabilities` away, and it should land in the split `ollama-models.ts`, not before it.
+**What the first increment found.** #94's answer said *"after it, no multi-function files remain in
+`src/`"*. That was never true. **95** of the 212 code files under `src/` declare more than one function —
+**461** functions between them — and **27** export more than one: `memory-db.ts` 11, `renderer.ts` 10,
+`project-git.ts` and `backlog.ts` 8 each. `config.ts` and `ollama-models.ts` were only the two that had
+*written the exception down*.
+
+**So item 1 is now the whole sweep, at the wider bar — any function declaration, not just an exported
+one**, which is the bar `config.ts` was judged by, since its three resolvers were private. It absorbs a
+second reversal: **types no longer live in `.type.ts` siblings**, they live in the file that owns the
+function, so the **55** sibling type files fold in as the sweep reaches them. `constitution.md` and
+`CLAUDE.md` state the opposite today; the amendment is drafted, review-gated, and **must be reviewed
+before any sweep work begins**. The task file carries the per-directory census the sweep is partitioned
+across.
+
+**Why first:** unchanged in substance and now much stronger. Stated in its own file and in
+[item 12](budget-ceilings-for-runs-and-batches.md): ship it **before** the budget ceilings, so the new
+resolver is written into the shape that already exists rather than added to an exception and moved
+afterwards — that half is done, and item 12's bullet now says so. The same argument reaches
+[item 6](boot-can-pick-a-toolless-model.md) through the second file: that item rewrites `listModels` to
+stop projecting `capabilities` away, and it now lands in `list-models.ts`. At the widened scope it also
+blocks [2](test-the-invariant-functions.md), [5](record-attempted-tasks.md) and
+[7](derive-constants-from-one-ceiling.md), each of which tests, moves or adds to a function the sweep
+will relocate.
 
 ### 2. ⚠ Ask first — [Test the pure invariant functions](test-the-invariant-functions.md)
 *Engineering quality.* The invariants the whole design rests on, pinned by tests: `verdictGitConflict`,

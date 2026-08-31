@@ -191,7 +191,7 @@ export class OllamaClient {
       return { message: recoverIfNeeded(response.message), tokens: this.captureTokens(response) };
     } catch (err) {
       // An abort surfaces here as a rejected fetch; abortReason disambiguates it from a real fault the
-      // same way ollama-models.ts uses signal.aborted for a cancelled pull.
+      // same way pull-model.ts uses signal.aborted for a cancelled pull.
       throw this.abortedOr(call, err);
     } finally {
       call.settle();
@@ -267,7 +267,7 @@ export class OllamaClient {
           options: { num_ctx: resolveWindowCtx(role, this.baseNumCtx) },
         });
         // The `ollama` package exposes no per-request signal param for chat, so bridge the lifetime onto
-        // the iterator's own abort() — the same bridge ollama-models.ts builds for a cancelled pull. The
+        // the iterator's own abort() — the same bridge pull-model.ts builds for a cancelled pull. The
         // pre-check covers a cancel that landed between opening the lifetime and the request opening.
         if (call.signal.aborted) iterator.abort();
         const onAbort = (): void => iterator.abort();
