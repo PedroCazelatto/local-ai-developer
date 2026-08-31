@@ -17,11 +17,18 @@ all of them still spelling the version by hand:
 | `src/interface/commands/project-templates.ts:43` | `compose: runnerCompose('node:24-slim')` — the image every **new** project's runner is scaffolded with |
 | `projects/hello-world/docker-compose.yml:3` | `image: node:24-slim` — the same tag, already baked into the one committed example project |
 
-Four comments also name the tag as descriptive prose rather than as a declaration:
-`sandbox.ts:53`, `project-templates.ts:24`, `project-git.ts:3` and `list-workspace-entries.ts:6`.
-The last two are reasoning *about* the image (it is Debian-based, so it ships GNU findutils; it ships
-no git), which is a fact about the base image rather than about the version — those may well be
-better left alone. Decide deliberately rather than sweeping them.
+**Six** comments also name the tag as descriptive prose rather than as a declaration: `sandbox.ts:53`,
+`project-templates.ts:24`, `list-workspace-entries.ts:6`, and three in `core/session` —
+`capture-changed-files.ts:3`, `is-working-tree-dirty.ts:2` and `list-changed-paths.ts:2`.
+
+That last group used to be **one** comment at `project-git.ts:3`. Backlog item 1's sweep deleted that
+file and split its functions, and the sentence went along to each of the three that needed it — so the
+count here rose from four to six without any new fact entering the repo. Worth knowing before anyone
+reads the increase as drift.
+
+Four of the six reason *about the image* rather than about its version — it is Debian-based so it ships
+GNU findutils; it ships no git — which is a fact about the base image and may well be better left
+alone. Decide deliberately rather than sweeping them.
 
 ## Why this is not simply "finish the job"
 

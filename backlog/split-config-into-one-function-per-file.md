@@ -145,6 +145,17 @@ convention. The alternative offered — threading state as a parameter with the 
 closure — was declined. Each state file's header carries the invariant, because a header is now the only
 place it lives.
 
+**An unowned constant gets a vocabulary file named for what it describes.** When a constant has no
+single owning function, it goes in its own file named for the thing, not for a consumer —
+`tar-format.ts` (3 constants), `status-bar-rows.ts` (2), `input-prompt.ts`, `panel-indent.ts`,
+`no-subject.ts`, all created by earlier waves from precedent before this brief said so. Roughly fourteen
+more are coming: `BACKLOG_DIRNAME`, `MAX_TOOL_ROUNDS`, `KEEP_RECENT_TOOL_RESULTS`,
+`CONTEXT_TITLE_LIMIT`, `MAX_DEBATE_ROUNDS` among them.
+
+**The corollary matters as much as the rule: a constant with a single owner rides with that owner.**
+Only a genuinely shared constant earns its own file. Otherwise the sweep trades one over-full file for a
+scatter of one-line modules, which is not what the rule is for.
+
 **A file-name collision is a signal to reach for the assembler — never a licence to rename an exported
 name.** In a flat directory, one file per function is sometimes *impossible*: `repaint` is exported by
 both `status-bar.ts` and `activity-line.ts`, `reset` by both `input-fence.ts` and `status-activity.ts`.
@@ -164,6 +175,25 @@ replaces its own copies as it reaches them.** Nobody runs a migration pass acros
 afterwards — that would be one agent editing every other agent's files, which is the thing the
 partition exists to prevent.
 
+**Extracting a private helper promotes its name from a local detail to a repo-visible identifier, and
+the name must be re-judged at that moment.** This has now bitten twice, in mirror-image ways, and both
+times the wave was doing exactly what it was told:
+
+- **`errMessage` / `messageOf` — two names for one behaviour**, caught *after* it landed.
+- **`toPosix` — one name for two behaviours**, caught *before* it landed. The session copy was
+  `.replace(/\\/g, '/').trim()`; the two private copies in `src/tools/` are
+  `.replace(/\\/g, '/').replace(/\/+$/, '')`. **Neither is a superset of the other** — one trims
+  whitespace and keeps trailing slashes, the other strips trailing slashes and keeps whitespace. While
+  both were private that was invisible; extracted, they become same-named files in sibling directories.
+
+> **RULING: both get renamed, and half of it is done.** Wave C renamed the session half to
+> `src/core/session/to-posix-trimmed.ts` / `toPosixTrimmed`, whose header records why.
+> **`src/tools/` still owes the other half, and wave D owns it**: `commit-changes.ts:24` and
+> `git-inspect.ts:30` hold the two copies, identical to each other, and both must lose the name
+> `toPosix` for one that says what they do. **Do not resolve this by making one import the other** —
+> they are different functions that were never the same function, and `commit-changes.ts:43` already
+> writes `toPosix(entry.trim())` to make up the difference at the call site.
+
 **A shared destination is created once, by the first wave that needs it, and named here before a second
 wave can invent a rival.** This rule has a scar. `b63092e` committed
 `src/core/container/message-of.ts`, and the `commands` wave then wrote `src/core/err-message.ts` with
@@ -172,11 +202,17 @@ ruling is `src/core/err-message.ts`**; the container copy is deleted and repoint
 knowing before anyone re-opens it: `messageOf` is the *dominant* spelling by a distance — 14 files at the
 baseline, 16 now, against 2 — **and it lost anyway.** Frequency is not the argument.
 
-**"Update your barrel in place" means repointing lines it already carries. It never means adding one.**
-A newly created shared file gets a **direct import** from its callers and no barrel entry.
-`src/core/index.ts` re-exports one thing and has zero importers; `src/core/ui/index.ts` has 32 export
-lines and zero importers. A new line in either mints a re-export whose only future is to be deleted by
-the final barrel pass. So neither `src/core/err-message.ts` nor `src/core/ui/write.ts` gets one.
+**The barrel invariant: its line count may grow, its NAME SET may not.** Splitting a source file turns
+one `export { a, b, c } from './x.js'` into three one-name lines. That is unavoidable — ESM has no other
+way to say it — and it is **not** what the prohibition covers. What is forbidden is **minting a
+re-export for a newly created file**, which adds a name the barrel never carried.
+
+State compliance as the invariant, because it is the thing that is actually checkable: **the set of
+names a barrel exports must be identical before and after your commit.** Wave C proved its git-family
+split that way — 91 exported values and 77 exported types, name for name against `HEAD` — having created
+`push-remote.ts`, `has-head.ts`, `porcelain-path.ts` and a dozen more and given **none** of them a
+barrel entry. A newly created file gets a **direct import** from its callers. `src/core/err-message.ts`
+and `src/core/ui/write.ts` got none, and neither did anything in `src/boot/`.
 
 **A re-export barrel left behind is not an acceptable intermediate state, even temporarily.** A
 barrel-then-cleanup two-pass was put to the user precisely because it would have let all nine directories
@@ -424,6 +460,15 @@ before you edit it.** Never write it out from your own last-known state — betw
 write, someone else may have landed in the same paragraph.
 
 ## Hazards found during the first increment
+
+- **`import 'dotenv/config'` must stay the FIRST import in `src/index.ts`.** ESM evaluates a module's
+  imports in source order, so being first is what guarantees the whole boot subtree sees a populated
+  `process.env`. Move it below `./boot/main.js` and `OLLAMA_NUM_CTX` reads `undefined` **with no error
+  at all** — every window silently runs at Ollama's default ceiling instead of the pinned one. The
+  entry point states it in a comment, and **that is deliberately where it stays.** A one-file
+  source-structure test was offered and declined: this repo states every other ordering constraint the
+  same way, and a suite that polices file layout rather than behaviour is a different instrument from
+  the one item 2 built. Do not re-propose it.
 
 - **`docs/mental-model.md:27` links `src/core/llm/call-role.type.ts` by path.** `CallRole` moves to
   `src/core/llm/types.ts`, which is a stable path, so **retarget the link there** in the same change that

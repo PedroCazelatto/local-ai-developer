@@ -60,10 +60,16 @@ table matched exactly. Two agents, two instruments, one number.
 | baseline | 104 | 504 |
 | cleared by wave A | 13 | 50 |
 | cleared by wave B | 14 | 77 |
-| **remaining** | **77** | **377** |
+| cleared by wave C so far | 8 | 42 |
+| **remaining** | **69** | **335** |
 
-**Wave C is running:** `core/session` (28/181 — the largest directory in the repo, expected to take
-several commits) and `src/index.ts` (1/3), one agent each. **`core/llm` is complete** — the
+**Wave C is running.** `src/` root is **done** (`66d5a39`): `src/index.ts`'s three declarations are now
+`src/boot/{main,resolve-or-exit,fail}.ts`, the entry point declares nothing, three inlined `errMessage`
+copies were repointed at the shared one, and **no barrel was minted in `src/boot/`**. `core/session` —
+the largest directory in the repo — is running across several commits; the first (`038fc83`) took the
+git family: 7 files / 39 declarations, five `project-git*` modules and `review-types.ts` deleted, 43 new
+files, and the barrel's exported **name set** held identical at 91 values / 77 types. That leaves
+`core/session` at **21 files / 142 declarations**. **`core/llm` is complete** — the
 `ollama-with-signal.ts` follow-up this table used to carry was withdrawn once the arrow rule was scoped
 to top-level object literals.
 
