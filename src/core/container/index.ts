@@ -6,7 +6,10 @@ export type { ExecResult, SandboxOptions } from './sandbox.js';
 // The file tools' byte transport — exact bytes in and out of /workspace over Docker's archive
 // endpoints, so no file content ever passes through `sh -c`. One function per file: encodeTar and
 // decodeTarFile are the two ends, over the ustar helpers and the shared widths in tar-format.ts.
-export type { SandboxRead, SandboxWrite, TarEntry } from './types.js';
+// TarEntry is its own module (no function owns it); the two result types belong to the SandboxClient
+// methods that return them, so they come from sandbox.js beside ExecResult.
+export type { TarEntry } from './tar-entry.type.js';
+export type { SandboxRead, SandboxWrite } from './sandbox.js';
 export { encodeTar } from './encode-tar.js';
 export { decodeTarFile } from './decode-tar-file.js';
 export type { TarFileRead } from './decode-tar-file.js';
