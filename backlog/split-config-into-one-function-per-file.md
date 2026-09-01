@@ -252,6 +252,18 @@ Three data points in one sweep, which is what makes this a rule rather than an a
 holds its own private `buildRegistry` and why the grep caught a live collision rather than a historical
 one. Treat any claim that a directory is finished as something to check against the ledger.
 
+**A rename can be for meaning, or for distance — they are different jobs.** Two from one commit:
+
+- **`asBoolean` → `looseBoolean`** — for **meaning**. The old name described the *return type*, which
+  every predicate shares and which therefore said nothing. The new one names the **decision**: it
+  accepts a quoted `"true"` because a local model writes one, and refuses `"yes"` because that is a
+  verdict it declines to interpret. **The tolerance is the function**, and the name now says so.
+- **`digestLine` / `digestLineList` deliberately NOT `digest-line.ts` / `digest-lines.ts`** — for
+  **distance**. Two file names one letter apart is how a reader opens the wrong one, and no amount of
+  accuracy in either name fixes that. Every other rename recorded here was about a name being *wrong*;
+  this one is about two names being *too close*, which is a separate failure and a separate reason to
+  rename.
+
 **Type-vs-function stem collision — the exported name outranks the private helper.** A `.type.ts` may
 not share a stem with a `.ts`, so `ChatRole` (exported type) and `chatRole` (private function) could not
 both be `chat-role`. **`ChatRole` kept the stem**; the helper moved to `to-message-role.ts`. The sweep
@@ -425,6 +437,26 @@ where a reader loses the thread, so: **owned types have never moved.**
 **sibling** of a function file — a `<name>.ts` / `<name>.type.ts` pair. It now names a **standalone
 module holding exactly one unowned type**, with deliberately **no `.ts` file of the same stem**. Do not
 recreate the old pairing; a type that has a function to sit beside belongs *inside* it.
+
+### The two remaining retrofits, measured
+
+Recorded so whoever takes them starts from measurement rather than from scratch — though the agent that
+measured them noted it would **re-measure rather than trust its own notes** when the work is handed
+over, which is the standing rule working as intended.
+
+- **`src/tools/types.ts` and `src/core/ui/types.ts` are coupled — ONE owner takes both.**
+  `tools/types.ts` imports `ToolCallDisplay` from `core/ui/types.js`, and also pulls `Message`,
+  `OneShotResult` and `OneShotRole` from `core/llm/index.js`.
+- **`tools/types.ts` is not a pure type module**, and the exception is bigger than it looks: it exports
+  **`toolError`**, referenced by **26 files**. Note it is a **function**, not a constant — so this is
+  *not* the `task-statuses.ts` / `severities.ts` constant-module case. It is the ordinary
+  one-function-per-file rule: it becomes **`tool-error.ts`**, and the nine types around it become nine
+  `.type.ts` modules.
+- **That makes it the first retrofit a normal differential harness can verify**, because for once there
+  is a runtime value to import. Use the ordinary recipe, not the checker-level structural tool the
+  pure-type moves needed.
+- **`core/ui/types.ts` stays blocked until wave C clears.** Three importers still sit in `core/session`
+  — `dispatch.ts`, `retro-runner.ts`, `turn-loop.ts`.
 
 **Retrofit, not forward-only — and scheduled, not now.** All five surviving `types.ts` files split:
 `core/session` (26 declarations), `tools` (9), `core/llm` (6), `core/ui` (5), `core/container` (3). The
@@ -627,6 +659,13 @@ write, someone else may have landed in the same paragraph.
 > instrument is worse than having no instrument, because it is the one you would believe **over** the
 > noisy whole-repo run. (An earlier version of this advice omitted it and passed only because the
 > directory it was used on touches no Node global — a latent bug that looked like a working recipe.)
+>
+> **This is a trigger, not a mandate.** Wave C **declined** the scoped config and was right to: the
+> whole-repo gate had stayed clean for it, and **adopting tooling against a problem you do not have is
+> how you acquire a second thing that can be wrong** — which the `typeRoots` bug above demonstrates
+> exactly. **Adopt it when the repo-wide gate starts going red on other agents' saves.** Until then,
+> re-run a red before believing it. The repo-wide typecheck has gone transiently red twice so far, both
+> times resolving within seconds.
 
 > **RULE — NEVER BUILD A STAGE LIST BY EXCLUSION.** Enumerate the paths you created and modified and
 > stage those. **Never subtract a known-bad set from everything dirty** — no "`git status --porcelain`
@@ -662,24 +701,46 @@ were aimed at two agents editing one file — but *never stage speculatively, ke
 and always commit by pathspec* is exactly what makes an agent's sudden death cost nothing. Keep doing all
 three even when you are the only one working.
 
-## A green differential proves nothing until a control has gone red
+## A green differential proves nothing until a control has gone red — AND been shown to run
 
-> **RULE: a passing harness is a claim about the harness, not about the code, until a control has
-> demonstrated it can distinguish.** Every wave from here builds one of these, so build the control
-> first.
+> **THE RULE HAS TWO HALVES, AND ONLY ONE IS OBVIOUS.**
+> 1. **Prove the instrument can distinguish** — a negative control that fires on a deliberate
+>    difference.
+> 2. **Prove the instrument ran** — a **coverage control** asserting the probe total.
+>
+> A negative control proves the harness *can* go red. **It does not prove it executed.** A control that
+> never runs never fails either, so half a rule is not most of a rule here — it is a harness that
+> passes both ways.
 
-Three separate green-and-worthless harnesses have now been caught in this sweep. They are recorded
-together because they are one failure with three faces, and **not one of them was caught by reading the
-green result** — every time it was an instrument failing to fail:
+**Why the second half exists.** Wave C's harness had `main()` **defined and never called** — an earlier
+restructure to dodge `tsx`'s top-level-`await` limit had replaced the invocation with the definition.
+Sixteen probes silently did not execute and it printed `probes=58 mismatches=0`. **No negative control
+could have caught it.** It was found by reading the file's tail, by eye — which is exactly the argument
+for the coverage control existing: *so the next person does not need the same luck.* That harness now
+prints `controls: same() fires on a difference; 94/94 probes ran`, and the total went 58 → 94 once both
+defects were fixed. **Every remaining harness carries both lines.**
+
+Four separate green-and-worthless harnesses have now been caught in this sweep. They are recorded
+together because they are one failure with four faces, and **not one of them was caught by reading the
+green result**:
 
 | shape | how it stayed green | how it was caught |
 |---|---|---|
 | **type-only baseline** | `tsx` erases type imports, so the baseline kept resolving after the module had moved | a runtime value happened to be in the import and broke loudly — **luck** |
 | **already-migrated fixture** | `addCancelledAtColumn` early-returns on every fresh database, so the probe migrated nothing | a separate check proving the fixture really was pre-migration |
 | **wrong-shaped grid** | probed `{function:{name,arguments}}` — the shape `coerceCall` *returns*, not the one it accepts — so every probe returned `null` on **both** sides | **a negative control refused to fire** |
+| **self-comparison** | `same(f(v), f(v))` — the harness compared the new implementation with **itself**, which passes unconditionally | reading the comparison, not running it |
+| **harness never ran** | `main()` defined and never called; 16 probes skipped, `probes=58 mismatches=0` printed | reading the file's tail — **a coverage control now** |
 
-The third is the purest form: a harness comparing `null` to `null`, thousands of times, reporting
-perfect agreement. Nothing about the output distinguishes it from a real proof.
+The wrong-shaped grid is the purest form: a harness comparing `null` to `null`, thousands of times,
+reporting perfect agreement. Nothing in the output distinguishes it from a real proof.
+
+**Self-comparison is the likeliest of the four, because the road to it is honest.** The baseline's
+helper is *private*, so it genuinely cannot be imported — and comparing the new implementation with
+itself is the path of least resistance from a real obstacle rather than carelessness. **The answer is
+the `%TEMP%` baseline recipe below: take `HEAD`'s file, add `export` to its private declarations, change
+no body.** That recipe exists precisely to dissolve the obstacle that produces shape four; if you find
+yourself about to write `same(f(v), f(v))`, that is the entry to go and read.
 
 **A control that fires on MORE than you perturbed is evidence about *what* is being compared.** In the
 `core/llm` type-identity proof, perturbing `WindowRole` or `OneShotRole` also flagged **`CallRole`** —
@@ -726,7 +787,8 @@ fixed. Note that a *historical* reference is fine and should not be swept: `firs
   `{"type":"module"}` `package.json` beside the baseline, or esbuild treats it as CJS and rejects
   top-level `await`. The half that makes the technique work at all: **take `HEAD`'s file and add
   `export` to its private declarations, changing no body.** That is what makes a private helper
-  differentiable without altering what it does.
+  differentiable without altering what it does. **This is the answer to the self-comparison shape
+  above** — reach for it the moment you notice the baseline's helper is private.
 - **A pure-type move cannot satisfy the runtime-value rule, and saying so is the point.**
   `core/container/types.ts` exported **zero** runtime values, so *"a differential baseline must import
   at least one runtime value"* was **unsatisfiable** — any harness built over it would have run

@@ -60,8 +60,8 @@ table matched exactly. Two agents, two instruments, one number.
 | baseline | 104 | 504 |
 | cleared by wave A | 13 | 50 |
 | cleared by wave B | 14 | 77 |
-| cleared by wave C so far | 27 | 172 |
-| **remaining** | **50** | **205** |
+| cleared by wave C so far | 29 | 188 |
+| **remaining** | **48** | **189** |
 
 **Wave C is running.** `src/` root is **done** (`66d5a39`): `src/index.ts`'s three declarations are now
 `src/boot/{main,resolve-or-exit,fail}.ts`, the entry point declares nothing, three inlined `errMessage`
@@ -73,8 +73,10 @@ barrel's exported **name set** identical at 91 values / 77 types), `eaeb319` the
 four persistence stores, `61574a9` the backlog reader (18 declarations) and `9f4d932` the `types.ts`
 retrofit — 26 declarations into 24 one-type `.type.ts` modules, plus `task-statuses.ts` and
 `severities.ts` as plain constant modules, since those are runtime values rather than types. That leaves
-`core/session` at **14 files / 63 declarations** — 14 files and 118 declarations cleared, **65% of the
-wave** — after `463e9ba` took `SessionMemory`. A third agent has closed two of its three jobs:
+`core/session` at **12 files / 47 declarations** — 16 files and 134 declarations cleared, **74% of the
+wave**, after `c24a371` took the debate pair (16 declarations + 8 types, its `isRecord` dedupe importing
+`src/core/llm/is-record.ts` directly because the barrel does not export it). Six harnesses green after
+every commit — **2819 probes, 0 mismatches** — barrel steady at 91 values / 77 types — after `463e9ba` took `SessionMemory`. A third agent has closed two of its three jobs:
 **`src/phases` is clean at the bar** (`5d74ad4`), and **`src/core/container` is fully clean**
 (`2b3e381`) — `types.ts` retired into `tar-entry.type.ts` plus two folds into `sandbox.ts`, every file
 now at one declaration or zero, and its barrel unchanged at 8 values / 7 types for the final pass. **All three of its jobs are now done**, the third being `core/llm` (`602f62f`): `types.ts` deleted into
@@ -83,9 +85,12 @@ four standalone `.type.ts` modules, `ChatResult` folded into `client.ts`, and th
 the five in-folder importers taking them straight from the package. Barrel unchanged at 13 values /
 16 types. **`src/core/llm` is fully clean at the bar.**
 
-**`src/interface` (top level) is running in parallel** — 25 of its 28 declarations across two commits,
-`repl.ts` (9) and the three REPL renderers (12) and the completion pair (4), with `command-registry.ts`
-(3) to follow. Its pre-flight census was **exactly right** — 7 files, 28 declarations, per-file
+**`src/interface` (top level) is running in parallel** — 25 of its 28 declarations across `ea9715b` and
+`7da4b97`, with `command-registry.ts` (3) finishing. That last took **option (a)**: `commandRegistry` is
+a `ReadonlyMap` **value module**, with `get-command.ts` and `list-commands.ts` as separate files rather
+than an assembler — and it wrote the TDZ constraint into its header, which is why the constitution now
+states that constraint for **any** module-level value read across a cycle rather than for assemblers
+alone. Its pre-flight census was **exactly right** — 7 files, 28 declarations, per-file
 9/5/4/3/3/2/2 — which is worth recording after three earlier censuses in this sweep were not. The sixth commit, `45d6313`, took `memory-db.ts`: 26 declarations, the largest single file in
 the whole census and the last "cohesive store module" header in the directory. Four differential
 harnesses now re-run after every commit — five of them, **2725 probes, 0 mismatches** — and the barrel's
