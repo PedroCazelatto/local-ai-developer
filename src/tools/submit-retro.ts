@@ -9,8 +9,9 @@
 // reliable one-sentence rootCause via the same tool-call recovery pipeline every other tool rides.
 
 import type { Tool } from '../core/llm/index.js';
-import type { RetroScope, RetroSubmission } from '../core/session/retro-runner.type.js';
-import { RETRO_SCOPES } from '../core/session/retro-runner.type.js';
+import type { RetroScope } from '../core/session/retro-scope.type.js';
+import { RETRO_SCOPES } from '../core/session/retro-scopes.js';
+import type { RetroSubmission } from '../core/session/retro-submission.type.js';
 
 /** The one name the Retro window special-cases to capture its diagnosis and end the turn. */
 export const SUBMIT_RETRO = 'submit_retro';
