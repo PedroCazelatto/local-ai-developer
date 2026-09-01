@@ -145,16 +145,15 @@ export type { StopScope } from './run-stop-signal.type.js';
 // Model-to-model deliberation (backlog/model-to-model-dialogue.md): challenger ⇄ proponent on throwaway
 // contexts, distilled by a third — one model, three windows, none of them in any phase's memory.
 export { parseDebateDigest } from './parse-debate-digest.js';
-export { runDebate, MAX_DEBATE_ROUNDS } from './run-debate.js';
-export type {
-  DebateRequest,
-  DebateRole,
-  DebateTurn,
-  DebateDigest,
-  DebateDeps,
-  DebateFailure,
-  DebateOutcome,
-} from './run-debate.type.js';
+export { runDebate } from './run-debate.js';
+export { MAX_DEBATE_ROUNDS } from './max-debate-rounds.js';
+export type { DebateRequest } from './debate-request.type.js';
+export type { DebateRole } from './debate-role.type.js';
+export type { DebateTurn } from './debate-turn.type.js';
+export type { DebateDigest } from './debate-digest.type.js';
+export type { DebateDeps } from './debate-deps.type.js';
+export type { DebateFailure } from './debate-failure.type.js';
+export type { DebateOutcome } from './debate-outcome.type.js';
 export { SubagentManager, SUBAGENT_TOOL_NAMES, SUBAGENT_SHORT_ID_LEN } from './subagents.js';
 export type {
   SubagentInfo,
