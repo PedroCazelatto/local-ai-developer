@@ -14,7 +14,7 @@
 
 import { renderer } from '../../core/ui/renderer.js';
 import { theme } from '../../core/ui/theme.js';
-import type { Command } from '../command-registry.js';
+import type { Command } from '../command.type.js';
 import { formatAuditRow } from './format-audit-row.js';
 import { readAuditRows } from './read-audit-rows.js';
 import { writeFittedLine } from './write-fitted-line.js';

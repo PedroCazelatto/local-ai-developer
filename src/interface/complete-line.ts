@@ -12,7 +12,8 @@
 // A line that doesn't start with '/' gets no candidates, so Tab stays inert while composing a chat
 // message instead of completing something the user never asked for.
 
-import { getCommand, listCommands } from './command-registry.js';
+import { getCommand } from './get-command.js';
+import { listCommands } from './list-commands.js';
 import { matchingCandidates } from './matching-candidates.js'; // prefix-filtered and alphabetized -- the order Tab cycles in
 import type { ReplOrchestrator } from './run-repl.js';
 

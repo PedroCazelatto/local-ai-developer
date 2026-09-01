@@ -23,7 +23,8 @@ import {
 import type { RetroInput, RetroResult } from '../../core/session/index.js';
 import { renderer } from '../../core/ui/renderer.js';
 import { renderRetroResult } from '../render-retro-result.js';
-import type { Command, CompletionContext } from '../command-registry.js';
+import type { Command } from '../command.type.js';
+import type { CompletionContext } from '../completion-context.type.js';
 
 const USAGE = 'Usage: /answer <task-id> <answer text>';
 

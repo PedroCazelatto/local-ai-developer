@@ -3,7 +3,7 @@
 // and the switch below in step.
 
 import { renderer } from '../core/ui/renderer.js';
-import type { CommandContext } from '../interface/command-registry.js';
+import type { CommandContext } from '../interface/command-context.type.js';
 import { listSubcommand } from './list-subcommand.js';
 import { modelsCommand } from './models.js';
 import { pullSubcommand } from './pull-subcommand.js';

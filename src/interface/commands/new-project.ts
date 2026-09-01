@@ -8,7 +8,7 @@ import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 
 import { renderer } from '../../core/ui/renderer.js';
-import type { Command } from '../command-registry.js';
+import type { Command } from '../command.type.js';
 import {
   BACKLOG_README_SKELETON,
   isKnownStack,

@@ -3,7 +3,7 @@
 
 import { pullWithSpinner } from '../core/ui/pull-with-spinner.js';
 import { renderer } from '../core/ui/renderer.js';
-import type { CommandContext } from '../interface/command-registry.js';
+import type { CommandContext } from '../interface/command-context.type.js';
 
 /**
  * `/models pull <name>` — stream the pull, then point the user at `/models use` on success.

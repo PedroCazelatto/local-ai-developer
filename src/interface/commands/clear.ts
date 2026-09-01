@@ -9,7 +9,7 @@
 import type { ClearResult } from '../../core/session/index.js';
 import { shortContextId } from '../../core/session/index.js';
 import { renderer } from '../../core/ui/renderer.js';
-import type { Command } from '../command-registry.js';
+import type { Command } from '../command.type.js';
 
 /** The slice of the orchestrator /clear needs — satisfied structurally by SessionOrchestrator. */
 export interface ClearOrchestrator {

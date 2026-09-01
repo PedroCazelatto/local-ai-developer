@@ -3,7 +3,7 @@
 import type { Interface as ReadlineInterface } from 'node:readline/promises';
 
 import { renderer } from '../core/ui/renderer.js';
-import { getCommand } from './command-registry.js'; // name -> Command, undefined for an unknown one
+import { getCommand } from './get-command.js'; // name -> Command, undefined for an unknown one
 import type { ReplOrchestrator } from './run-repl.js';
 
 /**

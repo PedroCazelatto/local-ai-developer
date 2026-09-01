@@ -5,7 +5,7 @@
 import { errMessage } from '../core/err-message.js';
 import { saveAppState } from '../core/session/index.js';
 import { renderer } from '../core/ui/renderer.js';
-import type { CommandContext } from '../interface/command-registry.js';
+import type { CommandContext } from '../interface/command-context.type.js';
 
 /**
  * Apply `name` as the live session model (the next phase turn + any newly spawned window/sub-agent uses

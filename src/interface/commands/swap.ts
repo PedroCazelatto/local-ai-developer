@@ -3,7 +3,7 @@
 // color-coded phase field on the status line reflects the change.
 
 import { renderer } from '../../core/ui/renderer.js';
-import type { Command } from '../command-registry.js';
+import type { Command } from '../command.type.js';
 
 export const swapCommand: Command = {
   name: 'swap',

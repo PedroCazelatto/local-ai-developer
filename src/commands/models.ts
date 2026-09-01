@@ -11,7 +11,7 @@
 // object the registry registers, and exports that object and nothing else. It declares no function of
 // its own — run.ts dispatches, and list-/pull-/use-subcommand.ts do the work.
 
-import type { Command } from '../interface/command-registry.js';
+import type { Command } from '../interface/command.type.js';
 import { run } from './run.js';
 
 const USAGE = 'Usage: /models list | pull <name> | use <name>';
