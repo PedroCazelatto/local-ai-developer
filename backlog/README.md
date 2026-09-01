@@ -63,59 +63,55 @@ table matched exactly. Two agents, two instruments, one number.
 | cleared by wave C so far | 29 | 188 |
 | **remaining** | **48** | **189** |
 
-**Wave C is running.** `src/` root is **done** (`66d5a39`): `src/index.ts`'s three declarations are now
+**Wave C is running, and `src/core/session` is 74% done.** Its eight commits so far: `038fc83` the git
+family (7 files / 39 declarations, five `project-git*` modules and `review-types.ts` deleted, 43 new
+files), `eaeb319` the two follow-ups it owed (`hasHead` collapsed to one implementation, `toPosix`
+renamed `toPosixTrimmed`), `c69c1b3` the four persistence stores, `61574a9` the backlog reader (18
+declarations), `9f4d932` the `types.ts` retrofit (26 declarations into 24 one-type `.type.ts` modules,
+plus `task-statuses.ts` and `severities.ts` as plain constant modules, since those are runtime values
+rather than types), `45d6313` `memory-db.ts` (26 declarations — the largest single file in the whole
+census, and the last "cohesive store module" header in the directory), `463e9ba` `SessionMemory`, and
+`c24a371` the debate pair (16 declarations + 8 types, its `isRecord` dedupe importing
+`src/core/llm/is-record.ts` directly because the barrel does not export it).
+
+That leaves `core/session` at **12 files / 47 declarations** — 16 files and 134 declarations cleared.
+**Six differential harnesses re-run after every commit: 2819 probes, 0 mismatches**, and the barrel's
+exported **name set** has held identical at **91 values / 77 types** across all eight.
+
+**`src/` root is done** (`66d5a39`): `src/index.ts`'s three declarations are now
 `src/boot/{main,resolve-or-exit,fail}.ts`, the entry point declares nothing, three inlined `errMessage`
-copies were repointed at the shared one, and **no barrel was minted in `src/boot/`**. `core/session` —
-the largest directory in the repo — is running across several commits: `038fc83` took the git family
-(7 files / 39 declarations, five `project-git*` modules and `review-types.ts` deleted, 43 new files, the
-barrel's exported **name set** identical at 91 values / 77 types), `eaeb319` the two follow-ups it owed
-(`hasHead` collapsed to one implementation, `toPosix` renamed to `toPosixTrimmed`), and `c69c1b3` the
-four persistence stores, `61574a9` the backlog reader (18 declarations) and `9f4d932` the `types.ts`
-retrofit — 26 declarations into 24 one-type `.type.ts` modules, plus `task-statuses.ts` and
-`severities.ts` as plain constant modules, since those are runtime values rather than types. That leaves
-`core/session` at **12 files / 47 declarations** — 16 files and 134 declarations cleared, **74% of the
-wave**, after `c24a371` took the debate pair (16 declarations + 8 types, its `isRecord` dedupe importing
-`src/core/llm/is-record.ts` directly because the barrel does not export it). Six harnesses green after
-every commit — **2819 probes, 0 mismatches** — barrel steady at 91 values / 77 types — after `463e9ba` took `SessionMemory`. A third agent has closed two of its three jobs:
-**`src/phases` is clean at the bar** (`5d74ad4`), and **`src/core/container` is fully clean**
-(`2b3e381`) — `types.ts` retired into `tar-entry.type.ts` plus two folds into `sandbox.ts`, every file
-now at one declaration or zero, and its barrel unchanged at 8 values / 7 types for the final pass. **All three of its jobs are now done**, the third being `core/llm` (`602f62f`): `types.ts` deleted into
-four standalone `.type.ts` modules, `ChatResult` folded into `client.ts`, and the
-`export type { Message, Tool, ToolCall } from 'ollama'` re-export **deleted** by the user's ruling, with
-the five in-folder importers taking them straight from the package. Barrel unchanged at 13 values /
-16 types. **`src/core/llm` is fully clean at the bar.**
+copies were repointed at the shared one, and **no barrel was minted in `src/boot/`**.
+
+**A third agent has closed all three of its jobs, and all three directories are clean at the bar.**
+`src/phases` (`5d74ad4`); `src/core/container` (`2b3e381`) — `types.ts` retired into `tar-entry.type.ts`
+plus two folds into `sandbox.ts`, barrel unchanged at 8 values / 7 types; and `src/core/llm`
+(`602f62f`) — `types.ts` deleted into four standalone `.type.ts` modules, `ChatResult` folded into
+`client.ts`, and the `export type { Message, Tool, ToolCall } from 'ollama'` re-export **deleted** by
+the user's ruling, with the five in-folder importers taking them straight from the package; barrel
+unchanged at 13 values / 16 types.
 
 **`src/interface` (top level) is running in parallel** — 25 of its 28 declarations across `ea9715b` and
 `7da4b97`, with `command-registry.ts` (3) finishing. That last took **option (a)**: `commandRegistry` is
 a `ReadonlyMap` **value module**, with `get-command.ts` and `list-commands.ts` as separate files rather
 than an assembler — and it wrote the TDZ constraint into its header, which is why the constitution now
 states that constraint for **any** module-level value read across a cycle rather than for assemblers
-alone. Its pre-flight census was **exactly right** — 7 files, 28 declarations, per-file
-9/5/4/3/3/2/2 — which is worth recording after three earlier censuses in this sweep were not. The sixth commit, `45d6313`, took `memory-db.ts`: 26 declarations, the largest single file in
-the whole census and the last "cohesive store module" header in the directory. Four differential
-harnesses now re-run after every commit — five of them, **2725 probes, 0 mismatches** — and the barrel's
-exported name set has held steady at 91 values / 77 types across every commit.
+alone. Its pre-flight census was **exactly right** — 7 files, 28 declarations, per-file 9/5/4/3/3/2/2 —
+worth recording after three earlier censuses in this sweep were not.
 
-**Ten old-style `.type.ts` pairs still sit in that directory** — `batch`, `memory-db`, `subagents`,
+**Ten old-style `.type.ts` pairs still sit in `core/session`** — `batch`, `memory-db`, `subagents`,
 `retro-runner`, `run-debate`, `run-task-loop`, `run-stop-signal`, `events-log`, `read-tracker`,
 `evict-stale-tool-results`. Each is the sibling of a `.ts` file wave C has not reached yet and **dies
-with it**, so this is not the retrofit having been left half-done. **`core/llm` is complete** — the
-`ollama-with-signal.ts` follow-up this table used to carry was withdrawn once the arrow rule was scoped
-to top-level object literals.
+with it**, so this is not the retrofit having been left half-done.
 
-**A type retrofit wave sits between C and D.** The type rule changed a third time — an unowned type now
-gets its own one-type `<kebab-type-name>.type.ts` file and `types.ts` is retired as a concept — and the
-user chose to retrofit rather than leave five directories on the old shape. All five surviving `types.ts`
-files split: `core/session` (26 declarations), `tools` (9), `core/llm` (6), `core/ui` (5),
-`core/container` (3). It cannot run during wave C: `core/ui/types.ts` alone has six importers outside its
-folder, three of them inside `src/core/session/`. `tools`' share folds into wave D. **A type with an
-owning function is untouched by all of this** — that rule has never changed.
+**Wave D, not started:** `tools` (20/60) as one agent — **`phases` is no longer part of it**, having
+been cleared early by the self-contained agent (`5d74ad4`) — and `interface/commands` with whatever
+`interface` has not finished, as one agent, because the two are mutually coupled (15 edges one way, 1
+the other) and splitting them would put both agents in the same files. **Then the two `types.ts`
+retrofits**, `tools`' riding with its own wave and `core/ui`'s once `core/session` clears its three
+importers. **Wave E is the final barrel pass**, deleting all nine `index.ts` re-export modules at once.
 
-**Wave D is shaped and not started:** `tools` + `phases` (21/62) as **one** agent, and `interface` +
-`interface/commands` (27/131) as **one** agent. Each pair is mutually coupled — 15 and 4 edges between
-`interface` and `interface/commands`, and `phases` imports 7 files from `tools` — so each gets a single
-owner rather than two agents fighting over the same files. **Wave E is the final barrel pass**, deleting
-all nine `index.ts` re-export modules at once.
+Re-measure the coupling before starting any of them — the graph has changed under every wave so far,
+and this shape is a starting point rather than a schedule.
 
 The baseline was **106 / 528** until wave B found that an arrow property only counts when its object
 literal is at module top level. Twenty-two arrows across ten files sit inside a function body instead —
