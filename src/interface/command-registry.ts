@@ -5,8 +5,9 @@
 // `listCommands()` — so a new command shows up in `/help`, correctly grouped, the MOMENT it is added
 // to COMMANDS below, with no hand-maintained list to drift.
 //
-// repl.ts now dispatches EVERY command through `getCommand` — the old fallback switch is gone. A
-// command that needs to stop the session (`/exit`) calls `ctx.requestExit()`; the REPL owns the loop.
+// The REPL dispatches EVERY command through `getCommand` (handle-command.ts) — the old fallback switch
+// is gone. A command that needs to stop the session (`/exit`) calls `ctx.requestExit()`; the loop in
+// run-repl.ts owns the decision.
 
 import type { Interface as ReadlineInterface } from 'node:readline/promises';
 
@@ -26,7 +27,7 @@ import { runCommand } from './commands/run.js';
 import { subagentsCommand } from './commands/subagents.js';
 import { swapCommand } from './commands/swap.js';
 import { tasksCommand } from './commands/tasks.js';
-import type { ReplOrchestrator } from './repl.js';
+import type { ReplOrchestrator } from './run-repl.js';
 
 /** The purpose buckets `/help` groups commands under. The display order/labels live in commands/help.ts. */
 export type CommandGroup = 'session' | 'models' | 'projects' | 'subagents' | 'execution';
