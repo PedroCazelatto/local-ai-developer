@@ -102,6 +102,11 @@ a shell.** Its four types were each measured by importer and all four found genu
 pre-flight census was **exactly right** — 7 files, 28 declarations, per-file 9/5/4/3/3/2/2 — worth
 recording after three earlier censuses in this sweep were not.
 
+**[2](test-the-invariant-functions.md)'s deferred `core/llm` pass is landing** — **136 tests in 9 files,
+taking the suite 195 → 331**, one test file per function under test, every one importing the specific
+function file rather than a barrel. It produced [26](streamed-reply-corruption-in-core-llm.md). `src/context/`
+tests start next; both directories are finished and stable, which is what makes them safe to pin.
+
 **Ten old-style `.type.ts` pairs still sit in `core/session`** — `batch`, `memory-db`, `subagents`,
 `retro-runner`, `run-debate`, `run-task-loop`, `run-stop-signal`, `events-log`, `read-tracker`,
 `evict-stale-tool-results`. Each is the sibling of a `.ts` file wave C has not reached yet and **dies
@@ -464,6 +469,28 @@ this module and throws before its first assertion. That makes it a **prerequisit
 what turns latent into blocking. The method is worth keeping too: **one process per entry point**, since
 Node's module cache makes first-import order the only variable and a second import in the same process is
 served from cache.
+
+### 26. [Two ways `core/llm` corrupts the reply the user reads](streamed-reply-corruption-in-core-llm.md)
+*Terminal UX.* Two defects from [2](test-the-invariant-functions.md)'s `core/llm` pass, grouped as
+[24](backlog-reader-drifts-from-its-own-docs.md) was — one directory, one reviewer, one symptom class:
+**the model's output is correct and what reaches the screen is not.**
+
+**A reply ending in a fenced code block loses its closing fence.** `flush()` returns held text only in
+`prose` and `fence_close`, and a closing ``` sits in `fence_open`. **It is lossless only when prose
+*follows* the block** — the closing fence is then re-read as a new opener and aborted back into prose —
+so **the ordinary case fails and the unusual one passes**, which is the distribution that keeps a defect
+alive. `system-prompt.ts` instructs the model to fence its code, so a reply ending with the code it just
+wrote shows an unterminated block. A trailing single backtick goes the same way.
+
+**`repairDecode` counts `consumed` in code points while every caller slices in code units**, so each
+astral character undercounts by one and the tool-call span misaligns. The call is recovered correctly —
+the **debris** lands in the reply: `'a {"name":…"hi 😀"}} b'` cleans to `'a } b'`. One emoji is enough.
+Its JSDoc says `consumed` *"counts characters"*, which is exactly ambiguous enough to read as correct.
+
+Both carry the standing conditions: **the tests assert the current behaviour**, so a fix changes its
+test, and **neither may ride in a sweep commit** — easy here, since `core/llm` closed at `602f62f` and
+there is no refactor in flight to hide behind. The file also records one **non**-defect, so nobody
+promotes it: `expandOverFence`'s unreachable guard.
 
 ---
 

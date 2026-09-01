@@ -775,6 +775,29 @@ subsumes the other. And it **demonstrated** the `readonly` blind spot rather tha
 from this file — ran the control, got zero errors, recorded it. **Inheriting a claimed blind spot is
 itself a green you have not tested.**
 
+### Mutation testing answers directly what every other instrument answered by proxy
+
+> **A test that passes is not yet evidence that the code it names is the code being exercised.** Five
+> earlier findings in this file circle that sentence from outside — the type-only baseline, the
+> already-migrated fixture, the wrong-shaped grid, the self-comparison, the harness that never ran. Each
+> was a different way of discovering that a green result was not about the code. **Mutation testing
+> answers it head-on:** break the code on purpose, and see whether the test notices.
+
+The instrument: copy `src/` to a temp directory, **mutate one file at a time**, and run only the test
+file affected. Thirteen mutations, twelve killed — **and the survivor is the entire value of the
+exercise.** An array test was being killed by a later *"name must be a string"* check rather than by the
+`Array.isArray` guard it was aimed at. **The test passed for the wrong reason**, and would have gone on
+passing if the guard it was written for were deleted outright.
+
+Note what that costs to find any other way: nothing about the test's name, its assertions or its green
+result distinguishes it from a test that works. **Only deleting the guard reveals it**, which is what a
+mutation harness does automatically and no amount of reading does reliably.
+
+It also carried the coverage-control idea forward: the harness **printed the unmutated control for each
+file first**, so a broken harness shows up as a **red control** rather than as false confidence. That is
+the same two-part rule as above — prove it can distinguish, and prove it ran — applied to the strongest
+instrument this sweep has produced.
+
 **A control that fires on MORE than you perturbed is evidence about *what* is being compared.** In the
 `core/llm` type-identity proof, perturbing `WindowRole` or `OneShotRole` also flagged **`CallRole`** —
 which proves `CallRole` is compared **expanded**, not matched by name. That matters precisely because
