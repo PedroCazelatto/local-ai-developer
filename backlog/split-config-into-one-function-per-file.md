@@ -346,15 +346,36 @@ reaches them. Classified by who imports them:
   into the sibling, retarget the barrel line, done.
 - **21 shared** — imported by files beyond their sibling. Still mechanical, just wide: each importer
   changes one path. Widest are `read-tracker.type.ts` (8 importers) and `memory-db.type.ts` (5).
-- **5 orphans** — **no `.ts` sibling at all**, so no function owns them. These are the ones that bite:
+- **5 files with no `.ts` sibling.** That is a **structural** fact and nothing more.
 
-  | file | non-barrel importers |
-  |---|---|
-  | `src/core/ui/tool-call-display.type.ts` | 6 — `dispatch.ts`, `retro-runner.ts`, `build-file-diff.ts`, `write-file.ts`, `types.ts`, `format-tool-result-lines.type.ts` |
-  | `src/core/llm/call-role.type.ts` | 3 — `client.ts`, `one-shot.ts`, `resolve-window-ctx.ts` |
-  | `src/core/ui/markdown-stream.type.ts` | 3 — `turn-loop.ts`, `create-markdown-stream.ts`, `renderer.ts` |
-  | `src/core/container/tar-entry.type.ts` | 2 — `encode-tar.ts`, `sandbox.ts` |
-  | `src/core/container/sandbox-file.type.ts` | 1 — `sandbox.ts` |
+  > **THE TABLE'S OLD HEADING SAID "so no function owns them". THAT INFERENCE IS WRONG — do not carry
+  > it into the two remaining retrofits.** A missing stem-mate says nothing about ownership.
+  > **Measure the importers; do not trust the label.**
+
+  | file | non-barrel importers | verdict |
+  |---|---|---|
+  | `src/core/ui/tool-call-display.type.ts` | 6 — `dispatch.ts`, `retro-runner.ts`, `build-file-diff.ts`, `write-file.ts`, `types.ts`, `format-tool-result-lines.type.ts` | genuinely unowned |
+  | `src/core/llm/call-role.type.ts` | 3 — `client.ts`, `one-shot.ts`, `resolve-window-ctx.ts` | genuinely unowned |
+  | `src/core/ui/markdown-stream.type.ts` | 3 — `turn-loop.ts`, `create-markdown-stream.ts`, `renderer.ts` | genuinely unowned |
+  | `src/core/container/tar-entry.type.ts` | 2 — `encode-tar.ts`, `sandbox.ts` | genuinely unowned |
+  | `src/core/container/sandbox-file.type.ts` | 1 — `sandbox.ts` | **OWNED — the label was wrong** |
+
+  **The trap waits wherever a single consumer is the sole importer.** Three importers or more and the
+  type really is folder vocabulary; one, and you are probably looking at a return type that wandered.
+
+  **Two disproofs, both on the record.** `ChatResult` never had a `.type.ts` *at all* and was still
+  ruled **owned**, folding into `client.ts` — so the structural test gets it wrong in both directions.
+  And `sandbox-file.type.ts`'s two types, `SandboxRead` and `SandboxWrite`, are each the return type of
+  a `SandboxClient` method, with `sandbox.ts` their only non-barrel importer and nothing outside the
+  folder naming either. They folded into `sandbox.ts` beside **`ExecResult`** — their exact structural
+  peer, which wave A left there and which no rule has ever proposed moving.
+
+  **The stronger disproof is documentary.** The retired `core/container/types.ts` justified its
+  folder-level home by asserting those types were *"returned by SandboxClient and **read by the file
+  tools**"*. `grep -rl 'SandboxRead\|SandboxWrite' src/tools/` returns **nothing** — the tools call the
+  methods and destructure structurally. **The load-bearing justification had been false for as long as
+  it had been written**, and that is the **third** time this sweep has found a header asserting
+  something the code does not do.
 
 > **RULING, third and final revision — read this before writing any type.** An unowned type gets **its
 > own file: one type per file, named `<kebab-type-name>.type.ts`.** `blocker-row.type.ts`,
@@ -557,6 +578,14 @@ Which is the general rule worth stating on its own: **in a shared tree, re-read 
 before you edit it.** Never write it out from your own last-known state — between your read and your
 write, someone else may have landed in the same paragraph.
 
+> **A red `npm run typecheck` may not be yours.** A whole-repo typecheck in a shared tree is
+> attributable to **whoever is mid-save**, not necessarily to your change: one agent hit six
+> `Cannot find module './run-repl.js'` errors from another agent's write window, and the file existed a
+> second later. **Re-run before believing a red**, and keep a **directory-scoped `tsconfig` outside the
+> repo** so you have a gate that is unambiguously yours. This is the natural sibling of scoping
+> `git status` with a pathspec: in a shared tree, narrow every instrument to your own work before you
+> read a result off it.
+
 > **RULE — NEVER BUILD A STAGE LIST BY EXCLUSION.** Enumerate the paths you created and modified and
 > stage those. **Never subtract a known-bad set from everything dirty** — no "`git status --porcelain`
 > minus the governance docs", no "everything except someone else's directory". Scope every `git status`
@@ -596,6 +625,23 @@ three even when you are the only one working.
   runtime value. **Every remaining wave builds one of these harnesses, so: a differential baseline
   must import at least one runtime value from the module under test, or its green result is not
   evidence.** Check that before trusting a byte-identical comparison.
+- **A pure-type move cannot satisfy the runtime-value rule, and saying so is the point.**
+  `core/container/types.ts` exported **zero** runtime values, so *"a differential baseline must import
+  at least one runtime value"* was **unsatisfiable** — any harness built over it would have run
+  byte-identical code on both sides and gone green **by construction.** The right move was to **name
+  that as the hazard rather than dress it as mitigation**, then build the instrument that does have
+  power: a TypeScript `Program` rendering each type **structurally** — every property with its
+  optionality and `readonly`, every union arm, recursively, sorted — from `HEAD` and from the live
+  barrel, requiring **identical renders and mutual assignability in both directions**.
+
+  **The eight negative controls are what make it evidence rather than ritual**, and one earns its own
+  sentence: **dropping `readonly` from a property is invisible to mutual assignability** and is caught
+  only by the structural render. A harness with no negative control is a harness nobody has shown can
+  fail.
+
+  The honest companion belongs here too: the same commit's **45 `encodeTar` byte probes pin
+  `encode-tar.ts`, not the type move** — `tsx` erases the type import before the first byte runs. It
+  was recorded that way rather than letting 45 green probes imply more than they carry.
 - **The same trap's second shape: when a probe depends on a fixture being in a particular state, prove
   the fixture is in that state.** A migration probe is the worked example. `addCancelledAtColumn`
   early-returns on every fresh database, because `memory-db.schema.ts` already carries `cancelled_at` —
