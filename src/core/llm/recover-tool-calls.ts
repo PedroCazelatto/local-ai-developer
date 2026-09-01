@@ -4,13 +4,14 @@
 // and the turn loop can't dispatch. Port of core/llm/tool_call_recovery.py — delete once Ollama
 // parses them reliably.
 
+import type { ToolCall } from 'ollama';
+
 import { coerceCall } from './coerce-call.js';
 import { expandOverFence } from './expand-over-fence.js';
 import type { Span } from './expand-over-fence.js';
 import { parseCall } from './parse-call.js';
 import { repairDecode } from './repair-decode.js';
 import { stripSpans } from './strip-spans.js';
-import type { ToolCall } from './types.js';
 
 // Lazy `\{[\s\S]*?\}` is safe here because the trailing </tool_call> anchor forces it to expand
 // to the LAST closing brace (so nested-object arguments are captured whole).

@@ -14,8 +14,11 @@
 // because their input is either window-sized (`summarize`) or uncapped (`debate-*`). Passing the role
 // rather than binding a ceiling here is what keeps that decision in one place instead of six.
 
+import type { Message } from 'ollama';
+
 import type { OllamaClient } from './client.js';
-import type { Message, OneShotRole, TokenCounts } from './types.js';
+import type { OneShotRole } from './one-shot-role.type.js';
+import type { TokenCounts } from './token-counts.type.js';
 
 /**
  * The model's text reply plus the EXACT token counts Ollama reported for this single throwaway call.

@@ -9,15 +9,27 @@ import type { ChatResponse, Message, Tool, ToolCall } from 'ollama';
 
 import { beginModelCall } from './begin-model-call.js';
 import type { ModelCallLifetime } from './begin-model-call.js';
+import type { CallRole } from './call-role.type.js';
 import { exactCount } from './exact-count.js';
 import { ollamaWithSignal } from './ollama-with-signal.js';
 import { recoverIfNeeded } from './recover-if-needed.js';
 import { resolveWindowCtx } from './resolve-window-ctx.js';
 import { StreamFilter } from './stream-filter.js';
+import type { TokenCounts } from './token-counts.type.js';
 import { TurnAbortedError } from './turn-aborted-error.js';
-import type { CallRole, ChatResult, TokenCounts, WindowRole } from './types.js';
+import type { WindowRole } from './window-role.type.js';
 
 const NO_TOKENS: TokenCounts = { promptTokens: null, evalTokens: null };
+
+/**
+ * One finished model call: the assistant message Ollama returned, and the EXACT token counts it
+ * reported for it. Declared here rather than in a module of its own because OllamaClient owns it —
+ * `chat` returns it, `StreamHandle.result()` returns it, and nothing outside core/llm names it.
+ */
+export interface ChatResult {
+  readonly message: Message; // final assistant message, incl. content AND tool_calls
+  readonly tokens: TokenCounts;
+}
 
 /** A live streaming turn: consume `deltas` fully, then read `result()`. */
 export interface StreamHandle {
