@@ -156,6 +156,16 @@ more are coming: `BACKLOG_DIRNAME`, `MAX_TOOL_ROUNDS`, `KEEP_RECENT_TOOL_RESULTS
 Only a genuinely shared constant earns its own file. Otherwise the sweep trades one over-full file for a
 scatter of one-line modules, which is not what the rule is for.
 
+**Before reaching for the assembler, check whether the colliding helper is a DUPLICATE.** This inverts
+the guidance below, and it was earned: `inbox-store`'s private `appendEvent` and `events-log.ts`'s
+exported `appendEvent` were heading for two `append-event.ts` in one flat folder — exactly the collision
+shape that sent wave B to an assembler. Neither renaming nor an assembler was right. **The private one
+was the fourth copy of `append-jsonl-line.ts`**, whose own header says it exists so that "audit.ts and
+events-log.ts do not each re-implement the fsync dance". A helper that already had a shared home had
+been re-implemented three more times. So the order is: **duplicate? → delete and repoint. Genuinely two
+different functions? → then the assembler.** A collision is evidence about the code, not just a file-system
+problem to route around.
+
 **A file-name collision is a signal to reach for the assembler — never a licence to rename an exported
 name.** In a flat directory, one file per function is sometimes *impossible*: `repaint` is exported by
 both `status-bar.ts` and `activity-line.ts`, `reset` by both `input-fence.ts` and `status-activity.ts`.
@@ -308,26 +318,46 @@ reaches them. Classified by who imports them:
   | `src/core/container/tar-entry.type.ts` | 2 — `encode-tar.ts`, `sandbox.ts` |
   | `src/core/container/sandbox-file.type.ts` | 1 — `sandbox.ts` |
 
-**Ruled: a type no function owns goes in the folder's `types.ts`.** Not into an arbitrary function's
-file — `write-file.ts` holding a display contract six other files import would be worse than what exists
-today. The reasoning is the one the one-function-per-file rule already uses: *cohesion is an argument for
-a folder, not for a file*, and that holds for types exactly as it holds for functions. The shape is not
-new — `src/tools/types.ts` (9 declarations), `src/core/session/review-types.ts` (5),
-`src/core/session/types.ts` (4) and `src/core/llm/types.ts` (3) already do this and predate the rule.
+> **RULING, third and final revision — read this before writing any type.** An unowned type gets **its
+> own file: one type per file, named `<kebab-type-name>.type.ts`.** `blocker-row.type.ts`,
+> `phase-load.type.ts`, `tool-call-display.type.ts`. **`types.ts` no longer exists as a concept**, and
+> neither does the "one mandated spelling per folder" clause it needed, nor the rationale that had
+> `review-types.ts` merging into it.
 
-**`types.ts` is the mandated spelling, one per folder.** `review-types.ts` is a second spelling of the
-same idea and merges into `src/core/session/types.ts` when the sweep reaches that directory.
+**What did NOT change, and it is the rule most of this work rests on: a type WITH an owning function
+stays inside that function's file.** `InstalledModel` stays in `list-models.ts`. Everything five waves
+have already folded in stays folded in. Only the **unowned** types — the ones that were collecting in a
+folder's `types.ts` — are affected. Three type rulings have now landed in one session, which is exactly
+where a reader loses the thread, so: **owned types have never moved.**
 
-So the five orphans go to `src/core/ui/types.ts`, `src/core/llm/types.ts` and
-`src/core/container/types.ts`. This also keeps `CallRole` addressable at a stable path, which is what
-lets `docs/mental-model.md:27` keep linking to a file — see the hazards below.
+**`<name>.type.ts` is back, and it means something different from what it used to.** It once named a
+**sibling** of a function file — a `<name>.ts` / `<name>.type.ts` pair. It now names a **standalone
+module holding exactly one unowned type**, with deliberately **no `.ts` file of the same stem**. Do not
+recreate the old pairing; a type that has a function to sit beside belongs *inside* it.
+
+**Retrofit, not forward-only — and scheduled, not now.** All five surviving `types.ts` files split:
+`core/session` (26 declarations), `tools` (9), `core/llm` (6), `core/ui` (5), `core/container` (3). The
+user chose retrofitting over leaving them, so the repo ends with one convention rather than a reader
+having to know which era a folder was swept in. **It is its own wave after C**, because the three
+finished directories collide with live work: `core/ui/types.ts` alone has six importers outside its
+folder — `dispatch.ts`, `retro-runner.ts` and `turn-loop.ts` in `core/session`, where wave C is running,
+plus `build-file-diff.ts`, `write-file.ts` and `tools/types.ts`. That last one means the `core/ui` and
+`tools` retrofits are themselves coupled. **`tools`' share folds into wave D.**
+
+**Wave C's type-family tie-breaker is retired, not confirmed.** It existed because splitting `BlockerRow`
+from `RaisedBlocker`/`ResolvedBlocker` would have made `types.ts` import from a function file. Under
+one-type-per-file the union and its members are simply three files and the union imports the other two.
+**Types importing types is fine**, and nothing about the rule argues for keeping a family in one module.
+
+**Second worked example for the barrel invariant.** A single `types.ts` export line becomes 26 one-name
+lines. The line count grows; **the exported name set is identical.** That is the check.
 
 **Worked example — `src/tools/search-in-files.type.ts`.** It has a sibling, so it looks like a mechanical
 fold, but its 8 declarations serve five peer functions (`find-matching-lines`, `merge-line-ranges`,
 `parse-search-request`, `render-file-matches`, `summarize-search`) and none of them owns the
-request/result vocabulary. It is the orphan case wearing a sibling's clothes: **it goes to
-`src/tools/types.ts`.** Do not agonise over which of the five should host it — that question is itself
-the signal that no function owns it.
+request/result vocabulary. It is the orphan case wearing a sibling's clothes: under the ruling above its
+declarations become **eight `<name>.type.ts` files**. Do not agonise over which of the five functions
+should host it — that question is itself the signal that no function owns it.
 
 `.schema.ts` siblings **stay**. A type erases at compile time and costs the function file nothing; a
 schema is a runtime value with its own weight and its own imports. There is one in the repo,
@@ -458,6 +488,14 @@ nothing was lost only because the second one re-read the file from disk before w
 Which is the general rule worth stating on its own: **in a shared tree, re-read a file immediately
 before you edit it.** Never write it out from your own last-known state — between your read and your
 write, someone else may have landed in the same paragraph.
+
+**The discipline has now been tested by accident, and it held.** Two live agents were killed mid-task by
+a session limit. The tree needed **no recovery of any kind**: nothing was staged, no scratch files sat
+inside the repo, and every commit had been made by explicit pathspec, so no half-finished work was
+reachable by anyone else's `git add`. Nobody designed the partition rules for that failure mode — they
+were aimed at two agents editing one file — but *never stage speculatively, keep scratch out of the tree,
+and always commit by pathspec* is exactly what makes an agent's sudden death cost nothing. Keep doing all
+three even when you are the only one working.
 
 ## Hazards found during the first increment
 

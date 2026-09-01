@@ -60,18 +60,28 @@ table matched exactly. Two agents, two instruments, one number.
 | baseline | 104 | 504 |
 | cleared by wave A | 13 | 50 |
 | cleared by wave B | 14 | 77 |
-| cleared by wave C so far | 8 | 42 |
-| **remaining** | **69** | **335** |
+| cleared by wave C so far | 12 | 71 |
+| **remaining** | **65** | **306** |
 
 **Wave C is running.** `src/` root is **done** (`66d5a39`): `src/index.ts`'s three declarations are now
 `src/boot/{main,resolve-or-exit,fail}.ts`, the entry point declares nothing, three inlined `errMessage`
 copies were repointed at the shared one, and **no barrel was minted in `src/boot/`**. `core/session` —
-the largest directory in the repo — is running across several commits; the first (`038fc83`) took the
-git family: 7 files / 39 declarations, five `project-git*` modules and `review-types.ts` deleted, 43 new
-files, and the barrel's exported **name set** held identical at 91 values / 77 types. That leaves
-`core/session` at **21 files / 142 declarations**. **`core/llm` is complete** — the
+the largest directory in the repo — is running across several commits: `038fc83` took the git family
+(7 files / 39 declarations, five `project-git*` modules and `review-types.ts` deleted, 43 new files, the
+barrel's exported **name set** identical at 91 values / 77 types), `eaeb319` the two follow-ups it owed
+(`hasHead` collapsed to one implementation, `toPosix` renamed to `toPosixTrimmed`), and `c69c1b3` the
+four persistence stores. That leaves `core/session` at **17 files / 113 declarations** — 11 files and 68
+declarations cleared. **`core/llm` is complete** — the
 `ollama-with-signal.ts` follow-up this table used to carry was withdrawn once the arrow rule was scoped
 to top-level object literals.
+
+**A type retrofit wave sits between C and D.** The type rule changed a third time — an unowned type now
+gets its own one-type `<kebab-type-name>.type.ts` file and `types.ts` is retired as a concept — and the
+user chose to retrofit rather than leave five directories on the old shape. All five surviving `types.ts`
+files split: `core/session` (26 declarations), `tools` (9), `core/llm` (6), `core/ui` (5),
+`core/container` (3). It cannot run during wave C: `core/ui/types.ts` alone has six importers outside its
+folder, three of them inside `src/core/session/`. `tools`' share folds into wave D. **A type with an
+owning function is untouched by all of this** — that rule has never changed.
 
 **Wave D is shaped and not started:** `tools` + `phases` (21/62) as **one** agent, and `interface` +
 `interface/commands` (27/131) as **one** agent. Each pair is mutually coupled — 15 and 4 edges between
