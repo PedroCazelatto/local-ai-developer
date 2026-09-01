@@ -230,6 +230,18 @@ Three data points in one sweep, which is what makes this a rule rather than an a
 | `splitFrontmatter` | **different bodies**: `context/`'s takes one argument, returns `{name, body}`, never throws; `backlog.ts`'s took the task path for its error message, returned `{data, body}`, threw `BacklogError` | newcomer renamed `splitTaskFrontmatter`; `context/` kept the plain name it already had |
 | `toPosix` | **different bodies**, neither a superset | session half renamed `toPosixTrimmed`; `src/tools/` still owes its half to wave D |
 
+**Type-vs-function stem collision — the exported name outranks the private helper.** A `.type.ts` may
+not share a stem with a `.ts`, so `ChatRole` (exported type) and `chatRole` (private function) could not
+both be `chat-role`. **`ChatRole` kept the stem**; the helper moved to `to-message-role.ts`. The sweep
+has had three function-vs-function collisions and this is its first type-vs-function one, so the
+tie-break is written down rather than re-derived.
+
+The part worth keeping is that **the rename was more correct, not a workaround**: the helper returns
+Ollama's `Message['role']`, not this folder's `ChatRole`, so its old name claimed a return type it never
+had. That is the **second** time a forced rename has exposed a name that was lying — `splitFrontmatter`
+was the first. A collision is often a naming defect presenting itself, which is the same lesson the
+duplicate check teaches from the other side.
+
 **A shared destination is created once, by the first wave that needs it, and named here before a second
 wave can invent a rival.** This rule has a scar. `b63092e` committed
 `src/core/container/message-of.ts`, and the `commands` wave then wrote `src/core/err-message.ts` with
@@ -545,6 +557,28 @@ Which is the general rule worth stating on its own: **in a shared tree, re-read 
 before you edit it.** Never write it out from your own last-known state — between your read and your
 write, someone else may have landed in the same paragraph.
 
+> **RULE — NEVER BUILD A STAGE LIST BY EXCLUSION.** Enumerate the paths you created and modified and
+> stage those. **Never subtract a known-bad set from everything dirty** — no "`git status --porcelain`
+> minus the governance docs", no "everything except someone else's directory". Scope every `git status`
+> you run with a pathspec.
+>
+> The reason is general, and it is why this cannot be left to care: **an exclusion filter encodes an
+> assumption about everyone else's work.** It is correct exactly as long as the tree around you looks
+> the way it did when you wrote it, it stops being correct silently, and **nothing tells you.** A
+> positive list can only ever be wrong about your own work, which is the only thing you can actually
+> check.
+
+This nearly cost the sweep a corrupted commit. A wave C agent's recipe was "`git status --porcelain`
+minus the four governance docs" — **correct and safe for six commits**, while it was the only agent
+writing in `src/`. Concurrency was then raised, and the same recipe was one command away from sweeping
+the `src/interface` agent's **22 uncommitted files** into an unrelated commit.
+
+**That was an orchestration error, not the agent's.** The condition the recipe depended on — *"the only
+uncommitted work in `src/` is mine"* — stopped being true, and nobody broadcast it. Which is the point:
+the agent had no way to know, and that is exactly the failure mode an exclusion filter has and a
+positive list does not. **Committing by explicit pathspec is what caught it**, for the third time in
+this sweep.
+
 **The discipline has now been tested by accident, and it held.** Two live agents were killed mid-task by
 a session limit. The tree needed **no recovery of any kind**: nothing was staged, no scratch files sat
 inside the repo, and every commit had been made by explicit pathspec, so no half-finished work was
@@ -635,6 +669,17 @@ Two items are outstanding, and one that was listed here has been **withdrawn**:
 - **Tests for `StreamFilter` and `recoverToolCalls`** — item 2 deferred them while `core/llm` was
   mid-split. That directory has landed, so they are unblocked.
 - **Tests for `src/context/`** — likewise deferred; the directory landed in `daf08cf`.
+- **A test asserting the two halves of the visible-turn predicate agree.** *"Still in the phase's live
+  history"* is now defined **twice**: as SQL in `visible-turn-where.ts` for turns read from `memory.db`,
+  and as JS in `visible-turns.ts` for turns still held in RAM. **It cannot be deduped** — two languages,
+  two execution sites — and **the two must agree or a flush changes what a phase can see.** Both headers
+  now cross-reference each other, which is the best guard available in prose, but this is precisely the
+  shape that wants a test and does not have one. Note the framing, which is the sweep's recurring theme:
+  **the duplication was always there; one file was hiding it.**
+- **Remove `ChatRole`, deliberately and not as sweep work.** It has no consumer at all — only its own
+  declaration and the barrel line re-exporting it. Wave C left it in place because the barrel's name set
+  may not change mid-sweep, which is correct. It is dead vocabulary for someone to delete on purpose,
+  after the barrel pass.
 - ~~`src/core/llm` needs a follow-up for `ollama-with-signal.ts`~~ — **withdrawn, and worth knowing why.**
   It read as one function plus an inline arrow, but the arrow is `fetch: (input, init) => {` on the
   object passed to `new Ollama({…})` **inside the function body**. Under the corrected rule that is not
