@@ -60,8 +60,8 @@ table matched exactly. Two agents, two instruments, one number.
 | baseline | 104 | 504 |
 | cleared by wave A | 13 | 50 |
 | cleared by wave B | 14 | 77 |
-| cleared by wave C so far | 12 | 71 |
-| **remaining** | **65** | **306** |
+| cleared by wave C so far | 13 | 89 |
+| **remaining** | **64** | **288** |
 
 **Wave C is running.** `src/` root is **done** (`66d5a39`): `src/index.ts`'s three declarations are now
 `src/boot/{main,resolve-or-exit,fail}.ts`, the entry point declares nothing, three inlined `errMessage`
@@ -70,8 +70,16 @@ the largest directory in the repo — is running across several commits: `038fc8
 (7 files / 39 declarations, five `project-git*` modules and `review-types.ts` deleted, 43 new files, the
 barrel's exported **name set** identical at 91 values / 77 types), `eaeb319` the two follow-ups it owed
 (`hasHead` collapsed to one implementation, `toPosix` renamed to `toPosixTrimmed`), and `c69c1b3` the
-four persistence stores. That leaves `core/session` at **17 files / 113 declarations** — 11 files and 68
-declarations cleared. **`core/llm` is complete** — the
+four persistence stores, `61574a9` the backlog reader (18 declarations) and `9f4d932` the `types.ts`
+retrofit — 26 declarations into 24 one-type `.type.ts` modules, plus `task-statuses.ts` and
+`severities.ts` as plain constant modules, since those are runtime values rather than types. That leaves
+`core/session` at **16 files / 95 declarations** — 12 files and 86 declarations cleared, a little under
+half the wave.
+
+**Ten old-style `.type.ts` pairs still sit in that directory** — `batch`, `memory-db`, `subagents`,
+`retro-runner`, `run-debate`, `run-task-loop`, `run-stop-signal`, `events-log`, `read-tracker`,
+`evict-stale-tool-results`. Each is the sibling of a `.ts` file wave C has not reached yet and **dies
+with it**, so this is not the retrofit having been left half-done. **`core/llm` is complete** — the
 `ollama-with-signal.ts` follow-up this table used to carry was withdrawn once the arrow rule was scoped
 to top-level object literals.
 

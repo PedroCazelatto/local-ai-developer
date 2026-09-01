@@ -204,6 +204,19 @@ times the wave was doing exactly what it was told:
 > they are different functions that were never the same function, and `commit-changes.ts:43` already
 > writes `toPosix(entry.trim())` to make up the difference at the call site.
 
+> **RULE — grep before you name.** Before a private helper becomes a file name, **grep the other
+> directories for that name.** It costs one command and it is the only moment the collision is cheap.
+> Then apply the sequence: **a duplicate → delete it and repoint.** **Genuinely different → rename the
+> newcomer**, leaving the plain name with whoever already had it.
+
+Three data points in one sweep, which is what makes this a rule rather than an anecdote:
+
+| name | what it turned out to be | resolution |
+|---|---|---|
+| `appendEvent` | a **duplicate** — the fourth copy of `append-jsonl-line.ts` | deleted, callers repointed |
+| `splitFrontmatter` | **different bodies**: `context/`'s takes one argument, returns `{name, body}`, never throws; `backlog.ts`'s took the task path for its error message, returned `{data, body}`, threw `BacklogError` | newcomer renamed `splitTaskFrontmatter`; `context/` kept the plain name it already had |
+| `toPosix` | **different bodies**, neither a superset | session half renamed `toPosixTrimmed`; `src/tools/` still owes its half to wave D |
+
 **A shared destination is created once, by the first wave that needs it, and named here before a second
 wave can invent a rival.** This rule has a scar. `b63092e` committed
 `src/core/container/message-of.ts`, and the `commands` wave then wrote `src/core/err-message.ts` with
@@ -499,6 +512,13 @@ three even when you are the only one working.
 
 ## Hazards found during the first increment
 
+- **A differential harness whose baseline imports only types proves nothing.** `tsx` **strips
+  type-only imports**, so a baseline that imports nothing but types from the module under test keeps
+  compiling and passing after that module has moved or been deleted — green, and worthless. Wave C's
+  `verify-backlog` baseline did exactly this and only broke honestly because `TASK_STATUSES` is a
+  runtime value. **Every remaining wave builds one of these harnesses, so: a differential baseline
+  must import at least one runtime value from the module under test, or its green result is not
+  evidence.** Check that before trusting a byte-identical comparison.
 - **`import 'dotenv/config'` must stay the FIRST import in `src/index.ts`.** ESM evaluates a module's
   imports in source order, so being first is what guarantees the whole boot subtree sees a populated
   `process.env`. Move it below `./boot/main.js` and `OLLAMA_NUM_CTX` reads `undefined` **with no error
