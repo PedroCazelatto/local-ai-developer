@@ -152,6 +152,13 @@ single owning function, it goes in its own file named for the thing, not for a c
 more are coming: `BACKLOG_DIRNAME`, `MAX_TOOL_ROUNDS`, `KEEP_RECENT_TOOL_RESULTS`,
 `CONTEXT_TITLE_LIMIT`, `MAX_DEBATE_ROUNDS` among them.
 
+**Two near-identical functions are two files when the difference is an invariant, not a flag.**
+`sql-int.ts` and `sql-int-or-null.ts` were kept apart deliberately rather than merged behind a boolean.
+NULL-means-zero for a `COUNT` and NULL-means-Ollama-reported-nothing are exactly the distinction the
+**exact-token invariant** rests on — which `harness-gaps-vs-claude-code.md` lists among the things that
+must not be traded away. A flag would have pushed that judgement out to every call site, where it would
+eventually be got wrong. When collapsing two similar helpers, ask what the parameter would be *deciding*.
+
 **The corollary matters as much as the rule: a constant with a single owner rides with that owner.**
 Only a genuinely shared constant earns its own file. Otherwise the sweep trades one over-full file for a
 scatter of one-line modules, which is not what the rule is for.
@@ -206,6 +213,12 @@ times the wave was doing exactly what it was told:
 
 > **RULE — grep before you name.** Before a private helper becomes a file name, **grep the other
 > directories for that name.** It costs one command and it is the only moment the collision is cheap.
+>
+> **A clean grep is not permission to skip the read.** The rule's real purpose is to make you *look at
+> the name*; catching a collision is the cheaper half. `memory-db.ts`'s split grepped 15 helpers, found
+> **zero** collisions, and renamed **eight of them anyway** — `sqlText`, `sqlIntOrNull`,
+> `toMemoryRecord`, `messageInsertParams` — because a name that was adequate as a local detail is often
+> not adequate as a file name a stranger reads first. Zero hits means keep reading, not move on.
 > Then apply the sequence: **a duplicate → delete it and repoint.** **Genuinely different → rename the
 > newcomer**, leaving the plain name with whoever already had it.
 
@@ -462,10 +475,40 @@ Recorded here rather than held by whoever is coordinating, so it survives a hand
 | **D** | `tools`+`phases`; `interface`+`interface/commands` — two agents | 48 / 193 | each pair is mutually coupled, so one owner each |
 | **E** | the final barrel pass — one agent | 9 barrels | all nine `index.ts` re-export modules deleted at once, after every directory is final |
 
-**Why the pairs in wave D are pairs, not four agents.** `interface` ↔ `interface/commands` is mutual, 15
-edges one way and 4 the other; `phases` imports 7 files from `tools`. Splitting either pair across two
-agents puts both of them in the same files. One owner per pair is not a convenience — it is the only
-shape that does not create the contention the partition exists to avoid.
+**Why a pair is a pair and not two agents.** `interface` ↔ `interface/commands` is mutual, and
+`phases` imports from `tools`. Splitting either pair across two agents puts both of them in the same
+files. One owner per pair is not a convenience — it is the only shape that avoids the contention the
+partition exists to prevent.
+
+> **THE LESSON THAT COST THROUGHPUT: re-measure the coupling at the start of every wave. Never inherit
+> it from this plan.** The import graph **changes as directories complete** — a split retires deep
+> edges, a barrel absorbs others — so a posture that was correct when the plan was written goes stale
+> underneath it. Waves C and D were held more serial than the graph required for exactly that reason,
+> and the cost was real. The plan above is a **starting point, not a schedule.**
+
+**What the graph actually said when re-measured after five directories had landed** — and every one of
+these was more parallel than the plan assumed:
+
+- **`core/session` and `interface` have ZERO deep edges in either direction.** They can run at the same
+  time. (Both do import each other's *barrels*, which is precisely why the barrels survive to wave E:
+  a barrel absorbs a split so its importers never see one.)
+- **`phases`, `core/llm/types.ts` and `core/container/types.ts` are fully self-contained** — 9 and 3
+  importers respectively, every one inside its own directory. One agent can hold all three.
+- **Only three genuine blockers remain:** `core/session` ↔ `tools` (mutual, 17 and 10 files),
+  `interface` ↔ `interface/commands` (15 and 1), and the `core/ui/types.ts` retrofit.
+- **`tools/types.ts` rides with the `tools` wave.** 50 importers, but **exactly one** outside its own
+  directory (`core/session/dispatch.ts`).
+
+**The concurrency ceiling is about four agents.** Past that the blockers above bind and agents start
+waiting on each other rather than working.
+
+**One correction to the blocker list, measured rather than assumed.** The `core/ui/types.ts` retrofit
+was recorded as having to run **alone and last**, reaching `interface/commands`, `core/session`, `tools`
+and `interface`. It does not. The module has **15 importers: 9 inside `core/ui`, 3 in `core/session`
+(`dispatch.ts`, `retro-runner.ts`, `turn-loop.ts`) and 3 in `tools` (`build-file-diff.ts`,
+`write-file.ts`, `types.ts`) — and none at all in `interface` or `interface/commands`**, by import or by
+type-name usage. It conflicts with `core/session` and `tools` only, and **can run beside the
+`interface` pair.**
 
 ## `__tests__` is not a sweep target — but it is an importer
 
@@ -519,6 +562,20 @@ three even when you are the only one working.
   runtime value. **Every remaining wave builds one of these harnesses, so: a differential baseline
   must import at least one runtime value from the module under test, or its green result is not
   evidence.** Check that before trusting a byte-identical comparison.
+- **The same trap's second shape: when a probe depends on a fixture being in a particular state, prove
+  the fixture is in that state.** A migration probe is the worked example. `addCancelledAtColumn`
+  early-returns on every fresh database, because `memory-db.schema.ts` already carries `cancelled_at` —
+  so the naive probe opens a new database, migrates nothing, and reports green. Wave C hand-built a
+  **pre-migration** database and then wrote **a separate check proving the builder had produced one**:
+  column absent before the open, present after. Without that second check the probe passes while
+  starting from an already-migrated schema, which is the same worthless green as the type-only baseline
+  one entry above.
+- **False red teaches nothing, and it has two known shapes.** Ten probes in the `memory-db` split were
+  red for reasons that were not behaviour: a dump ordered `BY id` where the ids are **random UUIDs**,
+  and a comparison against a query whose `ORDER BY last_at DESC` had **ties the seed data created**,
+  which SQLite breaks arbitrarily. The danger is not the wasted time — it is that the obvious next move
+  is to "fix" the code until it matches the harness, encoding an artefact of the fixture as behaviour.
+  **Order by something total and deterministic, and make the seed data tie-free.**
 - **`import 'dotenv/config'` must stay the FIRST import in `src/index.ts`.** ESM evaluates a module's
   imports in source order, so being first is what guarantees the whole boot subtree sees a populated
   `process.env`. Move it below `./boot/main.js` and `OLLAMA_NUM_CTX` reads `undefined` **with no error

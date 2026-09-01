@@ -60,8 +60,8 @@ table matched exactly. Two agents, two instruments, one number.
 | baseline | 104 | 504 |
 | cleared by wave A | 13 | 50 |
 | cleared by wave B | 14 | 77 |
-| cleared by wave C so far | 13 | 89 |
-| **remaining** | **64** | **288** |
+| cleared by wave C so far | 14 | 115 |
+| **remaining** | **63** | **262** |
 
 **Wave C is running.** `src/` root is **done** (`66d5a39`): `src/index.ts`'s three declarations are now
 `src/boot/{main,resolve-or-exit,fail}.ts`, the entry point declares nothing, three inlined `errMessage`
@@ -73,8 +73,11 @@ barrel's exported **name set** identical at 91 values / 77 types), `eaeb319` the
 four persistence stores, `61574a9` the backlog reader (18 declarations) and `9f4d932` the `types.ts`
 retrofit — 26 declarations into 24 one-type `.type.ts` modules, plus `task-statuses.ts` and
 `severities.ts` as plain constant modules, since those are runtime values rather than types. That leaves
-`core/session` at **16 files / 95 declarations** — 12 files and 86 declarations cleared, a little under
-half the wave.
+`core/session` at **15 files / 69 declarations** — 13 files and 112 declarations cleared, **62% of the
+wave**. The sixth commit, `45d6313`, took `memory-db.ts`: 26 declarations, the largest single file in
+the whole census and the last "cohesive store module" header in the directory. Four differential
+harnesses now re-run after every commit — **1968 + 164 + 478 + 51 probes, 0 mismatches** — and the
+barrel's exported name set has held steady at 91 values / 77 types across all six.
 
 **Ten old-style `.type.ts` pairs still sit in that directory** — `batch`, `memory-db`, `subagents`,
 `retro-runner`, `run-debate`, `run-task-loop`, `run-stop-signal`, `events-log`, `read-tracker`,
