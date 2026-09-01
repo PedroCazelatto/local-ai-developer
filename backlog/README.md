@@ -62,7 +62,8 @@ table matched exactly. Two agents, two instruments, one number.
 | cleared by wave B | 14 | 77 |
 | cleared by wave C so far | 29 | 188 |
 | cleared by the `interface` agent | 7 | 28 |
-| **remaining** | **41** | **161** |
+| cleared by wave D so far | 9 | 48 |
+| **remaining** | **32** | **113** |
 
 **Wave C is running, and `src/core/session` is 74% done.** Its eight commits so far: `038fc83` the git
 family (7 files / 39 declarations, five `project-git*` modules and `review-types.ts` deleted, 43 new
@@ -76,7 +77,7 @@ census, and the last "cohesive store module" header in the directory), `463e9ba`
 `src/core/llm/is-record.ts` directly because the barrel does not export it), and `9fd9e2e` the Retro
 runner.
 
-That leaves `core/session` at **12 files / 47 declarations** — 16 files and 134 declarations cleared.
+That leaves `core/session` at **5 files / 17 declarations — 91% done**.
 **Six differential harnesses re-run after every commit: 2819 probes, 0 mismatches**, and the barrel's
 exported **name set** has held identical at **91 values / 77 types** across all eight.
 
@@ -127,7 +128,11 @@ visible-turn predicate, waiting on `src/core/session/` to close.
 `evict-stale-tool-results`. Each is the sibling of a `.ts` file wave C has not reached yet and **dies
 with it**, so this is not the retrofit having been left half-done.
 
-**Wave D, not started:** `tools` (20/60) and `interface/commands` (20/103), one agent each. **`phases`
+**Wave D is running on `interface/commands`** — **9 of 20 files, 48 of 103 declarations**, four commits.
+Three assemblers created (`new-project.ts`, `swap.ts`, `help.ts`) on the `models.ts` precedent, and
+**`project-templates.ts` deleted rather than assembled** — its one importer takes **six named things**
+from it, not one thing, which is the assembler test answering cleanly in the negative. `tools` (20/60)
+is the other half, one agent each. **`phases`
 dropped out** (cleared early in `5d74ad4`) and **`interface` is finished**, so the coupling that made
 `interface`/`interface/commands` one job is gone — `interface/commands` unblocked the moment `26ca3c4`
 landed. `tools` still waits on `core/session`, the last big directory. **Then the two `types.ts`
