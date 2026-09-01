@@ -1,12 +1,14 @@
 // REPL renderer for the Reviewer verdict (V2/02). Terminal-UX first (constitution): a color-coded
 // PASS/FAIL headline + summary, the issues grouped by severity with file + note, and the EXACT
 // Reviewer token usage (never estimated — "not reported" when Ollama omitted a metric). Pure
-// printing: the accept/send-back/skip decision is collected by the REPL over readline (repl.ts), to
+// printing: the accept/send-back/skip decision is collected by the REPL over readline (run-repl.ts), to
 // avoid fighting clack for stdin the way /run's askYesNo does. Wraps naturally — no horizontal scroll.
 
 import type { TokenCounts } from '../core/llm/index.js';
 import type { ReviewVerdict, Severity } from '../core/session/index.js';
 import { theme } from '../core/ui/theme.js';
+import { write } from '../core/ui/write.js';
+import { reviewerTokenLine } from './reviewer-token-line.js'; // exact prompt/eval counts, "not reported" for a missing one
 
 /** Most-severe first, so the list reads top-down by importance. */
 const SEVERITY_ORDER: readonly Severity[] = ['blocker', 'major', 'minor'];
@@ -17,17 +19,6 @@ export interface VerdictContext {
   readonly changedCount: number;
   /** Exact tokens from the Reviewer's final turn — surfaced verbatim (nulls preserved). */
   readonly tokens: TokenCounts;
-}
-
-function write(line: string): void {
-  process.stdout.write(`${line}\n`);
-}
-
-/** Exact token line — never a length estimate; says "not reported" when a metric was omitted. */
-function tokenLine(tokens: TokenCounts): string {
-  const prompt = tokens.promptTokens === null ? 'not reported' : String(tokens.promptTokens);
-  const evalT = tokens.evalTokens === null ? 'not reported' : String(tokens.evalTokens);
-  return theme.meta(`Reviewer tokens — prompt: ${prompt}, eval: ${evalT}`);
 }
 
 /** Render one Reviewer verdict: headline, summary, issues by severity, exact tokens. */
@@ -51,6 +42,6 @@ export function renderVerdict(verdict: ReviewVerdict, ctx: VerdictContext): void
     }
   }
 
-  write(tokenLine(ctx.tokens));
+  write(reviewerTokenLine(ctx.tokens));
   write('');
 }

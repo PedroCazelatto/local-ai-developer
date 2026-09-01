@@ -39,8 +39,8 @@ import type {
   TaskLoopReporter,
   TaskLoopResult,
 } from '../../core/session/index.js';
-import { renderBatchSummary } from '../batch-summary.js';
-import { renderVerdict } from '../review-prompt.js';
+import { renderBatchSummary } from '../render-batch-summary.js';
+import { renderVerdict } from '../render-verdict.js';
 import type { Command, CompletionContext } from '../command-registry.js';
 
 /** The slice of the orchestrator /run needs — satisfied structurally by SessionOrchestrator. */

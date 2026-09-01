@@ -2,32 +2,13 @@
 // headline, the one-sentence root cause, the single file patched, and — for a SYSTEMIC patch — the LOUD
 // warning that the uncommitted rules/phases change must be reviewed + committed manually before the loop
 // continues (the whole point of the task: the orchestrator's own instructions never mutate silently).
-// Pure printing; wraps naturally, no horizontal scroll. Mirrors review-prompt.ts.
-
-import path from 'node:path';
+// Pure printing; wraps naturally, no horizontal scroll. Mirrors render-verdict.ts.
 
 import type { RetroResult } from '../core/session/index.js';
 import { theme } from '../core/ui/theme.js';
-
-function write(line: string): void {
-  process.stdout.write(`${line}\n`);
-}
-
-/** Exact token line — never a length estimate; says "not reported" when a metric was omitted. */
-function tokenLine(result: RetroResult): string {
-  const prompt = result.tokens.promptTokens === null ? 'not reported' : String(result.tokens.promptTokens);
-  const evalT = result.tokens.evalTokens === null ? 'not reported' : String(result.tokens.evalTokens);
-  return theme.meta(`Retro tokens — prompt: ${prompt}, eval: ${evalT}`);
-}
-
-/** A readable path for the patched file: project-relative when inside the project, else as resolved. */
-function displayPath(result: RetroResult, projectPath: string): string {
-  if (result.scope === 'systemic') {
-    return `rules/phases/${path.basename(result.editedFile)}`;
-  }
-  const rel = path.relative(projectPath, result.editedFile);
-  return rel.startsWith('..') ? result.editedFile : rel;
-}
+import { write } from '../core/ui/write.js';
+import { retroPatchedPath } from './retro-patched-path.js'; // project-relative when it can be, absolute otherwise
+import { retroTokenLine } from './retro-token-line.js'; // exact prompt/eval counts, "not reported" for a missing one
 
 /**
  * Render one Retro outcome. `projectPath` is the active project root, used only to show a friendly
@@ -38,7 +19,7 @@ export function renderRetroResult(result: RetroResult, projectPath: string): voi
   const badge = result.scope === 'systemic' ? theme.danger(' SYSTEMIC ') : theme.success(' TASK-SPECIFIC ');
   write(`${theme.strong('Retro')} ${badge}`);
   write(theme.meta(`Root cause: ${result.rootCause}`));
-  write(`Patched: ${theme.strong(displayPath(result, projectPath))}`);
+  write(`Patched: ${theme.strong(retroPatchedPath(result, projectPath))}`);
 
   if (result.scope === 'systemic') {
     // The loud, unmissable warning — an uncommitted global-instruction change must be reviewed first.
@@ -52,6 +33,6 @@ export function renderRetroResult(result: RetroResult, projectPath: string): voi
     write(theme.error(result.reviewWarning));
   }
 
-  write(tokenLine(result));
+  write(retroTokenLine(result));
   write('');
 }
