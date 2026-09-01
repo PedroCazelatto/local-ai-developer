@@ -407,6 +407,12 @@ reaches them. Classified by who imports them:
   **The trap waits wherever a single consumer is the sole importer.** Three importers or more and the
   type really is folder vocabulary; one, and you are probably looking at a return type that wandered.
 
+  **The cleanest disproof of "one importer means owned" came later, and it is structural rather than a
+  head-count.** `CommandContext` and `CompletionContext` are **parameters of interface *methods***, not
+  of any declaration — so there is no function file to fold them into and they are unowned no matter how
+  few files name them. **Ask what would own it, not how many import it.** If the answer is "a method on
+  an interface", nothing owns it.
+
   **Two disproofs, both on the record.** `ChatResult` never had a `.type.ts` *at all* and was still
   ruled **owned**, folding into `client.ts` — so the structural test gets it wrong in both directions.
   And `sandbox-file.type.ts`'s two types, `SandboxRead` and `SandboxWrite`, are each the return type of
@@ -678,6 +684,18 @@ write, someone else may have landed in the same paragraph.
 > positive list can only ever be wrong about your own work, which is the only thing you can actually
 > check.
 >
+> **The rule is now two steps, because enumeration alone is not enough: ENUMERATE, then READ what git
+> thinks changed and account for EVERY line.** A pathspec-scoped `git status` before staging, with an
+> explanation for each entry — and if you cannot explain one, stop.
+>
+> The gap that forced this: **`sed -i` over a glob rewrites every file it matched, including the ones it
+> changed nothing in.** It reads CRLF and writes LF, and with this repo's `core.autocrlf=true` that
+> leaves untouched files **dirty with a completely empty content diff.** Two files the `interface` agent
+> did not own sat modified as pure churn. **Positive enumeration would not have caught it** — the glob
+> would have written itself into the stage list. Only reading the status did. **A file showing modified
+> with an empty diff, that you did not edit, is the signature**, and it is exactly the line a reader
+> skims past.
+>
 > **And `git commit -- <pathspec>` cannot reach an untracked file** — it fails with `did not match any
 > file(s) known to git`. The pathspec form silently assumes git already knows the path, so **`git add`
 > your new files first.** Same operation, failure one step earlier than the one above.
@@ -720,8 +738,8 @@ for the coverage control existing: *so the next person does not need the same lu
 prints `controls: same() fires on a difference; 94/94 probes ran`, and the total went 58 → 94 once both
 defects were fixed. **Every remaining harness carries both lines.**
 
-Four separate green-and-worthless harnesses have now been caught in this sweep. They are recorded
-together because they are one failure with four faces, and **not one of them was caught by reading the
+**Five** separate green-and-worthless harnesses have now been caught in this sweep. They are recorded
+together because they are one failure with five faces, and **not one of them was caught by reading the
 green result**:
 
 | shape | how it stayed green | how it was caught |
@@ -731,6 +749,7 @@ green result**:
 | **wrong-shaped grid** | probed `{function:{name,arguments}}` — the shape `coerceCall` *returns*, not the one it accepts — so every probe returned `null` on **both** sides | **a negative control refused to fire** |
 | **self-comparison** | `same(f(v), f(v))` — the harness compared the new implementation with **itself**, which passes unconditionally | reading the comparison, not running it |
 | **harness never ran** | `main()` defined and never called; 16 probes skipped, `probes=58 mismatches=0` printed | reading the file's tail — **a coverage control now** |
+| **prefix match** | `haystack.includes(needle)` is true for a **prefix**, so four declarations certified VERBATIM while every range was one line short, closing brace excluded | **a different instrument failed on the same input** — `tsc` threw `'}' expected` |
 
 The wrong-shaped grid is the purest form: a harness comparing `null` to `null`, thousands of times,
 reporting perfect agreement. Nothing in the output distinguishes it from a real proof.
@@ -741,6 +760,20 @@ itself is the path of least resistance from a real obstacle rather than careless
 the `%TEMP%` baseline recipe below: take `HEAD`'s file, add `export` to its private declarations, change
 no body.** That recipe exists precisely to dissolve the obstacle that produces shape four; if you find
 yourself about to write `same(f(v), f(v))`, that is the entry to go and read.
+
+**A substring check can only ever prove a prefix — anchor it on the closing token.** `includes()` will
+happily certify a range that stops before the closing brace, and every probe stays green.
+
+> **THE PRINCIPLE THE TABLE HAS BEEN BUILDING TOWARD: two instruments with different failure modes catch
+> what either alone will not.** The prefix bug was invisible to the byte-identity check *by
+> construction* and immediate to a parser. This is not redundancy — it is choosing a second instrument
+> that fails **differently**, not a second one that fails the same way twice.
+
+The worked example is the same agent's pair of type checks: **byte-identity** catches a dropped
+`readonly`, and **mutual assignability** proves every importer resolves to *that* declaration. Neither
+subsumes the other. And it **demonstrated** the `readonly` blind spot rather than inheriting the claim
+from this file — ran the control, got zero errors, recorded it. **Inheriting a claimed blind spot is
+itself a green you have not tested.**
 
 **A control that fires on MORE than you perturbed is evidence about *what* is being compared.** In the
 `core/llm` type-identity proof, perturbing `WindowRole` or `OneShotRole` also flagged **`CallRole`** —

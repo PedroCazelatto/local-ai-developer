@@ -61,7 +61,8 @@ table matched exactly. Two agents, two instruments, one number.
 | cleared by wave A | 13 | 50 |
 | cleared by wave B | 14 | 77 |
 | cleared by wave C so far | 29 | 188 |
-| **remaining** | **48** | **189** |
+| cleared by the `interface` agent | 7 | 28 |
+| **remaining** | **41** | **161** |
 
 **Wave C is running, and `src/core/session` is 74% done.** Its eight commits so far: `038fc83` the git
 family (7 files / 39 declarations, five `project-git*` modules and `review-types.ts` deleted, 43 new
@@ -90,23 +91,26 @@ plus two folds into `sandbox.ts`, barrel unchanged at 8 values / 7 types; and `s
 the user's ruling, with the five in-folder importers taking them straight from the package; barrel
 unchanged at 13 values / 16 types.
 
-**`src/interface` (top level) is running in parallel** — 25 of its 28 declarations across `ea9715b` and
-`7da4b97`, with `command-registry.ts` (3) finishing. That last took **option (a)**: `commandRegistry` is
+**`src/interface` (top level) is COMPLETE** — 7 files, 28 declarations, three commits (`ea9715b`,
+`7da4b97`, `26ca3c4`), 32 files at zero violations. `command-registry.ts` took **option (a)**: `commandRegistry` is
 a `ReadonlyMap` **value module**, with `get-command.ts` and `list-commands.ts` as separate files rather
 than an assembler — and it wrote the TDZ constraint into its header, which is why the constitution now
 states that constraint for **any** module-level value read across a cycle rather than for assemblers
-alone. Its pre-flight census was **exactly right** — 7 files, 28 declarations, per-file 9/5/4/3/3/2/2 —
-worth recording after three earlier censuses in this sweep were not.
+alone — and it **survives as a value module**, one exported value, no function, no re-export: the
+`daemon.ts` shape, with its header saying so explicitly **so the final barrel pass does not delete it as
+a shell.** Its four types were each measured by importer and all four found genuinely unowned. Its
+pre-flight census was **exactly right** — 7 files, 28 declarations, per-file 9/5/4/3/3/2/2 — worth
+recording after three earlier censuses in this sweep were not.
 
 **Ten old-style `.type.ts` pairs still sit in `core/session`** — `batch`, `memory-db`, `subagents`,
 `retro-runner`, `run-debate`, `run-task-loop`, `run-stop-signal`, `events-log`, `read-tracker`,
 `evict-stale-tool-results`. Each is the sibling of a `.ts` file wave C has not reached yet and **dies
 with it**, so this is not the retrofit having been left half-done.
 
-**Wave D, not started:** `tools` (20/60) as one agent — **`phases` is no longer part of it**, having
-been cleared early by the self-contained agent (`5d74ad4`) — and `interface/commands` with whatever
-`interface` has not finished, as one agent, because the two are mutually coupled (15 edges one way, 1
-the other) and splitting them would put both agents in the same files. **Then the two `types.ts`
+**Wave D, not started:** `tools` (20/60) and `interface/commands` (20/103), one agent each. **`phases`
+dropped out** (cleared early in `5d74ad4`) and **`interface` is finished**, so the coupling that made
+`interface`/`interface/commands` one job is gone — `interface/commands` unblocked the moment `26ca3c4`
+landed. `tools` still waits on `core/session`, the last big directory. **Then the two `types.ts`
 retrofits**, `tools`' riding with its own wave and `core/ui`'s once `core/session` clears its three
 importers. **Wave E is the final barrel pass**, deleting all nine `index.ts` re-export modules at once.
 
@@ -445,6 +449,21 @@ invariant functions, and they share two properties that make them safe to pick u
   change nobody reviews. [22](truncate-to-width-measures-code-units.md) is the sharpest case: `core/ui` is
   the next wave and will be moving the very file that needs fixing. Land the sweep, then the fix, against
   the settled file.
+
+### 25. [`help.ts` cannot be the first module imported](help-command-cannot-be-imported-first.md)
+*Engineering quality.* Entering the module graph at `src/interface/commands/help.ts` throws
+`ReferenceError: Cannot access 'helpCommand' before initialization` — a temporal dead zone across a
+cycle, since `help.ts` needs the command list and the command list contains `helpCommand`. **Latent, not
+a regression**: it fails identically before the sweep, and the nine other entry points probed are fine,
+including every path the app actually takes.
+
+**It is a task rather than a note because it blocks test coverage.** `constitution.md` requires a test to
+import the file owning the function under test, so a test for `helpCommand` enters the graph at exactly
+this module and throws before its first assertion. That makes it a **prerequisite for
+[2](test-the-invariant-functions.md)'s follow-up work**, and the first test written for that directory is
+what turns latent into blocking. The method is worth keeping too: **one process per entry point**, since
+Node's module cache makes first-import order the only variable and a second import in the same process is
+served from cache.
 
 ---
 
