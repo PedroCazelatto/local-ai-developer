@@ -12,8 +12,9 @@ export { resolveBootModel } from './resolve-boot-model.js';
 // Phase memory is SQLite-backed (projects/<active>/.orchestrator/memory.db): a context is an
 // addressable, titled row rather than a file whose name had to be renamed to change state.
 export { appendAuditRow, OUTPUT_PREVIEW_LIMIT } from './audit.js';
-export type { ToolCallRecord, DispatchDeps } from './dispatch.js';
-export { dispatchToolCall } from './dispatch.js';
+export { dispatchToolCall } from './dispatch-tool-call.js';
+export type { ToolCallRecord } from './tool-call-record.type.js';
+export type { DispatchDeps } from './dispatch-deps.type.js';
 export { CONTEXT_TITLE_LIMIT, generateContextTitle } from './generate-context-title.js';
 export { CONTEXT_SHORT_ID_LEN, shortContextId } from './short-context-id.js';
 export type { ClearResult } from './clear-result.type.js';

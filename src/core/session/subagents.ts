@@ -18,7 +18,7 @@ import { SPAWN_SUBAGENT } from '../../tools/spawn-subagent.js';
 import type { Message, TokenCounts, Tool } from '../llm/index.js';
 import { printToolCall } from '../ui/print-tool-call.js';
 import { addTokenCounts } from './add-token-counts.js';
-import { dispatchToolCall } from './dispatch.js';
+import { dispatchToolCall } from './dispatch-tool-call.js';
 import { appendEvent } from './events-log.js';
 import { generateSubagentId } from './generate-subagent-id.js';
 import { createReadTracker } from './read-tracker.js';

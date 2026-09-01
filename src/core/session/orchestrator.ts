@@ -13,7 +13,7 @@ import { OllamaClient } from '../llm/index.js';
 import { renderer } from '../ui/renderer.js';
 import { addTokenCounts } from './add-token-counts.js';
 import type { SessionConfig } from './config.js';
-import { dispatchToolCall } from './dispatch.js';
+import { dispatchToolCall } from './dispatch-tool-call.js';
 import { drainAnsweredQuestions } from './drain-answered-questions.js';
 import { appendEvent } from './events-log.js';
 import { generateContextTitle } from './generate-context-title.js';

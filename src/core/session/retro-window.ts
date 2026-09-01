@@ -22,8 +22,8 @@ import type { Message, StreamHandle, TokenCounts, Tool, ToolCall } from '../llm/
 import type { ToolCallDisplay } from '../ui/types.js';
 import { addTokenCounts } from './add-token-counts.js';
 import { candidatePhaseFile } from './candidate-phase-file.js';
-import type { ToolCallRecord } from './dispatch.js';
-import { dispatchToolCall } from './dispatch.js';
+import type { ToolCallRecord } from './tool-call-record.type.js';
+import { dispatchToolCall } from './dispatch-tool-call.js';
 import { isToolErrorResult } from './is-tool-error-result.js';
 import { createReadTracker } from './read-tracker.js';
 import type { FileReadTracker } from './read-tracker.type.js';
