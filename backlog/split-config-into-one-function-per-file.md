@@ -557,8 +557,9 @@ these was more parallel than the plan assumed:
 - **`core/session` and `interface` have ZERO deep edges in either direction.** They can run at the same
   time. (Both do import each other's *barrels*, which is precisely why the barrels survive to wave E:
   a barrel absorbs a split so its importers never see one.)
-- **`phases`, `core/llm/types.ts` and `core/container/types.ts` are fully self-contained** — 9 and 3
-  importers respectively, every one inside its own directory. One agent can hold all three.
+- **`phases`, `core/llm/types.ts` and `core/container/types.ts` were fully self-contained** — 9 and 3
+  importers respectively, every one inside its own directory. One agent held all three, and **all three
+  are now done** (`5d74ad4`, `2b3e381`, `602f62f`); both `types.ts` files are gone.
 - **Only three genuine blockers remain:** `core/session` ↔ `tools` (mutual, 17 and 10 files),
   `interface` ↔ `interface/commands` (15 and 1), and the `core/ui/types.ts` retrofit.
 - **`tools/types.ts` rides with the `tools` wave.** 50 importers, but **exactly one** outside its own
@@ -617,6 +618,15 @@ write, someone else may have landed in the same paragraph.
 > repo** so you have a gate that is unambiguously yours. This is the natural sibling of scoping
 > `git status` with a pathspec: in a shared tree, narrow every instrument to your own work before you
 > read a result off it.
+>
+> **That scoped `tsconfig` needs an explicit `typeRoots`, or it produces confident nonsense.**
+> `typeRoots` resolves relative to **the config file's own directory**, so from a scratch folder
+> outside the repo `@types/node` is never found and you get `Cannot find name 'AbortSignal' / 'fetch' /
+> 'setTimeout'` — a **false red about code that is fine.** Point it explicitly at the repo's
+> `node_modules/@types`. This matters more than an ordinary bug: a false red from your own narrow
+> instrument is worse than having no instrument, because it is the one you would believe **over** the
+> noisy whole-repo run. (An earlier version of this advice omitted it and passed only because the
+> directory it was used on touches no Node global — a latent bug that looked like a working recipe.)
 
 > **RULE — NEVER BUILD A STAGE LIST BY EXCLUSION.** Enumerate the paths you created and modified and
 > stage those. **Never subtract a known-bad set from everything dirty** — no "`git status --porcelain`
@@ -628,6 +638,10 @@ write, someone else may have landed in the same paragraph.
 > the way it did when you wrote it, it stops being correct silently, and **nothing tells you.** A
 > positive list can only ever be wrong about your own work, which is the only thing you can actually
 > check.
+>
+> **And `git commit -- <pathspec>` cannot reach an untracked file** — it fails with `did not match any
+> file(s) known to git`. The pathspec form silently assumes git already knows the path, so **`git add`
+> your new files first.** Same operation, failure one step earlier than the one above.
 
 This nearly cost the sweep a corrupted commit. A wave C agent's recipe was "`git status --porcelain`
 minus the four governance docs" — **correct and safe for six commits**, while it was the only agent
@@ -647,6 +661,32 @@ reachable by anyone else's `git add`. Nobody designed the partition rules for th
 were aimed at two agents editing one file — but *never stage speculatively, keep scratch out of the tree,
 and always commit by pathspec* is exactly what makes an agent's sudden death cost nothing. Keep doing all
 three even when you are the only one working.
+
+## A green differential proves nothing until a control has gone red
+
+> **RULE: a passing harness is a claim about the harness, not about the code, until a control has
+> demonstrated it can distinguish.** Every wave from here builds one of these, so build the control
+> first.
+
+Three separate green-and-worthless harnesses have now been caught in this sweep. They are recorded
+together because they are one failure with three faces, and **not one of them was caught by reading the
+green result** — every time it was an instrument failing to fail:
+
+| shape | how it stayed green | how it was caught |
+|---|---|---|
+| **type-only baseline** | `tsx` erases type imports, so the baseline kept resolving after the module had moved | a runtime value happened to be in the import and broke loudly — **luck** |
+| **already-migrated fixture** | `addCancelledAtColumn` early-returns on every fresh database, so the probe migrated nothing | a separate check proving the fixture really was pre-migration |
+| **wrong-shaped grid** | probed `{function:{name,arguments}}` — the shape `coerceCall` *returns*, not the one it accepts — so every probe returned `null` on **both** sides | **a negative control refused to fire** |
+
+The third is the purest form: a harness comparing `null` to `null`, thousands of times, reporting
+perfect agreement. Nothing about the output distinguishes it from a real proof.
+
+**A control that fires on MORE than you perturbed is evidence about *what* is being compared.** In the
+`core/llm` type-identity proof, perturbing `WindowRole` or `OneShotRole` also flagged **`CallRole`** —
+which proves `CallRole` is compared **expanded**, not matched by name. That matters precisely because
+splitting a union from its members into separate files is now the standard shape: a name-matching
+instrument would go green through exactly the change most likely to break something. **Read the
+propagation, not just the pass/fail.**
 
 ## Stale prose the compiler will never find
 
@@ -727,10 +767,12 @@ fixed. Note that a *historical* reference is fine and should not be swept: `firs
   same way, and a suite that polices file layout rather than behaviour is a different instrument from
   the one item 2 built. Do not re-propose it.
 
-- **`docs/mental-model.md:27` links `src/core/llm/call-role.type.ts` by path.** `CallRole` moves to
-  `src/core/llm/types.ts`, which is a stable path, so **retarget the link there** in the same change that
-  moves the file. `docs/` is governance-gated: that edit is handed to the user for review, never
-  committed by the agent that makes it.
+- ~~`docs/mental-model.md:27` must be retargeted to `src/core/llm/types.ts`~~ — **closed, and it
+  round-tripped.** `CallRole` went to `types.ts` in the consolidation and came back to
+  `call-role.type.ts` in the one-type-per-file retrofit, so the doc link is at its original path and the
+  edit tracking it was reverted to exactly what `HEAD` already said. **Two rulings in one sweep can
+  cancel out**: before editing a governance doc to chase a moving file, check whether the move is
+  settled. `docs/` is governance-gated, so each of those edits would otherwise have cost a review.
 - **`backlog/README.md`'s item 1 pointer** has been retargeted to this file's new title; the edit is in
   the working tree and rides along with the first sweep commit rather than getting a commit of its own.
 

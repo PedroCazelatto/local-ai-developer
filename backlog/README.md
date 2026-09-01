@@ -60,8 +60,8 @@ table matched exactly. Two agents, two instruments, one number.
 | baseline | 104 | 504 |
 | cleared by wave A | 13 | 50 |
 | cleared by wave B | 14 | 77 |
-| cleared by wave C so far | 20 | 140 |
-| **remaining** | **57** | **237** |
+| cleared by wave C so far | 27 | 172 |
+| **remaining** | **50** | **205** |
 
 **Wave C is running.** `src/` root is **done** (`66d5a39`): `src/index.ts`'s three declarations are now
 `src/boot/{main,resolve-or-exit,fail}.ts`, the entry point declares nothing, three inlined `errMessage`
@@ -77,10 +77,11 @@ retrofit — 26 declarations into 24 one-type `.type.ts` modules, plus `task-sta
 wave** — after `463e9ba` took `SessionMemory`. A third agent has closed two of its three jobs:
 **`src/phases` is clean at the bar** (`5d74ad4`), and **`src/core/container` is fully clean**
 (`2b3e381`) — `types.ts` retired into `tar-entry.type.ts` plus two folds into `sandbox.ts`, every file
-now at one declaration or zero, and its barrel unchanged at 8 values / 7 types for the final pass. Job 2
-(`core/llm/types.ts`) is running: four standalone `.type.ts`, `ChatResult` folding into `client.ts`, and
-the `export type { Message, Tool, ToolCall } from 'ollama'` re-export **deleted** by the user's ruling,
-with the five in-folder importers taking them straight from the package.
+now at one declaration or zero, and its barrel unchanged at 8 values / 7 types for the final pass. **All three of its jobs are now done**, the third being `core/llm` (`602f62f`): `types.ts` deleted into
+four standalone `.type.ts` modules, `ChatResult` folded into `client.ts`, and the
+`export type { Message, Tool, ToolCall } from 'ollama'` re-export **deleted** by the user's ruling, with
+the five in-folder importers taking them straight from the package. Barrel unchanged at 13 values /
+16 types. **`src/core/llm` is fully clean at the bar.**
 
 **`src/interface` (top level) is running in parallel** — 25 of its 28 declarations across two commits,
 `repl.ts` (9) and the three REPL renderers (12) and the completion pair (4), with `command-registry.ts`
