@@ -137,6 +137,23 @@ assembler is the expected shape, not a special case.** The six `core/ui` singlet
 `status-bar`, `input-fence`, `status-activity`, `activity-line`, `message-queue` — take it, holding 179
 call sites still.
 
+> **An assembler is NOT a device for keeping a diff inside your directory.** `command-registry.ts`
+> could have become one, touching zero files outside `src/interface/` — or could be deleted per the
+> rule's default, needing six `import type` lines in `src/commands/`. **The deletion was right**, and
+> the reason is the test: **inventing an assembler to route around an ownership boundary is using the
+> wrong tool for a scheduling problem.** An assembler is for a module callers already treat as one
+> thing. If your reason for reaching for it mentions *whose files change*, it is the wrong reason. This
+> is the first time the rule has been correctly **declined**, which is as useful a precedent as the two
+> times it was correctly applied.
+
+> **Check BOTH facts before applying the `core/ui` precedent.** The assembler + state-module shape is a
+> response to **two** things: a module consumed as a **namespace**, *and* module-level **mutable
+> state**. `repl.ts` looked exactly like `core/ui`'s six stateful singletons and is neither — it has no
+> module-level mutable state at all (`processing`, `cycle`, `firstPrompt`, `repaintScheduled` and
+> `ticker` all live inside `runRepl`'s own body) and it is consumed by one named import, not as a
+> namespace. Following the precedent would have minted **six pointless `<name>-state.ts` modules**. The
+> agent proved both facts rather than pattern-matching the shape; do the same.
+
 **Singleton state moves to a `<name>-state.ts` value module**, since the functions that shared a
 module-private variable no longer share a module. **The cost is real and was accepted knowingly**: six
 sets of module-private state become six exported mutable objects, and the invariant that only the owning
@@ -229,6 +246,11 @@ Three data points in one sweep, which is what makes this a rule rather than an a
 | `appendEvent` | a **duplicate** — the fourth copy of `append-jsonl-line.ts` | deleted, callers repointed |
 | `splitFrontmatter` | **different bodies**: `context/`'s takes one argument, returns `{name, body}`, never throws; `backlog.ts`'s took the task path for its error message, returned `{data, body}`, threw `BacklogError` | newcomer renamed `splitTaskFrontmatter`; `context/` kept the plain name it already had |
 | `toPosix` | **different bodies**, neither a superset | session half renamed `toPosixTrimmed`; `src/tools/` still owes its half to wave D |
+| `buildRegistry` | **different bodies** — `interface/command-registry.ts:102` over `Command`, `tools/registry.ts:85` over `ToolModule` | newcomer renamed `buildCommandRegistry`, **before it landed**, because the grep rule ran |
+
+**`src/tools` is NOT swept.** It is wave D and unstarted, which is exactly why `tools/registry.ts` still
+holds its own private `buildRegistry` and why the grep caught a live collision rather than a historical
+one. Treat any claim that a directory is finished as something to check against the ledger.
 
 **Type-vs-function stem collision — the exported name outranks the private helper.** A `.type.ts` may
 not share a stem with a `.ts`, so `ChatRole` (exported type) and `chatRole` (private function) could not
@@ -241,6 +263,16 @@ Ollama's `Message['role']`, not this folder's `ChatRole`, so its old name claime
 had. That is the **second** time a forced rename has exposed a name that was lying — `splitFrontmatter`
 was the first. A collision is often a naming defect presenting itself, which is the same lesson the
 duplicate check teaches from the other side.
+
+**The CONCERN decides the home, not the domain the value came from.** `capitalize` had four identical
+bodies — `repl.ts`, `core/session/orchestrator.ts`, `interface/commands/clear.ts`,
+`interface/commands/resume.ts` — all formatting a phase name for display. Ruled:
+**`src/core/ui/capitalize-phase.ts`**. It is display formatting, so it goes to `core/ui` *even though
+the value is a phase* — exactly as `write` did. `src/phases/` was declined because it holds phase
+**definitions**, not display; the root of `core/` was declined to stop it becoming the drawer everything
+cross-cutting lands in. The `interface` wave created it; `core/session` and `interface/commands` repoint
+their own copies as their waves reach them (`orchestrator.ts:632`, `clear.ts:23`, `resume.ts:54` still
+declare theirs).
 
 **A shared destination is created once, by the first wave that needs it, and named here before a second
 wave can invent a rival.** This rule has a scar. `b63092e` committed
@@ -616,6 +648,29 @@ were aimed at two agents editing one file — but *never stage speculatively, ke
 and always commit by pathspec* is exactly what makes an agent's sudden death cost nothing. Keep doing all
 three even when you are the only one working.
 
+## Stale prose the compiler will never find
+
+**A split leaves stale prose in files that never imported the moved code.** A header saying "see
+`repl.ts`" keeps compiling forever after `repl.ts` is gone. Every wave so far has produced some, and
+**no compiler, test or harness will ever surface one** — only a reader who notices, or a grep for the
+dead name. **When you delete or rename a file, grep the repo for its bare name in prose**, not just for
+its import specifier.
+
+Outstanding at the time of writing — eleven sites naming `repl.ts`, `batch-summary.ts`,
+`retro-prompt.ts` or `review-prompt.ts` as though they still exist, **none of them imports**:
+
+| file | note |
+|---|---|
+| `src/core/ui/write.ts:2` | names all three deleted renderers, **and** its "not swept yet" claim is now wrong for `interface/` |
+| `src/core/ui/index.ts:12`, `message-queue.ts:8`, `renderer.ts:19`, `repaint-status-bar.ts:6`, `text-input.ts:2`, `theme.ts:41,51` | `core/ui`, already swept — so a swept directory is no guarantee |
+| `src/core/session/resolve-boot-model.ts:14` | live `core/session` wave |
+| `src/interface/commands/resume.ts:8,45,185` | wave D |
+
+The `src/interface` wave fixed the four inside its own grant and left these, correctly — they are other
+directories' files. **`backlog/ux-gaps-vs-claude-code.md:27` was the same defect in the docs** and is
+fixed. Note that a *historical* reference is fine and should not be swept: `first-line-preview.ts:4` and
+`retro-patched-path.ts:2` both name an old file deliberately and give its successor.
+
 ## Hazards found during the first increment
 
 - **A differential harness whose baseline imports only types proves nothing.** `tsx` **strips
@@ -625,6 +680,13 @@ three even when you are the only one working.
   runtime value. **Every remaining wave builds one of these harnesses, so: a differential baseline
   must import at least one runtime value from the module under test, or its green result is not
   evidence.** Check that before trusting a byte-identical comparison.
+- **The `%TEMP%` differential-baseline recipe — the next waves all need it.** A baseline materialised
+  **outside the repo** (so no scratch ever sits in the tree) cannot keep its relative specifiers.
+  Rewrite them to absolute `file:///C:/…/x.ts` URLs, which `tsx` resolves — and drop an
+  `{"type":"module"}` `package.json` beside the baseline, or esbuild treats it as CJS and rejects
+  top-level `await`. The half that makes the technique work at all: **take `HEAD`'s file and add
+  `export` to its private declarations, changing no body.** That is what makes a private helper
+  differentiable without altering what it does.
 - **A pure-type move cannot satisfy the runtime-value rule, and saying so is the point.**
   `core/container/types.ts` exported **zero** runtime values, so *"a differential baseline must import
   at least one runtime value"* was **unsatisfiable** — any harness built over it would have run

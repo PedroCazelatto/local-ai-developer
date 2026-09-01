@@ -24,7 +24,7 @@ reasons attached.
   and it matters more here, because the number is a VRAM-safety signal rather than a billing one.
 - **The append-only invariant is written down, justified and centralized.** Exactly two things may repaint, the
   pinned rows are outside history by construction, `ESC[2K` only and never `ESC[0J` — with the reason recorded, and
-  `repl.ts` documenting that readline does exactly that on every line refresh, which is why it repaints after each
+  `run-repl.ts` documenting that readline does exactly that on every line refresh, which is why it repaints after each
   keypress.
 - **The model cannot choose a color.** Construct→color lives only in `theme.ts` and the model is told to emit no
   ANSI, so a hallucinated escape cannot fight the palette and a retune is one file.

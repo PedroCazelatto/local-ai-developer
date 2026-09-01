@@ -80,7 +80,12 @@ wave** — after `463e9ba` took `SessionMemory`. A third agent has closed two of
 now at one declaration or zero, and its barrel unchanged at 8 values / 7 types for the final pass. Job 2
 (`core/llm/types.ts`) is running: four standalone `.type.ts`, `ChatResult` folding into `client.ts`, and
 the `export type { Message, Tool, ToolCall } from 'ollama'` re-export **deleted** by the user's ruling,
-with the five in-folder importers taking them straight from the package. The sixth commit, `45d6313`, took `memory-db.ts`: 26 declarations, the largest single file in
+with the five in-folder importers taking them straight from the package.
+
+**`src/interface` (top level) is running in parallel** — 25 of its 28 declarations across two commits,
+`repl.ts` (9) and the three REPL renderers (12) and the completion pair (4), with `command-registry.ts`
+(3) to follow. Its pre-flight census was **exactly right** — 7 files, 28 declarations, per-file
+9/5/4/3/3/2/2 — which is worth recording after three earlier censuses in this sweep were not. The sixth commit, `45d6313`, took `memory-db.ts`: 26 declarations, the largest single file in
 the whole census and the last "cohesive store module" header in the directory. Four differential
 harnesses now re-run after every commit — five of them, **2725 probes, 0 mismatches** — and the barrel's
 exported name set has held steady at 91 values / 77 types across every commit.
