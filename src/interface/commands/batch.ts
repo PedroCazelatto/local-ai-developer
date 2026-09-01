@@ -18,7 +18,7 @@ import { renderer } from '../../core/ui/renderer.js';
 import { renderBatchSummary } from '../render-batch-summary.js';
 import type { Command } from '../command.type.js';
 import { listBatchFiles } from './list-batch-files.js';
-import type { BatchFile } from './list-batch-files.type.js';
+import type { BatchFile } from './list-batch-files.js';
 import { readBatchSummaryFile } from './read-batch-summary-file.js';
 
 /** The slice of the orchestrator /batch needs — satisfied structurally by SessionOrchestrator. */

@@ -10,7 +10,22 @@ import { existsSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 
 import { BATCHES_DIRNAME } from '../../core/session/index.js';
-import type { BatchFile } from './list-batch-files.type.js';
+
+/**
+ * One persisted batch summary on disk, addressed by the seq its own report prints as `Batch #N`. A
+ * batch summary is written by the batch driver as pretty JSON under .orchestrator/batches/, named
+ * `<zero-padded seq>-<compact startedAt>.json` — written that way precisely so the morning-after
+ * report survives the REPL, and this is what a listing needs to address one of those files by the
+ * number the report itself printed (`Batch #7`).
+ */
+export interface BatchFile {
+  /** Sequential batch number, parsed from the file name's zero-padded prefix. */
+  readonly seq: number;
+  /** File name as written, e.g. `0007-20260711T030405Z.json`. */
+  readonly fileName: string;
+  /** Absolute host path to the file. */
+  readonly filePath: string;
+}
 
 /**
  * The project's persisted batch summaries, ascending by seq. An empty array covers both "no batch has
