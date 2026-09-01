@@ -113,10 +113,17 @@ answers a blocker**, not after a review.
 
 - **Git is missing.** The git tools shell out to a host `git`; without it the execution loop cannot
   commit anything.
-- **"Node 24 LTS"** was one of four places the version was declared. The other three are settled:
+- **"Node 24 LTS"** should point at [.nvmrc](.nvmrc) rather than restate a major version.
   `package.json`'s `engines` is **deleted**, [docker-compose.yml](docker-compose.yml) **interpolates**
-  the pin, and [.nvmrc](.nvmrc) is the single source of truth `scripts/run.mjs` refuses against. This
-  line is the one copy left, so it should point at `.nvmrc` rather than restate a major version.
+  the pin, and `.nvmrc` is the single source of truth `scripts/run.mjs` refuses against.
+
+  **This entry used to say "one of four places" and "the one copy left". Both were wrong**, and the
+  correction is the interesting part. Three more hardcoded `node:24-slim` tags were later found in
+  `sandbox.ts`, `project-templates.ts` and `projects/hello-world/docker-compose.yml` — see
+  [backlog item 21](backlog/node-version-hardcoded-in-the-images.md) — and `npm test` was added to
+  `package.json` afterwards, invoking `node` **directly** rather than through `scripts/run.mjs`, so the
+  pin is not enforced on that path at all. **An enforcement count is a claim about the surface that
+  existed when it was counted**, and this file should not restate one as though it were permanent.
 
 **Truth:** *Node version* in [docs/cli.md](docs/cli.md), [.nvmrc](.nvmrc), `scripts/run.mjs`.
 
