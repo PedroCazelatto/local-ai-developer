@@ -1,64 +1,37 @@
-// Worker runner (V1/10) — spawns a FRESH, ISOLATED Worker window per task: an empty messages array
-// seeded with the Worker system prompt (rules/phases/worker.md via V1/01) + a user message carrying
-// the task definition and a slice of PRODUCT_SPEC.md. Runs the tool-dispatch loop (streaming to the
-// REPL, every call audited), returns the Worker's summary, then the window is DISCARDED — no
-// cross-task carryover (V1 has no persisting fix loop; that's V3).
+// One Worker window (V1/10): its own TurnContext over its own messages array, isolated from the
+// session's per-phase histories and from the Reviewer that will judge it.
+//
+// It NEVER commits and never reviews its own work. The refusal list is what enforces that: a tool the
+// Worker must not reach is refused here, audited, and reported back as a recoverable error, rather
+// than being left out of the tool list and silently hallucinated.
 
-import { buildSystemPrompt, loadPhasePrompt } from '../../context/index.js';
-import { resolvePhaseTools } from '../../phases/index.js';
+import type { FileReadTracker } from './read-tracker.type.js';
+import type { OllamaClient, Message, StreamHandle, TokenCounts, Tool, ToolCall } from '../llm/index.js';
+import type { ToolCallRecord } from './tool-call-record.type.js';
+import type { TurnContext } from './turn-context.type.js';
+import type { WorkerDeps } from './worker-deps.type.js';
 import { COMMIT_CHANGES } from '../../tools/commit-changes.js';
 import { GIT_PUSH } from '../../tools/git-push.js';
 import { GIT_STASH } from '../../tools/git-stash.js';
-import { createToolContext } from '../../tools/index.js';
-import { toolError, truncateHeadTail } from '../../tools/index.js';
-import type { SandboxClient } from '../container/index.js';
-import type { OllamaClient, Message, StreamHandle, TokenCounts, Tool, ToolCall } from '../llm/index.js';
-import { renderer } from '../ui/renderer.js';
 import { addTokenCounts } from './add-token-counts.js';
-import type { ToolCallRecord } from './tool-call-record.type.js';
-import { dispatchToolCall } from './dispatch-tool-call.js';
 import { appendEvent } from './events-log.js';
-import { evictStaleToolResults } from './evict-stale-tool-results.js';
+import { buildSystemPrompt, loadPhasePrompt } from '../../context/index.js';
 import { createReadTracker } from './read-tracker.js';
-import type { FileReadTracker } from './read-tracker.type.js';
+import { createToolContext } from '../../tools/index.js';
+import { dispatchToolCall } from './dispatch-tool-call.js';
+import { evictStaleToolResults } from './evict-stale-tool-results.js';
 import { recordToolCall } from './record-tool-call.js';
-import { taskBranchName } from './task-branch-name.js';
-import type { Task } from './task.type.js';
-import type { TurnContext } from './turn-context.type.js';
-import { processMessage } from './process-message.js';
+import { renderer } from '../ui/renderer.js';
+import { resolvePhaseTools } from '../../phases/index.js';
+import { toolError, truncateHeadTail } from '../../tools/index.js';
 
 // A test-first implement loop (write test → run → implement → run → summarize) needs more rounds
 // than an interactive chat turn, so give the Worker generous headroom before the loop cap trips.
 // Exported so the V3/01 fix loop reuses the SAME per-round budget it grants each interactive pass.
 export const WORKER_MAX_ROUNDS = 24;
 
-export interface WorkerDeps {
-  readonly llm: OllamaClient;
-  readonly sandbox: SandboxClient;
-  readonly projectName: string;
-  readonly projectPath: string;
-  /**
-   * From SessionConfig — the fraction of the base context ceiling at which this window starts stubbing
-   * its older tool results. Threaded, unlike the ceiling itself (which is read off `llm.baseNumCtx`,
-   * since the client is what puts it on the wire), because config is what owns a tuning ratio and boot
-   * is where it is resolved.
-   */
-  readonly evictionThresholdRatio: number;
-}
-
-/** What one Worker window produces: its final summary + its last test/build run (for the Reviewer). */
-export interface WorkerResult {
-  /** The Worker's final no-tool-call turn — files touched, tests added, assumptions. */
-  readonly summary: string;
-  /**
-   * The Worker's LAST run_in_project invocation (command + output tail), so V2/02 can seed the
-   * Reviewer with the test results; null if the Worker ran none. The Reviewer may re-run regardless.
-   */
-  readonly lastTestRun: string | null;
-}
-
 /** Max chars of a captured run_in_project result carried to the Reviewer (it can re-run for more). */
-const TEST_RUN_CAPTURE_LIMIT = 4000;
+export const TEST_RUN_CAPTURE_LIMIT = 4000;
 
 /**
  * The tools the Worker window refuses outright, each with the sentence the Worker is shown. These are
@@ -293,39 +266,4 @@ export class WorkerWindow implements TurnContext {
     recordToolCall(this.deps.projectPath, record);
     return output;
   }
-}
-
-/** Assemble the seed user message: the task definition + the spec slice + the Worker's marching orders. */
-export function buildWorkerSeed(task: Task, specSlice: string): string {
-  const deps = task.dependsOn.length > 0 ? task.dependsOn.join(', ') : 'none';
-  // taskBranchName: the one-branch-per-task name, derived mechanically from the backlog id + title.
-  // Handing the Worker the exact string means nothing downstream has to guess it — a later fix round
-  // or a re-run names the same branch, and git_branch's create-or-switch makes repeating it harmless.
-  const branch = taskBranchName(task);
-  return `You are implementing ONE task from the backlog. Implement exactly this task, test-first — no more, no less.
-
-## Task: ${task.title}
-(backlog id: ${task.id})
-
-${task.body}
-
-Depends on: ${deps}
-${specSlice ? `\n${specSlice}\n` : ''}
-Rules for this task:
-- FIRST, before anything else, put yourself on this task's branch: git_branch(action:"create", name:"${branch}"). One task is one branch. If the branch already exists you simply move onto it — expected on a later round or a re-run, and nothing is lost.
-- Write FAILING tests first, then the minimum code to pass them.
-- Run tests/builds/installs with run_in_project (the project's own container); use execute_command for plain shell. Never touch the host.
-- Write and edit files with write_file / edit_file.
-- You do NOT commit. Leave your work in the working tree — the Reviewer commits every file it accepts and hands the rest back to you with notes.
-- When finished, end with a plain-text SUMMARY for the user: files touched, tests added, assumptions made, and anything surprising. Do not call a tool in that final turn.`;
-}
-
-/**
- * Spawn a fresh Worker window for `task`, run it to completion (streaming to the REPL, all tool
- * calls audited), and return its summary. The window is discarded when this resolves.
- */
-export async function runWorkerTask(deps: WorkerDeps, task: Task, specSlice: string): Promise<WorkerResult> {
-  const window = new WorkerWindow(deps);
-  await processMessage(window, buildWorkerSeed(task, specSlice), WORKER_MAX_ROUNDS);
-  return { summary: window.summary, lastTestRun: window.lastTestRun };
 }

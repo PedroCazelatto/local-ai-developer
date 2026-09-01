@@ -17,13 +17,15 @@ import { addTokenCounts } from './add-token-counts.js';
 import { buildWorkerFixMessage } from './build-worker-fix-message.js';
 import { captureChangedFiles } from './capture-changed-files.js';
 import { formatReviewFeedback } from './format-review-feedback.js';
-import type { ReviewerCommit } from './reviewer-runner.js';
-import { ReviewerVerdictError, runReviewerTask } from './reviewer-runner.js';
+import type { ReviewerCommit } from './reviewer-commit.type.js';
+import { ReviewerVerdictError } from './reviewer-verdict-error.js';
+import { runReviewerTask } from './run-reviewer-task.js';
 import type { TaskLoopDeps, TaskLoopReporter, TaskLoopResult } from './run-task-loop.type.js';
 import { setTaskStatus } from './set-task-status.js';
 import type { Task } from './task.type.js';
 import { processMessage } from './process-message.js';
-import { buildWorkerSeed, WORKER_MAX_ROUNDS, WorkerWindow } from './worker-runner.js';
+import { buildWorkerSeed } from './build-worker-seed.js';
+import { WORKER_MAX_ROUNDS, WorkerWindow } from './worker-window.js';
 
 /** Hard cap on implement→fix rounds per task — a ceiling, not a target (CLAUDE.md). Assert exactly 5. */
 export const MAX_ROUNDS = 5;
