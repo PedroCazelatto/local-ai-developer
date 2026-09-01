@@ -16,7 +16,8 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { test } from 'node:test';
 
-import { BacklogError, readBacklog } from '../backlog.js';
+import { BacklogError } from '../backlog-error.js';
+import { readBacklog } from '../read-backlog.js';
 import type { Backlog, Task } from '../types.js';
 
 /** Build a throwaway project whose backlog/ holds `files` (keys are paths under backlog/), and read it. */

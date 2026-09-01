@@ -34,18 +34,15 @@ export { drainAnsweredQuestions } from './drain-answered-questions.js';
 export type { PendingQuestion, AnsweredQuestion, QuestionRow } from './types.js';
 export { appendEvent } from './events-log.js';
 export type { OrchestratorEvent, OrchestratorEventInput, OrchestratorEventType } from './events-log.type.js';
-export {
-  readBacklog,
-  setTaskStatus,
-  nextRunnableTasks,
-  allTasks,
-  findTask,
-  taskSkipReason,
-  levelDocs,
-  backlogRoot,
-  BACKLOG_DIRNAME,
-  BacklogError,
-} from './backlog.js';
+export { readBacklog } from './read-backlog.js';
+export { setTaskStatus } from './set-task-status.js';
+export { nextRunnableTasks } from './next-runnable-tasks.js';
+export { allTasks } from './all-tasks.js';
+export { findTask } from './find-task.js';
+export { taskSkipReason } from './task-skip-reason.js';
+export { levelDocs } from './level-docs.js';
+export { backlogRoot, BACKLOG_DIRNAME } from './backlog-root.js';
+export { BacklogError } from './backlog-error.js';
 export type { Backlog, Task, TaskStatus } from './types.js';
 export { TASK_STATUSES } from './types.js';
 export { runWorkerTask } from './worker-runner.js';

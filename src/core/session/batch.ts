@@ -17,7 +17,9 @@ import path from 'node:path';
 
 import type { TokenCounts } from '../llm/index.js';
 import { addTokenCounts } from './add-token-counts.js';
-import { findTask, readBacklog, taskSkipReason } from './backlog.js';
+import { findTask } from './find-task.js';
+import { readBacklog } from './read-backlog.js';
+import { taskSkipReason } from './task-skip-reason.js';
 import type {
   BatchBlocked,
   BatchCancelled,

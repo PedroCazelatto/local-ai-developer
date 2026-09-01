@@ -14,7 +14,7 @@
 import { TurnAbortedError } from '../llm/index.js';
 import type { TokenCounts } from '../llm/index.js';
 import { addTokenCounts } from './add-token-counts.js';
-import { setTaskStatus } from './backlog.js';
+import { setTaskStatus } from './set-task-status.js';
 import { buildWorkerFixMessage } from './build-worker-fix-message.js';
 import { formatReviewFeedback } from './format-review-feedback.js';
 import { captureChangedFiles } from './capture-changed-files.js';
