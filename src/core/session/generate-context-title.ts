@@ -15,7 +15,7 @@
 import { loadPrompt } from '../../context/load-prompt.js';
 import type { Message, OllamaClient, TokenCounts } from '../llm/index.js';
 import { oneShot } from '../llm/index.js';
-import type { MemoryRecord } from './memory-db.type.js';
+import type { MemoryRecord } from './memory-record.type.js';
 import { renderTurn } from './render-turn.js';
 
 /** Hard ceiling on a stored title, so one always fits a listing row beside the id and token counts. */

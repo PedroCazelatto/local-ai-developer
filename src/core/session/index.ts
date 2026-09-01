@@ -15,8 +15,13 @@ export { appendAuditRow, OUTPUT_PREVIEW_LIMIT } from './audit.js';
 export type { ToolCallRecord, DispatchDeps } from './dispatch.js';
 export { dispatchToolCall } from './dispatch.js';
 export { CONTEXT_TITLE_LIMIT, generateContextTitle } from './generate-context-title.js';
-export { CONTEXT_SHORT_ID_LEN, shortContextId } from './memory-db.js';
-export type { ClearResult, ContextSummary, MemoryRecord, MemoryRole, PhaseLoad, TurnTokens } from './memory-db.type.js';
+export { CONTEXT_SHORT_ID_LEN, shortContextId } from './short-context-id.js';
+export type { ClearResult } from './clear-result.type.js';
+export type { ContextSummary } from './context-summary.type.js';
+export type { MemoryRecord } from './memory-record.type.js';
+export type { MemoryRole } from './memory-role.type.js';
+export type { PhaseLoad } from './phase-load.type.js';
+export type { TurnTokens } from './turn-tokens.type.js';
 export type { TurnContext } from './turn-loop.js';
 export { MAX_TOOL_ROUNDS } from './turn-loop.js';
 // The ONE place a finished tool call is recorded: its durable audit row AND its `←` scrollback line.

@@ -9,7 +9,7 @@
 // flattens a turn into prose a model is asked to summarize or describe, so the role and the tool call
 // are spelled out in the text instead of living in structured fields.
 
-import type { MemoryRecord } from './memory-db.type.js';
+import type { MemoryRecord } from './memory-record.type.js';
 
 /** One turn as `[role]` (or `[tool:<name>]`), its content, and any tool calls the turn issued. */
 export function renderTurn(record: MemoryRecord): string {

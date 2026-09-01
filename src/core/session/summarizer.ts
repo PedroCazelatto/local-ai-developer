@@ -8,7 +8,7 @@
 
 import type { Message, OllamaClient, TokenCounts } from '../llm/index.js';
 import { oneShot } from '../llm/index.js';
-import type { MemoryRecord } from './memory-db.type.js';
+import type { MemoryRecord } from './memory-record.type.js';
 import type { SessionMemory } from './memory.js';
 import { renderTurn } from './render-turn.js';
 
