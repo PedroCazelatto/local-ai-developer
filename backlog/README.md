@@ -73,7 +73,8 @@ plus `task-statuses.ts` and `severities.ts` as plain constant modules, since tho
 rather than types), `45d6313` `memory-db.ts` (26 declarations — the largest single file in the whole
 census, and the last "cohesive store module" header in the directory), `463e9ba` `SessionMemory`, and
 `c24a371` the debate pair (16 declarations + 8 types, its `isRecord` dedupe importing
-`src/core/llm/is-record.ts` directly because the barrel does not export it).
+`src/core/llm/is-record.ts` directly because the barrel does not export it), and `9fd9e2e` the Retro
+runner.
 
 That leaves `core/session` at **12 files / 47 declarations** — 16 files and 134 declarations cleared.
 **Six differential harnesses re-run after every commit: 2819 probes, 0 mismatches**, and the barrel's
@@ -102,10 +103,24 @@ a shell.** Its four types were each measured by importer and all four found genu
 pre-flight census was **exactly right** — 7 files, 28 declarations, per-file 9/5/4/3/3/2/2 — worth
 recording after three earlier censuses in this sweep were not.
 
-**[2](test-the-invariant-functions.md)'s deferred `core/llm` pass is landing** — **136 tests in 9 files,
-taking the suite 195 → 331**, one test file per function under test, every one importing the specific
-function file rather than a barrel. It produced [26](streamed-reply-corruption-in-core-llm.md). `src/context/`
-tests start next; both directories are finished and stable, which is what makes them safe to pin.
+**[2](test-the-invariant-functions.md) is CLOSED.** Ten original targets plus four `src/context/`
+additions — **25 test files, 400 tests, 0 failures, 0 skips**, `tsc --noEmit` clean:
+
+| pass | commit | tests | suite |
+|---|---|---:|---:|
+| the eight original targets | `973adce` | 195 | 195 |
+| `StreamFilter` + `recoverToolCalls` | `d3e0f42` | 136 | 331 |
+| `src/context/` | `48af6f5` | 69 | 400 |
+
+**Its actual return was not the tests.** Item 2 was argued on the grounds that the docs were carrying
+both specification *and* verification, and it produced **twelve findings across three passes, none fixed
+in passing** — four backlog items' worth of places where the docs and the code disagreed:
+[22](truncate-to-width-measures-code-units.md), [25](help-command-cannot-be-imported-first.md),
+[26](streamed-reply-corruption-in-core-llm.md) and
+[27](standards-frontmatter-parsers-disagree.md). The tests are the smaller half of what it delivered.
+
+**One follow-up remains and is not yet available**: the SQL-versus-JS agreement test for the
+visible-turn predicate, waiting on `src/core/session/` to close.
 
 **Ten old-style `.type.ts` pairs still sit in `core/session`** — `batch`, `memory-db`, `subagents`,
 `retro-runner`, `run-debate`, `run-task-loop`, `run-stop-signal`, `events-log`, `read-tracker`,
@@ -491,6 +506,33 @@ Both carry the standing conditions: **the tests assert the current behaviour**, 
 test, and **neither may ride in a sweep commit** — easy here, since `core/llm` closed at `602f62f` and
 there is no refactor in flight to hide behind. The file also records one **non**-defect, so nobody
 promotes it: `expandOverFence`'s unreachable guard.
+
+### 27. [Three defects in the standards frontmatter parsers](standards-frontmatter-parsers-disagree.md)
+*Engineering quality.* From [2](test-the-invariant-functions.md)'s `src/context/` pass, in the pair that
+decides which standards the model can find and what it reads.
+
+**A UTF-8 BOM defeats both parsers, and one aborts boot.** Both anchor `^---` with no BOM tolerance, so
+one standards file saved BOM-first — routine for a Windows editor, on a Windows box — throws
+`Missing YAML frontmatter (leading --- block)` **naming that file**, while the file visibly has one. It
+ranks near [22](truncate-to-width-measures-code-units.md) for the same reason: **the defect is the
+misleading diagnosis**, which sends the reader to inspect the one thing already correct. The
+`splitFrontmatter` half is quieter and worse — empty name, so the standard is simply unreachable, with
+the raw `---` block handed to the model as body. **The repo already disagrees with itself**:
+`split-task-frontmatter.ts` tolerates a BOM on purpose. Latent — none of the nine standards files has one.
+
+**`splitFrontmatter` strips CRLF blank lines only partly** — `/^
+?
++/` is one optional `
+` then a run
+of `
+`, so an LF file loses every leading blank line and a CRLF file loses exactly one. All nine
+standards files are CRLF. **First reported as live and corrected to latent by driving the real tree**,
+which is worth as much as the defect: it is one formatting edit from biting.
+
+**The two parsers disagree about a duplicated key** — last-wins vs first-wins — so a file repeating `name`
+is catalogued under one and resolved under another: listed by `search_rules`, unreachable by `load_rule`.
+
+Standing conditions as ever, with no excuse available: **`src/context/` closed at `daf08cf`.**
 
 ---
 

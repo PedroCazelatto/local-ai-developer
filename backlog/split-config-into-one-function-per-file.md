@@ -775,6 +775,46 @@ subsumes the other. And it **demonstrated** the `readonly` blind spot rather tha
 from this file — ran the control, got zero errors, recorded it. **Inheriting a claimed blind spot is
 itself a green you have not tested.**
 
+### The sixth shape inverts the table: a FALSE FAILURE
+
+Every row above is a false green. This one is a false red, and it cost an hour that was about to be
+spent hunting for weaknesses in two tests that were fine.
+
+A mutation harness used `sed -i` on its temp copy. `sed` rewrote the line endings, `cmp` therefore
+reported "file changed", and **two patterns that matched nothing were scored as SURVIVED mutations.**
+
+**It is not a CRLF bug, and scoping it to `sed` would make the rule miss most of its range.** In the
+agent's own words: *"CRLF was just what made the bytes differ. It was that my change-detector and my
+mutation were **two different questions**, and I only asked one."* `cmp` answers *did anything about this
+file change?* — what was needed was *did the specific edit I intended land?* **Any tool with a side
+effect on the file produces the identical false SURVIVED through a different door**: a formatter, a
+normalising write, an editor trimming trailing whitespace.
+
+> **RULE: assert the occurrence count of the literal you meant to replace, and treat zero as a HARNESS
+> FAULT rather than a verdict.** Print `harness bug`, not `SURVIVED`.
+>
+> **The assertion is bidirectional, and the second direction is the one nobody looks for.** An
+> **under-match** mutates nothing and fakes a *survivor*. An **over-match** mutates several sites at
+> once and fakes a *kill* — a red that looks like a killed mutation while actually testing something
+> else. The first announces itself as a puzzling result; **the second's symptom is a passing result**,
+> so nothing prompts you to look.
+
+This also sharpens a rule already in this file: **the reason a tool is dangerous in one place is not
+always the only reason it is dangerous.** The staging section warns that `sed -i` dirties files *in the
+repo*. This agent was on a temp copy, where that risk genuinely did not apply — and the same tool
+corrupted the **measurement** instead. Same tool, different victim, and the existing warning would not
+have prompted a second look.
+
+### Layered assertions, proven necessary rather than assumed
+
+`buildSystemPrompt` is pinned by two layers, and **neither alone caught both mutations.** A SHA-256
+digest of the whole 2,897-character prompt caught *delete a guidance line* and *tighten a separator*;
+readable order assertions caught *swap the inventory and the mechanics*. The layers were **shown** to be
+non-redundant, not assumed to be.
+
+Record the framing that keeps a digest test from being deleted as brittle: **it does not forbid a prompt
+change, it makes one show up in a diff.** Recompute the digest in the same commit as the change.
+
 ### Mutation testing answers directly what every other instrument answered by proxy
 
 > **A test that passes is not yet evidence that the code it names is the code being exercised.** Five
@@ -792,6 +832,10 @@ passing if the guard it was written for were deleted outright.
 Note what that costs to find any other way: nothing about the test's name, its assertions or its green
 result distinguishes it from a test that works. **Only deleting the guard reveals it**, which is what a
 mutation harness does automatically and no amount of reading does reliably.
+
+**Two runs, two survivors, both of which improved a test** — first the array carrying a `name` property,
+then the bare word `namex`, which collides where a colonless line cannot. **Two for two is evidence
+rather than luck**: this instrument finds something every time it is pointed at a suite.
 
 It also carried the coverage-control idea forward: the harness **printed the unmutated control for each
 file first**, so a broken harness shows up as a **red control** rather than as false confidence. That is
