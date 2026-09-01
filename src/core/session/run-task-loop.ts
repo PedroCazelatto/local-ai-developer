@@ -11,18 +11,18 @@
 // is refused unless the repo agrees. So a round can land commits even when the verdict is a fail, and
 // a `pass` is proof the tree was already clean — the loop just reports what the Reviewer committed.
 
-import { TurnAbortedError } from '../llm/index.js';
 import type { TokenCounts } from '../llm/index.js';
+import { TurnAbortedError } from '../llm/index.js';
 import { addTokenCounts } from './add-token-counts.js';
-import { setTaskStatus } from './set-task-status.js';
 import { buildWorkerFixMessage } from './build-worker-fix-message.js';
-import { formatReviewFeedback } from './format-review-feedback.js';
 import { captureChangedFiles } from './capture-changed-files.js';
-import { ReviewerVerdictError, runReviewerTask } from './reviewer-runner.js';
+import { formatReviewFeedback } from './format-review-feedback.js';
 import type { ReviewerCommit } from './reviewer-runner.js';
+import { ReviewerVerdictError, runReviewerTask } from './reviewer-runner.js';
 import type { TaskLoopDeps, TaskLoopReporter, TaskLoopResult } from './run-task-loop.type.js';
+import { setTaskStatus } from './set-task-status.js';
+import type { Task } from './task.type.js';
 import { processMessage } from './turn-loop.js';
-import type { Task } from './types.js';
 import { buildWorkerSeed, WORKER_MAX_ROUNDS, WorkerWindow } from './worker-runner.js';
 
 /** Hard cap on implement→fix rounds per task — a ceiling, not a target (CLAUDE.md). Assert exactly 5. */

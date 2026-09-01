@@ -17,7 +17,8 @@
 
 import { canonicalizePhase } from '../../core/session/canonicalize-phase.js';
 import { readInbox } from '../../core/session/read-inbox.js';
-import type { InboxItem, Phase } from '../../core/session/types.js';
+import type { InboxItem } from '../../core/session/inbox-item.type.js';
+import type { Phase } from '../../core/session/phase.type.js';
 import { renderer } from '../../core/ui/renderer.js';
 import { theme } from '../../core/ui/theme.js';
 import type { Command } from '../command-registry.js';

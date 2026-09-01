@@ -1,7 +1,7 @@
 // The open blocker for a task, derived by REPLAY rather than read from a mutable flag.
 
+import type { RaisedBlocker } from './raised-blocker.type.js';
 import { readBlockerRows } from './read-blocker-rows.js';
-import type { RaisedBlocker } from './types.js';
 
 /**
  * The OPEN blocker for a task, or undefined — a `raised` row whose id has no matching `resolved` row.

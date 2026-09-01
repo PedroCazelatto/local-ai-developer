@@ -12,7 +12,7 @@ import { readDependsOn } from './read-depends-on.js';
 import { readOrder } from './read-order.js';
 import { readTaskStatus } from './read-task-status.js';
 import { splitTaskFrontmatter } from './split-task-frontmatter.js';
-import type { Task } from './types.js';
+import type { Task } from './task.type.js';
 
 /** Max relative-path segments for a task: epic / story / task. Deeper nesting is rejected. */
 const MAX_DEPTH = 3;

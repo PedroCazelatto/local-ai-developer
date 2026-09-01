@@ -3,7 +3,7 @@
 // that says nothing on its own in a flat folder.
 
 import { truncateHeadTail } from '../../tools/truncate.js';
-import type { InspectResult } from './types.js';
+import type { InspectResult } from './inspect-result.type.js';
 
 /** Bound `output` to `budget`, reporting whether anything was cut. */
 export function boundInspectOutput(output: string, budget: number): InspectResult {

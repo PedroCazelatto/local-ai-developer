@@ -6,8 +6,8 @@ import { mkdirSync, renameSync, writeFileSync } from 'node:fs';
 
 import { appStateDir } from './app-state-dir.js';
 import { appStateFile } from './app-state-file.js';
+import type { AppState } from './app-state.type.js';
 import { loadAppState } from './load-app-state.js';
-import type { AppState } from './types.js';
 
 /**
  * Persist a partial update, MERGED over the current on-disk state so unrelated (future) fields survive.

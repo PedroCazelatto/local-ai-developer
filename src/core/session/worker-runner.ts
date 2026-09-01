@@ -6,26 +6,26 @@
 
 import { buildSystemPrompt, loadPhasePrompt } from '../../context/index.js';
 import { resolvePhaseTools } from '../../phases/index.js';
-import { createToolContext } from '../../tools/index.js';
-import { toolError, truncateHeadTail } from '../../tools/index.js';
 import { COMMIT_CHANGES } from '../../tools/commit-changes.js';
 import { GIT_PUSH } from '../../tools/git-push.js';
 import { GIT_STASH } from '../../tools/git-stash.js';
+import { createToolContext } from '../../tools/index.js';
+import { toolError, truncateHeadTail } from '../../tools/index.js';
 import type { SandboxClient } from '../container/index.js';
 import type { OllamaClient, Message, StreamHandle, TokenCounts, Tool, ToolCall } from '../llm/index.js';
 import { renderer } from '../ui/renderer.js';
 import { addTokenCounts } from './add-token-counts.js';
-import { recordToolCall } from './record-tool-call.js';
 import type { ToolCallRecord } from './dispatch.js';
 import { dispatchToolCall } from './dispatch.js';
 import { appendEvent } from './events-log.js';
 import { evictStaleToolResults } from './evict-stale-tool-results.js';
 import { createReadTracker } from './read-tracker.js';
 import type { FileReadTracker } from './read-tracker.type.js';
+import { recordToolCall } from './record-tool-call.js';
 import { taskBranchName } from './task-branch-name.js';
-import { processMessage } from './turn-loop.js';
+import type { Task } from './task.type.js';
 import type { TurnContext } from './turn-loop.js';
-import type { Task } from './types.js';
+import { processMessage } from './turn-loop.js';
 
 // A test-first implement loop (write test → run → implement → run → summarize) needs more rounds
 // than an interactive chat turn, so give the Worker generous headroom before the loop cap trips.

@@ -1,7 +1,7 @@
 // Defensive narrowing for one line of blockers.jsonl. The file is both hand-inspectable and
 // machine-fed, so a row that does not match its `kind` is dropped rather than trusted.
 
-import type { BlockerRow } from './types.js';
+import type { BlockerRow } from './blocker-row.type.js';
 
 /** Narrow a parsed JSON value to a BlockerRow (defensive — the file is hand-inspectable + machine-fed). */
 export function isBlockerRow(value: unknown): value is BlockerRow {

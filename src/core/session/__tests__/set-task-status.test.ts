@@ -17,7 +17,7 @@ import { test } from 'node:test';
 import { BacklogError } from '../backlog-error.js';
 import { readBacklog } from '../read-backlog.js';
 import { setTaskStatus } from '../set-task-status.js';
-import type { TaskStatus } from '../types.js';
+import type { TaskStatus } from '../task-status.type.js';
 
 /** Write `text` as backlog/a.md, flip it to `status`, and hand back the exact bytes on disk after. */
 function rewrite(text: string, status: TaskStatus = 'done'): string {

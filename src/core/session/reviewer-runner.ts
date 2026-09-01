@@ -21,9 +21,9 @@
 
 import { buildSystemPrompt, loadPhasePrompt } from '../../context/index.js';
 import { PHASE_SCOPED_TOOL_NAMES, REVIEWER_TOOL_NAMES, resolvePhaseTools } from '../../phases/index.js';
+import { COMMIT_CHANGES } from '../../tools/commit-changes.js';
 import { createToolContext } from '../../tools/index.js';
 import { toolError } from '../../tools/index.js';
-import { COMMIT_CHANGES } from '../../tools/commit-changes.js';
 import { LIST_CHANGES } from '../../tools/list-changes.js';
 import { MARK_TASK_DONE } from '../../tools/mark-task-done.js';
 import { RAISE_BLOCKER, validateBlockerRequest } from '../../tools/raise-blocker.js';
@@ -31,20 +31,20 @@ import { SUBMIT_VERDICT, parseVerdict } from '../../tools/submit-verdict.js';
 import type { SandboxClient } from '../container/index.js';
 import type { OllamaClient, Message, StreamHandle, TokenCounts, Tool, ToolCall } from '../llm/index.js';
 import { addTokenCounts } from './add-token-counts.js';
-import { recordToolCall } from './record-tool-call.js';
 import { BACKLOG_DIRNAME } from './backlog-root.js';
-import { setTaskStatus } from './set-task-status.js';
-import { raiseBlocker } from './raise-blocker.js';
-import type { RaisedBlocker } from './types.js';
 import type { ToolCallRecord } from './dispatch.js';
 import { dispatchToolCall } from './dispatch.js';
+import { listChangedPaths } from './list-changed-paths.js';
+import { raiseBlocker } from './raise-blocker.js';
+import type { RaisedBlocker } from './raised-blocker.type.js';
 import { createReadTracker } from './read-tracker.js';
 import type { FileReadTracker } from './read-tracker.type.js';
-import { listChangedPaths } from './list-changed-paths.js';
-import type { ReviewVerdict } from './types.js';
-import { processMessage } from './turn-loop.js';
+import { recordToolCall } from './record-tool-call.js';
+import type { ReviewVerdict } from './review-verdict.type.js';
+import { setTaskStatus } from './set-task-status.js';
+import type { Task } from './task.type.js';
 import type { TurnContext } from './turn-loop.js';
-import type { Task } from './types.js';
+import { processMessage } from './turn-loop.js';
 import { verdictGitConflict } from './verdict-git-conflict.js';
 
 // The Reviewer inspects (a few reads + maybe a test re-run) then submits — lighter than the Worker's

@@ -1,6 +1,7 @@
 // The execution trigger's view of the backlog (V1/10): what may run right now, in order.
 
-import type { Backlog, Task } from './types.js';
+import type { Backlog } from './backlog.type.js';
+import type { Task } from './task.type.js';
 
 /**
  * Tasks eligible to run now — status `pending` AND every `depends_on` id already `done` — sorted by

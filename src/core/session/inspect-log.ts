@@ -4,9 +4,9 @@
 import { boundInspectOutput } from './bound-inspect-output.js';
 import { hasHead } from './has-head.js';
 import { MAX_LOG_COUNT } from './inspect-log-count.js';
+import type { InspectResult } from './inspect-result.type.js';
 import { REVIEW_DIFF_BUDGET } from './review-diff-budget.js';
 import { runGit } from './run-git.js';
-import type { InspectResult } from './types.js';
 
 /**
  * One line per commit, newest first — `<short sha> <subject>`. `count` is clamped into

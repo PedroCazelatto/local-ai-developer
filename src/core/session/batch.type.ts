@@ -7,7 +7,7 @@
 import type { TokenCounts } from '../llm/index.js';
 import type { RunStopSignal } from './run-stop-signal.js';
 import type { TaskLoopResult } from './run-task-loop.type.js';
-import type { Task } from './types.js';
+import type { Task } from './task.type.js';
 
 /** A task that passed review — the Reviewer committed every file and marked it done. */
 export interface BatchPassed {

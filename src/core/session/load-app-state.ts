@@ -4,8 +4,8 @@
 import { existsSync, readFileSync } from 'node:fs';
 
 import { appStateFile } from './app-state-file.js';
+import type { AppState } from './app-state.type.js';
 import { narrowAppState } from './narrow-app-state.js';
-import type { AppState } from './types.js';
 
 /**
  * Load the global app state. A missing file is normal (fresh install) → `{}` silently. A corrupt file

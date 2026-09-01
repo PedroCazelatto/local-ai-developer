@@ -21,24 +21,24 @@ import path from 'node:path';
 
 import { availablePhaseNames, buildSystemPrompt, loadPhasePrompt, phasePromptPath, PHASES_DIR } from '../../context/index.js';
 import { PHASE_SCOPED_TOOL_NAMES, RETRO_TOOL_NAMES, resolvePhaseTools } from '../../phases/index.js';
-import { createToolContext, resolveInProject, toolError } from '../../tools/index.js';
 import { buildFileDiff } from '../../tools/build-file-diff.js';
 import { applyPhaseRuleEdit, EDIT_PHASE_RULE } from '../../tools/edit-phase-rule.js';
+import { createToolContext, resolveInProject, toolError } from '../../tools/index.js';
 import { READ_PHASE_RULE, readPhaseRule } from '../../tools/read-phase-rule.js';
 import { parseRetroSubmission, SUBMIT_RETRO } from '../../tools/submit-retro.js';
 import type { Message, StreamHandle, TokenCounts, Tool, ToolCall } from '../llm/index.js';
 import type { ToolCallDisplay } from '../ui/types.js';
 import { addTokenCounts } from './add-token-counts.js';
-import { recordToolCall } from './record-tool-call.js';
+import { commitPaths } from './commit-paths.js';
 import type { ToolCallRecord } from './dispatch.js';
 import { dispatchToolCall } from './dispatch.js';
 import { createReadTracker } from './read-tracker.js';
 import type { FileReadTracker } from './read-tracker.type.js';
-import { commitPaths } from './commit-paths.js';
+import { recordToolCall } from './record-tool-call.js';
 import type { RetroDeps, RetroInput, RetroResult, RetroSubmission } from './retro-runner.type.js';
-import { processMessage } from './turn-loop.js';
+import type { Task } from './task.type.js';
 import type { TurnContext } from './turn-loop.js';
-import type { Task } from './types.js';
+import { processMessage } from './turn-loop.js';
 
 // Retro reads a couple of files (task doc / phase file) then makes one edit and submits — lighter than
 // the Worker's implement loop. Give headroom for a few reads + a re-tried edit before the cap trips.

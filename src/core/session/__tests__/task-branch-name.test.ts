@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
 import { taskBranchName } from '../task-branch-name.js';
-import type { Task } from '../types.js';
+import type { Task } from '../task.type.js';
 
 /** A Task carrying only the two fields the branch name is derived from; the rest are inert. */
 function task(id: string, title: string): Task {

@@ -3,9 +3,9 @@
 
 import { existsSync, readFileSync } from 'node:fs';
 
+import type { BlockerRow } from './blocker-row.type.js';
 import { blockersFile } from './blockers-file.js';
 import { isBlockerRow } from './is-blocker-row.js';
-import type { BlockerRow } from './types.js';
 
 /** Read + parse every row; a malformed line is skipped (a torn last line must not sink replay). */
 export function readBlockerRows(projectPath: string): BlockerRow[] {

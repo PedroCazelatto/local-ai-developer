@@ -9,8 +9,10 @@
 // reliable across any model/hardware. Validation is strict here because downstream trusts the shape.
 
 import type { Tool } from '../core/llm/index.js';
-import type { ReviewIssue, ReviewVerdict, Severity } from '../core/session/types.js';
-import { SEVERITIES } from '../core/session/types.js';
+import type { ReviewIssue } from '../core/session/review-issue.type.js';
+import type { ReviewVerdict } from '../core/session/review-verdict.type.js';
+import type { Severity } from '../core/session/severity.type.js';
+import { SEVERITIES } from '../core/session/severities.js';
 
 /** The one name the Reviewer window special-cases to capture its verdict. */
 export const SUBMIT_VERDICT = 'submit_verdict';

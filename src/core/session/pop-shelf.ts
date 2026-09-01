@@ -2,7 +2,7 @@
 
 import { findShelfRef } from './find-shelf-ref.js';
 import { runGit } from './run-git.js';
-import type { ShelfResult } from './types.js';
+import type { ShelfResult } from './shelf-result.type.js';
 
 /** Restore `label` into the working tree and remove the shelf. Unknown label ⇒ recoverable refusal. */
 export function popShelf(projectPath: string, label: string): ShelfResult {

@@ -6,14 +6,14 @@
 // The loop drives the UI (renderer + spinner) and the orchestrator through the TurnContext seam
 // (SessionOrchestrator implements it), so this file stays free of Ollama/sandbox details.
 
-import { TurnAbortedError } from '../llm/index.js';
 import type { Message, StreamHandle, TokenCounts, ToolCall, TurnAbortReason } from '../llm/index.js';
-import type { MarkdownStream } from '../ui/types.js';
+import { TurnAbortedError } from '../llm/index.js';
+import { activityLine } from '../ui/activity-line.js';
+import { inputFence } from '../ui/input-fence.js';
 import { printToolCall } from '../ui/print-tool-call.js';
 import { renderer } from '../ui/renderer.js';
 import { statusActivity } from '../ui/status-activity.js';
-import { activityLine } from '../ui/activity-line.js';
-import { inputFence } from '../ui/input-fence.js';
+import type { MarkdownStream } from '../ui/types.js';
 
 /** Exact value ported from main.py — caps the implement/continue rounds per user message. */
 export const MAX_TOOL_ROUNDS = 8;

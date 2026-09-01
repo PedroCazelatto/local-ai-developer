@@ -15,9 +15,9 @@
 // calls; the scrollback line is a convenience for whoever is watching. If only one of the two can
 // happen, it is the durable one.
 
+import { printToolResult } from '../ui/print-tool-result.js';
 import { appendAuditRow } from './audit.js';
 import type { ToolCallRecord } from './dispatch.js';
-import { printToolResult } from '../ui/print-tool-result.js';
 
 /**
  * Record one dispatched tool call: append its audit row, then print its `←` result line (and diff).

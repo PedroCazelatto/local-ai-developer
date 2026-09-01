@@ -6,8 +6,9 @@ import { existsSync, statSync } from 'node:fs';
 
 import { BacklogError } from './backlog-error.js';
 import { backlogRoot } from './backlog-root.js';
+import type { Backlog } from './backlog.type.js';
 import { collectTaskFiles } from './collect-task-files.js';
-import type { Backlog, Task } from './types.js';
+import type { Task } from './task.type.js';
 
 /** Read + validate the whole backlog tree. Throws BacklogError if backlog/ is missing/malformed. */
 export function readBacklog(projectPath: string): Backlog {

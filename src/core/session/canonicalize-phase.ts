@@ -2,7 +2,7 @@
 // replaced had none, so a typo silently vanished from every future regex.
 
 import { PHASES } from './inbox-phases.js';
-import type { Phase } from './types.js';
+import type { Phase } from './phase.type.js';
 
 /**
  * Canonicalize a phase name to its PascalCase form, or undefined if it is not one of the six. Matches

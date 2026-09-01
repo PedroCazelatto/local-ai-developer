@@ -49,8 +49,8 @@ export const DEFAULT_TIMEOUT_MS = 120_000;
 // The assembly and the env resolvers it calls, one function per file. Each resolver reads ONE env var
 // and falls back loudly to the matching DEFAULT_* above; loadConfig validates the project folder and
 // puts their results into a SessionConfig.
+export type { SessionConfig } from './load-config.js';
 export { loadConfig } from './load-config.js';
 export { resolveNumCtx } from './resolve-num-ctx.js';
 export { resolveRatio } from './resolve-ratio.js';
 export { resolveTimeoutMs } from './resolve-timeout-ms.js';
-export type { SessionConfig } from './load-config.js';

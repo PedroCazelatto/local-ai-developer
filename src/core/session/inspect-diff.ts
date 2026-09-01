@@ -4,9 +4,9 @@
 
 import { boundInspectOutput } from './bound-inspect-output.js';
 import { hasHead } from './has-head.js';
+import type { InspectResult } from './inspect-result.type.js';
 import { REVIEW_DIFF_BUDGET } from './review-diff-budget.js';
 import { runGit } from './run-git.js';
-import type { InspectResult } from './types.js';
 
 /**
  * Uncommitted changes against `ref` (default HEAD), optionally narrowed to `paths`. Unlike

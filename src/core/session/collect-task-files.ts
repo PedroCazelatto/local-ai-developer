@@ -6,7 +6,7 @@ import path from 'node:path';
 
 import { LEVEL_DOC } from './level-doc.js';
 import { readTaskFile } from './read-task-file.js';
-import type { Task } from './types.js';
+import type { Task } from './task.type.js';
 
 /** Recursively collect every task file (any .md except README.md) under `dir`. */
 export function collectTaskFiles(root: string, dir: string, out: Task[]): void {

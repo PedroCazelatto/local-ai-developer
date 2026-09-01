@@ -8,9 +8,9 @@
 // switch, and inherits the switch rule instead.
 
 import { branchExists } from './branch-exists.js';
-import { switchBranch } from './switch-branch.js';
+import type { BranchResult } from './branch-result.type.js';
 import { runGit } from './run-git.js';
-import type { BranchResult } from './types.js';
+import { switchBranch } from './switch-branch.js';
 
 /**
  * Create `name` and check it out. If the branch is already there this is a switch instead — reported
