@@ -5,8 +5,8 @@ export type { AppState } from './app-state.type.js';
 export { loadAppState } from './load-app-state.js';
 export { saveAppState } from './save-app-state.js';
 // Boot model resolution against what Ollama actually has installed (replaces the old hard-coded default).
-export type { ChatRole } from './memory.js';
-export { SessionMemory } from './memory.js';
+export { SessionMemory } from './session-memory.js';
+export type { ChatRole } from './chat-role.type.js';
 export { SessionOrchestrator } from './orchestrator.js';
 export { resolveBootModel } from './resolve-boot-model.js';
 // Phase memory is SQLite-backed (projects/<active>/.orchestrator/memory.db): a context is an

@@ -20,7 +20,7 @@ import { generateContextTitle } from './generate-context-title.js';
 import type { ClearResult } from './clear-result.type.js';
 import type { ContextSummary } from './context-summary.type.js';
 import type { PhaseLoad } from './phase-load.type.js';
-import { SessionMemory } from './memory.js';
+import { SessionMemory } from './session-memory.js';
 import { createReadTracker } from './read-tracker.js';
 import type { FileReadTracker } from './read-tracker.type.js';
 import { recordToolCall } from './record-tool-call.js';

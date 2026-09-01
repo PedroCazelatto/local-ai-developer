@@ -5,7 +5,7 @@
 // way: both hand a slice of one phase's history to a fresh one-shot, and a turn that reads differently
 // in the two would make one of them reason about a shape the other never sees.
 //
-// This is NOT the replay path. Replay rebuilds Ollama `Message` objects (memory.ts, toMessage); this
+// This is NOT the replay path. Replay rebuilds Ollama `Message` objects (to-message.ts); this
 // flattens a turn into prose a model is asked to summarize or describe, so the role and the tool call
 // are spelled out in the text instead of living in structured fields.
 

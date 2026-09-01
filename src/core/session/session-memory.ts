@@ -14,6 +14,9 @@
 //
 // A context row is created LAZILY, on its first flush. A phase the user never talked to leaves no row,
 // and a session with no model selected — which cannot produce an answer — creates nothing at all.
+//
+// The file is named for the class it holds. Its free functions moved out under one declaration per
+// file; a class's METHODS are its implementation and stay (constitution).
 
 import type { DatabaseSync } from 'node:sqlite';
 
@@ -22,6 +25,9 @@ import type { ClearResult } from './clear-result.type.js';
 import { collapseIntoSummary } from './collapse-into-summary.js';
 import type { ContextSummary } from './context-summary.type.js';
 import { flushContext } from './flush-context.js';
+import { freshPhaseState } from './fresh-phase-state.js';
+import type { PhaseState } from './fresh-phase-state.js';
+import { lastPromptTokens } from './last-prompt-tokens.js';
 import { listContexts } from './list-contexts.js';
 import { markCancelled } from './mark-cancelled.js';
 import { maxSeq } from './max-seq.js';
@@ -32,10 +38,9 @@ import { readContextSummary } from './read-context-summary.js';
 import { readVisibleMessages } from './read-visible-messages.js';
 import { resolveContextId } from './resolve-context-id.js';
 import { setContextTitle } from './set-context-title.js';
+import { toMessage } from './to-message.js';
 import type { TurnTokens } from './turn-tokens.type.js';
-
-/** Valid chat roles for a stored message. */
-export type ChatRole = 'system' | 'user' | 'assistant' | 'tool';
+import { visibleTurns } from './visible-turns.js';
 
 /** The roles a turn is persisted under through `add` (`summary` goes through appendSummary). */
 type PersistableRole = 'user' | 'assistant' | 'tool';
@@ -53,27 +58,6 @@ interface AddOptions {
   readonly tokens?: TurnTokens;
   /** The model that GENERATED this turn. Omitted for user/tool turns — no generation produced them. */
   readonly model?: string;
-}
-
-/** One phase's live state: its context, every turn in RAM, and what has yet to reach the database. */
-interface PhaseState {
-  /** The live context's UUID, or null before its first flush has created the row. */
-  contextId: string | null;
-  /** Every turn in RAM — collapsed ones included, so `seq` never repeats within a context. */
-  records: MemoryRecord[];
-  /** Turns added since the last flush, in order. */
-  pending: MemoryRecord[];
-  /** The `seq` the next turn will take (1-based). */
-  nextSeq: number;
-  /** The live context's title, or null while it has none. */
-  title: string | null;
-  /** Whether a title has already been attempted for this context — one try per context per session. */
-  titleAttempted: boolean;
-}
-
-/** A phase's state on first use: no context row yet, nothing buffered, numbering from 1. */
-function freshState(): PhaseState {
-  return { contextId: null, records: [], pending: [], nextSeq: 1, title: null, titleAttempted: false };
 }
 
 export class SessionMemory {
@@ -98,7 +82,7 @@ export class SessionMemory {
   /** Point at a phase's history, starting it on a fresh context the first time it is activated. */
   activatePhase(name: string): void {
     if (!this.phases.has(name)) {
-      this.phases.set(name, freshState());
+      this.phases.set(name, freshPhaseState());
     }
     this.active = name;
   }
@@ -195,13 +179,13 @@ export class SessionMemory {
    */
   activeVisibleRecords(): readonly MemoryRecord[] {
     if (this.active === null) return [];
-    return visibleOf(this.phases.get(this.active)?.records ?? []);
+    return visibleTurns(this.phases.get(this.active)?.records ?? []);
   }
 
   /** The active phase's live message array (collapsed turns dropped; empty if no phase is active). */
   get history(): Message[] {
     if (this.active === null) return [];
-    return visibleOf(this.phases.get(this.active)?.records ?? []).map(toMessage);
+    return visibleTurns(this.phases.get(this.active)?.records ?? []).map(toMessage);
   }
 
   /**
@@ -269,7 +253,7 @@ export class SessionMemory {
     const state = this.requireState();
     this.flush();
     const cleared = state.contextId === null ? null : readContextSummary(this.db, state.contextId);
-    this.phases.set(phase, freshState());
+    this.phases.set(phase, freshPhaseState());
     return { phase, cleared };
   }
 
@@ -326,7 +310,7 @@ export class SessionMemory {
     });
     // `summary` rides out with the load: it was read here anyway, and `/resume <address>` has no listing
     // to take the reopened context's `numCtx` from.
-    return { contextId, turns: records.length, lastPromptTokens: lastPromptTokensOf(records), summary };
+    return { contextId, turns: records.length, lastPromptTokens: lastPromptTokens(records), summary };
   }
 
   /**
@@ -371,34 +355,4 @@ export class SessionMemory {
     }
     return state;
   }
-}
-
-/** The turns a phase still sees: everything no summary has collapsed and no cancel has branched off. */
-function visibleOf(records: readonly MemoryRecord[]): MemoryRecord[] {
-  return records.filter((record) => record.replacedBySeq === undefined && record.cancelledAt === undefined);
-}
-
-/**
- * Map a stored role to a chat role. `summary` replays as an assistant note — it stands in the history
- * where the turns it collapsed used to be, and any other role would break the chat template on replay.
- */
-function chatRole(role: MemoryRecord['role']): Message['role'] {
-  return role === 'summary' ? 'assistant' : role;
-}
-
-/** Rebuild one record into the Ollama Message shape (mirrors SessionMemory.add's field handling). */
-function toMessage(record: MemoryRecord): Message {
-  const message: Message = { role: chatRole(record.role), content: record.content };
-  if (record.tool_name !== undefined) message.tool_name = record.tool_name;
-  if (record.tool_calls !== undefined && record.tool_calls.length > 0) message.tool_calls = record.tool_calls;
-  return message;
-}
-
-/** The most recent EXACT prompt_eval_count among the records, or null if none recorded one (never estimated). */
-function lastPromptTokensOf(records: readonly MemoryRecord[]): number | null {
-  for (let i = records.length - 1; i >= 0; i -= 1) {
-    const prompt = records[i]?.tokens.prompt;
-    if (typeof prompt === 'number') return prompt;
-  }
-  return null;
 }
