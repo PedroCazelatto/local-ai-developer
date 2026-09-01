@@ -2,9 +2,10 @@
 // window sends to Ollama. This is the one place the per-phase arrays become real tool definitions,
 // so gating is applied identically to the active interactive phase and to every spawned window.
 //
-// FAIL LOUD, NEVER SILENT: an unknown phase, or a name no tool answers to, throws a typed error
-// naming the offender. A dropped tool is invisible at runtime — the model simply never sees it and
-// works around the gap — so a typo in an array must not degrade into a quietly smaller tool set.
+// FAIL LOUD, NEVER SILENT: an unknown phase, or a name no tool answers to, throws PhaseToolsError
+// (phase-tools-error.ts) naming the offender. A dropped tool is invisible at runtime — the model
+// simply never sees it and works around the gap — so a typo in an array must not degrade into a
+// quietly smaller tool set.
 
 import type { Tool } from '../core/llm/index.js';
 import { editPhaseRuleTool } from '../tools/edit-phase-rule.js';
@@ -14,16 +15,8 @@ import { readPhaseRuleTool } from '../tools/read-phase-rule.js';
 import { submitRetroTool } from '../tools/submit-retro.js';
 import { submitVerdictTool } from '../tools/submit-verdict.js';
 import { toolDefinitions } from '../tools/registry.js';
+import { PhaseToolsError } from './phase-tools-error.js';
 import { PHASE_SCOPED_TOOL_NAMES, PHASE_TOOL_NAMES } from './phase-tool-names.js';
-import type { ResolvePhaseToolsOptions } from './resolve-phase-tools.type.js';
-
-/** Typed failure so a caller can tell a bad phase/tool name from any other error. */
-export class PhaseToolsError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = 'PhaseToolsError';
-  }
-}
 
 // The tools kept OUT of the global registry so no other phase can reach them (registry.ts). Already
 // `Tool` definitions rather than ToolModules — the windows that own them wire them in directly.
@@ -35,6 +28,17 @@ const PHASE_SCOPED_TOOLS: readonly Tool[] = [
   readPhaseRuleTool,
   editPhaseRuleTool,
 ];
+
+export interface ResolvePhaseToolsOptions {
+  /**
+   * Drop the phase-scoped tools, keeping only what the GLOBAL registry can serve. Set this when the
+   * caller routes tool calls through the shared dispatcher (dispatch.ts → getTool), which knows the
+   * registry and nothing else: offering `submit_verdict` to a window that dispatches that way would
+   * hand the model a tool whose only possible answer is "unknown tool". The spawned Worker/Reviewer/
+   * Retro windows intercept their own phase-scoped tools in `callTool`, so they leave this unset.
+   */
+  readonly registryOnly?: boolean;
+}
 
 /**
  * The Tool definitions phase `phaseName` may call, in the order its array lists them. Reads the
