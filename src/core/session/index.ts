@@ -7,7 +7,7 @@ export { saveAppState } from './save-app-state.js';
 // Boot model resolution against what Ollama actually has installed (replaces the old hard-coded default).
 export { SessionMemory } from './session-memory.js';
 export type { ChatRole } from './chat-role.type.js';
-export { SessionOrchestrator } from './orchestrator.js';
+export { SessionOrchestrator } from './session-orchestrator.js';
 export { resolveBootModel } from './resolve-boot-model.js';
 // Phase memory is SQLite-backed (projects/<active>/.orchestrator/memory.db): a context is an
 // addressable, titled row rather than a file whose name had to be renamed to change state.
@@ -23,8 +23,8 @@ export type { MemoryRecord } from './memory-record.type.js';
 export type { MemoryRole } from './memory-role.type.js';
 export type { PhaseLoad } from './phase-load.type.js';
 export type { TurnTokens } from './turn-tokens.type.js';
-export type { TurnContext } from './turn-loop.js';
-export { MAX_TOOL_ROUNDS } from './turn-loop.js';
+export type { TurnContext } from './turn-context.type.js';
+export { MAX_TOOL_ROUNDS } from './process-message.js';
 // The ONE place a finished tool call is recorded: its durable audit row AND its `←` scrollback line.
 // Every audit-writing site goes through it — including the three runner-level refusals that never
 // reach the dispatcher, which are exactly the calls the record was built to make visible.

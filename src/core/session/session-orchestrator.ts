@@ -34,8 +34,9 @@ import { SubagentManager } from './subagents.js';
 import type { SubagentInfo } from './subagents.type.js';
 import { compactActivePhase } from './summarizer.js';
 import type { Task } from './task.type.js';
-import type { TurnContext } from './turn-loop.js';
-import { processMessage as processTurns } from './turn-loop.js';
+import { titleCase } from './title-case.js';
+import type { TurnContext } from './turn-context.type.js';
+import { processMessage as processTurns } from './process-message.js';
 
 const NO_TOKENS: TokenCounts = { promptTokens: null, evalTokens: null };
 
@@ -626,9 +627,4 @@ export class SessionOrchestrator implements TurnContext {
     );
     return [{ role: 'system', content: system }, ...this.memory.history];
   }
-}
-
-/** Phase ids are lowercase in-code; display them Titlecased to match the task's `<Phase>` wording. */
-function titleCase(phase: string): string {
-  return phase.charAt(0).toUpperCase() + phase.slice(1);
 }

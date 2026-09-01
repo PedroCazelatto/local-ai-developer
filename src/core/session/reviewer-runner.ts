@@ -43,8 +43,8 @@ import { recordToolCall } from './record-tool-call.js';
 import type { ReviewVerdict } from './review-verdict.type.js';
 import { setTaskStatus } from './set-task-status.js';
 import type { Task } from './task.type.js';
-import type { TurnContext } from './turn-loop.js';
-import { processMessage } from './turn-loop.js';
+import type { TurnContext } from './turn-context.type.js';
+import { processMessage } from './process-message.js';
 import { verdictGitConflict } from './verdict-git-conflict.js';
 
 // The Reviewer inspects (a few reads + maybe a test re-run) then submits — lighter than the Worker's

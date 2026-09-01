@@ -22,7 +22,7 @@ import { ReviewerVerdictError, runReviewerTask } from './reviewer-runner.js';
 import type { TaskLoopDeps, TaskLoopReporter, TaskLoopResult } from './run-task-loop.type.js';
 import { setTaskStatus } from './set-task-status.js';
 import type { Task } from './task.type.js';
-import { processMessage } from './turn-loop.js';
+import { processMessage } from './process-message.js';
 import { buildWorkerSeed, WORKER_MAX_ROUNDS, WorkerWindow } from './worker-runner.js';
 
 /** Hard cap on implement→fix rounds per task — a ceiling, not a target (CLAUDE.md). Assert exactly 5. */

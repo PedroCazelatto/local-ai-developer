@@ -30,7 +30,7 @@ import type { FileReadTracker } from './read-tracker.type.js';
 import { recordToolCall } from './record-tool-call.js';
 import type { RetroDeps } from './retro-deps.type.js';
 import type { RetroSubmission } from './retro-submission.type.js';
-import type { TurnContext } from './turn-loop.js';
+import type { TurnContext } from './turn-context.type.js';
 
 // The project-scoped registry tools Retro may use: inspect the backlog/spec, make a TASK-SPECIFIC
 // edit, and signal other phases via the cross-phase inbox (V3/04). No write_file (Retro makes the

@@ -24,8 +24,8 @@ import type { FileReadTracker } from './read-tracker.type.js';
 import { recordToolCall } from './record-tool-call.js';
 import { taskBranchName } from './task-branch-name.js';
 import type { Task } from './task.type.js';
-import type { TurnContext } from './turn-loop.js';
-import { processMessage } from './turn-loop.js';
+import type { TurnContext } from './turn-context.type.js';
+import { processMessage } from './process-message.js';
 
 // A test-first implement loop (write test → run → implement → run → summarize) needs more rounds
 // than an interactive chat turn, so give the Worker generous headroom before the loop cap trips.

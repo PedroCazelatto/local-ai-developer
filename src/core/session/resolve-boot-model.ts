@@ -14,27 +14,11 @@
 //                                                             prints the pull hint (repl.ts).
 // A declined pull is never followed by a second offer for a different model — one ask per boot.
 
-import process from 'node:process';
-
 import { listModels, matchesModelName, pickSmallestModel } from '../llm/index.js';
-import { confirmKey } from '../ui/confirm-key.js';
-import { pullWithSpinner } from '../ui/pull-with-spinner.js';
 import { renderer } from '../ui/renderer.js';
 import { SUGGESTED_MODEL } from './config.js';
 import { loadAppState } from './load-app-state.js';
-
-/**
- * Offer to pull `name` and, if the user accepts, run it to completion. The caller prints the line that
- * NAMES the model first, so the prompt itself is just "Download it now?". `process` is the SIGINT source:
- * this runs before any readline exists, so Ctrl-C reaches us as a plain process signal. Returns true only
- * when the blob is actually on disk afterwards — a declined offer, a Ctrl-C mid-pull, and a failed pull
- * are all just "no" to the caller (pullWithSpinner reports the cancel/error itself).
- */
-async function offerPull(name: string): Promise<boolean> {
-  // confirmKey blocks on one y/n keystroke (no Enter); false on n / Esc / Ctrl-C / non-TTY.
-  if (!(await confirmKey('Download it now?'))) return false;
-  return (await pullWithSpinner(name, process)) === 'ok';
-}
+import { offerPull } from './offer-pull.js';
 
 /**
  * The model the session should boot on, or undefined when none is available and the user declined to pull
