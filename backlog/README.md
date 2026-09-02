@@ -22,6 +22,16 @@ the answer can **delete** the task rather than shape it.
 ## The order
 
 ### 1. [One function per file, across `src/`](split-config-into-one-function-per-file.md)
+
+> **CHECKPOINTED at `5ca1d1f`.** Work stopped deliberately, on a commit boundary, with nothing
+> half-split. **Start at *Resuming from cold* — the first section of
+> [the task file](split-config-into-one-function-per-file.md)**, which is written for someone with none
+> of the conversation: every directory's state re-measured by parser rather than remembered, the two
+> directories that remain with per-file counts, wave E's measured barrel inventory, the open decisions,
+> and the traps. **`tsc --noEmit` clean, `npm test` 400 / 400.** The working tree is dirty in exactly
+> three review-gated files — `CLAUDE.md`, `constitution.md`, `docs/repo-layout.md` — which are waiting on
+> the user and must be neither committed nor reverted by an agent.
+
 *Repo hygiene.* **Widened, and partly landed.** The four-function env-resolution exception is over:
 `resolveNumCtx`, `resolveRatio`, `resolveTimeoutMs` and `loadConfig` each hold their own file, `config.ts`
 keeps the `DEFAULT_*` constants and re-exports them, and `ollama-models.ts` is gone — `list-models.ts`,
@@ -57,15 +67,24 @@ table matched exactly. Two agents, two instruments, one number.
 
 | | files | declarations |
 |---|---:|---:|
-| baseline | 104 | 504 |
+| baseline (regex census, `a0e9e31`) | 104 | 504 |
 | cleared by wave A | 13 | 50 |
 | cleared by wave B | 14 | 77 |
-| cleared by wave C so far | 29 | 188 |
+| cleared by wave C | 29 | 188 |
 | cleared by the `interface` agent | 7 | 28 |
 | cleared by wave D so far | 9 | 48 |
-| **remaining** | **32** | **113** |
+| **remaining — measured at HEAD, by parser** | **35** | **129** |
 
-**Wave C is running, and `src/core/session` is 74% done.** Its eight commits so far: `038fc83` the git
+**The last row does not equal the subtraction, and the sweep has not regressed.** The baseline was a
+regex pass that declared a pattern for object-literal **method shorthand** and then never added it to the
+total; a parser census counts it. `src/tools` — nearly every file of which is
+`export const xTool = { …, execute(…) {…} }` — was understated from the start, at 20 / 60 where the truth
+is 24 / 74. **Stop decrementing the baseline and measure the tree.** The task file's checkpoint section
+carries the parser census, the reconciliation and the one bar question the discrepancy exposed.
+
+**Wave C is CLOSED: `src/core/session` is at zero violations**, down from 28 files / 181 declarations —
+the largest directory in the repo — in **14 commits**, `038fc83` through `9c51bfb`. Its first ten:
+`038fc83` the git
 family (7 files / 39 declarations, five `project-git*` modules and `review-types.ts` deleted, 43 new
 files), `eaeb319` the two follow-ups it owed (`hasHead` collapsed to one implementation, `toPosix`
 renamed `toPosixTrimmed`), `c69c1b3` the four persistence stores, `61574a9` the backlog reader (18
@@ -77,9 +96,24 @@ census, and the last "cohesive store module" header in the directory), `463e9ba`
 `src/core/llm/is-record.ts` directly because the barrel does not export it), and `9fd9e2e` the Retro
 runner.
 
-That leaves `core/session` at **5 files / 17 declarations — 91% done**.
-**Six differential harnesses re-run after every commit: 2819 probes, 0 mismatches**, and the barrel's
-exported **name set** has held identical at **91 values / 77 types** across all eight.
+Then the last four: `682e235` the unattended batch driver, `0b65062` the tool dispatcher, `f7bb8d8` the
+four two-declaration files, and `ffbc4f0` the Worker and Reviewer runners — which also **retired
+`title-case.ts`**, repointing `session-orchestrator.ts` at the shared
+[`capitalizePhase`](../src/core/ui/capitalize-phase.ts). `9c51bfb` closed the directory.
+
+**Six differential harnesses re-run after every commit: 2819 probes, 0 mismatches** as of `c24a371`, and
+green through the last six.
+
+**The barrel's name set was reported as "held identical at 91 values / 77 types". Re-measured at HEAD,
+that is not what happened, and the real invariant is the stronger one.** The set *grew*: 68 values / 55
+types at `a0e9e31`, 77 / 55 after `038fc83`, 91 / 62 after `c24a371`, 91 / 71 after `682e235`, and frozen
+there for the last three commits. **No exported name was ever removed** — 23 values and 16 types were
+added, every one of them a function or type the split gave its own file and the barrel then listed. That
+is the invariant worth checking, because removal is what breaks an importer and addition is not. Wave E
+deletes the barrel regardless, so the widened surface is transitional.
+
+Closing it unblocked three things at once: the whole `src/tools` wave, the `core/ui/types.ts` retrofit
+(which needed `core/session`'s three importers to settle), and the visible-turn agreement test below.
 
 **`src/` root is done** (`66d5a39`): `src/index.ts`'s three declarations are now
 `src/boot/{main,resolve-or-exit,fail}.ts`, the entry point declares nothing, three inlined `errMessage`
@@ -120,24 +154,52 @@ in passing** — four backlog items' worth of places where the docs and the code
 [26](streamed-reply-corruption-in-core-llm.md) and
 [27](standards-frontmatter-parsers-disagree.md). The tests are the smaller half of what it delivered.
 
-**One follow-up remains and is not yet available**: the SQL-versus-JS agreement test for the
-visible-turn predicate, waiting on `src/core/session/` to close.
+**One follow-up remains**: the SQL-versus-JS agreement test for the visible-turn predicate. `core/session`
+closing removed one of its two blockers; the other is the **runtime** — it is the first test that would
+touch `node:sqlite`, which is experimental on 22.x and stable from 24, and the suite has only ever run on
+22.14.0 against an `.nvmrc` pinning 24.14.0.
 
-**Ten old-style `.type.ts` pairs still sit in `core/session`** — `batch`, `memory-db`, `subagents`,
-`retro-runner`, `run-debate`, `run-task-loop`, `run-stop-signal`, `events-log`, `read-tracker`,
-`evict-stale-tool-results`. Each is the sibling of a `.ts` file wave C has not reached yet and **dies
-with it**, so this is not the retrofit having been left half-done.
+**Fourteen old-style `.type.ts` pairs remain, in two directories.** Six in `core/session` — `events-log`,
+`evict-stale-tool-results`, `read-tracker`, `run-stop-signal`, `run-task-loop`, `subagents` — down from
+ten as wave C reached their siblings; and **eight in `src/tools`**, which nothing has enumerated before
+now: `compose-commit-message`, `guard-write-target`, `list-files`, `parse-ask-questions`, `raise-blocker`,
+`read-optional-count`, `render-numbered-slice`, `search-in-files`. Each is the sibling of a `.ts` file the
+sweep has not reached and **dies with it**, so this is not the retrofit having been left half-done.
+
+**Take `read-tracker.type.ts` last, and alone** — nine importers, three of them in `src/tools`, so folding
+it while anyone is working there puts two agents in the same files.
 
 **Wave D is running on `interface/commands`** — **9 of 20 files, 48 of 103 declarations**, four commits.
 Three assemblers created (`new-project.ts`, `swap.ts`, `help.ts`) on the `models.ts` precedent, and
 **`project-templates.ts` deleted rather than assembled** — its one importer takes **six named things**
-from it, not one thing, which is the assembler test answering cleanly in the negative. `tools` (20/60)
-is the other half, one agent each. **`phases`
+from it, not one thing, which is the assembler test answering cleanly in the negative. Its **11 remaining
+files hold 55 declarations**, largest first `run.ts` 14, `resume.ts` 12, `subagents.ts` 6, `answer.ts` 4;
+all 11 survive as assemblers and none is deleted. **`phases`
 dropped out** (cleared early in `5d74ad4`) and **`interface` is finished**, so the coupling that made
 `interface`/`interface/commands` one job is gone — `interface/commands` unblocked the moment `26ca3c4`
-landed. `tools` still waits on `core/session`, the last big directory. **Then the two `types.ts`
-retrofits**, `tools`' riding with its own wave and `core/ui`'s once `core/session` clears its three
-importers. **Wave E is the final barrel pass**, deleting all nine `index.ts` re-export modules at once.
+landed.
+
+**`src/tools` is the other half, it is unstarted, and `core/session` closing unblocked it.** At 24 files /
+74 declarations it is now the largest remaining directory — bigger than the 20 / 60 the partition table
+records, for the method-shorthand reason above. **It also carries the one open bar question**, and that
+question is worth answering before an agent starts: whether an `execute(…) {…}` method shorthand on a
+top-level object literal counts as a declaration. It decides between 24 / 74 and 19 / 63, and nothing on
+record settles it — arrow properties count and class methods do not, and this is neither. **Ask.**
+
+**Then the two `types.ts` retrofits**: `tools`' rides with its own wave, and `core/ui`'s is unblocked now
+that `core/session` has cleared its three importers.
+
+**Wave E is the final barrel pass, and the "nine barrels, one pass" shape does not survive measurement.**
+There are ten `index.ts` files; **eight** are pure re-export barrels, **`src/core/index.ts` is not one**
+(zero re-exports — four lines of comment held in the graph by `export {}`, and deleting it destroys the
+only written map of what the four subdirectories are for, so **ask** where the comment goes), and
+**`src/index.ts` is the entry point and survives** — which matters because `find src -name index.ts`
+returns it. Two of the eight are free right now: **`core/ui/index.ts` has zero importers** (wave B
+repointed all 43) and `interface/index.ts` has one. `core/llm/index.ts` has 65 and `core/session/index.ts`
+has 37, 27 of them in `interface/commands` — so that one waits on wave D and the rest do not. **Wave E is
+stageable, not atomic.** Three files must not be deleted by it, distinguished by *one exported value, no
+function, zero re-export lines*: `src/index.ts`, `src/interface/command-registry.ts` and
+`src/core/llm/daemon.ts`.
 
 Re-measure the coupling before starting any of them — the graph has changed under every wave so far,
 and this shape is a starting point rather than a schedule.
