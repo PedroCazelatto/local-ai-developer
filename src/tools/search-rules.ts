@@ -11,11 +11,13 @@ import type { StandardEntry } from '../context/index.js';
 import { errMessage } from '../core/err-message.js'; // an Error's message, or the thrown value stringified
 import { loadsOrRepair } from '../core/llm/index.js';
 import type { Message } from '../core/llm/index.js';
+import { buildSearchUserPrompt } from './build-search-user-prompt.js'; // the catalog rides in the USER turn
 import type { JsonObject } from './json-object.type.js';
 import type { StructuredToolResult } from './structured-tool-result.type.js';
 import { toolError } from './tool-error.js';
 import type { ToolModule } from './tool-module.type.js';
 import type { ToolResult } from './tool-result.type.js';
+import { validateStandardNames } from './validate-standard-names.js'; // drops any name not in the catalog
 
 // Kept SHORT on purpose — the catalog grows and rides in the user turn, not here (task V4/02).
 const SEARCH_SYSTEM_PROMPT =
@@ -67,7 +69,7 @@ export const searchRulesTool: ToolModule = {
     const { content, tokens } = await ctx.oneShot(messages, 'search-rules');
 
     const names = new Set(catalog.map((entry) => entry.name));
-    const matches = validateMatches(content, names);
+    const matches = validateStandardNames(content, names);
 
     const result: StructuredToolResult = {
       content: { matches },
@@ -83,41 +85,3 @@ export const searchRulesTool: ToolModule = {
   },
 };
 
-/** Assemble the throwaway user turn: one `name: description` line per standard, then the intent. */
-function buildSearchUserPrompt(catalog: StandardEntry[], intent: string): string {
-  const lines = catalog.map((entry) => `${entry.name}: ${entry.description}`).join('\n');
-  return `Catalog:\n${lines}\n\nIntent: ${intent}\n\nReturn ONLY a JSON array of matching names drawn from the catalog above.`;
-}
-
-/**
- * Parse the model's UNTRUSTED reply as a JSON array of strings and keep only catalog-valid, deduped
- * names (order preserved). Non-array / non-JSON output → [] (never a thrown error): the model may
- * legitimately match nothing, and a malformed reply must not kill the turn.
- */
-function validateMatches(content: string, valid: ReadonlySet<string>): string[] {
-  const matches: string[] = [];
-  const seen = new Set<string>();
-  for (const item of parseArray(content)) {
-    if (typeof item !== 'string') continue; // drop non-strings from a mixed array
-    const name = item.trim();
-    if (valid.has(name) && !seen.has(name)) {
-      seen.add(name);
-      matches.push(name);
-    }
-  }
-  return matches;
-}
-
-/** Best-effort extraction of a JSON array from the reply (tolerates code fences / stray prose). */
-function parseArray(content: string): unknown[] {
-  const direct = loadsOrRepair(content.trim());
-  if (Array.isArray(direct)) return direct;
-  // Fall back to the first bracketed span if the model wrapped the array in fences or prose.
-  const span = /\[[\s\S]*\]/.exec(content);
-  const whole = span?.[0];
-  if (whole !== undefined) {
-    const extracted = loadsOrRepair(whole);
-    if (Array.isArray(extracted)) return extracted;
-  }
-  return [];
-}
