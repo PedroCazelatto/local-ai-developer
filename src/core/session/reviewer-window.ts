@@ -5,7 +5,7 @@
 // a "pass" that left files uncommitted, or a "fail" that left a file unexplained, is handed back as a
 // recoverable error rather than believed.
 
-import type { FileReadTracker } from './read-tracker.type.js';
+import type { FileReadTracker } from './file-read-tracker.type.js';
 import type { OllamaClient, Message, StreamHandle, TokenCounts, Tool, ToolCall } from '../llm/index.js';
 import type { RaisedBlocker } from './raised-blocker.type.js';
 import type { ReviewVerdict } from './review-verdict.type.js';

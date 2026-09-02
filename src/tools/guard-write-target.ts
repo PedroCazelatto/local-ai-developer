@@ -12,7 +12,7 @@
 // phase prompts can now tell the Worker NOT to re-read a file to verify its own edit: the harness
 // knows what the window has seen, so the model does not have to check.
 
-import type { FileReadTracker } from '../core/session/read-tracker.type.js';
+import type { FileReadTracker } from '../core/session/file-read-tracker.type.js';
 
 /**
  * The guard's answer. A refusal carries BOTH halves the model needs: what is wrong, and which of

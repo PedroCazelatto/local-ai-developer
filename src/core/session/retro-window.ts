@@ -26,7 +26,7 @@ import type { ToolCallRecord } from './tool-call-record.type.js';
 import { dispatchToolCall } from './dispatch-tool-call.js';
 import { isToolErrorResult } from './is-tool-error-result.js';
 import { createReadTracker } from './read-tracker.js';
-import type { FileReadTracker } from './read-tracker.type.js';
+import type { FileReadTracker } from './file-read-tracker.type.js';
 import { recordToolCall } from './record-tool-call.js';
 import type { RetroDeps } from './retro-deps.type.js';
 import type { RetroSubmission } from './retro-submission.type.js';

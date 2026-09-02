@@ -23,7 +23,7 @@ import { dispatchToolCall } from './dispatch-tool-call.js';
 import { appendEvent } from './events-log.js';
 import { generateSubagentId } from './generate-subagent-id.js';
 import { createReadTracker } from './read-tracker.js';
-import type { FileReadTracker } from './read-tracker.type.js';
+import type { FileReadTracker } from './file-read-tracker.type.js';
 import { recordToolCall } from './record-tool-call.js';
 import { shortSubagentId } from './short-subagent-id.js';
 import type { SubagentAskOutcome } from './subagent-ask-outcome.type.js';

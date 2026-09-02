@@ -23,7 +23,7 @@ import type { ContextSummary } from './context-summary.type.js';
 import type { PhaseLoad } from './phase-load.type.js';
 import { SessionMemory } from './session-memory.js';
 import { createReadTracker } from './read-tracker.js';
-import type { FileReadTracker } from './read-tracker.type.js';
+import type { FileReadTracker } from './file-read-tracker.type.js';
 import { recordToolCall } from './record-tool-call.js';
 import type { RetroInput } from './retro-input.type.js';
 import type { RetroResult } from './retro-result.type.js';

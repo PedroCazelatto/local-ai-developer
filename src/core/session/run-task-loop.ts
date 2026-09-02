@@ -53,7 +53,7 @@ export interface TaskLoopDeps {
   readonly projectPath: string;
   /**
    * From SessionConfig — the fraction of num_ctx at which the persistent Worker window starts stubbing
-   * its older tool results (worker-runner.ts). Carried here because TaskLoopDeps is what the loop hands
+   * its older tool results (worker-window.ts). Carried here because TaskLoopDeps is what the loop hands
    * straight to `new WorkerWindow(...)`, so WorkerDeps' own fields have to be satisfiable from it.
    */
   readonly evictionThresholdRatio: number;

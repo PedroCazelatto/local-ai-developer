@@ -4,7 +4,7 @@
 
 import type { SandboxClient } from '../core/container/index.js';
 import type { Message, OneShotResult, OneShotRole } from '../core/llm/index.js';
-import type { FileReadTracker } from '../core/session/read-tracker.type.js';
+import type { FileReadTracker } from '../core/session/file-read-tracker.type.js';
 import type { SubagentHandle } from '../core/session/subagent-handle.type.js';
 
 /**
