@@ -4,6 +4,10 @@
 // Worker never reuses that stash -- a fresh Worker redoes the task from scratch -- it exists for Retro
 // to read (blocked) or the user to inspect (escalated, cancelled).
 //
+// An ESCALATION additionally records itself in the task's frontmatter and commits it, which is why
+// this file -- not run-task-loop.ts -- is where the fourth committer sits: the record has to be
+// written after the stash, and the stash is here.
+//
 // A non-pass can still have COMMITTED work, because the Reviewer accepts files partially, which is why
 // `commits` rides on every bucket rather than only on the passed one.
 //
@@ -13,6 +17,7 @@ import type { BatchBlocked } from './batch-blocked.type.js';
 import type { BatchCancelled } from './batch-cancelled.type.js';
 import type { BatchEscalated } from './batch-escalated.type.js';
 import type { BatchPassed } from './batch-passed.type.js';
+import { recordFailedAttempt } from './record-failed-attempt.js';
 import type { TaskLoopResult } from './run-task-loop.js';
 import { stashTaskAttempt } from './stash-task-attempt.js';
 
@@ -66,6 +71,16 @@ export function routeBatchOutcome(
   }
   // escalated — 5 rounds with no pass (or an empty diff / no verdict).
   const stashRef = stashTaskAttempt(projectPath, result.taskId);
+  // recordFailedAttempt: `status: failed` into the task's frontmatter, committed on its own. It runs
+  // AFTER the stash and never before: the stash resets the tree to HEAD, so an earlier write is lost
+  // with the attempt, and it leaves the index clean, so this commit can only carry the task file.
+  // Safe against the Reviewer's verdict check by ordering — an escalation is only reached once the
+  // last Reviewer has spoken, so no live verdict can be contradicted (OPEN-QUESTIONS #77).
+  //
+  // The result is deliberately not carried into the bucket: this file is core orchestration with no
+  // renderer, and a failure here rolls its own write back, so the tree stays clean and the batch runs
+  // on exactly as it does today. What is lost is the record, not the night.
+  recordFailedAttempt(projectPath, result.taskId);
   buckets.escalated.push({
     taskId: result.taskId,
     rounds: result.rounds,

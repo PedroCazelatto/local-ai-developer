@@ -1,13 +1,15 @@
-// The `next` / single-id path of /run: guard, run, then stash whatever did not pass. Split out of
-// run.ts, where it was the private `runSingle`.
+// The `next` / single-id path of /run: guard, run, then stash whatever did not pass — and, on an
+// escalation, record the attempt in the task's frontmatter. Split out of run.ts, where it was the
+// private `runSingle`.
 //
-// Per-task eligibility, dirty-tree guarding and stashing live HERE for the single path and inside
-// runBatch for the unattended one — deliberately, because the batch has to queue what this path
-// halts on.
+// Per-task eligibility, dirty-tree guarding, stashing and the escalation record live HERE for the
+// single path and inside runBatch / routeBatchOutcome for the unattended one — deliberately, because
+// the batch has to queue what this path halts on.
 
 import { findTask } from '../../core/session/find-task.js';
 import { isWorkingTreeDirty } from '../../core/session/is-working-tree-dirty.js';
 import { readBacklog } from '../../core/session/read-backlog.js';
+import { recordFailedAttempt } from '../../core/session/record-failed-attempt.js';
 import { stashTaskAttempt } from '../../core/session/stash-task-attempt.js';
 import { taskSkipReason } from '../../core/session/task-skip-reason.js';
 import { renderer } from '../../core/ui/renderer.js';
@@ -48,6 +50,15 @@ export async function runSingleTask(orch: RunOrchestrator, id: string): Promise<
   if (result !== null && result.outcome !== 'passed') {
     const stashRef = stashTaskAttempt(orch.projectPath, task.id);
     const where = stashRef ?? 'nothing to stash';
+    if (result.outcome === 'escalated') {
+      // recordFailedAttempt: `status: failed` into the task's frontmatter, committed on its own — the
+      // durable record that this task was tried. It runs AFTER the stash and never before: the stash
+      // resets the tree to HEAD, so an earlier write is lost with the attempt, and it leaves the index
+      // clean, so this commit can only carry the task file. Safe against the Reviewer's verdict check
+      // by ordering — an escalation is only reached once the last Reviewer has spoken (#77). A failure
+      // rolls its own write back, leaving the tree exactly as clean as the stash left it.
+      recordFailedAttempt(orch.projectPath, task.id);
+    }
     if (result.outcome === 'blocked') {
       renderer.systemMessage(`Attempt stashed (${where}). Answer with /answer ${task.id} <text>, then /run to retry.`);
     } else {
