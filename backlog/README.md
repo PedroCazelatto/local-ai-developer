@@ -54,16 +54,23 @@ changes a function on that list. [Item 5](record-attempted-tasks.md) puts a fift
 [item 11](in-turn-progress-reporting.md) adds fields to the rows the width layer paints. Pinning them
 first is what makes those three safe to change.
 
-### 3. [The required Node version is never enforced](node-version-is-not-enforced.md)
-*Repo hygiene.* `.nvmrc` becomes the single source of truth, `run.mjs` reads it and refuses **both**
-`start` and `install` (#73), `docker-compose.yml` interpolates it, and `package.json`'s `engines` is
-deleted (#80a). Four declarations, none enforced, become one declaration enforced in three places.
+### 3. ~~The required Node version is never enforced~~ — shipped
+*Repo hygiene.* **Shipped.** `.nvmrc` is the single source of truth and now the **only** declaration:
+`package.json`'s `engines` is deleted (#80a), `docker-compose.yml` interpolates the pin through a
+`NODE_VERSION` the launcher exports (#76a), and `scripts/run.mjs` reads `.nvmrc` at the front of the
+process and refuses **both** `start` and `install` (#73). The comparison is the **major**, so any
+Node 24 passes and v22.14.0 — this box — does not. `stop` is never gated. A `.nvmrc` that is missing
+or malformed refuses those same two verbs: with the only declaration unreadable there is nothing to
+check against, and a check that cannot run must not report a pass. Four declarations, none enforced,
+are one declaration enforced in three places.
 
-**Why here:** stated in [item 6](boot-can-pick-a-toolless-model.md) — its Ollama ≥ 0.9.1 check *"sits
-beside the Node check task C is adding, and the two should read as one family — same shape, same place
-in the boot sequence."* Build the family's first member first. Note the original premise was wrong and
-the correction is part of the shipping commit: `node:sqlite` **does** work on the v22.14.0 this box runs,
-so there is no `memory.db` failure to confirm.
+**The original premise was wrong, and the file said so before it was deleted:** `node:sqlite` **does**
+work on the v22.14.0 this box runs, so there was never a `memory.db` failure to confirm. The floor
+stays at 24 because a version declared in four places and enforced in none tells you nothing about
+what the code was tested on. Two accepted costs are on record: `docker compose` run by hand, without
+the launcher, no longer resolves to the pinned image, and `README.md`'s "Node 24 LTS" is now the last
+stale copy — [README-INCONSISTENCIES.md](../README-INCONSISTENCIES.md) #15 and #11. The
+`docs/cli.md` diff is review-gated and was left uncommitted.
 
 ### 4. [`/resume` hides contexts written under a different ceiling](resume-across-num-ctx-changes.md)
 *Memory / context.* Relax `num_ctx = ?` to `num_ctx <= ?` in `listContexts` and `resolveContextId`, and
@@ -92,7 +99,7 @@ VRAM probe behind the *too heavy* tag, its own accumulating cache file keyed on 
 Ollama ≥ 0.9.1 floor stated and checked.
 
 **Why here:** after [1](split-config-into-one-function-per-file.md) (the capability read lands in the
-split `ollama-models.ts`) and after [3](node-version-is-not-enforced.md) (its version check is the Node
+split `ollama-models.ts`) and after **item 3**, now shipped (its version check is the Node
 check's sibling). The largest of the defects, and the one that gates first-run usability — on this box
 three of nine models have no `tools` and six cannot keep their weights resident, leaving exactly one that
 can run the product.
