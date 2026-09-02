@@ -30,7 +30,7 @@ import type {
   TaskLoopReporter,
   TaskLoopResult,
 } from '../core/session/index.js';
-import { SUGGESTED_MODEL } from '../core/session/index.js';
+import { config } from '../core/session/config.js';
 import { activityLine } from '../core/ui/activity-line.js';
 import { bindNewlineKey } from '../core/ui/bind-newline-key.js';
 import { inputFence } from '../core/ui/input-fence.js';
@@ -113,7 +113,7 @@ export async function runRepl(orch: ReplOrchestrator): Promise<void> {
   // model (and offered a download) before we were called, but clearScreen above just wiped that
   // exchange — this is the one surface the user still sees. The status line shows the same state live.
   if (orch.model === undefined) {
-    renderer.systemMessage(`No model selected. Pull one with  /models pull ${SUGGESTED_MODEL}`);
+    renderer.systemMessage(`No model selected. Pull one with  /models pull ${config.SUGGESTED_MODEL}`);
   }
   // The no-op completer exists to SWALLOW Tab, and that is its whole job: with a completer registered,
   // readline neither self-inserts a literal tab nor runs its own completion. Both matter. Its inline
