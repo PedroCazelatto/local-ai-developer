@@ -1,5 +1,5 @@
 // A task id turned into branch-safe path segments. A task id is already a PATH under backlog/ (see
-// types.ts — "epic-auth/story-signup/01-add-hashing-test") and git branch names take slashes, so the
+// task.type.ts — "epic-auth/story-signup/01-add-hashing-test") and git branch names take slashes, so the
 // id maps straight through and the branch mirrors the backlog tree.
 
 /**

@@ -1,6 +1,7 @@
-// The signature of a `keypress` handler, spoken by three files in this folder and declared by none of
+// The signature of a `keypress` handler, spoken by four files in this folder and declared by none of
 // them: ask-questions.ts and capture-type-ahead.ts snapshot the stream's existing listeners to mute
-// readline while they own the terminal, and bind-newline-key.ts puts its own wrapper in front of them.
+// readline while they own the terminal, bind-newline-key.ts puts its own wrapper in front of them, and
+// confirm-key.ts attaches a throwaway one-shot listener for a single y/n key.
 // It is Node's event shape rather than any one function's parameter or return, so it gets its own
 // module.
 //
