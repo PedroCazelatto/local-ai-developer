@@ -30,7 +30,8 @@ import type { RetroResult } from './retro-result.type.js';
 import { spawnRetro as spawnRetroWindow } from './spawn-retro.js';
 import { RunStopSignal } from './run-stop-signal.js';
 import { runTaskLoop } from './run-task-loop.js';
-import type { TaskLoopReporter, TaskLoopResult } from './run-task-loop.type.js';
+import type { TaskLoopResult } from './run-task-loop.js';
+import type { TaskLoopReporter } from './task-loop-reporter.type.js';
 import { SubagentManager } from './subagents.js';
 import type { SubagentInfo } from './subagents.type.js';
 import { compactActivePhase } from './compact-active-phase.js';
@@ -65,7 +66,7 @@ export class SessionOrchestrator implements TurnContext {
   private readonly memory: SessionMemory;
   private phase: Phase;
   private lastTokens: TokenCounts = NO_TOKENS;
-  /** Handed to each spawned Worker window; see run-task-loop.type.ts and worker-runner.ts. */
+  /** Handed to each spawned Worker window; see TaskLoopDeps in run-task-loop.ts and worker-window.ts. */
   private readonly evictionThresholdRatio: number;
 
   // Summarization failsafe (V4/05). The trigger point (exact tokens): a phase whose last

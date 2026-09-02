@@ -11,7 +11,8 @@
 // is refused unless the repo agrees. So a round can land commits even when the verdict is a fail, and
 // a `pass` is proof the tree was already clean — the loop just reports what the Reviewer committed.
 
-import type { TokenCounts } from '../llm/index.js';
+import type { SandboxClient } from '../container/index.js';
+import type { OllamaClient, TokenCounts } from '../llm/index.js';
 import { TurnAbortedError } from '../llm/index.js';
 import { addTokenCounts } from './add-token-counts.js';
 import { buildWorkerFixMessage } from './build-worker-fix-message.js';
@@ -20,12 +21,72 @@ import { formatReviewFeedback } from './format-review-feedback.js';
 import type { ReviewerCommit } from './reviewer-commit.type.js';
 import { ReviewerVerdictError } from './reviewer-verdict-error.js';
 import { runReviewerTask } from './run-reviewer-task.js';
-import type { TaskLoopDeps, TaskLoopReporter, TaskLoopResult } from './run-task-loop.type.js';
+import type { RunStopSignal } from './run-stop-signal.js';
+import type { TaskLoopReporter } from './task-loop-reporter.type.js';
 import { setTaskStatus } from './set-task-status.js';
 import type { Task } from './task.type.js';
 import { processMessage } from './process-message.js';
 import { buildWorkerSeed } from './build-worker-seed.js';
 import { WORKER_MAX_ROUNDS, WorkerWindow } from './worker-window.js';
+
+/**
+ * How one task's loop ended:
+ * - `passed`    — a Reviewer `pass`; everything was committed and the task marked done; loop over.
+ * - `escalated` — MAX_ROUNDS elapsed with no pass (or the Worker changed nothing / the Reviewer
+ *                 produced no verdict); surfaced to the user with the last feedback.
+ * - `blocked`   — the Reviewer raised a blocker (V3/02); loop halted mid-round.
+ * - `cancelled` — the user stopped it: Ctrl+C cut the model call in flight, or a `/stop round` wind-down
+ *                 ended the loop between rounds. Distinct from `escalated` ON PURPOSE — the task was not
+ *                 tried and found wanting, it was interrupted, and a summary that called it an escalation
+ *                 would be reporting a judgement nobody made.
+ *
+ * `escalated`, `blocked` and `cancelled` none of them imply "nothing committed": the Reviewer commits
+ * partially, so files it accepted in an earlier round are already in git. `commits` is what actually landed.
+ */
+export type TaskLoopOutcome = 'passed' | 'escalated' | 'blocked' | 'cancelled';
+
+/** The session infrastructure the loop binds a Worker/Reviewer window to (supplied by the orchestrator). */
+export interface TaskLoopDeps {
+  readonly llm: OllamaClient;
+  readonly sandbox: SandboxClient;
+  readonly projectName: string;
+  readonly projectPath: string;
+  /**
+   * From SessionConfig — the fraction of num_ctx at which the persistent Worker window starts stubbing
+   * its older tool results (worker-runner.ts). Carried here because TaskLoopDeps is what the loop hands
+   * straight to `new WorkerWindow(...)`, so WorkerDeps' own fields have to be satisfiable from it.
+   */
+  readonly evictionThresholdRatio: number;
+  /** The `/stop` wind-down request, read between rounds. See run-stop-signal.ts. */
+  readonly stop: RunStopSignal;
+}
+
+/** The single result the loop returns for one task. */
+export interface TaskLoopResult {
+  readonly taskId: string;
+  readonly outcome: TaskLoopOutcome;
+  /** Rounds actually run, 1..MAX_ROUNDS. */
+  readonly rounds: number;
+  /**
+   * Every commit the Reviewer made across all rounds, in order — empty when it accepted nothing.
+   * Present on EVERY outcome: partial acceptance means an escalated or blocked task can still have
+   * landed work.
+   */
+  readonly commits: readonly ReviewerCommit[];
+  /** The Reviewer's blocker question — present only when outcome === "blocked" (V3/02). */
+  readonly question?: string;
+  /** The persisted blocker id (`${taskId}#${n}`) — present only when outcome === "blocked" (V3/02). */
+  readonly blockerId?: string;
+  /** The last Reviewer feedback — present when outcome === "escalated", so a human sees why. */
+  readonly lastFeedback?: string;
+  /** How a `cancelled` loop was stopped, in one line — present only when outcome === "cancelled". */
+  readonly cancelReason?: string;
+  /**
+   * EXACT sum of every Worker AND Reviewer turn's prompt/eval counts across all rounds. A field is
+   * `null` when any contributing turn omitted that metric — surfaced, never estimated (constitution).
+   */
+  readonly tokens: TokenCounts;
+}
 
 /** Hard cap on implement→fix rounds per task — a ceiling, not a target (CLAUDE.md). Assert exactly 5. */
 export const MAX_ROUNDS = 5;

@@ -1,7 +1,7 @@
 // Where the batch sends its progress. Injected so the driver prints nothing itself.
 
 import type { BatchPosition } from './batch-position.type.js';
-import type { TaskLoopResult } from './run-task-loop.type.js';
+import type { TaskLoopResult } from './run-task-loop.js';
 import type { BatchSummary } from './batch-summary.type.js';
 import type { Task } from './task.type.js';
 

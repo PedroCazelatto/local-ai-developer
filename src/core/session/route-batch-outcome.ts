@@ -13,7 +13,7 @@ import type { BatchBlocked } from './batch-blocked.type.js';
 import type { BatchCancelled } from './batch-cancelled.type.js';
 import type { BatchEscalated } from './batch-escalated.type.js';
 import type { BatchPassed } from './batch-passed.type.js';
-import type { TaskLoopResult } from './run-task-loop.type.js';
+import type { TaskLoopResult } from './run-task-loop.js';
 import { stashTaskAttempt } from './stash-task-attempt.js';
 
 /**

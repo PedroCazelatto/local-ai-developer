@@ -2,7 +2,7 @@
 
 import type { BatchPosition } from './batch-position.type.js';
 import type { RunStopSignal } from './run-stop-signal.js';
-import type { TaskLoopResult } from './run-task-loop.type.js';
+import type { TaskLoopResult } from './run-task-loop.js';
 import type { Task } from './task.type.js';
 
 /**
