@@ -421,15 +421,30 @@ warning fires on top. To make the second half reach `/resume <address>`, which n
 `reopenActiveContext` now returns the reopened `ContextSummary` instead of a bare boolean.
 `docs/mental-model.md` and `docs/cli.md` were corrected in the same change (review-gated).
 
-### 5. [Stop a failed task looking untouched](record-attempted-tasks.md)
-*Execution loop.* A fifth `TaskStatus` (`failed`), written after the stash and committed by the loop via
-`commitPaths`, so no dirty-tree gate has to learn an exception. `/run all` skips it; `/run <id>` retries
-from scratch. Its `docs/phases.md` "Who may commit" edit is review-gated.
+### 5. ~~Stop a failed task looking untouched~~ — shipped
+*Execution loop.* A fifth `TaskStatus`, `failed`, written **after** the stash and committed by the loop
+itself via `commitPaths` — one path, so no dirty-tree gate had to learn an exception, and a failed
+commit rolls the write back rather than leaving one behind. `/run all` passes over it; `/run <id>` still
+retries from scratch, because the skip lives in the `all` selector alone and never in the shared
+eligibility check. A failed dependency holds its dependents back.
 
-**Why here:** independent of items 1–4, and it ships the first half of a shared vocabulary. Stated in
-both files: this and [item 12](budget-ceilings-for-runs-and-batches.md) *"ship the same vocabulary for
-'ended without a verdict'"* — `failed` in `TaskStatus`, `over_budget` in the batch outcomes. Building
-this one first means `failed` exists before `over_budget` has to sit beside it.
+**The task file's paths were pre-sweep and stale** — it named `src/core/session/types.ts` twice for
+what is now `task-status.type.ts`, and `retro-runner.ts` for a `commitPaths` precedent now in
+`route-retro-edit.ts`. It was also **self-contradictory**: it asked for the commit *after* the stash and
+for the commit site to be `run-task-loop.ts`, which cannot both hold, since the loop returns before
+anything stashes. The ordering won; the loop carries a comment saying why the write is *not* there.
+`OPEN-QUESTIONS.md` #2/#4/#70 still name the deleted `types.ts`, `project-git.ts`, `batch.ts` and
+`run.ts` — folded into [item 29](prose-names-files-the-sweep-deleted.md).
+
+Spun out **[33](failed-record-is-invisible-to-the-user.md)** and
+**[34](rerun-stash-reverts-the-failed-record.md)**: the record is invisible to the user, and a re-run's
+stash carries a stale `pending`. Its `docs/phases.md` edit is review-gated and was handed over rather
+than committed — that section had been written to the *superseded* answer and was already wrong.
+
+**It shipped the first half of a shared vocabulary**, which is why it went before its neighbours: this
+and [item 12](budget-ceilings-for-runs-and-batches.md) *"ship the same vocabulary for 'ended without a
+verdict'"* — `failed` in `TaskStatus`, `over_budget` in the batch outcomes. `failed` now exists before
+`over_budget` has to sit beside it.
 
 ### 6. [Boot can pick a model that cannot call tools](boot-can-pick-a-toolless-model.md)
 *Model behavior.* `pickSmallestModel` is **deleted**, not filtered: a saved `activeModel` wins, otherwise
@@ -870,6 +885,38 @@ Filed rather than fixed because choosing **which** name moves is a judgement abo
 are called, and a rename touching every consumer of the union should not ride inside somebody else's
 commit. The union sitting under `core/session/` while the abstraction sits under `phases/` may itself be
 the thing to fix, in which case the rename question answers itself.
+
+### 33. [The `failed` record is invisible to the user](failed-record-is-invisible-to-the-user.md)
+*Execution loop / terminal UX.* [Item 5](#5-stop-a-failed-task-looking-untouched--shipped) made an
+escalation write and commit `status: failed`. **Nothing says so.** Three silences: the write is never
+announced (the outcome line prints *before* the stash, and the record cannot move earlier than the
+stash), `/run all` drops a failed task as silently as a `done` one, and — the one that matters — when
+the escalation commit **fails**, the write is rolled back and nobody hears. No dirty-tree gate trips,
+so the task stays `pending` and the next batch spends five more rounds on it: **item 5's own defect,
+reinstated whenever git has a bad day.**
+
+`recordFailedAttempt` already returns `{ recorded, sha, error }` and both call sites discard it. The
+obstacle is structural rather than verbal — `route-batch-outcome.ts` has no renderer at all, so the
+fact has to ride out on `BatchEscalated` beside `stashRef`. `render-task-outcome.ts`'s *"committed …
++ marked done"* is the sentence to mirror, so no new vocabulary is being invented.
+
+**Why here:** two files and a field, and it closes a hole in work already shipped. Also carries the
+note that `failed` shares `theme.danger` with `blocked`, so whoever touches these lines decides that
+deliberately instead of discovering it.
+
+### 34. [A re-run's stash carries a stale `pending`](rerun-stash-reverts-the-failed-record.md)
+*Execution loop.* Retrying an already-`failed` task that escalates again leaves the stash holding the
+task file with `status: pending` — a reversion of the record sitting beside the attempt it describes.
+Popping it to inspect the work locally un-marks the task. The committed state is correct, so this is
+uncommitted-only and harmless.
+
+The subtlety worth keeping: the hardcoded revert to `pending` is **load-bearing on the first failure**,
+where it is exactly what keeps the task file byte-identical to HEAD and therefore *out* of the stash —
+which is what lets the record commit one clean path. The wart is the second failure only, where HEAD
+has moved on. The fix is to write back the status found rather than a literal `pending`, which is a
+decision about what every non-passing exit means, not just this one.
+
+**Why here:** last, and knowingly. It is the smallest thing in the ledger and nothing depends on it.
 
 ---
 
