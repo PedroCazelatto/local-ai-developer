@@ -1,7 +1,8 @@
 // Evict stale tool results from a window's history to reclaim context, replacing each with a stub
 // that records what was called. The recent tail is protected; nothing the model is still using goes.
 
-import type { Message, ToolCall } from '../llm/index.js';
+import type { Message, ToolCall } from 'ollama';
+
 import { formatEvictedStub } from './format-evicted-stub.js';
 import { isEvictableTool } from './is-evictable-tool.js';
 import { protectedTailStart } from './protected-tail-start.js';

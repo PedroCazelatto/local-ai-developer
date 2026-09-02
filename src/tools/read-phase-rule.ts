@@ -8,11 +8,11 @@
 // exist on disk (availablePhaseNames), so no `..`/absolute-path traversal can reach the host fs.
 
 import { readFileSync } from 'node:fs';
+import type { Tool } from 'ollama';
 
 import { availablePhaseNames } from '../context/available-phase-names.js';
 import { phasePromptPath } from '../context/phase-prompt-path.js';
 import { errMessage } from '../core/err-message.js'; // an Error's message, or the thrown value stringified
-import type { Tool } from '../core/llm/index.js';
 
 /** The one name the Retro window special-cases to read a global phase instruction file. */
 export const READ_PHASE_RULE = 'read_phase_rule';

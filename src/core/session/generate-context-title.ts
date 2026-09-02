@@ -2,13 +2,16 @@
 // asked for a single line. One attempt per context per session -- a title is a convenience, and
 // re-spending a window on it every turn is not what the num_ctx budget is for.
 
+import type { Message } from 'ollama';
+
 import type { ContextTitle } from './context-title.type.js';
 import type { MemoryRecord } from './memory-record.type.js';
-import type { Message, OllamaClient, TokenCounts } from '../llm/index.js';
+import type { OllamaClient } from '../llm/client.js';
+import type { TokenCounts } from '../llm/token-counts.type.js';
 import { buildTitleTranscript } from './build-title-transcript.js';
 import { capTitle } from './cap-title.js';
 import { loadPrompt } from '../../context/load-prompt.js';
-import { oneShot } from '../llm/index.js';
+import { oneShot } from '../llm/one-shot.js';
 import { unwrapTitle } from './unwrap-title.js';
 
 /** The rules the throwaway context is given — rules/prompts/context-title.md. */

@@ -1,7 +1,8 @@
 // The index where the protected tail begins: the most recent tool results are never evicted, because
 // they are what the model is reasoning from right now.
 
-import type { Message, ToolCall } from '../llm/index.js';
+import type { Message, ToolCall } from 'ollama';
+
 import { KEEP_RECENT_TOOL_RESULTS } from './evict-stale-tool-results.js';
 
 /**

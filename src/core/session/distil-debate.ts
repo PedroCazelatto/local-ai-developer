@@ -9,7 +9,9 @@
 //
 // Named distilDebate rather than the module-private `distil` it was extracted from.
 
-import type { Message, TokenCounts } from '../llm/index.js';
+import type { Message } from 'ollama';
+
+import type { TokenCounts } from '../llm/token-counts.type.js';
 import { addTokenCounts } from './add-token-counts.js';
 import type { DebateDeps } from './debate-deps.type.js';
 import type { DebateDigest } from './debate-digest.type.js';

@@ -4,8 +4,12 @@
 // cut, back out to the rollback: a cancelled turn still said something, and the history has to record
 // what the model had produced before the key press rather than pretending the turn never happened.
 
-import type { Message, StreamHandle, TokenCounts, ToolCall, TurnAbortReason } from '../llm/index.js';
-import { TurnAbortedError } from '../llm/index.js';
+import type { Message, ToolCall } from 'ollama';
+
+import type { StreamHandle } from '../llm/client.js';
+import type { TokenCounts } from '../llm/token-counts.type.js';
+import type { TurnAbortReason } from '../llm/turn-aborted-error.js';
+import { TurnAbortedError } from '../llm/turn-aborted-error.js';
 import { activityLine } from '../ui/activity-line.js';
 import type { MarkdownStream } from '../ui/markdown-stream.type.js';
 import { printToolCall } from '../ui/print-tool-call.js';

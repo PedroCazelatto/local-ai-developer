@@ -11,6 +11,7 @@
 // than trusting the model to.
 
 import path from 'node:path';
+import type { Message, Tool, ToolCall } from 'ollama';
 
 import { PHASE_SCOPED_TOOL_NAMES, RETRO_TOOL_NAMES } from '../../phases/phase-tool-names.js';
 import { resolvePhaseTools } from '../../phases/resolve-phase-tools.js';
@@ -21,7 +22,8 @@ import { resolveInProject } from '../../tools/resolve-in-project.js';
 import { toolError } from '../../tools/tool-error.js';
 import { READ_PHASE_RULE, readPhaseRule } from '../../tools/read-phase-rule.js';
 import { parseRetroSubmission, SUBMIT_RETRO } from '../../tools/submit-retro.js';
-import type { Message, StreamHandle, TokenCounts, Tool, ToolCall } from '../llm/index.js';
+import type { StreamHandle } from '../llm/client.js';
+import type { TokenCounts } from '../llm/token-counts.type.js';
 import type { ToolCallDisplay } from '../ui/tool-call-display.type.js';
 import { addTokenCounts } from './add-token-counts.js';
 import { candidatePhaseFile } from './candidate-phase-file.js';

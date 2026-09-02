@@ -8,7 +8,7 @@
 // code and then pass its own edit. The flip only becomes real when the Reviewer commits the backlog
 // file with commit_changes — marking without committing leaves the tree dirty, which blocks a `pass`.
 
-import type { Tool } from '../core/llm/index.js';
+import type { Tool } from 'ollama';
 
 /** The one name the Reviewer window special-cases to flip its task's backlog status. */
 export const MARK_TASK_DONE = 'mark_task_done';

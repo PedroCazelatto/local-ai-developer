@@ -9,7 +9,8 @@
 // one-function-per-file sweep deleted; it is recorded here because nothing else in the directory
 // held it.
 
-import type { Tool } from '../core/llm/index.js';
+import type { Tool } from 'ollama';
+
 import { buildToolSection } from './build-tool-section.js';
 
 // The model writes PLAIN markdown and never names a color: the terminal renderer (theme.ts +

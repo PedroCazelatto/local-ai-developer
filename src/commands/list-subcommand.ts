@@ -2,7 +2,8 @@
 // the HOST Ollama daemon (Ollama runs on the host GPU, not the sandbox — CLAUDE.md); the session
 // orchestrator only holds the active model, it is never asked what is installed.
 
-import { listModels, matchesModelName } from '../core/llm/index.js';
+import { listModels } from '../core/llm/list-models.js';
+import { matchesModelName } from '../core/llm/matches-model-name.js';
 import { formatSize } from '../core/ui/format-size.js';
 import { renderer } from '../core/ui/renderer.js';
 import { theme } from '../core/ui/theme.js';

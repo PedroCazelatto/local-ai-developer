@@ -2,8 +2,12 @@
 // spawned Worker / Reviewer / Retro window. The loop is written against this and nothing else, which
 // is what lets one implementation drive five different kinds of window.
 
-import type { Message, StreamHandle, TokenCounts, ToolCall, TurnAbortReason } from '../llm/index.js';
-import { TurnAbortedError } from '../llm/index.js';
+import type { Message, ToolCall } from 'ollama';
+
+import type { StreamHandle } from '../llm/client.js';
+import type { TokenCounts } from '../llm/token-counts.type.js';
+import type { TurnAbortReason } from '../llm/turn-aborted-error.js';
+import { TurnAbortedError } from '../llm/turn-aborted-error.js';
 
 /** What the turn loop needs from the orchestrator. Keeps the loop decoupled from its internals. */
 export interface TurnContext {

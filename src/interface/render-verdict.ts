@@ -4,7 +4,7 @@
 // printing: the accept/send-back/skip decision is collected by the REPL over readline (run-repl.ts), to
 // avoid fighting clack for stdin the way /run's askYesNo does. Wraps naturally — no horizontal scroll.
 
-import type { TokenCounts } from '../core/llm/index.js';
+import type { TokenCounts } from '../core/llm/token-counts.type.js';
 import type { ReviewVerdict, Severity } from '../core/session/index.js';
 import { theme } from '../core/ui/theme.js';
 import { write } from '../core/ui/write.js';

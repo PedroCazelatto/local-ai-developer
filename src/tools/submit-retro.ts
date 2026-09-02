@@ -8,7 +8,8 @@
 // commit). Capturing it anyway forces the model to reason about the classification and yields a
 // reliable one-sentence rootCause via the same tool-call recovery pipeline every other tool rides.
 
-import type { Tool } from '../core/llm/index.js';
+import type { Tool } from 'ollama';
+
 import type { RetroScope } from '../core/session/retro-scope.type.js';
 import { RETRO_SCOPES } from '../core/session/retro-scopes.js';
 import type { RetroSubmission } from '../core/session/retro-submission.type.js';

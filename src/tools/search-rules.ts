@@ -6,11 +6,12 @@
 // passed on). The model then calls load_rule with a returned name to pull that one body in. An empty
 // result is valid.
 
+import type { Message } from 'ollama';
+
 import { loadCatalog } from '../context/load-catalog.js';
 import type { StandardEntry } from '../context/load-catalog.js';
 import { errMessage } from '../core/err-message.js'; // an Error's message, or the thrown value stringified
-import { loadsOrRepair } from '../core/llm/index.js';
-import type { Message } from '../core/llm/index.js';
+import { loadsOrRepair } from '../core/llm/loads-or-repair.js';
 import { buildSearchUserPrompt } from './build-search-user-prompt.js'; // the catalog rides in the USER turn
 import type { JsonObject } from './json-object.type.js';
 import type { StructuredToolResult } from './structured-tool-result.type.js';

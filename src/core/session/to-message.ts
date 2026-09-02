@@ -7,7 +7,7 @@
 // key off entirely rather than setting it to null, so a replayed message is shaped exactly like the one
 // that was buffered.
 
-import type { Message } from '../llm/index.js';
+import type { Message } from 'ollama';
 
 import type { MemoryRecord } from './memory-record.type.js';
 import { toMessageRole } from './to-message-role.js';

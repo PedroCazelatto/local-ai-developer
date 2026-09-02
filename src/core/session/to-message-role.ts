@@ -7,7 +7,7 @@
 // reasons: it returns Ollama's `Message['role']` rather than this folder's ChatRole, and the
 // `chat-role` stem belongs to chat-role.type.ts — a `.type.ts` may not share a stem with a `.ts`.
 
-import type { Message } from '../llm/index.js';
+import type { Message } from 'ollama';
 
 import type { MemoryRecord } from './memory-record.type.js';
 

@@ -5,7 +5,7 @@
 // reliably, and bouncing them costs a round-trip and teaches nothing. Whether the questions are any
 // GOOD is a different question, answered strictly by parse-one-question.ts.
 
-import { loadsOrRepair } from '../core/llm/index.js';
+import { loadsOrRepair } from '../core/llm/loads-or-repair.js';
 
 /** Pull the questions array out of whatever the model actually sent. */
 export function extractQuestionList(args: Record<string, unknown>): unknown[] | null {

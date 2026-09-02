@@ -19,8 +19,8 @@
 // file; a class's METHODS are its implementation and stay (constitution).
 
 import type { DatabaseSync } from 'node:sqlite';
+import type { Message, ToolCall } from 'ollama';
 
-import type { Message, ToolCall } from '../llm/index.js';
 import type { ClearResult } from './clear-result.type.js';
 import { collapseIntoSummary } from './collapse-into-summary.js';
 import type { ContextSummary } from './context-summary.type.js';

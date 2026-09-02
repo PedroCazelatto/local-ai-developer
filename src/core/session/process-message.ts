@@ -6,7 +6,7 @@
 // The loop drives the UI (renderer + spinner) and the orchestrator through the TurnContext seam
 // (SessionOrchestrator implements it), so this file stays free of Ollama/sandbox details.
 
-import { TurnAbortedError } from '../llm/index.js';
+import { TurnAbortedError } from '../llm/turn-aborted-error.js';
 import { inputFence } from '../ui/input-fence.js';
 import { renderer } from '../ui/renderer.js';
 import { statusActivity } from '../ui/status-activity.js';

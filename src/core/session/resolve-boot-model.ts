@@ -14,7 +14,9 @@
 //                                                             prints the pull hint (run-repl.ts).
 // A declined pull is never followed by a second offer for a different model — one ask per boot.
 
-import { listModels, matchesModelName, pickSmallestModel } from '../llm/index.js';
+import { listModels } from '../llm/list-models.js';
+import { matchesModelName } from '../llm/matches-model-name.js';
+import { pickSmallestModel } from '../llm/pick-smallest-model.js';
 import { renderer } from '../ui/renderer.js';
 import { config } from './config.js';
 import { loadAppState } from './load-app-state.js';

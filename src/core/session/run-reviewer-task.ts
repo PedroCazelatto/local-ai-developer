@@ -8,7 +8,7 @@
 // loop in run-task-loop.ts only READS one. Contrast ReviewerDeps beside it, which stays a standalone
 // module precisely because the CALLER constructs that one.
 
-import type { TokenCounts } from '../llm/index.js';
+import type { TokenCounts } from '../llm/token-counts.type.js';
 import type { RaisedBlocker } from './raised-blocker.type.js';
 import type { ReviewVerdict } from './review-verdict.type.js';
 import type { ReviewerCommit } from './reviewer-commit.type.js';

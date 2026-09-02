@@ -11,7 +11,7 @@
 import path from 'node:path';
 
 import { PHASES_DIR } from '../../context/phase-prompt.js';
-import type { TokenCounts } from '../llm/index.js';
+import type { TokenCounts } from '../llm/token-counts.type.js';
 import { buildRetroCommitMessage } from './build-retro-commit-message.js';
 import { commitPaths } from './commit-paths.js';
 import { isPathUnder } from './is-path-under.js';

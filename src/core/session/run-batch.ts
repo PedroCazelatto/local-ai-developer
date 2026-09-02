@@ -12,7 +12,7 @@
 
 import path from 'node:path';
 
-import type { TokenCounts } from '../llm/index.js';
+import type { TokenCounts } from '../llm/token-counts.type.js';
 import { addTokenCounts } from './add-token-counts.js';
 import type { BatchBlocked } from './batch-blocked.type.js';
 import type { BatchCancelled } from './batch-cancelled.type.js';

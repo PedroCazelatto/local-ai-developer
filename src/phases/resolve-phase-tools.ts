@@ -7,7 +7,8 @@
 // simply never sees it and works around the gap — so a typo in an array must not degrade into a
 // quietly smaller tool set.
 
-import type { Tool } from '../core/llm/index.js';
+import type { Tool } from 'ollama';
+
 import { editPhaseRuleTool } from '../tools/edit-phase-rule.js';
 import { markTaskDoneTool } from '../tools/mark-task-done.js';
 import { raiseBlockerTool } from '../tools/raise-blocker.js';

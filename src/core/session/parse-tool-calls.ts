@@ -2,8 +2,8 @@
 // value must not sink a reopen — the turn simply replays without its calls.
 
 import type { SQLOutputValue } from 'node:sqlite';
+import type { ToolCall } from 'ollama';
 
-import type { ToolCall } from '../llm/index.js';
 import { isToolCallArray } from './is-tool-call-array.js';
 
 /** Rebuild the `tool_calls` column into ToolCall[]; undefined when absent or unparseable (never throws). */

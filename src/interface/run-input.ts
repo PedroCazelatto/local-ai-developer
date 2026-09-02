@@ -4,7 +4,7 @@
 import type { Interface as ReadlineInterface } from 'node:readline/promises';
 
 import { errMessage } from '../core/err-message.js'; // an Error's message, or the thrown value stringified
-import { TurnAbortedError } from '../core/llm/index.js';
+import { TurnAbortedError } from '../core/llm/turn-aborted-error.js';
 import { activityLine } from '../core/ui/activity-line.js';
 import { renderer } from '../core/ui/renderer.js';
 import { handleCommand } from './handle-command.js'; // registry dispatch; true only when /exit ran

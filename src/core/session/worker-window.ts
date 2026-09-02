@@ -5,8 +5,11 @@
 // Worker must not reach is refused here, audited, and reported back as a recoverable error, rather
 // than being left out of the tool list and silently hallucinated.
 
+import type { Message, Tool, ToolCall } from 'ollama';
+
 import type { FileReadTracker } from './file-read-tracker.type.js';
-import type { OllamaClient, Message, StreamHandle, TokenCounts, Tool, ToolCall } from '../llm/index.js';
+import type { OllamaClient, StreamHandle } from '../llm/client.js';
+import type { TokenCounts } from '../llm/token-counts.type.js';
 import type { ToolCallRecord } from './tool-call-record.type.js';
 import type { TurnContext } from './turn-context.type.js';
 import type { WorkerDeps } from './worker-deps.type.js';

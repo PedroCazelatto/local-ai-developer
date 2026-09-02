@@ -10,13 +10,16 @@
 // never the master's history; and the master's history is never polluted by the sub-agent's internal
 // turns — the master only ever sees the { id, response } tool result.
 
+import type { Message, Tool } from 'ollama';
+
 import { resolvePhaseTools } from '../../phases/resolve-phase-tools.js';
 import { ASK_SUBAGENT } from '../../tools/ask-subagent.js';
 import { DISMISS_SUBAGENT } from '../../tools/dismiss-subagent.js';
 import { createToolContext } from '../../tools/create-tool-context.js';
 import { SPAWN_SUBAGENT } from '../../tools/spawn-subagent.js';
 import type { SandboxClient } from '../container/sandbox.js';
-import type { Message, OllamaClient, TokenCounts, Tool } from '../llm/index.js';
+import type { OllamaClient } from '../llm/client.js';
+import type { TokenCounts } from '../llm/token-counts.type.js';
 import { printToolCall } from '../ui/print-tool-call.js';
 import { addTokenCounts } from './add-token-counts.js';
 import { dispatchToolCall } from './dispatch-tool-call.js';
