@@ -244,13 +244,29 @@ There are ten `index.ts` files; **eight** are pure re-export barrels, **`src/cor
 (zero re-exports — four lines of comment held in the graph by `export {}`), and **`src/index.ts` is the
 entry point and survives** — which matters because `find src -name index.ts` returns it.
 
+**`config.ts` owed one last thing and `483237f` paid it** — the sweep's oldest debt. It now holds zero
+declarations and exports **exactly one value**, `config`, carrying the six constants *and* `loadConfig`
+*and* the three resolvers as properties, with `export type { SessionConfig }` riding along. The ESM cycle
+survives, re-driven across five entry orders in one process each.
+
+**That job also exposed a gap in how every coupling figure in this sweep was measured**, and it is the
+most important thing to carry forward. It was briefed with **six** importers — every file naming
+`'./config.js'` directly, correctly counted. The truth was **eight**: `core/session/index.ts:2` was
+`export * from './config.js'`, so `boot/resolve-or-exit.ts` and `interface/run-repl.ts` took config's
+names *through the barrel* and were invisible to a direct-import census. **`run-repl.ts` could not have
+been left alone by any arrangement**, since `SUGGESTED_MODEL` has no standalone export once the constants
+live inside the object. The parcel guarantees in the brief are stated as *zero file overlap* and were all
+computed the undercounting way; the overlap was genuinely zero here, but because the agent checked, not
+because the method was sound. **Resolve `export *` transitively before trusting an overlap of zero** —
+which matters most for the barrel pass, since it is entirely about star re-exports.
+
 **`93dc209` deleted the first two**, the ones the measurement showed were free: `core/ui/index.ts`, which
 had **zero** importers because wave B had already repointed all 43, and `interface/index.ts`, which had
 exactly one — a single line in `src/boot/main.ts`. Its agent reproduced all ten importer counts exactly
 and proved its instrument by making it report 65 real importers of `core/llm/index.ts` and then go red on
 14 spelling probes after the deletion. **Six barrels remain**: `core/llm` (66 importers), `core/session`
-(55), `core/container` (13), `context` (12), `phases` (7), `tools` (5). **Wave E is stageable, not
-atomic.**
+(55), `core/container` (13), `context` (12), `phases` (7), `tools` (5) — and those counts are **lower
+bounds**, for the `export *` reason above. **Wave E is stageable, not atomic.**
 
 Three files must not be deleted by it, distinguished by *one exported value, no function, zero re-export
 lines*: `src/index.ts`, `src/interface/command-registry.ts` and `src/core/llm/daemon.ts`. And one more
@@ -258,7 +274,7 @@ trap, found by the agent that did the deletions: **`find src -name index.ts` is 
 is not** — `src/core/session/tool-call-args-by-index.ts` matches `*index.ts`, so a mechanical wave-E
 command written that way sweeps up a real function file.
 
-**`src/core/index.ts` needed a ruling and got two.** The user ruled the comment goes into
+**`src/core/index.ts` is gone (`530f273`), and it needed a ruling first.** The user ruled the comment goes into
 [docs/repo-layout.md](../docs/repo-layout.md) and the file is deleted; in the event only its framing
 phrase was not already there in richer form, and one line of it — attributing the *phase factory* to
 `session/` — was simply **stale**, since the factory is `src/phases/factory.ts`.
