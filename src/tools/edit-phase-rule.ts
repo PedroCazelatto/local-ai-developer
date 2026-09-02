@@ -15,6 +15,7 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { availablePhaseNames, phasePromptPath } from '../context/index.js';
 import { errMessage } from '../core/err-message.js'; // an Error's message, or the thrown value stringified
 import type { Tool } from '../core/llm/index.js';
+import { countOccurrences } from './count-occurrences.js'; // the exactly-once precondition, as a count
 
 /** The one name the Retro window special-cases to patch a global phase instruction file. */
 export const EDIT_PHASE_RULE = 'edit_phase_rule';
@@ -64,18 +65,6 @@ export type PhaseRuleEdit =
       readonly after: string;
     }
   | { readonly ok: false; readonly error: string; readonly hint?: string };
-
-/** Count non-overlapping occurrences of `needle` in `haystack` (matches edit_file's semantics). */
-function countOccurrences(haystack: string, needle: string): number {
-  if (needle === '') return 0;
-  let count = 0;
-  let index = haystack.indexOf(needle);
-  while (index !== -1) {
-    count += 1;
-    index = haystack.indexOf(needle, index + needle.length);
-  }
-  return count;
-}
 
 /** Apply a smallest-correct exact-once replace to rules/phases/<phase>.md; leaves the write uncommitted. */
 export function applyPhaseRuleEdit(phase: unknown, oldString: unknown, newString: unknown): PhaseRuleEdit {

@@ -11,6 +11,7 @@
 import { errMessage } from '../core/err-message.js';
 // The compact +/- diff shown in the scrollback; null when the change is too large to count exactly.
 import { buildFileDiff } from './build-file-diff.js';
+import { countOccurrences } from './count-occurrences.js'; // the exactly-once precondition, as a count
 import { decodeUtf8Strict } from './decode-utf8-strict.js';
 // Refuses an existing file this window has not read, or has read a now-stale copy of.
 import { guardWriteTarget } from './guard-write-target.js';
@@ -19,18 +20,6 @@ import { scopeToWorkspace } from './scope-to-workspace.js';
 import { toolError } from './tool-error.js';
 import type { ToolModule } from './tool-module.type.js';
 import type { ToolResult } from './tool-result.type.js';
-
-/** Count non-overlapping occurrences of `needle` in `haystack` (matches Python str.count semantics). */
-function countOccurrences(haystack: string, needle: string): number {
-  if (needle === '') return 0;
-  let count = 0;
-  let index = haystack.indexOf(needle);
-  while (index !== -1) {
-    count += 1;
-    index = haystack.indexOf(needle, index + needle.length);
-  }
-  return count;
-}
 
 export const editFileTool: ToolModule = {
   name: 'edit_file',
