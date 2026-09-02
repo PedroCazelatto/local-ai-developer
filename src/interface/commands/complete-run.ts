@@ -1,0 +1,23 @@
+// Tab candidates for /run. Split out of run.ts.
+
+import { allTasks, readBacklog } from '../../core/session/index.js';
+import type { CompletionContext } from '../completion-context.type.js';
+
+/**
+ * Tab candidates for `/run <selector>`: the two static selectors plus every not-done task id — the same
+ * set `all` would sweep, so nothing is offered that resolveSelector would then skip. Only the selector is
+ * completable; a comma list past the first id isn't (the partial word carries the commas with it).
+ */
+export function completeRun(ctx: CompletionContext): string[] {
+  if (ctx.args.length > 0) return [];
+  try {
+    // readBacklog is a SYNC file read, which is what makes it safe in a completer that must never await
+    // (complete-line.ts). A missing or malformed backlog just means no ids to offer, never a thrown Tab.
+    const ids = allTasks(readBacklog(ctx.orch.projectPath))
+      .filter((t) => t.status !== 'done')
+      .map((t) => t.id);
+    return ['next', 'all', ...ids];
+  } catch {
+    return ['next', 'all'];
+  }
+}
