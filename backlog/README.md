@@ -23,14 +23,18 @@ the answer can **delete** the task rather than shape it.
 
 ### 1. [One function per file, across `src/`](split-config-into-one-function-per-file.md)
 
-> **CHECKPOINTED at `5ca1d1f`.** Work stopped deliberately, on a commit boundary, with nothing
-> half-split. **Start at *Resuming from cold* — the first section of
-> [the task file](split-config-into-one-function-per-file.md)**, which is written for someone with none
-> of the conversation: every directory's state re-measured by parser rather than remembered, the two
-> directories that remain with per-file counts, wave E's measured barrel inventory, the open decisions,
-> and the traps. **`tsc --noEmit` clean, `npm test` 400 / 400.** The working tree is dirty in exactly
-> three review-gated files — `CLAUDE.md`, `constitution.md`, `docs/repo-layout.md` — which are waiting on
-> the user and must be neither committed nor reverted by an agent.
+> **THE DECLARATION CENSUS IS AT ZERO.** A TypeScript-parser pass over all **643** files under `src/`
+> finds **no file holding more than one declaration** — functions, classes, arrow properties and object
+> method shorthand all counted. From a baseline of 104 files / 504 declarations, every directory is
+> clear. **`tsc --noEmit` clean, `npm test` 400 / 400, 0 skips.**
+>
+> **What remains is shape work, not census work**: `config.ts`'s owed assembler reshape, the
+> `core/ui/types.ts` retrofit, six old-style `.type.ts` pairs in `core/session`, and six of the eight
+> `index.ts` barrels. **Start at *Resuming from cold* — the first section of
+> [the task file](split-config-into-one-function-per-file.md)**, written for someone with none of the
+> conversation. The working tree is dirty in exactly three review-gated files — `CLAUDE.md`,
+> `constitution.md`, `docs/repo-layout.md` — which are waiting on the user and must be neither committed
+> nor reverted by an agent.
 
 *Repo hygiene.* **Widened, and partly landed.** The four-function env-resolution exception is over:
 `resolveNumCtx`, `resolveRatio`, `resolveTimeoutMs` and `loadConfig` each hold their own file, `config.ts`
@@ -73,7 +77,9 @@ table matched exactly. Two agents, two instruments, one number.
 | cleared by wave C | 29 | 188 |
 | cleared by the `interface` agent | 7 | 28 |
 | cleared by wave D so far | 9 | 48 |
-| **remaining — measured at HEAD, by parser** | **35** | **129** |
+| cleared by wave D — `interface/commands` | 20 | 103 |
+| cleared by wave D — `tools` | 24 | 74 |
+| **remaining — measured at HEAD, by parser** | **0** | **0** |
 
 **The last row does not equal the subtraction, and the sweep has not regressed.** The baseline was a
 regex pass that declared a pattern for object-literal **method shorthand** and then never added it to the
@@ -159,54 +165,102 @@ closing removed one of its two blockers; the other is the **runtime** — it is 
 touch `node:sqlite`, which is experimental on 22.x and stable from 24, and the suite has only ever run on
 22.14.0 against an `.nvmrc` pinning 24.14.0.
 
-**Fourteen old-style `.type.ts` pairs remain, in two directories.** Six in `core/session` — `events-log`,
+**Six old-style `.type.ts` pairs remain, all in `core/session`** — `events-log`,
 `evict-stale-tool-results`, `read-tracker`, `run-stop-signal`, `run-task-loop`, `subagents` — down from
-ten as wave C reached their siblings; and **eight in `src/tools`**, which nothing has enumerated before
-now: `compose-commit-message`, `guard-write-target`, `list-files`, `parse-ask-questions`, `raise-blocker`,
-`read-optional-count`, `render-numbered-slice`, `search-in-files`. Each is the sibling of a `.ts` file the
-sweep has not reached and **dies with it**, so this is not the retrofit having been left half-done.
+ten as wave C reached their siblings. Each is the sibling of a `.ts` file the sweep has not reached and
+**dies with it**, so this is not the retrofit having been left half-done.
+
+There were **fourteen**: eight more sat in `src/tools`, unenumerated by anything until the checkpoint
+census found them, and all eight went with that directory's wave in `c88da11` and `abfced0`.
 
 **Take `read-tracker.type.ts` last, and alone** — nine importers, three of them in `src/tools`, so folding
 it while anyone is working there puts two agents in the same files.
 
-**Wave D is running on `interface/commands`** — **9 of 20 files, 48 of 103 declarations**, four commits.
-Three assemblers created (`new-project.ts`, `swap.ts`, `help.ts`) on the `models.ts` precedent, and
-**`project-templates.ts` deleted rather than assembled** — its one importer takes **six named things**
-from it, not one thing, which is the assembler test answering cleanly in the negative. Its **11 remaining
-files hold 55 declarations**, largest first `run.ts` 14, `resume.ts` 12, `subagents.ts` 6, `answer.ts` 4;
-all 11 survive as assemblers and none is deleted. **`phases`
-dropped out** (cleared early in `5d74ad4`) and **`interface` is finished**, so the coupling that made
-`interface`/`interface/commands` one job is gone — `interface/commands` unblocked the moment `26ca3c4`
-landed.
+**Wave D is CLOSED. Both halves are at zero, and with them the whole census.**
 
-**`src/tools` is the other half, it is unstarted, and `core/session` closing unblocked it.** At 24 files /
-74 declarations it is now the largest remaining directory — bigger than the 20 / 60 the partition table
-records, for the method-shorthand reason above. **The bar question it raised is now settled**: the user
-ruled that an `execute(…) {…}` method shorthand on a top-level object literal **counts**, exactly as an
-arrow property does — the same declaration written two ways, and the bar cannot depend on the spelling.
-That is what makes the directory 24 / 74 rather than 19 / 63, and every tool object becomes an assembler
-over a separate `execute` file. The clause is in `constitution.md` under *What counts, exactly*, with the
-reason it does not contradict the class rule: a class is itself one declaration that owns its methods,
-whereas an object literal declares nothing of its own.
+**`interface/commands`: 20 files / 103 declarations, nine commits.** Four early (`458c2ab`, `6b5d5d9`,
+`a27f9a0`, `5ca1d1f`) created three assemblers on the `models.ts` precedent and **deleted
+`project-templates.ts` rather than assembling it** — its one importer took **six named things** from it,
+not one thing, the assembler test answering cleanly in the negative. Five more (`0c90c01`, `e2ef474`,
+`ed85868`, `49bfd1d`, `56842db`) took the last 11 files / 55 declarations: **63 new single-function
+files, seven duplicate helpers retired** (`titleCase` ×2 → `capitalizePhase`, `write` ×2, `messageOf` ×2
+→ `errMessage`, `localStamp` → `formatLocalStamp`), and **zero files outside the lane changed** —
+`command-registry.ts` needed no edit at all.
 
-**Then the two `types.ts` retrofits**: `tools`' rides with its own wave, and `core/ui`'s is unblocked now
-that `core/session` has cleared its three importers.
+**`tools`: 24 files / 74 declarations, thirteen commits** (`00ed603`…`e38e496`), plus `tools/types.ts`
+and **all eight** old-style `.type.ts` pairs. Its barrel name set held at 59 values / 13 types, name for
+name.
 
-**Wave E is the final barrel pass, and the "nine barrels, one pass" shape does not survive measurement.**
+**The bar question `tools` raised is settled**: the user ruled that an `execute(…) {…}` method shorthand
+on a top-level object literal **counts**, exactly as an arrow property does — the same declaration
+written two ways, and the bar cannot depend on the spelling. That is what makes the directory 24 / 74
+rather than 19 / 63.
+
+**A second ruling followed, and it is the more consequential one.** Clearing the census left 23 tool
+files each holding one declaration — but that declaration was the tool's whole `execute` body, **16 to
+135 lines**, inline in the object literal, while the 17 command files held 1-line members
+(`run: swapPhase`). Asked whether the tool bodies should be extracted too, the user ruled **no, and gave
+the reason**: *the tool name is the file name; description, parameters and execute all belong in the same
+file by the Single Responsibility principle; the object conforms to the Ollama API type; all tools must
+be in the same format.* Splitting a tool would divide **one** responsibility rather than separate two.
+So `src/tools/<tool>.ts` is the one place in the repo a substantial function body legitimately sits inside
+an object literal — and it is a precedent for nothing else, since a command's dispatch and its work
+genuinely are two responsibilities. Both clauses are now in `constitution.md`.
+
+Checking that ruling held turned up **the one axis on which the tools are not uniform**: 11 name
+themselves with an exported constant and 12 with an inline literal. It is filed as
+[28](tool-names-split-between-constants-and-literals.md) rather than fixed in passing — the split
+predates the sweep, and it should ship after wave E, which decides where a name constant is imported
+from.
+
+**`tools/types.ts` had five outside importers, not the one this file claimed.** `core/session/dispatch.ts`
+— the file named as the sole outsider — **no longer exists**; the real five are `dispatch-tool-call.ts`,
+`first-missing-required.ts`, `serialize-tool-result.ts`, `tool-call-record.type.ts` and
+`tool-result-error.ts`. Total reach was 44 files / 112 named imports, not 50.
+
+**Then the `core/ui/types.ts` retrofit** — the last per-folder `types.ts`, now unblocked, 16 importers.
+
+**Wave E has started, and the "nine barrels, one atomic pass" shape did not survive measurement.**
 There are ten `index.ts` files; **eight** are pure re-export barrels, **`src/core/index.ts` is not one**
-(zero re-exports — four lines of comment held in the graph by `export {}`; the user ruled that the
-comment goes into [docs/repo-layout.md](../docs/repo-layout.md) and the file is deleted, and in the event
-only its framing phrase was not already there in richer form), and
-**`src/index.ts` is the entry point and survives** — which matters because `find src -name index.ts`
-returns it. Two of the eight are free right now: **`core/ui/index.ts` has zero importers** (wave B
-repointed all 43) and `interface/index.ts` has one. `core/llm/index.ts` has 65 and `core/session/index.ts`
-has 37, 27 of them in `interface/commands` — so that one waits on wave D and the rest do not. **Wave E is
-stageable, not atomic.** Three files must not be deleted by it, distinguished by *one exported value, no
-function, zero re-export lines*: `src/index.ts`, `src/interface/command-registry.ts` and
-`src/core/llm/daemon.ts`.
+(zero re-exports — four lines of comment held in the graph by `export {}`), and **`src/index.ts` is the
+entry point and survives** — which matters because `find src -name index.ts` returns it.
+
+**`93dc209` deleted the first two**, the ones the measurement showed were free: `core/ui/index.ts`, which
+had **zero** importers because wave B had already repointed all 43, and `interface/index.ts`, which had
+exactly one — a single line in `src/boot/main.ts`. Its agent reproduced all ten importer counts exactly
+and proved its instrument by making it report 65 real importers of `core/llm/index.ts` and then go red on
+14 spelling probes after the deletion. **Six barrels remain**: `core/llm` (66 importers), `core/session`
+(55), `core/container` (13), `context` (12), `phases` (7), `tools` (5). **Wave E is stageable, not
+atomic.**
+
+Three files must not be deleted by it, distinguished by *one exported value, no function, zero re-export
+lines*: `src/index.ts`, `src/interface/command-registry.ts` and `src/core/llm/daemon.ts`. And one more
+trap, found by the agent that did the deletions: **`find src -name index.ts` is safe but a suffix pattern
+is not** — `src/core/session/tool-call-args-by-index.ts` matches `*index.ts`, so a mechanical wave-E
+command written that way sweeps up a real function file.
+
+**`src/core/index.ts` needed a ruling and got two.** The user ruled the comment goes into
+[docs/repo-layout.md](../docs/repo-layout.md) and the file is deleted; in the event only its framing
+phrase was not already there in richer form, and one line of it — attributing the *phase factory* to
+`session/` — was simply **stale**, since the factory is `src/phases/factory.ts`.
+
+Its `(task 03)` reference blocked the deletion until it was chased down, and **the answer is worth
+keeping because it applies to ten other sites.** The Foundation tasks were real task files completed at
+an older date: `tasks/foundation/03-ollama-client.md`, marked *Completed 2026-06-30*, shipped in
+`796454c`, one of 24 indexed by a `ROADMAP.md` that **`be503a1` deleted along with the whole `tasks/`
+tree** — this repo's own convention, *one file per task, deleted in the commit that ships the work*. So
+the numbering is a pointer into git history rather than a dangling reference, it still resolves
+(`git log --grep="Foundation 03"`, `git show be503a1^:tasks/foundation/03-ollama-client.md`), and in this
+case the comment's own prose already said what the task file said. **Eleven source files still carry such
+numbers; none is lost, and none needs an index written for it.**
+
+The user also set the general policy for barrel prose: **relocate anything unpreserved onto the owning
+file's header and report it in the commit message** — do not ask, and do not silently drop it.
 
 Re-measure the coupling before starting any of them — the graph has changed under every wave so far,
-and this shape is a starting point rather than a schedule.
+and this shape is a starting point rather than a schedule. Measured after wave D closed, the remaining
+parcels are **almost entirely serial**: everything funnels through `core/session` importers, and the only
+pair with zero overlap is `core/ui/types.ts` alongside `config.ts`'s reshape.
 
 The baseline was **106 / 528** until wave B found that an arrow property only counts when its object
 literal is at module top level. Twenty-two arrows across ten files sit inside a function body instead —
@@ -612,6 +666,33 @@ which is worth as much as the defect: it is one formatting edit from biting.
 is catalogued under one and resolved under another: listed by `search_rules`, unreachable by `load_rule`.
 
 Standing conditions as ever, with no excuse available: **`src/context/` closed at `daf08cf`.**
+
+### 28. [Half the tools name themselves with a constant, half with a literal](tool-names-split-between-constants-and-literals.md)
+*Repo hygiene.* From [1](split-config-into-one-function-per-file.md)'s `src/tools` wave, while checking
+that the user's tool-shape ruling actually held. All 23 tools do share one shape —
+`{ name, description, parameters, execute(…) {…} }`, verified by parser — and **`name` is the single axis
+on which they disagree**: 11 spell it with an exported constant, 12 with an inline literal.
+
+**The split is not a typo, which is what makes it a question.** The eleven constants exist because
+something outside the tool needed the name as a symbol, and all eleven are used —
+`worker-window.ts:47` keys a record on `[COMMIT_CHANGES]`, `reviewer-window.ts:188` compares
+`name === COMMIT_CHANGES`, `build-reviewer-seed.ts:43` interpolates two of them into a prompt the model
+reads, and `subagents.ts:37` builds `SUBAGENT_TOOL_NAMES` from three. The twelve literals are the tools
+nobody has yet needed to name from outside. Today's state is what you get from adding a constant the
+first time each name is needed, and never going back.
+
+**The repo also has two competing conventions for naming a tool from outside, and one of them is
+unguarded.** `phases/phase-tool-names.ts` spells every name as a literal and can afford to, because
+`resolve-phase-tools.ts` **fails loud on a name no tool answers to**. The `core/session` comparison sites
+have no such guarantee: a typo in `name === COMMIT_CHANGES` is a compile error, a typo in
+`name === 'commit_chnages'` simply never matches — and **a tool that silently never matches is invisible
+at runtime.** That asymmetry is the real argument, and it points at the constant.
+
+**Ships after wave E**, which decides where a tool-name constant is imported from —
+`src/tools/index.ts` re-exports five of them today and is being deleted. Filed rather than folded into
+item 1 for the usual reason: adding twelve exported constants inside a no-behaviour-change refactor
+buries an API change in a mechanical diff. **The sweep made this visible; it did not cause it** — the
+11/12 split predates it, in the same files, for the same consumers.
 
 ---
 

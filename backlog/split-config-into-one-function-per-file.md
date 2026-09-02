@@ -24,15 +24,26 @@ them, and do not revert them.** If they are already committed when you arrive, t
 Nothing is half-split. Every agent that was working stopped on a commit boundary, and the two that had
 files left had started nothing on them, so there was nothing to revert.
 
-### What is left, measured at HEAD
+### What is left — THE CENSUS IS AT ZERO
 
-A TypeScript-parser census at `5ca1d1f` (562 files scanned, `.type.ts` / `.schema.ts` / `__tests__`
-excluded) finds **35 files holding 129 declarations**, and they sit in exactly **two directories**:
+> **Updated after the checkpoint: work resumed and both remaining directories closed.** A
+> TypeScript-parser census over all **643** files under `src/` now finds **no file holding more than one
+> declaration**. From a baseline of 104 files / 504 declarations, **every** directory is clear —
+> `core/llm`, `core/container`, `core/ui`, `core/session`, `context`, `commands`, `phases`, `interface`,
+> `interface/commands`, `tools`, and `src/` root.
+>
+> **What remains is shape work, not census work**: `config.ts`'s owed assembler reshape, the
+> `core/ui/types.ts` retrofit, six old-style `.type.ts` pairs in `core/session`, and six of the eight
+> `index.ts` barrels. See *Open follow-ups*.
 
-| directory | files | declarations |
-|---|---:|---:|
-| `src/tools` | 24 | 74 |
-| `src/interface/commands` | 11 | 55 |
+The checkpoint census this section was built around found **35 files holding 129 declarations** across
+exactly two directories. It is kept below, because the two subsections that follow still carry the
+rulings, dedupes and traps that closing them depended on:
+
+| directory | files | declarations | closed by |
+|---|---:|---:|---|
+| `src/tools` | 24 | 74 | 13 commits, `00ed603`…`e38e496` |
+| `src/interface/commands` | 11 | 55 | 5 commits, `0c90c01`…`56842db` |
 
 **How to reproduce that census**, because the number is worthless if the next person cannot re-derive it.
 It is a throwaway script, so it is not in the repo — rewrite it, in about forty lines. Walk `src/`
@@ -1104,6 +1115,39 @@ always the only reason it is dangerous.** The staging section warns that `sed -i
 repo*. This agent was on a temp copy, where that risk genuinely did not apply — and the same tool
 corrupted the **measurement** instead. Same tool, different victim, and the existing warning would not
 have prompted a second look.
+
+### The seventh shape: a FALSE KILL from a crash the harness had already survived
+
+Found closing `interface/commands`, and it belongs beside the sixth because it fails the same way — **its
+symptom is a clean pass.**
+
+The mutation driver scored `dispatch-run.ts :: an empty selection is not reported` as **KILLED**. No probe
+had reached that branch at all. The kill came from `rmSync` over about 25 real git repositories, which on
+Windows **intermittently exits non-zero *after* the harness has already printed GREEN** — and the driver
+read the process exit code as its verdict. The same race also manufactured one spurious `BROKEN HARNESS`.
+
+So a mutation runner has **two** ways to lie, and they are opposites. The sixth shape is a change-detector
+answering a different question than the mutation. This one is the *runner* answering a different question
+than the harness: the harness said pass, the teardown said fail, and the exit code carried the teardown's
+answer.
+
+**The rule that closes it: harness cleanup must be retried and non-fatal, and a verdict must be read from
+what the harness printed rather than from how the process exited.** A driver that reads only
+`mismatches=` has a third hole in the same family — the `tools` wave hit it, where one mutation was killed
+by sending the code into an **infinite loop**, which produces no mismatch line at all and would score as
+clean.
+
+### Two more instrument findings from the same round
+
+- **A `\bname\b` rename matches inside a kebab-case import specifier.** Renaming `describe` →
+  `describeValue` rewrote `'./describe-value.js'`; `unwrap` did the same. **The occurrence-count guard
+  could not see it** — the count came out exactly as expected, because the specifier hit *is* one of the
+  occurrences it was counting. `tsc` caught both. A word-boundary regex is not word-aware across a
+  hyphen, and a count is not a location.
+- **`git commit -- <pathspec>` appears to re-check-out the committed paths**, flipping some LF
+  working-tree files to CRLF under `core.autocrlf=true`. Invisible to git and harmless in itself — but it
+  defeated a `grep -q $'\r'` EOL check run early in a commit sequence. **Read line endings with a byte
+  check in Node, not with a shell grep**, if the answer is going to gate anything.
 
 ### Layered assertions, proven necessary rather than assumed
 
