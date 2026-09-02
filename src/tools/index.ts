@@ -29,7 +29,7 @@ export { runInProjectTool } from './run-in-project.js';
 export { listChangesTool, LIST_CHANGES } from './list-changes.js';
 export { commitChangesTool, COMMIT_CHANGES } from './commit-changes.js';
 export { composeCommitMessage } from './compose-commit-message.js';
-export type { ComposeCommitMessageInput } from './compose-commit-message.type.js';
+export type { ComposeCommitMessageInput } from './compose-commit-message.js';
 // The rest of git — global registry tools, gated per phase by phase-tool-names.ts. git_stash and
 // git_push are additionally refused inside the Worker window (see worker-runner).
 export { gitStashTool, GIT_STASH } from './git-stash.js';

@@ -13,7 +13,7 @@
 // coherent: a row is only ever emitted after its parent, so nothing is left orphaned under a
 // directory that was cut.
 
-import type { WorkspaceEntry } from './list-files.type.js';
+import type { WorkspaceEntry } from './workspace-entry.type.js';
 
 interface TreeNode {
   readonly name: string;

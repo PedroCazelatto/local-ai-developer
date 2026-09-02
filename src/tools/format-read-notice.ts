@@ -9,7 +9,7 @@
 // resumed with a `char_offset` and not merely the same line again.
 
 import { READ_FILE_CHAR_LIMIT, READ_FILE_LINE_LIMIT } from './render-numbered-slice.js';
-import type { NumberedSlice } from './render-numbered-slice.type.js';
+import type { NumberedSlice } from './render-numbered-slice.js';
 
 export function formatReadNotice(slice: NumberedSlice, path: string): string {
   if (slice.totalLines === 0) {
