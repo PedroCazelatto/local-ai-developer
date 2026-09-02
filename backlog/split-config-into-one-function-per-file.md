@@ -33,7 +33,9 @@ files left had started nothing on them, so there was nothing to revert.
 > `interface/commands`, `tools`, and `src/` root.
 >
 > **What remains is shape work, not census work**: `config.ts`'s owed assembler reshape, the
-> `core/ui/types.ts` retrofit, six old-style `.type.ts` pairs in `core/session`, and six of the eight
+> `core/ui/types.ts` retrofit (**done, `e92e410`** — no `types.ts` remains anywhere under `src/`, so the
+> per-folder convention is fully reversed), six old-style `.type.ts` pairs in `core/session`, and six of
+> the eight
 > `index.ts` barrels. See *Open follow-ups*.
 
 The checkpoint census this section was built around found **35 files holding 129 declarations** across
@@ -743,6 +745,16 @@ recreate the old pairing; a type that has a function to sit beside belongs *insi
 Recorded so whoever takes them starts from measurement rather than from scratch — though the agent that
 measured them noted it would **re-measure rather than trust its own notes** when the work is handed
 over, which is the standing rule working as intended.
+
+> **ALL FIVE `types.ts` FILES ARE NOW GONE**, so everything in this subsection is planning-era record
+> rather than instruction: `core/session` (`9f4d932`), `core/llm` (`602f62f`), `core/container`
+> (`2b3e381`), `tools` (`00ed603`) and `core/ui` (`e92e410`). **Two of its predictions were wrong and are
+> worth the read anyway.** The `tools` ↔ `core/ui` coupling below did *not* force one owner: by the time
+> `tools` was swept, its share of the coupling went with its own wave and `core/ui` followed
+> independently, because a directory completing retires the deep edges the coupling was measured on.
+> And `core/ui/types.ts`’s blockers were named as three `core/session` files that had all since been
+> renamed or deleted — the real count at retrofit time was **16 importers, 7 / 5 / 4** across `core/ui`,
+> `core/session` and `tools`. **Re-measure; never inherit.**
 
 - **`src/tools/types.ts` and `src/core/ui/types.ts` are coupled — ONE owner takes both.**
   `tools/types.ts` imports `ToolCallDisplay` from `core/ui/types.js`, and also pulls `Message`,

@@ -29,7 +29,8 @@ the answer can **delete** the task rather than shape it.
 > clear. **`tsc --noEmit` clean, `npm test` 400 / 400, 0 skips.**
 >
 > **What remains is shape work, not census work**: `config.ts`'s owed assembler reshape, the
-> `core/ui/types.ts` retrofit, six old-style `.type.ts` pairs in `core/session`, and six of the eight
+> `core/ui/types.ts` retrofit (**done, `e92e410`** — no `types.ts` remains anywhere under `src/`), six
+> old-style `.type.ts` pairs in `core/session`, and six of the eight
 > `index.ts` barrels. **Start at *Resuming from cold* — the first section of
 > [the task file](split-config-into-one-function-per-file.md)**, written for someone with none of the
 > conversation. The working tree is dirty in exactly three review-gated files — `CLAUDE.md`,
@@ -218,7 +219,25 @@ from.
 `first-missing-required.ts`, `serialize-tool-result.ts`, `tool-call-record.type.ts` and
 `tool-result-error.ts`. Total reach was 44 files / 112 named imports, not 50.
 
-**Then the `core/ui/types.ts` retrofit** — the last per-folder `types.ts`, now unblocked, 16 importers.
+**The `core/ui/types.ts` retrofit is DONE (`e92e410`), and with it there is no `types.ts` anywhere under
+`src/`** — the per-folder convention is fully reversed. Five types, 16 importers, 22 files in one commit,
+and every home decided by measuring importers: `ToolCallDisplay` (8), `MarkdownStream` (4, two of which
+*return* one), `KeypressListener` (3), `KeypressSource` (2, both of which *take* one), `ToolDiffDisplay`
+(1, which returns it). All five became `.type.ts` modules rather than folding into a function's file.
+
+**`ToolDiffDisplay` is the one that looks like it should have folded and did not**, and the reasoning is
+worth keeping: `buildFileDiff` returns it and is its only importer — exactly the shape that folded
+`ChatResult` into `client.ts`. It stayed out because `4daa490` had already measured this group and found
+no owning function, and because folding it would make `core/ui` import a type out of `src/tools`,
+inverting the only edge that exists between them. Reversal is one file and two import lines if that reads
+wrong later.
+
+**`16caa82` swept three leftovers the retrofit surfaced but could not reach.** `confirm-key.ts` held a
+**fourth** byte-identical `KeypressListener`; it never appeared in the 16 importers because a file that
+declares its own copy is not an importer — which is a measurement blind spot worth remembering, not just
+a missed file. Fixing it also repaired the new module's header, which claimed the type was *"declared by
+none of them"*. And `safe-id-path.ts` and `task-branch-name.ts` both pointed at a `types.ts` deleted back
+in `9f4d932`; the example they cite now lives in `task.type.ts`.
 
 **Wave E has started, and the "nine barrels, one atomic pass" shape did not survive measurement.**
 There are ten `index.ts` files; **eight** are pure re-export barrels, **`src/core/index.ts` is not one**
