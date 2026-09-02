@@ -22,37 +22,53 @@ that owns the topic.
 > [!IMPORTANT]
 > **Never run the full app to test a change.** `npm run start` (and `node scripts/run.mjs start`)
 > boots a live session against Ollama and burns a large number of tokens. The only npm scripts you
-> may run are **`npm run setup`** and **`npm run typecheck`**.
+> may run are **`npm run setup`**, **`npm run typecheck`** and **`npm test`**.
 
 - **Verify by driving code directly.** Write throwaway `.ts`/`.js` files that import and call the
   specific functions — another reason for the one-function-per-file rule: units stay callable in
   isolation. For rendering changes, replay the real renderer + readline through a terminal-grid
   emulator harness instead of launching the app.
+- **Pure functions get real tests; everything else keeps the throwaway script.** `node:test` +
+  `node:assert`, under `src/**/__tests__/`, run with `npm test` — see *Testing* in
+  [constitution.md](constitution.md) for the scope, which stops at anything needing Docker, Ollama or
+  a real terminal.
 - **Read [constitution.md](constitution.md) before writing or changing any code, every session.**
 - **One function per file — and there are no exceptions.** Every code file under [src/](src/) holds
-  exactly one function, named by its kebab-case file name, with **the types it needs declared in that
-  same file** — or, when no function owns a type, in the folder's `types.ts` — and schemas in a sibling
-  `.schema.ts`. **The bar is any function declaration, not any exported one** — a private helper is a
-  second function and means a second file; `config.ts`'s three env resolvers were all private, and that
-  is what made it a violation. Cohesion is not a reason to keep two functions together: the two files
-  that argued it were `config.ts` (four env resolvers) and `ollama-models.ts` (three daemon wrappers),
-  and **both have been split** — `config.ts` is now the `DEFAULT_*` constants over `load-config.ts` and
-  its three resolvers, and `ollama-models.ts` is gone, into `list-models.ts`, `has-model.ts` and
-  `pull-model.ts` over a shared `daemon.ts`. A file holding only constants, or only a value, is not a
-  violation either. **A split file survives only if it assembles the parts into an object** — one value
-  callers use as a single thing, exporting that object and nothing else. A file that would survive
-  merely by re-exporting the names is deleted and its importers repointed at the file that owns the
-  function — **including every directory `index.ts` barrel**, which get no exception; an import names
-  its file, not its folder. The lone survivor is [src/index.ts](src/index.ts), which exports nothing and
-  is the entry point rather than a barrel. A leftover `export * from` is not an acceptable end state, or
-  even a temporary one. The rule is stated in full in [constitution.md](constitution.md); it is
-  repeated here because it is the one most often reasoned around.
+  exactly one function, named by its kebab-case file name, with **the types it needs declared in
+  that same file** — or, when no function owns a type, alone in its own `<kebab-type-name>.type.ts`
+  — and schemas in a sibling `.schema.ts`. **The bar is any function declaration, not any exported
+  one** — a private helper is a second function and means a second file; `config.ts`'s three env
+  resolvers were all private, and that is what made it a violation. Cohesion is not a reason to keep
+  two functions together: the two files that argued it were `config.ts` (four env resolvers) and
+  `ollama-models.ts` (three daemon wrappers), and **both have been split** — `config.ts` is now the
+  `DEFAULT_*` constants over `load-config.ts` and its three resolvers, and `ollama-models.ts` is
+  gone, into `list-models.ts`, `has-model.ts` and `pull-model.ts` over a shared `daemon.ts`. A file
+  holding only constants, or only a value, is not a violation either. **A split file survives only
+  if it assembles the parts into an object** — one value callers use as a single thing, exporting
+  that object and no other value (types may ride along beside it). A file that would survive merely by re-exporting the names is
+  deleted and its importers repointed at the file that owns the function — **including every
+  directory `index.ts` barrel**, which get no exception; an import names its file, not its folder.
+  The lone survivor is [src/index.ts](src/index.ts), which exports nothing and is the entry point
+  rather than a barrel. A leftover `export * from` is not an acceptable end state, or even a
+  temporary one. **The one carve-out is `src/**/__tests__/**`**: a test file is `test(...)` calls
+  plus the fixtures they share, and the rule is served by the file under test rather than the file
+  that pins it. The rule is stated in full in [constitution.md](constitution.md); it is repeated
+  here because it is the one most often reasoned around.
 - **`src/` does not satisfy that rule yet — the sweep that makes it true is backlog item 1.** Two files
   were split when the exception was formally ended, and a survey then found the rule had never held
-  repo-wide: **96** files declare more than one function — **464** functions between them, 27 of the
-  files exporting more than one — plus **55** `.type.ts` siblings to fold into their function files and
-  **9** pure re-export barrels to delete. Until the sweep lands, a multi-function file you meet is a
-  violation not yet reached — never a precedent to copy.
+  repo-wide. Measured at the sweep's start: **104** files held more than one declaration and **504**
+  declarations sat in them, counting functions, classes and top-level arrow properties — plus **55**
+  old-style `.type.ts` siblings to fold in and barrels to delete. (`.type.ts` has
+  since returned with a different meaning — one unowned type, no `.ts` of the same stem — see the
+  constitution.) The brief tracks what is left as waves land. Until the sweep finishes, a
+  multi-declaration file you meet is a violation not yet reached — never a precedent to copy.
+  **Two of those figures were later found wrong by a parser census, and the brief's *Resuming from
+  cold* section carries the corrections**: the baseline never counted **method shorthand on an object
+  literal**, which it must, so `src/tools` was understated throughout; and the nine barrels were never
+  nine — `src/index.ts` is the entry point and `src/core/index.ts` re-exported nothing, so the real
+  figure was **eight**. **All eight are now deleted.** `find src -name index.ts` returns exactly one
+  path, [src/index.ts](src/index.ts), and a parser census over `src/` finds no `export * from` and no
+  pure re-export module anywhere.
 - **Do not edit [README.md](README.md)** unless asked; validate it when requested.
 - **Keep these docs current.** If a change makes a doc wrong, fixing the doc is part of that change.
   Edits to this file, [constitution.md](constitution.md), and anything under [docs/](docs/) are
