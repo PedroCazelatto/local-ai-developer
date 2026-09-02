@@ -18,8 +18,11 @@ import type { DebateOutcome } from '../core/session/debate-outcome.type.js';
 import type { DebateRequest } from '../core/session/debate-request.type.js';
 import { renderDebateSummary } from '../core/ui/render-debate-summary.js';
 import { renderDebateTurn } from '../core/ui/render-debate-turn.js';
-import type { JsonObject, StructuredToolResult, ToolModule, ToolResult } from './types.js';
-import { toolError } from './types.js';
+import type { JsonObject } from './json-object.type.js';
+import type { StructuredToolResult } from './structured-tool-result.type.js';
+import { toolError } from './tool-error.js';
+import type { ToolModule } from './tool-module.type.js';
+import type { ToolResult } from './tool-result.type.js';
 
 export const DEBATE = 'debate';
 

@@ -6,8 +6,10 @@
 
 import { loadStandardBody } from '../context/index.js';
 import type { StandardBody } from '../context/index.js';
-import type { JsonObject, ToolModule, ToolResult } from './types.js';
-import { toolError } from './types.js';
+import type { JsonObject } from './json-object.type.js';
+import { toolError } from './tool-error.js';
+import type { ToolModule } from './tool-module.type.js';
+import type { ToolResult } from './tool-result.type.js';
 
 function messageOf(err: unknown): string {
   return err instanceof Error ? err.message : String(err);

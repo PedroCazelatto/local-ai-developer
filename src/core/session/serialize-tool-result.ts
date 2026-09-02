@@ -6,7 +6,9 @@
 //
 // Named serializeToolResult rather than the module-private `serializeResult` it was extracted from.
 
-import type { JsonObject, ToolAuditExtra, ToolResult } from '../../tools/types.js';
+import type { JsonObject } from '../../tools/json-object.type.js';
+import type { ToolAuditExtra } from '../../tools/tool-audit-extra.type.js';
+import type { ToolResult } from '../../tools/tool-result.type.js';
 import type { ToolCallDisplay } from '../ui/types.js';
 import { toolResultError } from './tool-result-error.js';
 

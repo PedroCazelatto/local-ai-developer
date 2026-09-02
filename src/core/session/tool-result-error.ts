@@ -3,7 +3,7 @@
 //
 // Named toolResultError rather than the module-private `errorOf` it was extracted from.
 
-import type { JsonObject } from '../../tools/types.js';
+import type { JsonObject } from '../../tools/json-object.type.js';
 
 /** The `error` string of a structured payload, if it carries one (for deriving exit_status/error). */
 export function toolResultError(content: string | JsonObject): string | null {

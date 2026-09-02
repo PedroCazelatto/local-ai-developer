@@ -16,8 +16,11 @@ import { listShelves } from '../core/session/list-shelves.js';
 import { popShelf } from '../core/session/pop-shelf.js';
 import { saveShelf } from '../core/session/save-shelf.js';
 import { shelfLabelError } from '../core/session/shelf-label-error.js';
-import type { JsonObject, JsonValue, ToolModule, ToolResult } from './types.js';
-import { toolError } from './types.js';
+import type { JsonObject } from './json-object.type.js';
+import type { JsonValue } from './json-value.type.js';
+import { toolError } from './tool-error.js';
+import type { ToolModule } from './tool-module.type.js';
+import type { ToolResult } from './tool-result.type.js';
 
 export const GIT_STASH = 'git_stash';
 

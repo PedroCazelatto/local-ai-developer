@@ -15,8 +15,10 @@ import { commitPaths } from '../core/session/commit-paths.js';
 import { diffPaths } from '../core/session/diff-paths.js';
 import { listChangedPaths } from '../core/session/list-changed-paths.js';
 import { composeCommitMessage } from './compose-commit-message.js';
-import type { JsonObject, ToolModule, ToolResult } from './types.js';
-import { toolError } from './types.js';
+import type { JsonObject } from './json-object.type.js';
+import { toolError } from './tool-error.js';
+import type { ToolModule } from './tool-module.type.js';
+import type { ToolResult } from './tool-result.type.js';
 
 export const COMMIT_CHANGES = 'commit_changes';
 

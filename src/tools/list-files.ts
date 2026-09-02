@@ -21,8 +21,9 @@ import { readOptionalCount } from './read-optional-count.js';
 import { renderFileTree } from './render-file-tree.js';
 // Validates the path under the project root (throws on escape) and returns it /workspace-relative.
 import { scopeToWorkspace } from './scope-to-workspace.js';
-import type { ToolModule, ToolResult } from './types.js';
-import { toolError } from './types.js';
+import { toolError } from './tool-error.js';
+import type { ToolModule } from './tool-module.type.js';
+import type { ToolResult } from './tool-result.type.js';
 
 /** Entries one call may print. The bound is rows, not depth — see the tool description. */
 const MAX_ENTRIES = 500;

@@ -6,8 +6,10 @@
 // toolchains (npm/pip/pytest/cargo): the root sandbox is a slim base; those go to run_in_project.
 
 import { WORKSPACE_PATH } from './context.js';
+import type { JsonObject } from './json-object.type.js';
+import type { ToolModule } from './tool-module.type.js';
+import type { ToolResult } from './tool-result.type.js';
 import { truncateHeadTail } from './truncate.js';
-import type { JsonObject, ToolModule, ToolResult } from './types.js';
 
 // Ported from tools/execute_command.py: an obvious `..` escape anywhere the command could form a
 // path. Not a full shell parse (impossible + unnecessary — the mount is the real boundary).

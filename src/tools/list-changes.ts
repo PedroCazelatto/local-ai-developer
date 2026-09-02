@@ -8,7 +8,9 @@
 // what changed, and the Reviewer re-reads it after each partial commit to see what is still outstanding.
 
 import { listChangedPaths } from '../core/session/list-changed-paths.js';
-import type { JsonObject, ToolModule, ToolResult } from './types.js';
+import type { JsonObject } from './json-object.type.js';
+import type { ToolModule } from './tool-module.type.js';
+import type { ToolResult } from './tool-result.type.js';
 
 export const LIST_CHANGES = 'list_changes';
 

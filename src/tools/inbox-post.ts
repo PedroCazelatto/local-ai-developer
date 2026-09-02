@@ -8,8 +8,9 @@
 
 import { canonicalizePhase } from '../core/session/canonicalize-phase.js';
 import { postToInbox } from '../core/session/post-to-inbox.js';
-import { toolError } from './types.js';
-import type { ToolModule, ToolResult } from './types.js';
+import { toolError } from './tool-error.js';
+import type { ToolModule } from './tool-module.type.js';
+import type { ToolResult } from './tool-result.type.js';
 
 export const inboxPostTool: ToolModule = {
   name: 'inbox_post',
