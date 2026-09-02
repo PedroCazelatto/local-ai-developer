@@ -16,37 +16,14 @@ import { diffPaths } from '../core/session/diff-paths.js';
 import { listChangedPaths } from '../core/session/list-changed-paths.js';
 import { composeCommitMessage } from './compose-commit-message.js';
 import type { JsonObject } from './json-object.type.js';
+import { matchesChange } from './matches-change.js'; // a changed file, or a directory holding one
+import { readRequiredPaths } from './read-required-paths.js'; // the list is mandatory for a commit
+import { toPosixNoTrailingSlash } from './to-posix-no-trailing-slash.js';
 import { toolError } from './tool-error.js';
 import type { ToolModule } from './tool-module.type.js';
 import type { ToolResult } from './tool-result.type.js';
 
 export const COMMIT_CHANGES = 'commit_changes';
-
-/** git speaks forward slashes on every platform; accept whatever separator the model emitted. */
-function toPosix(value: string): string {
-  return value.replace(/\\/g, '/').replace(/\/+$/, '');
-}
-
-/** True when `path` is itself a changed file, or a directory containing one. */
-function matchesChange(path: string, changed: readonly string[]): boolean {
-  return changed.includes(path) || changed.some((file) => file.startsWith(`${path}/`));
-}
-
-/** Validate the `paths` argument into a clean posix list, or return the model-facing reason it isn't one. */
-function readPaths(raw: unknown): { readonly ok: true; readonly paths: string[] } | { readonly ok: false; readonly error: string } {
-  if (!Array.isArray(raw) || raw.length === 0) {
-    return { ok: false, error: "'paths' must be a non-empty array of project-relative file paths." };
-  }
-  const paths: string[] = [];
-  for (const entry of raw) {
-    if (typeof entry !== 'string' || entry.trim() === '') {
-      return { ok: false, error: "every entry in 'paths' must be a non-empty string." };
-    }
-    const normalized = toPosix(entry.trim());
-    if (normalized !== '' && !paths.includes(normalized)) paths.push(normalized);
-  }
-  return paths.length === 0 ? { ok: false, error: "'paths' contained no usable path." } : { ok: true, paths };
-}
 
 export const commitChangesTool: ToolModule = {
   name: COMMIT_CHANGES,
@@ -79,7 +56,7 @@ export const commitChangesTool: ToolModule = {
   async execute(ctx, args): Promise<ToolResult> {
     const metadata: JsonObject = { project: ctx.projectName };
 
-    const parsed = readPaths(args['paths']);
+    const parsed = readRequiredPaths(args['paths']);
     if (!parsed.ok) {
       return toolError(parsed.error, 'Call list_changes to see the exact paths you can commit.');
     }
@@ -104,7 +81,7 @@ export const commitChangesTool: ToolModule = {
 
     // Every named path must actually be uncommitted, so a mistyped path fails loudly here instead of
     // producing an empty commit (or, worse, a commit the phase believes contains a file it does not).
-    const changed = listChangedPaths(ctx.projectPath).files.map(toPosix);
+    const changed = listChangedPaths(ctx.projectPath).files.map(toPosixNoTrailingSlash);
     const missing = parsed.paths.filter((path) => !matchesChange(path, changed));
     if (missing.length > 0) {
       return toolError(
