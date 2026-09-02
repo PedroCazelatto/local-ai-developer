@@ -184,8 +184,16 @@ gate reads `/api/tags`, because that returns every model's capabilities in **one
 
 This box runs **0.33.2**, far past it.
 
+**The floor is now ENFORCED, not merely stated**, which changes what the README should say. Boot asks
+the daemon its version over `/api/version` and **refuses to start** below `0.9.1`, naming the
+requirement and the version found — the same shape `scripts/run.mjs` uses for the Node major. A daemon
+that reports no version refuses too, for the same reason an unreadable `.nvmrc` does: a check that
+cannot run must not report a pass. The refusal exists because the capability gate fails closed, so
+without it an old daemon produces an accurate symptom attached to a wrong diagnosis.
+
 **Suggested wording for Requirements:** *"Ollama 0.9.1 or newer — earlier versions do not report model
-capabilities, and the orchestrator refuses any model it cannot confirm supports tool calling."*
+capabilities over `/api/tags`, so the orchestrator cannot confirm a model supports tool calling and
+refuses to start. It also refuses any individual model whose tool support it cannot confirm."*
 
 **Truth:** OPEN-QUESTIONS.md #13 and #72,
 [backlog/boot-can-pick-a-toolless-model.md](backlog/boot-can-pick-a-toolless-model.md).

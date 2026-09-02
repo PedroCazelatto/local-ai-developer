@@ -1,12 +1,15 @@
 // The one client the Ollama model-management wrappers (V5/02) talk to — a VALUE, not a function, which
-// is why it gets its own module rather than living inside one of the three wrappers that share it
-// (list-models.ts, has-model.ts, pull-model.ts) for `/models list | pull | use`.
+// is why it gets its own module rather than living inside one of the wrappers that share it
+// (list-models.ts, has-model.ts, pull-model.ts, delete-model.ts) for `/models list | pull | use`.
 //
-// These are daemon queries (list installed models, pull a new blob, check presence), NOT per-turn chat,
-// so they use their OWN default Ollama instance rather than OllamaClient (which carries the session
-// model + num_ctx for turns). Same daemon (localhost:11434), different concern. Talking to the host
-// daemon directly is correct: Ollama runs on the host GPU, never in the sandbox (CLAUDE.md
-// "Sandboxing") — these are not sandboxed tool calls.
+// One read does NOT come through here: `/api/version`, which the package wraps at no version, so the
+// boot floor check fetches it directly against the same address (ollama-host.ts).
+//
+// These are daemon queries (list installed models, pull a new blob, check presence, delete a blob),
+// NOT per-turn chat, so they use their OWN default Ollama instance rather than OllamaClient (which
+// carries the session model + num_ctx for turns). Same daemon (localhost:11434), different concern.
+// Talking to the host daemon directly is correct: Ollama runs on the host GPU, never in the sandbox
+// (CLAUDE.md "Sandboxing") — these are not sandboxed tool calls.
 
 import { Ollama } from 'ollama';
 
