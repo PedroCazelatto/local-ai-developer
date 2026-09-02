@@ -1,47 +1,16 @@
-// ToolContext construction + the path-scoping `resolve` (ported from tools/base.py's
-// ToolContext.resolve). EVERY model-callable tool now does its file work inside the container, so
-// the Docker mount is the security boundary; `resolve` is the VALIDATOR that runs first, rejecting a
-// path that leaves the project with a message the model can act on, and it is the only scoping the
-// host-side git tools (commit_changes, git_inspect) and the Retro single-file lock have at all.
-//
-// It resolves symlinks. A lexical prefix check is not enough: `execute_command` can create a link
-// inside /workspace (its `..` guard is a courtesy, not a parse), that link materializes inside the
-// project directory on the host, and a purely lexical `path.resolve` would then hand git a path that
-// looks in-project and points anywhere. realpathSync on the deepest EXISTING ancestor closes that,
-// while still validating a path whose leaf has not been created yet.
-
-import path from 'node:path';
+// ToolContext construction: the one place a dispatched call's project binding, sandbox handle, read
+// tracker and one-shot channel are wired together. It runs once per dispatched call, which is why
+// nothing stateful is built here — see readTracker below.
 
 import type { SandboxClient } from '../core/container/index.js';
 import { oneShot } from '../core/llm/index.js';
 import type { Message, OllamaClient, OneShotResult, OneShotRole } from '../core/llm/index.js';
 import type { FileReadTracker } from '../core/session/read-tracker.type.js';
 import type { SubagentHandle } from '../core/session/subagents.type.js';
-// Resolves a path through symlinks without requiring its leaf to exist yet.
-import { realPathOfNearestExisting } from './real-path-of-nearest-existing.js';
+// Joins a path onto the project root and throws on any escape, symlinks resolved.
+import { resolveInProject } from './resolve-in-project.js';
 import type { ToolContext } from './tool-context.type.js';
-
-/** "/workspace" — where the active project is bind-mounted inside the sandbox (Foundation/04). */
-export const WORKSPACE_PATH = '/workspace';
-
-/**
- * Join `relative` onto `projectPath` and reject any path that escapes the project root: allow only
- * the root itself or paths strictly under `root + sep`. Throws (every caller catches this and
- * returns the structured escape error) — never returns an out-of-project path.
- *
- * BOTH sides go through realPathOfNearestExisting, which resolves symlinks down to the deepest
- * ancestor that exists — so a link planted inside the project cannot present an outside target as an
- * inside path, and a file that does not exist yet still validates. The root is resolved too: the
- * comparison is meaningless if one side is real and the other lexical.
- */
-export function resolveInProject(projectPath: string, relative: string): string {
-  const root = realPathOfNearestExisting(projectPath);
-  const resolved = realPathOfNearestExisting(path.resolve(root, relative));
-  if (resolved !== root && !resolved.startsWith(root + path.sep)) {
-    throw new Error(`Path '${relative}' escapes the project directory`);
-  }
-  return resolved;
-}
+import { WORKSPACE_PATH } from './workspace-path.js';
 
 export interface ToolContextInit {
   readonly projectName: string;
@@ -67,6 +36,9 @@ export interface ToolContextInit {
 /**
  * Build the ToolContext for a dispatch: binds `resolve` to the active project + fixes /workspace, and
  * binds `oneShot` to a fresh, history-free call against the session model (search_rules, V4/02).
+ *
+ * The two arrows below are properties of an object this function BUILDS AND RETURNS, so they are its
+ * implementation rather than declarations of their own (constitution, "what counts, exactly").
  */
 export function createToolContext(init: ToolContextInit): ToolContext {
   return {
