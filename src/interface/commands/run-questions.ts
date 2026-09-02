@@ -4,7 +4,8 @@
 // The same tabbed panel ask_user uses is reused verbatim, so answering a saved question feels
 // identical to answering it in the moment — and a question skipped again is simply still pending.
 
-import { answerQuestion, readPendingQuestions } from '../../core/session/index.js';
+import { answerQuestion } from '../../core/session/answer-question.js';
+import { readPendingQuestions } from '../../core/session/read-pending-questions.js';
 import { askQuestions } from '../../core/ui/ask-questions.js';
 import { renderer } from '../../core/ui/renderer.js';
 import { statusBar } from '../../core/ui/status-bar.js';

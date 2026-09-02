@@ -3,7 +3,7 @@
 // it, co-equally, and neither is the one the other serves. The test is what would own it, not how many
 // files import it — and when the honest answer is "two, co-equally", nothing does.
 
-import type { ContextSummary } from '../../core/session/index.js';
+import type { ContextSummary } from '../../core/session/context-summary.type.js';
 
 /** The slice of the orchestrator /resume needs — satisfied structurally by SessionOrchestrator. */
 export interface ResumeOrchestrator {

@@ -6,18 +6,17 @@
 // the backlog file commits the body at status "pending" and leaves the project tree clean for the
 // next /run.
 
-import {
-  BacklogError,
-  dropTaskStash,
-  findTask,
-  openBlockerForTask,
-  readBacklog,
-  readTaskStashDiff,
-  resolveBlocker,
-  RetroError,
-  setTaskStatus,
-} from '../../core/session/index.js';
-import type { RetroInput, RetroResult } from '../../core/session/index.js';
+import { BacklogError } from '../../core/session/backlog-error.js';
+import { dropTaskStash } from '../../core/session/drop-task-stash.js';
+import { findTask } from '../../core/session/find-task.js';
+import { openBlockerForTask } from '../../core/session/open-blocker-for-task.js';
+import { readBacklog } from '../../core/session/read-backlog.js';
+import { readTaskStashDiff } from '../../core/session/read-task-stash-diff.js';
+import { resolveBlocker } from '../../core/session/resolve-blocker.js';
+import { RetroError } from '../../core/session/retro-error.js';
+import { setTaskStatus } from '../../core/session/set-task-status.js';
+import type { RetroInput } from '../../core/session/retro-input.type.js';
+import type { RetroResult } from '../../core/session/retro-result.type.js';
 import { errMessage } from '../../core/err-message.js'; // an Error's message, or the thrown value stringified
 import { renderer } from '../../core/ui/renderer.js';
 import { renderRetroResult } from '../render-retro-result.js';

@@ -5,7 +5,7 @@
 // while it was private to render-task-tree.ts; extracted, a type called `Group` says nothing about
 // what it groups, so it is qualified here.
 
-import type { Task } from '../../core/session/index.js';
+import type { Task } from '../../core/session/task.type.js';
 
 /** One (epic, story) level of the tree with the tasks that sit directly in it. */
 export interface TaskGroup {

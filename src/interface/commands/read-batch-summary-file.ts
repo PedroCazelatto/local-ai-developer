@@ -14,7 +14,7 @@
 
 import { readFileSync } from 'node:fs';
 
-import type { BatchSummary } from '../../core/session/index.js';
+import type { BatchSummary } from '../../core/session/batch-summary.type.js';
 import { toBatchSummary } from './to-batch-summary.js'; // narrow the parsed JSON, or undefined
 
 /** The summary persisted at `filePath`, or null when it is unreadable or is not a batch summary. */

@@ -5,8 +5,9 @@
 // more ids, is unattended; `next` and a lone id are not. Deciding it in one place is what keeps
 // dispatch-run.ts from having to re-read the selector's shape.
 
-import { allTasks, nextRunnableTasks } from '../../core/session/index.js';
-import type { Backlog } from '../../core/session/index.js';
+import { allTasks } from '../../core/session/all-tasks.js';
+import { nextRunnableTasks } from '../../core/session/next-runnable-tasks.js';
+import type { Backlog } from '../../core/session/backlog.type.js';
 
 /** A resolved selector: the ordered task ids to attempt, and whether it is an unattended batch. */
 export interface Selection {

@@ -1,7 +1,7 @@
 // The numbered context list a bare /resume prints. Split out of resume.ts, where it was the private
 // `renderList` — a name that as a file name would not have said WHICH list.
 
-import type { ContextSummary } from '../../core/session/index.js';
+import type { ContextSummary } from '../../core/session/context-summary.type.js';
 import { capitalizePhase } from '../../core/ui/capitalize-phase.js';
 import { theme } from '../../core/ui/theme.js';
 import { write } from '../../core/ui/write.js';

@@ -1,6 +1,6 @@
 // Group the backlog's tasks by the (epic, story) level they sit in. Split out of render-task-tree.ts.
 
-import type { Task } from '../../core/session/index.js';
+import type { Task } from '../../core/session/task.type.js';
 import type { TaskGroup } from './task-group.type.js';
 
 /** Group the tasks by their (epic, story) level, keeping each level's tasks in backlog order. */

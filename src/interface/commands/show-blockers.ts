@@ -5,7 +5,7 @@
 // distance between seeing a blocker and resolving it, and a task id is long enough that retyping it
 // from memory is where the mistake happens.
 
-import { readBlockerRows } from '../../core/session/index.js';
+import { readBlockerRows } from '../../core/session/read-blocker-rows.js';
 import { renderer } from '../../core/ui/renderer.js';
 import { theme } from '../../core/ui/theme.js';
 import { formatLocalStamp } from './format-local-stamp.js';

@@ -1,6 +1,6 @@
 // One `escalated` row of a persisted batch summary. Split out of read-batch-summary-file.ts.
 
-import type { BatchEscalated } from '../../core/session/index.js';
+import type { BatchEscalated } from '../../core/session/batch-escalated.type.js';
 import { isFiniteNumber } from './is-finite-number.js';
 import { isString } from './is-string.js';
 import { readBatchCommits } from './read-batch-commits.js'; // the row's short SHAs, oldest first

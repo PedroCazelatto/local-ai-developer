@@ -1,7 +1,7 @@
 // A sub-agent's cumulative token cost, as the /subagents listing prints it. Split out of
 // subagents.ts.
 
-import type { SubagentInfo } from '../../core/session/index.js';
+import type { SubagentInfo } from '../../core/session/subagent-info.type.js';
 
 /**
  * The EXACT cumulative token total (prompt + eval). A null on either metric (Ollama omitted it on some

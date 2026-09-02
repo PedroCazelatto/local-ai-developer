@@ -18,7 +18,8 @@
 import { SANDBOX_CONTAINER, SandboxClient } from '../core/container/sandbox.js';
 import { errMessage } from '../core/err-message.js';
 import { OllamaClient } from '../core/llm/client.js';
-import { SessionOrchestrator, resolveBootModel } from '../core/session/index.js';
+import { resolveBootModel } from '../core/session/resolve-boot-model.js';
+import { SessionOrchestrator } from '../core/session/session-orchestrator.js';
 import { runRepl } from '../interface/run-repl.js';
 import { fail } from './fail.js';
 import { resolveOrExit } from './resolve-or-exit.js';

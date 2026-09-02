@@ -5,7 +5,8 @@
 // avoid fighting clack for stdin the way /run's askYesNo does. Wraps naturally — no horizontal scroll.
 
 import type { TokenCounts } from '../core/llm/token-counts.type.js';
-import type { ReviewVerdict, Severity } from '../core/session/index.js';
+import type { ReviewVerdict } from '../core/session/review-verdict.type.js';
+import type { Severity } from '../core/session/severity.type.js';
 import { theme } from '../core/ui/theme.js';
 import { write } from '../core/ui/write.js';
 import { reviewerTokenLine } from './reviewer-token-line.js'; // exact prompt/eval counts, "not reported" for a missing one

@@ -1,6 +1,7 @@
 // The dependencies still standing between a task and its turn. Split out of render-task-tree.ts.
 
-import type { Task, TaskStatus } from '../../core/session/index.js';
+import type { TaskStatus } from '../../core/session/task-status.type.js';
+import type { Task } from '../../core/session/task.type.js';
 import { relativeDepId } from './relative-dep-id.js'; // a dep id shortened against the task that names it
 
 /**

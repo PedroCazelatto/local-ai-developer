@@ -2,6 +2,10 @@
 // actor spells it the same way. The Worker is told this exact string in its seed and passes it to
 // git_branch; nothing has to guess, and a re-run or a later fix round lands on the same branch.
 //
+// One task, one branch — the rule this function implements, written up in docs/phases.md under that
+// heading. The citation was carried by the core/session/ barrel, which the one-function-per-file
+// sweep deleted; it is recorded here so the code still points at the doc that owns the rule.
+//
 // Shape: `task/<id>-<title-slug>`. A task id is already a PATH under backlog/ (see task.type.ts —
 // "epic-auth/story-signup/01-add-hashing-test"), and git branch names take slashes, so the id maps
 // straight through and the branch mirrors the backlog tree. The title slug is appended so the branch

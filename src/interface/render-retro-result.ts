@@ -4,7 +4,7 @@
 // continues (the whole point of the task: the orchestrator's own instructions never mutate silently).
 // Pure printing; wraps naturally, no horizontal scroll. Mirrors render-verdict.ts.
 
-import type { RetroResult } from '../core/session/index.js';
+import type { RetroResult } from '../core/session/retro-result.type.js';
 import { theme } from '../core/ui/theme.js';
 import { write } from '../core/ui/write.js';
 import { retroPatchedPath } from './retro-patched-path.js'; // project-relative when it can be, absolute otherwise

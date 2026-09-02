@@ -5,13 +5,11 @@
 // runBatch for the unattended one — deliberately, because the batch has to queue what this path
 // halts on.
 
-import {
-  findTask,
-  isWorkingTreeDirty,
-  readBacklog,
-  stashTaskAttempt,
-  taskSkipReason,
-} from '../../core/session/index.js';
+import { findTask } from '../../core/session/find-task.js';
+import { isWorkingTreeDirty } from '../../core/session/is-working-tree-dirty.js';
+import { readBacklog } from '../../core/session/read-backlog.js';
+import { stashTaskAttempt } from '../../core/session/stash-task-attempt.js';
+import { taskSkipReason } from '../../core/session/task-skip-reason.js';
 import { renderer } from '../../core/ui/renderer.js';
 import type { RunOrchestrator } from './run-orchestrator.type.js';
 import { runTaskAndReport } from './run-task-and-report.js';

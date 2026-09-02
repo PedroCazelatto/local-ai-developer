@@ -3,7 +3,7 @@
 // overwrites a stated one (docs/cli.md, *Model selection*).
 
 import { errMessage } from '../core/err-message.js';
-import { saveAppState } from '../core/session/index.js';
+import { saveAppState } from '../core/session/save-app-state.js';
 import { renderer } from '../core/ui/renderer.js';
 import type { CommandContext } from '../interface/command-context.type.js';
 

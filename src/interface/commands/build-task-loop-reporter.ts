@@ -8,7 +8,9 @@
 // This is the dependency inversion the batch driver rests on: runTaskLoop never imports a renderer,
 // it reports through whatever seam it is handed.
 
-import type { BatchPosition, Task, TaskLoopReporter } from '../../core/session/index.js';
+import type { BatchPosition } from '../../core/session/batch-position.type.js';
+import type { TaskLoopReporter } from '../../core/session/task-loop-reporter.type.js';
+import type { Task } from '../../core/session/task.type.js';
 import { renderer } from '../../core/ui/renderer.js';
 import { renderVerdict } from '../render-verdict.js';
 

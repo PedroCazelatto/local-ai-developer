@@ -8,7 +8,7 @@
 //
 // Read-only: it only reports. The model spawns / asks / dismisses through its own tools.
 
-import type { SubagentInfo } from '../../core/session/index.js';
+import type { SubagentInfo } from '../../core/session/subagent-info.type.js';
 import { renderer } from '../../core/ui/renderer.js';
 import { theme } from '../../core/ui/theme.js';
 import { write } from '../../core/ui/write.js';

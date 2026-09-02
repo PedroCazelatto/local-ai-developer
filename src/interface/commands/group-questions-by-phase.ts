@@ -6,7 +6,7 @@
 // private name was `byPhase`, which as a file name would have said what the key is and never what is
 // in the map.
 
-import type { PendingQuestion } from '../../core/session/index.js';
+import type { PendingQuestion } from '../../core/session/pending-question.type.js';
 
 /** The pending questions bucketed by asking phase, each bucket in the order the store replayed them. */
 export function groupQuestionsByPhase(questions: readonly PendingQuestion[]): Map<string, PendingQuestion[]> {

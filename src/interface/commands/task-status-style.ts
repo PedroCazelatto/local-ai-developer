@@ -4,7 +4,7 @@
 // the four a backlog task can hold.
 
 import { theme } from '../../core/ui/theme.js';
-import type { TaskStatus } from '../../core/session/index.js';
+import type { TaskStatus } from '../../core/session/task-status.type.js';
 import type { RowStyle } from './row-style.type.js';
 
 /** Status → its theme role. Colour repeats what the word says, so neither one alone has to be read. */

@@ -4,8 +4,11 @@
 // This is the one place the fork is decided, and the ONLY place the project runs SEQUENTIALLY is
 // stated as code rather than prose — there is no parallel branch to take (docs/product.md).
 
-import { BacklogError, readBacklog, runBatch } from '../../core/session/index.js';
-import type { Backlog, BatchDeps } from '../../core/session/index.js';
+import { BacklogError } from '../../core/session/backlog-error.js';
+import { readBacklog } from '../../core/session/read-backlog.js';
+import { runBatch } from '../../core/session/run-batch.js';
+import type { Backlog } from '../../core/session/backlog.type.js';
+import type { BatchDeps } from '../../core/session/batch-deps.type.js';
 import { renderer } from '../../core/ui/renderer.js';
 import { buildBatchReporter } from './build-batch-reporter.js';
 import { buildSpecSlice } from './build-spec-slice.js';
