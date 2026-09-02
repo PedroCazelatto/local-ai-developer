@@ -33,7 +33,7 @@ import { runTaskLoop } from './run-task-loop.js';
 import type { TaskLoopResult } from './run-task-loop.js';
 import type { TaskLoopReporter } from './task-loop-reporter.type.js';
 import { SubagentManager } from './subagents.js';
-import type { SubagentInfo } from './subagents.type.js';
+import type { SubagentInfo } from './subagent-info.type.js';
 import { compactActivePhase } from './compact-active-phase.js';
 import type { Task } from './task.type.js';
 import type { TurnContext } from './turn-context.type.js';

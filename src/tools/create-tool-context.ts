@@ -6,7 +6,7 @@ import type { SandboxClient } from '../core/container/index.js';
 import { oneShot } from '../core/llm/index.js';
 import type { Message, OllamaClient, OneShotResult, OneShotRole } from '../core/llm/index.js';
 import type { FileReadTracker } from '../core/session/read-tracker.type.js';
-import type { SubagentHandle } from '../core/session/subagents.type.js';
+import type { SubagentHandle } from '../core/session/subagent-handle.type.js';
 // Joins a path onto the project root and throws on any escape, symlinks resolved.
 import { resolveInProject } from './resolve-in-project.js';
 import type { ToolContext } from './tool-context.type.js';

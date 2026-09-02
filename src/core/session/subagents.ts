@@ -15,23 +15,70 @@ import { ASK_SUBAGENT } from '../../tools/ask-subagent.js';
 import { DISMISS_SUBAGENT } from '../../tools/dismiss-subagent.js';
 import { createToolContext } from '../../tools/index.js';
 import { SPAWN_SUBAGENT } from '../../tools/spawn-subagent.js';
-import type { Message, TokenCounts, Tool } from '../llm/index.js';
+import type { SandboxClient } from '../container/index.js';
+import type { Message, OllamaClient, TokenCounts, Tool } from '../llm/index.js';
 import { printToolCall } from '../ui/print-tool-call.js';
 import { addTokenCounts } from './add-token-counts.js';
 import { dispatchToolCall } from './dispatch-tool-call.js';
 import { appendEvent } from './events-log.js';
 import { generateSubagentId } from './generate-subagent-id.js';
 import { createReadTracker } from './read-tracker.js';
+import type { FileReadTracker } from './read-tracker.type.js';
 import { recordToolCall } from './record-tool-call.js';
 import { shortSubagentId } from './short-subagent-id.js';
-import type {
-  SubagentAskOutcome,
-  SubagentDeps,
-  SubagentHandle,
-  SubagentInfo,
-  SubagentSpawnResult,
-  SubagentState,
-} from './subagents.type.js';
+import type { SubagentAskOutcome } from './subagent-ask-outcome.type.js';
+import type { SubagentHandle } from './subagent-handle.type.js';
+import type { SubagentInfo } from './subagent-info.type.js';
+import type { SubagentSpawnResult } from './subagent-spawn-result.type.js';
+
+/**
+ * One live sub-agent's in-memory state (dies with the session — no JSONL, unlike per-phase memory).
+ * `promptTokens`/`evalTokens` are the EXACT cumulative Ollama counts across all of this sub-agent's
+ * turns (a `null` on any turn poisons the running sum — constitution: never a length-based estimate).
+ */
+export interface SubagentState {
+  readonly id: string;
+  /**
+   * The live session model at spawn — a reference record only. A sub-agent's turns dispatch through the
+   * shared client, so it uses the session's CURRENT live model, not a pin (V5/02: every window shares the
+   * one model; it only changes between turns, never mid-work).
+   */
+  readonly model: string;
+  readonly numCtx: number;
+  /** Its OWN isolated history: the system brief + the task + every turn since. Never the master's history. */
+  readonly messages: Message[];
+  /**
+   * The MASTER PHASE's own allowlist minus the three sub-agent tools — never the full registry, so a
+   * sub-agent can never reach a tool its master is gated out of. No nested sub-agents, verified by
+   * construction. Resolved at spawn from the master phase (SubagentManager.toolsForMaster).
+   */
+  readonly toolDefs: Tool[];
+  /** The phase that spawned it — stamped as `phase` on every audit row for this sub-agent's tool calls. */
+  readonly masterPhase: string;
+  /**
+   * Its OWN read tracker, isolated exactly like `messages`. A sub-agent's reads must never satisfy its
+   * master's look-before-you-write guard: the master never saw what the sub-agent read, and a brief
+   * summarising a file is not the file — which is precisely the case the guard exists to catch. The
+   * isolation runs the other way too: the master's reads do not unlock writes here.
+   */
+  readonly readTracker: FileReadTracker;
+  /** Date.now() ms at spawn — drives the age shown by `/subagents`. */
+  readonly createdAt: number;
+  /** EXACT cumulative prompt_eval_count; null once any turn failed to report it (never estimated). */
+  promptTokens: number | null;
+  /** EXACT cumulative eval_count; null once any turn failed to report it. */
+  evalTokens: number | null;
+}
+
+/** Everything the SubagentManager needs to run + audit sub-agent turns against the session's one model. */
+export interface SubagentDeps {
+  readonly llm: OllamaClient;
+  readonly sandbox: SandboxClient;
+  readonly projectName: string;
+  readonly projectPath: string;
+  /** num_ctx recorded on each SubagentState. The model is read LIVE from `llm` at spawn (V5/02). */
+  readonly numCtx: number;
+}
 
 /** The three tools a sub-agent must NOT receive — stripped from its tool defs so it cannot nest. */
 export const SUBAGENT_TOOL_NAMES: readonly string[] = [SPAWN_SUBAGENT, ASK_SUBAGENT, DISMISS_SUBAGENT];

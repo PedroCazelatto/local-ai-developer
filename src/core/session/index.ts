@@ -168,11 +168,8 @@ export type { DebateDeps } from './debate-deps.type.js';
 export type { DebateFailure } from './debate-failure.type.js';
 export type { DebateOutcome } from './debate-outcome.type.js';
 export { SubagentManager, SUBAGENT_TOOL_NAMES, SUBAGENT_SHORT_ID_LEN } from './subagents.js';
-export type {
-  SubagentInfo,
-  SubagentState,
-  SubagentDeps,
-  SubagentHandle,
-  SubagentSpawnResult,
-  SubagentAskOutcome,
-} from './subagents.type.js';
+export type { SubagentState, SubagentDeps } from './subagents.js';
+export type { SubagentInfo } from './subagent-info.type.js';
+export type { SubagentHandle } from './subagent-handle.type.js';
+export type { SubagentSpawnResult } from './subagent-spawn-result.type.js';
+export type { SubagentAskOutcome } from './subagent-ask-outcome.type.js';
