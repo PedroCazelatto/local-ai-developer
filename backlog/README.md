@@ -918,6 +918,44 @@ decision about what every non-passing exit means, not just this one.
 
 **Why here:** last, and knowingly. It is the smallest thing in the ledger and nothing depends on it.
 
+### 35. [`/models` lives in a second, undocumented commands directory](commands-have-two-homes.md)
+*Repo hygiene.* `src/interface/commands/` holds 112 command files; **`src/commands/` holds 7, all of
+them `/models`**. `docs/repo-layout.md` documents only the first, so a reader following the docs never
+finds `/models`. Not sweep damage — the original feature commit created the directory and the sweep
+split it **in place**, because a directory in the wrong place is invisible to a declaration census.
+
+**The worse half:** `src/commands/run.ts` declares `export async function run` and is the **`/models`
+dispatcher**, while `src/interface/commands/run.ts` is the actual `/run` command. Two files named
+`run.ts`, and the one that is not `/run` is the one named after it — its own header says *"The `/models`
+dispatcher"*, so the file name contradicts its first line of prose.
+
+**Deliberately kept out of [item 6](boot-can-pick-a-toolless-model.md)**, which is editing these very
+files: a directory move buried inside a feature PR is the diff that should not ride inside somebody
+else's commit, and item 6's agent was told to leave the location alone.
+
+**Why here:** mechanical once the names are chosen, but every open question is a naming call.
+
+### 36. [The naming half of "one function per file" was never measured](naming-half-of-one-function-per-file-unmeasured.md)
+*Repo hygiene / verification.* The rule has two halves — one declaration per file, **and** the kebab
+file name names that function's job. [Item 1](split-config-into-one-function-per-file.md)'s sweep drove
+the first to zero and **never measured the second at all**. Every "0 violations" figure in that brief
+counts declarations per file and says nothing about naming.
+
+A first scan finds 62 disagreements over 753 files, and sorting them is the actual deliverable:
+**23 `xTool`** and **15 `xCommand`** are the conventions the user ruled on, **10** are PascalCase
+classes, **3** are SCREAMING_CASE constants — so the honest total is **3 clear defects**
+(`appendAuditRow`/`audit.ts`, `appendEvent`/`events-log.ts`, `SubagentManager`/`subagents.ts`), **3
+needing a ruling** (a verb prefix on a noun file), and **56 conventions working as intended**.
+
+**The part worth keeping:** name-to-filename agreement is checkable, name-to-**job** agreement is not.
+`run.ts` declaring `run` is an exact match and still violates the rule (item 35). A census that reports
+the mechanical check must say plainly that it does not cover the rule as worded — otherwise a green run
+is read as more than it is, which is [the brief's](split-config-into-one-function-per-file.md) whole
+subject.
+
+**Why here:** the allowance list has to be agreed before any check can be written, and nothing is
+broken. The value is in not believing a figure that was never measured.
+
 ---
 
 ## Framing notes — not tasks
