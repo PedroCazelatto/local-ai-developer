@@ -12,7 +12,8 @@
 
 import { readFileSync, writeFileSync } from 'node:fs';
 
-import { availablePhaseNames, phasePromptPath } from '../context/index.js';
+import { availablePhaseNames } from '../context/available-phase-names.js';
+import { phasePromptPath } from '../context/phase-prompt-path.js';
 import { errMessage } from '../core/err-message.js'; // an Error's message, or the thrown value stringified
 import type { Tool } from '../core/llm/index.js';
 import { countOccurrences } from './count-occurrences.js'; // the exactly-once precondition, as a count

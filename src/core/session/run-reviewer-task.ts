@@ -21,7 +21,8 @@ import { ReviewerVerdictError } from './reviewer-verdict-error.js';
 import { ReviewerWindow } from './reviewer-window.js';
 import { SUBMIT_VERDICT, parseVerdict } from '../../tools/submit-verdict.js';
 import { buildReviewerSeed } from './build-reviewer-seed.js';
-import { buildSystemPrompt, loadPhasePrompt } from '../../context/index.js';
+import { loadPhasePrompt } from '../../context/load-phase-prompt.js';
+import { buildSystemPrompt } from '../../context/system-prompt.js';
 import { processMessage } from './process-message.js';
 
 /**

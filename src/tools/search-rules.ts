@@ -6,8 +6,8 @@
 // passed on). The model then calls load_rule with a returned name to pull that one body in. An empty
 // result is valid.
 
-import { loadCatalog } from '../context/index.js';
-import type { StandardEntry } from '../context/index.js';
+import { loadCatalog } from '../context/load-catalog.js';
+import type { StandardEntry } from '../context/load-catalog.js';
 import { errMessage } from '../core/err-message.js'; // an Error's message, or the thrown value stringified
 import { loadsOrRepair } from '../core/llm/index.js';
 import type { Message } from '../core/llm/index.js';

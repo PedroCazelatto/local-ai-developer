@@ -7,7 +7,8 @@
 // best-effort learning failing, not the session failing -- the caller keeps going and the user's answer
 // is already recorded.
 
-import { buildSystemPrompt, loadPhasePrompt } from '../../context/index.js';
+import { loadPhasePrompt } from '../../context/load-phase-prompt.js';
+import { buildSystemPrompt } from '../../context/system-prompt.js';
 import { resolvePhaseTools } from '../../phases/resolve-phase-tools.js';
 import { SUBMIT_RETRO } from '../../tools/submit-retro.js';
 import { buildRetroSeed } from './build-retro-seed.js';

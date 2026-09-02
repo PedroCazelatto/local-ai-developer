@@ -3,7 +3,7 @@
 // OllamaClient (03), the SandboxClient (04), and the exact tokens from the last turn. Drives the
 // tool-dispatch turn loop (turn-loop.ts) and exposes the small surface the REPL (05) needs.
 
-import { buildSystemPrompt } from '../../context/index.js';
+import { buildSystemPrompt } from '../../context/system-prompt.js';
 import type { Phase } from '../../phases/phase.js';
 import { PhaseFactory } from '../../phases/factory.js';
 import { resolvePhaseTools } from '../../phases/resolve-phase-tools.js';
