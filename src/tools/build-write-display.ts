@@ -4,7 +4,7 @@
 // something, and what it does is BUILD the display record -- the same spelling buildFileDiff beside it
 // uses for the same kind of job.
 
-import type { ToolCallDisplay } from '../core/ui/types.js';
+import type { ToolCallDisplay } from '../core/ui/tool-call-display.type.js';
 // The compact +/- diff; null when the change is too large to count exactly.
 import { buildFileDiff } from './build-file-diff.js';
 import { decodeUtf8Strict } from './decode-utf8-strict.js';

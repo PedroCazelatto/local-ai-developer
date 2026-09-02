@@ -10,7 +10,7 @@
 // The encapsulation a module-private `let` gave for free is now a convention, and a convention nobody
 // wrote down is one nobody keeps.
 
-import type { MarkdownStream } from './types.js';
+import type { MarkdownStream } from './markdown-stream.type.js';
 
 export const rendererState = {
   /** The stream rendering the turn right now, or null between turns — interjectLine prints around it. */

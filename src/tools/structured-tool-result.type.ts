@@ -2,7 +2,7 @@
 // dispatcher reads every field of it, so no single function owns the shape — not even tool-error.ts,
 // which builds one particular instance of it.
 
-import type { ToolCallDisplay } from '../core/ui/types.js';
+import type { ToolCallDisplay } from '../core/ui/tool-call-display.type.js';
 import type { JsonObject } from './json-object.type.js';
 import type { ToolAuditExtra } from './tool-audit-extra.type.js';
 

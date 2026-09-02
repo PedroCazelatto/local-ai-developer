@@ -11,8 +11,8 @@
 // is the dodge the arrow-property rule closed.
 
 import { createMarkdownStream } from './create-markdown-stream.js';
+import type { MarkdownStream } from './markdown-stream.type.js';
 import { rendererState } from './renderer-state.js';
-import type { MarkdownStream } from './types.js';
 
 /** Open the output sink for one streamed assistant turn. */
 export function assistantStream(): MarkdownStream {

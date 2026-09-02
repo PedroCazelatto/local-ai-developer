@@ -29,7 +29,8 @@
 // readline's job and resumes the moment the prompt reopens.
 
 import { isNewlineKey } from './is-newline-key.js';
-import type { KeypressListener, KeypressSource } from './types.js';
+import type { KeypressListener } from './keypress-listener.type.js';
+import type { KeypressSource } from './keypress-source.type.js';
 
 /** What the capture does with the keys it claims. The buffer itself stays inside the capture. */
 export interface TypeAheadHandlers {

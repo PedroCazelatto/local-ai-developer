@@ -1,7 +1,7 @@
 // One extra audit row a tool declares for an internal sub-step. Folder vocabulary: the tool that has
 // a sub-step builds one, the dispatcher writes it, and neither owns the shape.
 
-import type { ToolCallDisplay } from '../core/ui/types.js';
+import type { ToolCallDisplay } from '../core/ui/tool-call-display.type.js';
 import type { JsonObject } from './json-object.type.js';
 
 /** One extra audit row a tool declares for an internal sub-step (e.g. a build before a run). */

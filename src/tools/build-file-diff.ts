@@ -16,7 +16,7 @@
 // too big to run, and there this returns null — the caller then reports the file's before/after line
 // totals, which are facts, instead of inventing a count.
 
-import type { ToolDiffDisplay } from '../core/ui/types.js';
+import type { ToolDiffDisplay } from '../core/ui/tool-diff-display.type.js';
 import { buildEditScript } from './build-edit-script.js'; // the exact LCS, or null over its work ceiling
 import { commonPrefixLines } from './common-prefix-lines.js';
 import { commonSuffixLines } from './common-suffix-lines.js';
