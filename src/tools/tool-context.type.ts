@@ -2,7 +2,7 @@
 // read from one, and the dispatcher passes it through — the shape is the directory's contract, not any
 // one function's return type.
 
-import type { SandboxClient } from '../core/container/index.js';
+import type { SandboxClient } from '../core/container/sandbox.js';
 import type { Message, OneShotResult, OneShotRole } from '../core/llm/index.js';
 import type { FileReadTracker } from '../core/session/file-read-tracker.type.js';
 import type { SubagentHandle } from '../core/session/subagent-handle.type.js';

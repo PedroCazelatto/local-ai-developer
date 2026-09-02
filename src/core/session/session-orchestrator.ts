@@ -8,7 +8,7 @@ import type { Phase } from '../../phases/phase.js';
 import { PhaseFactory } from '../../phases/factory.js';
 import { resolvePhaseTools } from '../../phases/resolve-phase-tools.js';
 import { createToolContext } from '../../tools/create-tool-context.js';
-import type { SandboxClient } from '../container/index.js';
+import type { SandboxClient } from '../container/sandbox.js';
 import type { Message, StreamHandle, TokenCounts, Tool, ToolCall, TurnAbortReason } from '../llm/index.js';
 import { OllamaClient } from '../llm/index.js';
 import { capitalizePhase } from '../ui/capitalize-phase.js';

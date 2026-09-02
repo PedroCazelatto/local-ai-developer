@@ -15,7 +15,7 @@ import { ASK_SUBAGENT } from '../../tools/ask-subagent.js';
 import { DISMISS_SUBAGENT } from '../../tools/dismiss-subagent.js';
 import { createToolContext } from '../../tools/create-tool-context.js';
 import { SPAWN_SUBAGENT } from '../../tools/spawn-subagent.js';
-import type { SandboxClient } from '../container/index.js';
+import type { SandboxClient } from '../container/sandbox.js';
 import type { Message, OllamaClient, TokenCounts, Tool } from '../llm/index.js';
 import { printToolCall } from '../ui/print-tool-call.js';
 import { addTokenCounts } from './add-token-counts.js';

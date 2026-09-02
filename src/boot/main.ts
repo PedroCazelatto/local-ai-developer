@@ -15,7 +15,7 @@
 // `import 'dotenv/config'` is deliberately NOT here. It must run before any process.env read, so it
 // stays the first import of src/index.ts, which ESM evaluates in full before this module's subtree.
 
-import { SANDBOX_CONTAINER, SandboxClient } from '../core/container/index.js';
+import { SANDBOX_CONTAINER, SandboxClient } from '../core/container/sandbox.js';
 import { errMessage } from '../core/err-message.js';
 import { OllamaClient } from '../core/llm/index.js';
 import { SessionOrchestrator, resolveBootModel } from '../core/session/index.js';
