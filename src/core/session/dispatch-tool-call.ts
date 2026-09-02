@@ -15,10 +15,11 @@
 // timestamp so every one of the five exit paths writes exactly one row the same way. A local is not a
 // declaration (constitution), and lifting it out would mean threading four values through every call.
 
+import { getTool } from '../../tools/get-tool.js';
 import type { JsonObject } from '../../tools/json-object.type.js';
-import { getTool, toolNames } from '../../tools/registry.js';
 import type { ToolContext } from '../../tools/tool-context.type.js';
 import { toolError } from '../../tools/tool-error.js';
+import { toolNames } from '../../tools/tool-names.js';
 import { errMessage } from '../err-message.js';
 import { TurnAbortedError } from '../llm/index.js';
 import type { ToolCallDisplay } from '../ui/types.js';
