@@ -152,11 +152,17 @@ export class OllamaClient {
    * The live session model, or a clear, actionable throw when there is none. The REPL catches it and
    * prints it as one recoverable line, so a model-less session answers "why did nothing happen?" at the
    * moment the user tries — instead of sending `model: undefined` to Ollama and surfacing its 404.
+   *
+   * The line says TOOL SUPPORT and names no model (OPEN-QUESTIONS.md #8). A session gets here with no
+   * model for two reasons — an empty machine, or a machine whose every model failed the `tools` gate —
+   * and this throw cannot tell them apart. config.SUGGESTED_MODEL is a suggestion for the EMPTY case
+   * and has not itself been verified tool-capable, so naming it would answer a capability problem with
+   * an unverified model and move the problem one pull further along.
    */
   requireModel(): string {
     if (this.modelName === undefined) {
       throw new Error(
-        `No model selected. Pull one with  /models pull <name>  (or  /models use <name>  if it's already installed).`,
+        `No model selected. Pull one with tool support:  /models pull <name>  (or  /models use <name>  if it's already installed).`,
       );
     }
     return this.modelName;
