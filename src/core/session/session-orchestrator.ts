@@ -4,8 +4,9 @@
 // tool-dispatch turn loop (turn-loop.ts) and exposes the small surface the REPL (05) needs.
 
 import { buildSystemPrompt } from '../../context/index.js';
-import type { Phase } from '../../phases/index.js';
-import { PhaseFactory, resolvePhaseTools } from '../../phases/index.js';
+import type { Phase } from '../../phases/phase.js';
+import { PhaseFactory } from '../../phases/factory.js';
+import { resolvePhaseTools } from '../../phases/resolve-phase-tools.js';
 import { createToolContext } from '../../tools/create-tool-context.js';
 import type { SandboxClient } from '../container/index.js';
 import type { Message, StreamHandle, TokenCounts, Tool, ToolCall, TurnAbortReason } from '../llm/index.js';

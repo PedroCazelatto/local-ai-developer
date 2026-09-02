@@ -22,7 +22,7 @@ import { dispatchToolCall } from './dispatch-tool-call.js';
 import { evictStaleToolResults } from './evict-stale-tool-results.js';
 import { recordToolCall } from './record-tool-call.js';
 import { renderer } from '../ui/renderer.js';
-import { resolvePhaseTools } from '../../phases/index.js';
+import { resolvePhaseTools } from '../../phases/resolve-phase-tools.js';
 import { toolError } from '../../tools/tool-error.js';
 import { truncateHeadTail } from '../../tools/truncate.js';
 

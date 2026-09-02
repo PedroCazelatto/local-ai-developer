@@ -8,7 +8,7 @@
 // is already recorded.
 
 import { buildSystemPrompt, loadPhasePrompt } from '../../context/index.js';
-import { resolvePhaseTools } from '../../phases/index.js';
+import { resolvePhaseTools } from '../../phases/resolve-phase-tools.js';
 import { SUBMIT_RETRO } from '../../tools/submit-retro.js';
 import { buildRetroSeed } from './build-retro-seed.js';
 import { RetroError } from './retro-error.js';

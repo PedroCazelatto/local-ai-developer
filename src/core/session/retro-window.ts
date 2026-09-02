@@ -12,7 +12,8 @@
 
 import path from 'node:path';
 
-import { PHASE_SCOPED_TOOL_NAMES, RETRO_TOOL_NAMES, resolvePhaseTools } from '../../phases/index.js';
+import { PHASE_SCOPED_TOOL_NAMES, RETRO_TOOL_NAMES } from '../../phases/phase-tool-names.js';
+import { resolvePhaseTools } from '../../phases/resolve-phase-tools.js';
 import { buildFileDiff } from '../../tools/build-file-diff.js';
 import { applyPhaseRuleEdit, EDIT_PHASE_RULE } from '../../tools/edit-phase-rule.js';
 import { createToolContext } from '../../tools/create-tool-context.js';

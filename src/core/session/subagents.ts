@@ -10,7 +10,7 @@
 // never the master's history; and the master's history is never polluted by the sub-agent's internal
 // turns — the master only ever sees the { id, response } tool result.
 
-import { resolvePhaseTools } from '../../phases/index.js';
+import { resolvePhaseTools } from '../../phases/resolve-phase-tools.js';
 import { ASK_SUBAGENT } from '../../tools/ask-subagent.js';
 import { DISMISS_SUBAGENT } from '../../tools/dismiss-subagent.js';
 import { createToolContext } from '../../tools/create-tool-context.js';
