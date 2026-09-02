@@ -11,8 +11,7 @@
 // is refused unless the repo agrees. So a round can land commits even when the verdict is a fail, and
 // a `pass` is proof the tree was already clean — the loop just reports what the Reviewer committed.
 
-import type { SandboxClient } from '../container/index.js';
-import type { OllamaClient, TokenCounts } from '../llm/index.js';
+import type { TokenCounts } from '../llm/index.js';
 import { TurnAbortedError } from '../llm/index.js';
 import { addTokenCounts } from './add-token-counts.js';
 import { buildWorkerFixMessage } from './build-worker-fix-message.js';
@@ -21,7 +20,7 @@ import { formatReviewFeedback } from './format-review-feedback.js';
 import type { ReviewerCommit } from './reviewer-commit.type.js';
 import { ReviewerVerdictError } from './reviewer-verdict-error.js';
 import { runReviewerTask } from './run-reviewer-task.js';
-import type { RunStopSignal } from './run-stop-signal.js';
+import type { TaskLoopDeps } from './task-loop-deps.type.js';
 import type { TaskLoopReporter } from './task-loop-reporter.type.js';
 import { setTaskStatus } from './set-task-status.js';
 import type { Task } from './task.type.js';
@@ -44,22 +43,6 @@ import { WORKER_MAX_ROUNDS, WorkerWindow } from './worker-window.js';
  * partially, so files it accepted in an earlier round are already in git. `commits` is what actually landed.
  */
 export type TaskLoopOutcome = 'passed' | 'escalated' | 'blocked' | 'cancelled';
-
-/** The session infrastructure the loop binds a Worker/Reviewer window to (supplied by the orchestrator). */
-export interface TaskLoopDeps {
-  readonly llm: OllamaClient;
-  readonly sandbox: SandboxClient;
-  readonly projectName: string;
-  readonly projectPath: string;
-  /**
-   * From SessionConfig — the fraction of num_ctx at which the persistent Worker window starts stubbing
-   * its older tool results (worker-window.ts). Carried here because TaskLoopDeps is what the loop hands
-   * straight to `new WorkerWindow(...)`, so WorkerDeps' own fields have to be satisfiable from it.
-   */
-  readonly evictionThresholdRatio: number;
-  /** The `/stop` wind-down request, read between rounds. See run-stop-signal.ts. */
-  readonly stop: RunStopSignal;
-}
 
 /** The single result the loop returns for one task. */
 export interface TaskLoopResult {
