@@ -21,23 +21,22 @@ the answer can **delete** the task rather than shape it.
 
 ## The order
 
-### 1. [One function per file, across `src/`](split-config-into-one-function-per-file.md)
+### 1. ~~[One function per file, across `src/`](split-config-into-one-function-per-file.md)~~ — shipped
 
-> **THE DECLARATION CENSUS IS AT ZERO.** A TypeScript-parser pass over all **641** files under `src/`
-> finds **no file holding more than one declaration** — functions, classes, arrow properties and object
-> method shorthand all counted. From a baseline of 104 files / 504 declarations, every directory is
-> clear. **`tsc --noEmit` clean, `npm test` 400 / 400, 0 skips.**
+> **SHIPPED.** Measured against `src/`: **0** files holding more than one declaration (from 104 holding
+> 504), **0** old-style `.type.ts` pairs (from 50), **0** per-folder `types.ts` (from 3, having peaked at
+> 5), **0** directory barrels (from 8), and **0** value re-exports anywhere. `find src -name index.ts`
+> returns exactly one path — `src/index.ts`, the entry point. The only re-export left in the tree is
+> `config.ts`'s `export type { SessionConfig }`, which the constitution allows as an assembler's type
+> ride-along. `tsc --noEmit` clean, `npm test` **400 / 400**, 0 skips.
 >
-> **What remains is shape work, not census work**: `config.ts`'s owed assembler reshape, the
-> `core/ui/types.ts` retrofit (**done, `e92e410`** — no `types.ts` remains anywhere under `src/`), six
-> old-style `.type.ts` pairs in `core/session`, and six of the eight
-> `index.ts` barrels. **Start at *Resuming from cold* — the first section of
-> [the task file](split-config-into-one-function-per-file.md)**, written for someone with none of the
-> conversation. The working tree is dirty in exactly three review-gated files — `CLAUDE.md`,
-> `constitution.md`, `docs/repo-layout.md` — which are waiting on the user and must be neither committed
-> nor reverted by an agent.
+> **The task file survives, and it is the only one that does** — by the user's decision, because it
+> stopped being a task file and became the repo's record of *how to verify a refactor*: seven distinct
+> shapes of a test that passes while proving nothing, each found by making an instrument fail on purpose.
+> The exception is recorded in [docs/repo-layout.md](../docs/repo-layout.md). **Do not read it as pending
+> work.**
 
-*Repo hygiene.* **Widened, and partly landed.** The four-function env-resolution exception is over:
+*Repo hygiene.* **Shipped, having widened enormously on the way.** The four-function env-resolution exception is over:
 `resolveNumCtx`, `resolveRatio`, `resolveTimeoutMs` and `loadConfig` each hold their own file, `config.ts`
 keeps the `DEFAULT_*` constants and re-exports them, and `ollama-models.ts` is gone — `list-models.ts`,
 `has-model.ts` and `pull-model.ts` over a shared `daemon.ts` value module. That is item 1's **first
@@ -275,7 +274,7 @@ a missed file. Fixing it also repaired the new module's header, which claimed th
 none of them"*. And `safe-id-path.ts` and `task-branch-name.ts` both pointed at a `types.ts` deleted back
 in `9f4d932`; the example they cite now lives in `task.type.ts`.
 
-**Wave E has started, and the "nine barrels, one atomic pass" shape did not survive measurement.**
+**Wave E is COMPLETE, and the "nine barrels, one atomic pass" shape did not survive measurement.**
 There are ten `index.ts` files; **eight** are pure re-export barrels, **`src/core/index.ts` is not one**
 (zero re-exports — four lines of comment held in the graph by `export {}`), and **`src/index.ts` is the
 entry point and survives** — which matters because `find src -name index.ts` returns it.
@@ -300,9 +299,25 @@ which matters most for the barrel pass, since it is entirely about star re-expor
 had **zero** importers because wave B had already repointed all 43, and `interface/index.ts`, which had
 exactly one — a single line in `src/boot/main.ts`. Its agent reproduced all ten importer counts exactly
 and proved its instrument by making it report 65 real importers of `core/llm/index.ts` and then go red on
-14 spelling probes after the deletion. **Six barrels remain**: `core/llm` (66 importers), `core/session`
-(55), `core/container` (13), `context` (12), `phases` (7), `tools` (5) — and those counts are **lower
-bounds**, for the `export *` reason above. **Wave E is stageable, not atomic.**
+14 spelling probes after the deletion.
+
+**The last six went in six commits** (`e93e869`…`b130a91`), smallest blast radius first so the instruments
+were proven before the hard ones: `tools` (5 importers), `phases` (7), `context` (12), `core/container`
+(13), `core/llm` (66), `core/session` (54). **127 distinct files, 306 named imports repointed**, every one
+proven by the checker's aliased symbol to land on the module that declares it — **306/306, with 306
+wrong-home controls fired**. All 178 import declarations used the explicit `.../index.js` form: no folder
+imports, no side-effect-only imports, no dynamic `import()`, and no importer under `__tests__`.
+
+**Three of my figures were wrong and the agent caught all three.** `core/llm` carried **29** names from
+**18** homes with **66** importers, not 26/17/65 — my count had excluded `Message`, `Tool` and `ToolCall`,
+which the barrel re-exported **from the `ollama` package** rather than from a file. Total named imports
+was **306**, not 311. And my summary line said 65 importers while my own per-directory breakdown added to
+66 — **the detail was right and the total was wrong**, which is the more useful catch.
+
+**The `export *` warning was true when written and had expired.** The one star forwarded `config` and
+`SessionConfig`, and by the time wave E ran, both of the files that used to take them through the barrel
+imported `config.js` directly. Chased and empty — which is the right outcome for a warning, not a reason
+to have skipped it.
 
 Three files must not be deleted by it, distinguished by *one exported value, no function, zero re-export
 lines*: `src/index.ts`, `src/interface/command-registry.ts` and `src/core/llm/daemon.ts`. And one more
@@ -811,6 +826,50 @@ type's deadness visible.
 barrels are gone does *"exported and never imported"* become a meaningful search. Whether
 `noUnusedLocals` goes on is the open decision, and `noUnusedParameters` wants a different answer, since
 an interface-conforming callback often ignores an argument on purpose.
+
+### 31. [The visible-turn predicate has two halves, and nothing checks they agree](visible-turn-predicate-has-two-halves.md)
+*Memory / context.* The last surviving follow-up of [1](split-config-into-one-function-per-file.md), filed
+as its own task now that item 1 has shipped — otherwise it would sit orphaned inside a file nobody has
+reason to reopen.
+
+*"Still in the phase's live history"* is defined **twice**: as SQL in `visible-turn-where.ts` for turns
+read back from `memory.db`, and as JS in `visible-turns.ts` for turns still held in RAM. **They must agree
+or a flush changes what a phase can see** — the same conversation gaining or losing a turn purely by
+crossing the persistence boundary, which is the class of bug that cannot be reproduced from a transcript.
+It **cannot be deduped**: one runs inside SQLite, one in Node.
+
+Note the asymmetry a naive test would miss: SQL tests `IS NULL` on two columns, JS tests `=== undefined`
+on two properties, and a row round-tripped through SQLite yields `null` rather than `undefined` — so **the
+mapping layer between them is load-bearing** and only a test that reads a real row covers it.
+
+**Blocked on the runtime, which is a user action.** It is the first test that would touch `node:sqlite`,
+**experimental on 22.x and stable from 24**; the suite has only run on 22.14.0 while `.nvmrc` pins 24.14.0.
+Two things make that sharper than it sounds: `npm test` invokes `node --test` directly and never passes
+through `scripts/run.mjs`, the only thing enforcing the pin, and the `test` script passes
+`--disable-warning=ExperimentalWarning`, switching off the one signal that would announce the experimental
+API. **The duplication was always there; one file was hiding it** — the sweep made it addressable, not
+riskier.
+
+### 32. [Two unrelated types are both called `Phase`](two-unrelated-types-named-phase.md)
+*Repo hygiene.* `src/phases/phase.ts` declares `interface Phase`, the phase abstraction a session runs
+against. `src/core/session/phase.type.ts` declares `type Phase`, the closed six-name string union that is
+the only valid inbox sender or recipient. **Two concepts, one identifier.**
+
+Nothing is broken — no file imports both, so there is no shadowing and the type-checker has never had an
+opinion. It is a legibility defect in a codebase whose whole convention is that a file's name states its
+job.
+
+**A barrel was hiding it.** While both directories had an `index.ts`, every consumer wrote
+`from '../phases/index.js'` or `from '../core/session/index.js'` and the folder did the disambiguating;
+deleting the barrels made every import name its file, and `phase.ts` beside `phase.type.ts` reads plainly.
+It is also **exactly the class of problem an importer census cannot find** — a duplicated *declaration*
+imports nothing — the same blind spot that hid a fourth copy of `KeypressListener` for two waves. **Second
+time it has cost something**, which is the argument for filing it.
+
+Filed rather than fixed because choosing **which** name moves is a judgement about what the two concepts
+are called, and a rename touching every consumer of the union should not ride inside somebody else's
+commit. The union sitting under `core/session/` while the abstraction sits under `phases/` may itself be
+the thing to fix, in which case the rename question answers itself.
 
 ---
 
