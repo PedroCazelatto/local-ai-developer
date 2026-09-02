@@ -55,11 +55,17 @@ export async function main(): Promise<void> {
   // model was selected, which is a valid model-less session (the REPL prints the hint). An unreachable
   // daemon is fatal here for the same reason a missing Docker daemon is: without Ollama a session can
   // do nothing at all, so say so now instead of failing on the user's first message.
+  //
+  // It is also where the VRAM probe runs, which is why `config.numCtx` goes in: any model this machine
+  // has not yet measured AT THIS CEILING is loaded once and read from `/api/ps`, ~18 s each, cached in
+  // its own file forever after. That can make a FIRST boot take minutes and every later one take none,
+  // and it has to happen here — probing is loading, so a probe once the session is up would evict the
+  // model mid-turn (docs/product.md, no parallelism).
   let modelName: string | undefined;
   try {
     const versionRefusal = ollamaVersionRefusal(await fetchDaemonVersion());
     if (versionRefusal !== undefined) fail(versionRefusal);
-    modelName = await resolveBootModel();
+    modelName = await resolveBootModel(config.numCtx);
   } catch (err) {
     fail(`could not reach Ollama: ${errMessage(err)}`);
   }

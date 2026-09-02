@@ -10,6 +10,11 @@
 // the whole of #69/#14's shape at boot; `/models use <name>` carries the other half, where selecting
 // one prints why and offers to delete it.
 //
+// THE SECOND MARKER DOES NOT WORK THAT WAY. `(too heavy)` says the model's weights will not fit in
+// VRAM, and a model wearing it stays in the prompt: *slow is a choice the user gets to make;
+// incapable is not* (docs/product.md). A row shows one marker, and `(no tools)` outranks it — see
+// core/ui/model-marker.ts for the measured reason it is one column rather than two.
+//
 // Whatever this prints is wiped moments later by the REPL's one-time clearScreen, which is why the
 // marker also has a permanent home in `/models list` — a line printed once at startup is not a surface
 // the user can re-open.
@@ -28,6 +33,7 @@ import { select } from '../ui/select.js';
 import { theme } from '../ui/theme.js';
 import { write } from '../ui/write.js';
 import { bootModelRows } from './boot-model-rows.js';
+import type { ProbeCache } from './probe-cache.type.js';
 
 /**
  * Print `installed` (toolless models marked) and prompt for one of `selectable`. Returns the chosen
@@ -37,16 +43,23 @@ import { bootModelRows } from './boot-model-rows.js';
  *
  * `selectable` is the caller's tool-capable subset (bootModelPlan) and must not be empty; the plan's
  * `none-capable` outcome exists so this is never called with nothing to offer.
+ *
+ * `probes` and `numCtx` reach the table only — the `(too heavy)` marker informs a choice rather than
+ * restricting one, so a marked model stays in the prompt's list. That is the whole difference between
+ * the two markers: this one is advice, `(no tools)` is a refusal.
  */
 export async function chooseBootModel(
   installed: readonly InstalledModel[],
   selectable: readonly InstalledModel[],
+  probes: ProbeCache,
+  numCtx: number,
 ): Promise<string | undefined> {
   write('');
   write(theme.strong('Installed models:'));
   write('');
-  // bootModelRows: one plain row per model, `(no tools)` on the ones the prompt below will not offer.
-  for (const row of bootModelRows(installed)) write(theme.meta(row));
+  // bootModelRows: one plain row per model, marked — `(no tools)` on the ones the prompt below will
+  // not offer, `(too heavy)` on the ones it will offer but that will run from system RAM.
+  for (const row of bootModelRows(installed, probes, numCtx)) write(theme.meta(row));
   write('');
 
   if (!stdin.isTTY) {

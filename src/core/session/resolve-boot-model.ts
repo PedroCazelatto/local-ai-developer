@@ -24,6 +24,13 @@
 //   6. nothing tool-capable, or the chooser declined          → undefined; a model-less REPL, which is
 //                                                              a valid session (run-repl.ts).
 // Nothing on any of these paths downloads anything: every pull is now an explicit `/models pull`.
+//
+// IT ALSO OWNS THE ONE PLACE THE VRAM PROBE MAY RUN. Between the installed list and the plan, it asks
+// probePendingModels to measure any model this machine has not measured at `numCtx` — loading each one
+// and reading `/api/ps`, which is the only way to learn a card's real ceiling (#100c). It must be here
+// and nowhere later: probing IS loading, so a probe after boot would evict the session's model
+// mid-turn. `numCtx` is a parameter rather than a read off `config` because the ceiling is what the
+// measurement is ABOUT, and boot already holds the resolved SessionConfig when it calls this.
 
 import { listModels } from '../llm/list-models.js';
 import { renderer } from '../ui/renderer.js';
@@ -31,6 +38,7 @@ import { bootModelPlan } from './boot-model-plan.js';
 import { chooseBootModel } from './choose-boot-model.js';
 import { config } from './config.js';
 import { loadAppState } from './load-app-state.js';
+import { probePendingModels } from './probe-pending-models.js';
 
 /**
  * The model the session should boot on, or undefined when none is available and nothing was chosen (a
@@ -42,10 +50,15 @@ import { loadAppState } from './load-app-state.js';
  * clearScreen wipes the boot scrollback; the OUTCOME stays visible in the status line (or, when nothing
  * was selected, in the hint the REPL prints after its header) and in `/models list`.
  */
-export async function resolveBootModel(): Promise<string | undefined> {
+export async function resolveBootModel(numCtx: number): Promise<string | undefined> {
   // listModels asks the daemon for every installed model — name, size, digest and capabilities — in one
   // /api/tags round trip. main.ts has already refused a daemon too old to report capabilities.
   const installed = await listModels();
+  // probePendingModels loads every model this machine has not measured AT THIS CEILING, reads
+  // /api/ps, and returns the accumulated cache. THIS IS THE ONLY PLACE IT MAY BE CALLED: probing is
+  // loading, so anywhere later would evict the session's model mid-turn. It prints nothing once every
+  // row is cached, which is every boot after the first, and it never throws.
+  const probes = await probePendingModels(installed, numCtx);
   // bootModelPlan decides, with no IO: honour the saved model, recommend, boot model-less, or ask.
   const plan = bootModelPlan(installed, loadAppState().activeModel);
 
@@ -82,7 +95,8 @@ export async function resolveBootModel(): Promise<string | undefined> {
       return undefined;
     case 'choose':
       // chooseBootModel prints every installed model with the toolless ones marked, and prompts over
-      // the capable subset only — shown, marked, never selectable. Undefined if declined.
-      return await chooseBootModel(installed, plan.selectable);
+      // the capable subset only — shown, marked, never selectable. A `(too heavy)` model IS offered:
+      // that marker is advice, not a refusal. Undefined if declined.
+      return await chooseBootModel(installed, plan.selectable, probes, numCtx);
   }
 }
