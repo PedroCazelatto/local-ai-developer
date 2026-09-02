@@ -23,13 +23,13 @@ import { ReviewerVerdictError } from './reviewer-verdict-error.js';
 import { SUBMIT_VERDICT, parseVerdict } from '../../tools/submit-verdict.js';
 import { addTokenCounts } from './add-token-counts.js';
 import { createReadTracker } from './read-tracker.js';
-import { createToolContext } from '../../tools/index.js';
+import { createToolContext } from '../../tools/create-tool-context.js';
 import { dispatchToolCall } from './dispatch-tool-call.js';
 import { listChangedPaths } from './list-changed-paths.js';
 import { raiseBlocker } from './raise-blocker.js';
 import { recordToolCall } from './record-tool-call.js';
 import { setTaskStatus } from './set-task-status.js';
-import { toolError } from '../../tools/index.js';
+import { toolError } from '../../tools/tool-error.js';
 import { verdictGitConflict } from './verdict-git-conflict.js';
 
 // The Reviewer inspects (a few reads + maybe a test re-run) then submits — lighter than the Worker's

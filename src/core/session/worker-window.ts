@@ -17,13 +17,14 @@ import { addTokenCounts } from './add-token-counts.js';
 import { appendEvent } from './events-log.js';
 import { buildSystemPrompt, loadPhasePrompt } from '../../context/index.js';
 import { createReadTracker } from './read-tracker.js';
-import { createToolContext } from '../../tools/index.js';
+import { createToolContext } from '../../tools/create-tool-context.js';
 import { dispatchToolCall } from './dispatch-tool-call.js';
 import { evictStaleToolResults } from './evict-stale-tool-results.js';
 import { recordToolCall } from './record-tool-call.js';
 import { renderer } from '../ui/renderer.js';
 import { resolvePhaseTools } from '../../phases/index.js';
-import { toolError, truncateHeadTail } from '../../tools/index.js';
+import { toolError } from '../../tools/tool-error.js';
+import { truncateHeadTail } from '../../tools/truncate.js';
 
 // A test-first implement loop (write test → run → implement → run → summarize) needs more rounds
 // than an interactive chat turn, so give the Worker generous headroom before the loop cap trips.
