@@ -18,10 +18,12 @@
 import { SANDBOX_CONTAINER, SandboxClient } from '../core/container/sandbox.js';
 import { errMessage } from '../core/err-message.js';
 import { OllamaClient } from '../core/llm/client.js';
+import { fetchDaemonVersion } from '../core/llm/fetch-daemon-version.js';
 import { resolveBootModel } from '../core/session/resolve-boot-model.js';
 import { SessionOrchestrator } from '../core/session/session-orchestrator.js';
 import { runRepl } from '../interface/run-repl.js';
 import { fail } from './fail.js';
+import { ollamaVersionRefusal } from './ollama-version-refusal.js';
 import { resolveOrExit } from './resolve-or-exit.js';
 
 /**
@@ -39,14 +41,24 @@ export async function main(): Promise<void> {
   // returning when the project name does not name a real project.
   const config = resolveOrExit(projectName);
 
-  // resolveBootModel asks the daemon what is INSTALLED and picks from that (state.json's choice if it's
-  // still there → else the smallest installed → else offer to pull the suggestion), rather than trusting
-  // a hard-coded default that may not exist locally. It may prompt + pull, so it BLOCKS boot; it returns
-  // undefined only if the user declined, which is a valid model-less session (the REPL prints the hint).
-  // An unreachable daemon is fatal here for the same reason a missing Docker daemon is: without Ollama a
-  // session can do nothing at all, so say so now instead of failing on the user's first message.
+  // The Ollama floor, checked before anything reads a model's capabilities. `/api/tags` only reports
+  // `capabilities` from 0.9.1, and the gate below FAILS CLOSED — so on an older daemon every installed
+  // model looks toolless and the user would be told "nothing here supports tools" when the truth is
+  // "your daemon cannot say". ollamaVersionRefusal returns the line to die with (naming the requirement
+  // and what was found) or undefined; a daemon that reports no version refuses too, because a check
+  // that cannot run must not report a pass. It cannot live in scripts/run.mjs beside the Node check —
+  // the version is only knowable by asking the daemon — so it sits beside the unreachable-daemon fail.
+  //
+  // resolveBootModel then asks the daemon what is INSTALLED and resolves against that: state.json's
+  // choice when it is installed AND tool-capable, otherwise the user picks from the list. NOTHING is
+  // inferred and nothing is pulled. It may prompt, so it BLOCKS boot; it returns undefined when no
+  // model was selected, which is a valid model-less session (the REPL prints the hint). An unreachable
+  // daemon is fatal here for the same reason a missing Docker daemon is: without Ollama a session can
+  // do nothing at all, so say so now instead of failing on the user's first message.
   let modelName: string | undefined;
   try {
+    const versionRefusal = ollamaVersionRefusal(await fetchDaemonVersion());
+    if (versionRefusal !== undefined) fail(versionRefusal);
     modelName = await resolveBootModel();
   } catch (err) {
     fail(`could not reach Ollama: ${errMessage(err)}`);
