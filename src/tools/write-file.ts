@@ -10,10 +10,7 @@
 // `ctx.resolve` still runs first, as the scoping check: a path that leaves the project is refused
 // here with a message the model can act on, before anything reaches the container.
 
-import type { ToolCallDisplay } from '../core/ui/types.js';
-// The compact +/- diff shown in the scrollback; null when the change is too large to count exactly.
-import { buildFileDiff } from './build-file-diff.js';
-import { decodeUtf8Strict } from './decode-utf8-strict.js';
+import { buildWriteDisplay } from './build-write-display.js'; // `created +42` / `overwrote +12 −3`, with the diff under it
 // Refuses an existing file this window has not read, or has read a now-stale copy of.
 import { guardWriteTarget } from './guard-write-target.js';
 // Validates the path under the project root (throws on escape) and returns it /workspace-relative.
@@ -21,43 +18,6 @@ import { scopeToWorkspace } from './scope-to-workspace.js';
 import { toolError } from './tool-error.js';
 import type { ToolModule } from './tool-module.type.js';
 import type { ToolResult } from './tool-result.type.js';
-
-/** How many lines a piece of text holds; '' is zero lines rather than one empty one. */
-function lineCount(text: string): number {
-  return text === '' ? 0 : text.split('\n').length;
-}
-
-/**
- * What the scrollback says about a write: `created +42` for a new file, `overwrote +12 −3` for one
- * that already existed, each with the diff under it (collapsed to counts when it is large).
- *
- * A file whose previous bytes are not UTF-8 text, or a rewrite too large to diff exactly, has no
- * counts to give — those report the file's before/after line totals instead, which are facts. Nothing
- * here ever guesses a count.
- */
-function writeDisplay(path: string, previous: Uint8Array | null, content: string): ToolCallDisplay {
-  let before: string | null = '';
-  if (previous !== null) {
-    try {
-      before = decodeUtf8Strict(previous);
-    } catch {
-      before = null; // binary or invalid UTF-8: there is no line-wise diff to show
-    }
-  }
-  const verb = previous === null ? 'created' : 'overwrote';
-  if (before === null) {
-    return { summary: `${verb} ${content.length} characters (previous content is not UTF-8 text)` };
-  }
-  const diff = buildFileDiff(path, before, content);
-  if (diff === null) {
-    return { summary: `${verb} ${lineCount(before)} lines → ${lineCount(content)} lines` };
-  }
-  if (diff.added === 0 && diff.removed === 0) {
-    return { summary: `${verb} — no change`, diff };
-  }
-  const counts = diff.removed === 0 ? `+${diff.added}` : `+${diff.added} −${diff.removed}`;
-  return { summary: `${verb} ${counts}`, diff };
-}
 
 export const writeFileTool: ToolModule = {
   name: 'write_file',
@@ -131,6 +91,6 @@ export const writeFileTool: ToolModule = {
     // A write is one of the two operations with lasting consequences and the one you can currently see
     // least, so the scrollback gets the diff. `previous` is decoded here rather than earlier because
     // nothing else needed it as text — the bytes were already in hand, so this costs no round-trip.
-    return { content: message, display: writeDisplay(relative, previous, content) };
+    return { content: message, display: buildWriteDisplay(relative, previous, content) };
   },
 };
