@@ -50,6 +50,6 @@ every automated census passes it. Only the job disagrees. See
 ## Why it sits where it does
 
 Small and mechanical once the names are chosen, and it touches files
-[item 6](boot-can-pick-a-toolless-model.md) is editing right now. **It was deliberately kept out of
+**item 6** (since shipped — see [the ledger](README.md)) was editing at the time. **It was deliberately kept out of
 item 6**: a directory move buried inside a feature PR is exactly the diff that should not ride inside
 somebody else's commit, and item 6's agent was told to leave the location alone for that reason.

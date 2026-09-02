@@ -131,6 +131,31 @@ The gap is not theoretical. `src/commands/run.ts` declares `export async functio
   more needing a ruling. Filed as [item 36](README.md).
 - **Name-to-job agreement is not checkable**, and no future instrument will make it so.
 
+### A control placed AFTER the action it guards is not a gate
+
+Found on item 6, and it is the cheapest mistake in this file to make. An agent was budgeted at two
+model loads. Its harness seeded a cache at one ceiling, probed at another — where all nine models were
+of course pending — and **then** asserted that at most one model should have been pending. The
+assertion was correct, could fire, and **did** fire. It was still worthless: about two minutes of GPU
+had already been spent by the time it spoke.
+
+**The rule: a precondition that guards an expensive or irreversible action must THROW BEFORE the
+action, not report after it.** "The control fired" is only evidence when firing could still have
+prevented something. This is a sibling of the *harness never ran* shape rather than a new one — both
+are about a check whose position, not whose logic, is what makes it useless.
+
+### A census reported at the end must be run AFTER the last commit
+
+The item 6 probe agent reported `764 files, 595 declarations, 0 violations` as its closing figure. The
+tree at that moment held **779 files and 606 declarations** — its number was measured *before its own
+twenty-four new files existed*, so the zero it reported had never covered the code it was reporting on.
+The tell was exact and available: its test-file count, 32, was precisely the pre-task figure.
+
+The conclusion happened to survive — an independent re-run after the last commit also found zero — but
+it survived by luck rather than by evidence. **A census is a statement about a tree, so it must name
+the commit it was run against**, and a task that adds files must re-run it last. The same applies to a
+test count: `543 pass` means nothing without "at `5fe2f2b`".
+
 ### Two traps in the file LIST, which is upstream of every count in this file
 
 Both found while re-deriving the census after item 1 had shipped, and both silent.

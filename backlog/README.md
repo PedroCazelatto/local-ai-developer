@@ -360,7 +360,7 @@ census, the barrel table, the import-graph analysis, the partition and the open 
 [item 12](budget-ceilings-for-runs-and-batches.md): ship it **before** the budget ceilings, so the new
 resolver is written into the shape that already exists rather than added to an exception and moved
 afterwards — that half is done, and item 12's bullet now says so. The same argument reaches
-[item 6](boot-can-pick-a-toolless-model.md) through the second file: that item rewrites `listModels` to
+**item 6**, shipped through the second file: that item rewrites `listModels` to
 stop projecting `capabilities` away, and it now lands in `list-models.ts`. At the widened scope it also
 blocks [2](test-the-invariant-functions.md), [5](record-attempted-tasks.md) and
 [7](derive-constants-from-one-ceiling.md), each of which tests, moves or adds to a function the sweep
@@ -446,17 +446,39 @@ and [item 12](budget-ceilings-for-runs-and-batches.md) *"ship the same vocabular
 verdict'"* — `failed` in `TaskStatus`, `over_budget` in the batch outcomes. `failed` now exists before
 `over_budget` has to sit beside it.
 
-### 6. [Boot can pick a model that cannot call tools](boot-can-pick-a-toolless-model.md)
-*Model behavior.* `pickSmallestModel` is **deleted**, not filtered: a saved `activeModel` wins, otherwise
-the user chooses from a list where toolless models are shown, marked and never selectable. Plus the boot
-VRAM probe behind the *too heavy* tag, its own accumulating cache file keyed on `digest` (#103), and the
-Ollama ≥ 0.9.1 floor stated and checked.
+### 6. ~~Boot can pick a model that cannot call tools~~ — shipped
+*Model behavior.* `pickSmallestModel` **deleted**, not filtered: a saved `activeModel` that is installed
+*and* tool-capable wins, otherwise the user chooses from a list where toolless models are shown, marked
+and never selectable. Nothing infers a boot model any more. Plus the Ollama ≥ 0.9.1 floor checked at boot
+via `/api/version`, the VRAM probe behind the `too heavy` tag, and its own accumulating cache file keyed
+on `(digest, num_ctx)` — which never invalidates, because a re-pulled tag is simply a key never seen.
 
-**Why here:** after [1](split-config-into-one-function-per-file.md) (the capability read lands in the
-split `ollama-models.ts`) and after **item 3**, now shipped (its version check is the Node
-check's sibling). The largest of the defects, and the one that gates first-run usability — on this box
-three of nine models have no `tools` and six cannot keep their weights resident, leaving exactly one that
-can run the product.
+**The capability read is a narrowed raw row, not a package bump**, and the reason is better than the
+convenience: `capabilities` reached `/api/tags` only in 0.9.1, so a declared `capabilities: string[]`
+would *assert* a field an older daemon does not send — precisely the case the fail-closed rule exists
+for. A bump would have hidden the need for the check without removing it. The same call proved necessary
+a second time: the pinned package types `size_vram: number` on the ONE row type it uses for both
+`/api/tags` and `/api/ps`, and `/api/tags` returns it **undefined** on every row — the declared type is
+wrong on one of its two endpoints.
+
+**The task file contradicted its own measured table**, which is the finding worth keeping: it says
+`size_vram < size` *"**is** the spill"*, true as a definition of spill and wrong as the verdict, since
+its own table calls a model that spills 1.93 GB resident. An implementer following that sentence marks
+the one usable model on this box too heavy. The verdict is whether the **weights** fit — on-disk size
+inside `size_vram` — reproduced against all five rows and re-measured live for two. **The wrong reading
+had already reached `docs/product.md`** and was corrected there.
+
+Spun out **[37](boot-probe-cost-is-unbounded.md)** and
+**[38](marker-and-prompt-choices-left-open.md)**: the probe costs ~2.7 minutes on a first boot, cannot be
+skipped, and pays for three models nothing renders; plus seven small marker and prompt calls made because
+something had to ship. Dead code it created folded into [30](dead-exports-and-unused-imports.md) —
+including the counter-example, `select.ts`, which had **no** callers and gained its first from this work.
+Its `docs/cli.md` and `docs/product.md` edits were review-gated and handed over.
+
+**Why it went here:** after [1](split-config-into-one-function-per-file.md) and after item 3, whose
+version check is this one's sibling. The largest of the defects and the one gating first-run usability —
+on this box three of nine models have no `tools` and six cannot keep their weights resident, leaving
+**exactly one** that can run the product.
 
 ### 7. [Derive every budget from one ceiling, in exact tokens](derive-constants-from-one-ceiling.md)
 *Memory / context.* The local BPE tokenizer built from `/api/show` `verbose: true` — exact against
@@ -929,7 +951,7 @@ dispatcher**, while `src/interface/commands/run.ts` is the actual `/run` command
 `run.ts`, and the one that is not `/run` is the one named after it — its own header says *"The `/models`
 dispatcher"*, so the file name contradicts its first line of prose.
 
-**Deliberately kept out of [item 6](boot-can-pick-a-toolless-model.md)**, which is editing these very
+**Deliberately kept out of **item 6**, shipped**, which is editing these very
 files: a directory move buried inside a feature PR is the diff that should not ride inside somebody
 else's commit, and item 6's agent was told to leave the location alone.
 
@@ -955,6 +977,57 @@ subject.
 
 **Why here:** the allowance list has to be agreed before any check can be written, and nothing is
 broken. The value is in not believing a figure that was never measured.
+
+### 37. [The boot VRAM probe's cost is unbounded and unavoidable](boot-probe-cost-is-unbounded.md)
+*Model behavior / boot.* The probe measures residency by loading each installed model once — the only
+honest way, since Ollama exposes no capacity query. Cached forever per `(digest, num_ctx)`, so it is paid
+once. **Once is ~2.7 minutes on a first boot**, of which ~54 s measures the three toolless models whose
+result is *never rendered on any surface* (because `(no tools)` wins the single marker column), and all
+of it is paid even on a boot that prints no list at all — a saved `activeModel` shows nothing until the
+user types `/models list`. There is no opt-out.
+
+**Why it cannot simply be deferred:** probing *is* loading, so a probe during a live session evicts the
+session's model mid-turn — the one thing the no-parallelism rule exists to prevent. It is boot or never.
+A third option worth weighing is probing lazily on the first `/models list`, which contradicts nothing
+*if* that command is only reachable between turns — which needs checking rather than assuming.
+
+**Why here:** nothing is broken and the measurement is right; every option trades boot time against how
+much the product knows about the machine, and that trade is the user's.
+
+### 38. [Small unsettled choices around the two model markers](marker-and-prompt-choices-left-open.md)
+*Terminal UX.* Seven one-line calls made because something had to ship, none specified: the single
+marker column and its precedence, `/models use` staying silent on a `(too heavy)` model, the chooser's
+prompt hints, marker colour, Ctrl+C as the only decline gesture (measured — `@clack/core` does not map
+Escape), a non-TTY boot declining silently, and a just-pulled toolless model being refused *after* the
+download.
+
+**The last is the only one with a cost attached:** capability is genuinely unknowable until the daemon
+has the blob, so the refusal cannot honestly move earlier — but a caveat before the download can. **The
+precedence is already load-bearing:** it is pinned by a width test, so widening either spelling fails a
+test rather than wrapping an 80-column row, the trap that already cut `/models list`'s legend from 95
+characters to 68.
+
+**Why here:** all cosmetic or one sentence of copy, cheap to decide together and expensive one at a time.
+
+### 39. [Deleting a shipped task file dangles every link to it](shipped-task-files-dangle-every-link.md)
+*Repo hygiene / process.* Finishing a task deletes its file, and the deletion commit is the record the
+work landed. **Every cross-reference to it then breaks, silently** — no compiler, no test, no lint.
+Measured over `backlog/*.md`: **26 sites across 7 dead targets**, led by item 5's file (11) and item 6's
+(5). The same blind spot as [29](prose-names-files-the-sweep-deleted.md), one level up — that one is
+comments naming deleted *source* files, this is docs naming deleted *task* files.
+
+**Several are load-bearing rather than inconvenient.** The sentences that explain why one item must
+precede another cite the task file that states the constraint, so a dead link there **removes the
+argument** for a sequencing decision this ledger elsewhere insists must not be reordered without going
+back to the file that says so.
+
+**There is a mechanical fix**, which is why it is worth doing: the ledger never deletes a shipped entry,
+it strikes it and keeps the number — so every dead target has a stable successor in this file, making it
+one substitution *per target* rather than 26 judgements. **Five of the 26 were created today**, which is
+the argument that the real fix is one extra line in the convention rather than a one-off sweep.
+
+**Why here:** mechanical and safe, but the process half — whether the convention gains a
+repoint-before-delete step, and whether a check enforces it — is the user's call.
 
 ---
 
@@ -1154,7 +1227,7 @@ Kept in full. Several carry decisions that survive **only** here, and those are 
       *spill is acceptable while the weights stay resident and only KV cache offloads* (#84c). Nothing to
       migrate. Spun out **item 4**, since shipped, and handed
       the residency measurements and the boot probe to
-      [boot-can-pick-a-toolless-model.md](boot-can-pick-a-toolless-model.md), which is where the tag is
+      **item 6**, shipped, which is where the tag is
       painted. **Three decisions survive only here, so do not re-open them without reading this line:**
       **per-model ceilings are deferred** (#37a) — one global number is demonstrably wrong for one of the
       two models, 29.1 % against 6.8 %, but a ceiling that follows `/models use` changes *mid-session*

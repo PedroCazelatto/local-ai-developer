@@ -64,3 +64,23 @@ barrels are what make a dead export look live, so the search worth running is th
 gone. Filed rather than folded into item 1 because deleting a function is a behaviour change, and burying
 one inside a no-behaviour-change refactor is how a change stops being reviewable — the same rule that
 produced every other item filed out of that sweep.
+
+## Item 6 added three more, and its agents deliberately did not remove them
+
+Recorded here because both item 6 agents hit this file's rule — *an export with no consumer is a
+question, not a cleanup* — and correctly stopped rather than guessing:
+
+| now dead | why | what removed its caller |
+|---|---|---|
+| `src/core/llm/has-model.ts` | `/models use` now reads `listModels` instead, because the same `/api/tags` round trip answers *"is it here?"* and *"can it call tools?"* | item 6, part A |
+| `src/core/ui/confirm.ts` | already had zero callers before item 6 | — |
+| `src/core/ui/text-input.ts` | already had zero callers before item 6 | — |
+
+**One went the other way, which is the useful data point:** `src/core/ui/select.ts` had **no callers
+at all** and gained its first from item 6's boot chooser. So a caller-less export in this repo is not
+reliably dead — it is sometimes a facility built ahead of its use, and `select.ts` is the proof. That
+is the strongest argument yet for this file's position that the question goes to the user.
+
+`has-model.ts` is the one that is genuinely newly-orphaned rather than long-idle, and its own header
+already tells a caller that needs the list to match against it directly — so the header anticipated
+the change that orphaned it.
