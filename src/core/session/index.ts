@@ -42,9 +42,9 @@ export { backlogRoot, BACKLOG_DIRNAME } from './backlog-root.js';
 export type { Backlog } from './backlog.type.js';
 export { drainAnsweredQuestions } from './drain-answered-questions.js';
 export { appendEvent } from './events-log.js';
-export type { OrchestratorEvent, OrchestratorEventInput, OrchestratorEventType } from './events-log.type.js';
+export type { OrchestratorEvent, OrchestratorEventInput, OrchestratorEventType } from './events-log.js';
 export { evictStaleToolResults, KEEP_RECENT_TOOL_RESULTS } from './evict-stale-tool-results.js';
-export type { EvictionRewrite } from './evict-stale-tool-results.type.js';
+export type { EvictionRewrite } from './evict-stale-tool-results.js';
 export { findTask } from './find-task.js';
 export { formatEvictedStub } from './format-evicted-stub.js';
 export { isEvictableTool } from './is-evictable-tool.js';
@@ -153,7 +153,7 @@ export type { RetroDeps } from './retro-deps.type.js';
 export type { RetroSubmission } from './retro-submission.type.js';
 export { rulesPhasesDirty } from './rules-phases-dirty.js';
 export { RunStopSignal } from './run-stop-signal.js';
-export type { StopScope } from './run-stop-signal.type.js';
+export type { StopScope } from './run-stop-signal.js';
 // Model-to-model deliberation (backlog/model-to-model-dialogue.md): challenger ⇄ proponent on throwaway
 // contexts, distilled by a third — one model, three windows, none of them in any phase's memory.
 export { parseDebateDigest } from './parse-debate-digest.js';

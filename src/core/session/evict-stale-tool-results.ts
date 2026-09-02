@@ -1,12 +1,28 @@
 // Evict stale tool results from a window's history to reclaim context, replacing each with a stub
 // that records what was called. The recent tail is protected; nothing the model is still using goes.
 
-import type { EvictionRewrite } from './evict-stale-tool-results.type.js';
 import type { Message, ToolCall } from '../llm/index.js';
 import { formatEvictedStub } from './format-evicted-stub.js';
 import { isEvictableTool } from './is-evictable-tool.js';
 import { protectedTailStart } from './protected-tail-start.js';
 import { toolCallArgsByIndex } from './tool-call-args-by-index.js';
+
+/**
+ * One tool result the pass decided to replace, addressed by its position in the window's message array.
+ *
+ * The pass returns rewrites rather than a new array so it stays PURE: it decides, the window applies.
+ * That is also what keeps the whole policy callable from a throwaway script with no Ollama and no
+ * WorkerWindow (CLAUDE.md: verify by driving the specific function directly).
+ *
+ * `index` is load-bearing beyond the write itself: the LOWEST index in a batch is the exact point from
+ * which Ollama must re-evaluate the prompt, so it is the number that explains what the pass cost.
+ */
+export interface EvictionRewrite {
+  /** Position in the window's `messages` array. Always a `tool` message. */
+  readonly index: number;
+  /** The stub that replaces the result's text (format-evicted-stub.ts). */
+  readonly content: string;
+}
 
 /**
  * The fewest tool results a pass will rewrite. Below this it does nothing and lets more accumulate.
