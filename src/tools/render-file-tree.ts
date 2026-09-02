@@ -13,27 +13,10 @@
 // coherent: a row is only ever emitted after its parent, so nothing is left orphaned under a
 // directory that was cut.
 
+import { emptyTreeNode } from './empty-tree-node.js';
+import { orderTreeChildren } from './order-tree-children.js'; // files first, then directories, by code unit
+import type { TreeNode } from './tree-node.type.js';
 import type { WorkspaceEntry } from './workspace-entry.type.js';
-
-interface TreeNode {
-  readonly name: string;
-  readonly isDirectory: boolean;
-  readonly children: Map<string, TreeNode>;
-}
-
-function emptyNode(name: string, isDirectory: boolean): TreeNode {
-  return { name, isDirectory, children: new Map<string, TreeNode>() };
-}
-
-/** Files before directories; within each group, ascending by code unit. */
-function ordered(children: Iterable<TreeNode>): TreeNode[] {
-  const nodes = [...children];
-  nodes.sort((left, right) => {
-    if (left.isDirectory !== right.isDirectory) return left.isDirectory ? 1 : -1;
-    return left.name < right.name ? -1 : left.name > right.name ? 1 : 0;
-  });
-  return nodes;
-}
 
 /**
  * `entries` as an indented tree, capped at `maxEntries` rows.
@@ -48,7 +31,7 @@ export function renderFileTree(
   maxEntries: number,
 ): { readonly rows: string[]; readonly omitted: number } {
   const prefix = basePath === '' || basePath === '.' ? '' : `${basePath.replace(/\/+$/, '')}/`;
-  const root = emptyNode('', true);
+  const root = emptyTreeNode('', true);
 
   for (const entry of entries) {
     const relative = entry.path.startsWith(prefix) ? entry.path.slice(prefix.length) : entry.path;
@@ -60,7 +43,7 @@ export function renderFileTree(
       let child = node.children.get(segment);
       if (child === undefined) {
         // An intermediate segment is a directory by construction; only the leaf carries the real kind.
-        child = emptyNode(segment, last ? entry.isDirectory : true);
+        child = emptyTreeNode(segment, last ? entry.isDirectory : true);
         node.children.set(segment, child);
       }
       node = child;
@@ -70,7 +53,7 @@ export function renderFileTree(
   const rows: string[] = [];
   let total = 0;
   const walk = (node: TreeNode, depth: number): void => {
-    for (const child of ordered(node.children.values())) {
+    for (const child of orderTreeChildren(node.children.values())) {
       total += 1;
       if (rows.length < maxEntries) {
         rows.push(`${'  '.repeat(depth)}${child.name}${child.isDirectory ? '/' : ''}`);
