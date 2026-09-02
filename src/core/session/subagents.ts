@@ -87,9 +87,10 @@ export interface SubagentDeps {
 export const SUBAGENT_TOOL_NAMES: readonly string[] = [SPAWN_SUBAGENT, ASK_SUBAGENT, DISMISS_SUBAGENT];
 
 // The short-id length lives in its own file so spawn_subagent can name the sub-agent that answered
-// without importing this module (which imports the tool). Re-exported here because that is where
-// `/subagents` and core/session/index.ts have always read it from.
-export { SUBAGENT_SHORT_ID_LEN } from './short-subagent-id.js';
+// without importing this module (which imports the tool). It used to be re-exported from here, because
+// the barrel and `/subagents` read it through this file; the barrel is gone and `/subagents` never
+// referenced it, so the re-export had no consumer left and went with the barrel pass. Take it from
+// short-subagent-id.ts.
 
 // A sub-agent may read a couple of files before answering; give it headroom before the loop cap trips,
 // but far less than the Worker's implement loop (a sub-agent is a focused side-task, not a full build).
