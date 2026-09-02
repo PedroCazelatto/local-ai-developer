@@ -16,19 +16,14 @@ import { branchNameError } from '../core/session/branch-name-error.js';
 import { createBranch } from '../core/session/create-branch.js';
 import { listBranches } from '../core/session/list-branches.js';
 import { switchBranch } from '../core/session/switch-branch.js';
+import { BRANCH_ACTIONS } from './branch-actions.js';
+import { isBranchAction } from './is-branch-action.js';
 import type { JsonObject } from './json-object.type.js';
 import { toolError } from './tool-error.js';
 import type { ToolModule } from './tool-module.type.js';
 import type { ToolResult } from './tool-result.type.js';
 
 export const GIT_BRANCH = 'git_branch';
-
-const ACTIONS = ['create', 'switch', 'list'] as const;
-type BranchAction = (typeof ACTIONS)[number];
-
-function isAction(value: unknown): value is BranchAction {
-  return typeof value === 'string' && (ACTIONS as readonly string[]).includes(value);
-}
 
 export const gitBranchTool: ToolModule = {
   name: GIT_BRANCH,
@@ -57,9 +52,9 @@ export const gitBranchTool: ToolModule = {
 
   async execute(ctx, args): Promise<ToolResult> {
     const action = args['action'];
-    if (!isAction(action)) {
+    if (!isBranchAction(action)) {
       return toolError(
-        `'action' must be one of: ${ACTIONS.join(', ')}.`,
+        `'action' must be one of: ${BRANCH_ACTIONS.join(', ')}.`,
         'Call git_branch with action:"list" to see where you are.',
       );
     }
