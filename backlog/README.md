@@ -181,18 +181,22 @@ landed.
 
 **`src/tools` is the other half, it is unstarted, and `core/session` closing unblocked it.** At 24 files /
 74 declarations it is now the largest remaining directory — bigger than the 20 / 60 the partition table
-records, for the method-shorthand reason above. **It also carries the one open bar question**, and that
-question is worth answering before an agent starts: whether an `execute(…) {…}` method shorthand on a
-top-level object literal counts as a declaration. It decides between 24 / 74 and 19 / 63, and nothing on
-record settles it — arrow properties count and class methods do not, and this is neither. **Ask.**
+records, for the method-shorthand reason above. **The bar question it raised is now settled**: the user
+ruled that an `execute(…) {…}` method shorthand on a top-level object literal **counts**, exactly as an
+arrow property does — the same declaration written two ways, and the bar cannot depend on the spelling.
+That is what makes the directory 24 / 74 rather than 19 / 63, and every tool object becomes an assembler
+over a separate `execute` file. The clause is in `constitution.md` under *What counts, exactly*, with the
+reason it does not contradict the class rule: a class is itself one declaration that owns its methods,
+whereas an object literal declares nothing of its own.
 
 **Then the two `types.ts` retrofits**: `tools`' rides with its own wave, and `core/ui`'s is unblocked now
 that `core/session` has cleared its three importers.
 
 **Wave E is the final barrel pass, and the "nine barrels, one pass" shape does not survive measurement.**
 There are ten `index.ts` files; **eight** are pure re-export barrels, **`src/core/index.ts` is not one**
-(zero re-exports — four lines of comment held in the graph by `export {}`, and deleting it destroys the
-only written map of what the four subdirectories are for, so **ask** where the comment goes), and
+(zero re-exports — four lines of comment held in the graph by `export {}`; the user ruled that the
+comment goes into [docs/repo-layout.md](../docs/repo-layout.md) and the file is deleted, and in the event
+only its framing phrase was not already there in richer form), and
 **`src/index.ts` is the entry point and survives** — which matters because `find src -name index.ts`
 returns it. Two of the eight are free right now: **`core/ui/index.ts` has zero importers** (wave B
 repointed all 43) and `interface/index.ts` has one. `core/llm/index.ts` has 65 and `core/session/index.ts`

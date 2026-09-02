@@ -64,27 +64,30 @@ because module resolution walks up from the script rather than from the working 
 > not the sweep having regressed**, and the usual caveat still applies to the baseline: it is measured at
 > `a0e9e31` and will not reproduce against a live tree.
 
-### The one open decision, and it gates `src/tools`
+### Settled: method shorthand counts, and it is why `src/tools` is 24 / 74
 
-**Does a method shorthand on a top-level object literal count as a declaration?** The bar counts
-functions, classes, and **arrow properties** on a top-level object literal; the user ruled separately
-that **a class's methods do not count**. An `execute(…) {…}` written as method shorthand on an object
-literal is none of those three things, and nothing on record decides it.
+**Does a method shorthand on a top-level object literal count as a declaration?** The parser census
+raised the question, because the bar as written counted functions, classes and **arrow properties** on a
+top-level object literal, and the user had ruled separately that **a class's methods do not count**. An
+`execute(…) {…}` written as method shorthand on an object literal was none of those three things.
 
-It is not academic — it is the difference between two shapes for the whole `tools` directory:
+**Ruled by the user: it counts, exactly as an arrow property does.** `execute(x) {…}` and
+`execute: (x) => {…}` are the same declaration written two ways, and the bar cannot depend on which
+spelling someone reached for. The clause is now in [constitution.md](../constitution.md) under *What
+counts, exactly*, with the reason it does not contradict the class rule: **a class's methods are exempt
+because the class is itself one declaration that owns them, whereas an object literal declares nothing of
+its own, so its members are the only declarations there are.**
 
-| if a method shorthand… | `src/tools` is | what changes |
-|---|---:|---|
-| **counts** | 24 files / 74 decls | every tool object becomes an assembler over a separate `execute` file |
-| **does not count** | 19 files / 63 decls | five files conform as they stand: `debate.ts`, `edit-file.ts`, `execute-command.ts`, `git-branch.ts`, `load-rule.ts` |
+This is what makes `src/tools` **24 files / 74 declarations** rather than 19 / 63 — nearly every file
+there is `export const xTool = { name, description, execute(…) {…} }`, so every tool object becomes an
+assembler over a separate `execute` file. Under the rejected reading, five files would have conformed as
+they stood (`debate.ts`, `edit-file.ts`, `execute-command.ts`, `git-branch.ts`, `load-rule.ts`) — and the
+trap in that reading is worth recording: each of those five still holds one private helper whose name is
+not the file's name, so they would have stopped being *multi-declaration* violations while still not
+satisfying the rule. The ruling closes both questions at once.
 
-Note the trap in the second column. Under "does not count", those five files hold one private helper
-each (`messageOf`, `countOccurrences`, `looksLikeEscape`, `isAction`, `messageOf`) plus the tool object —
-so they stop being *multi-declaration* violations while still holding a function whose name is not the
-file's name. Whether that conforms is a second question the first one exposes.
-
-**Ask. Do not pick.** `interface/commands` is unaffected: its command objects use `run: async (…) => …`,
-an arrow property, which is settled and counted.
+`interface/commands` was never affected either way: its command objects use `run: async (…) => …`, an
+arrow property, settled and counted from the start.
 
 ### `src/interface/commands` — 11 files, 55 declarations, all measured
 
@@ -179,10 +182,14 @@ Three consequences the plan does not carry:
 - **`core/ui/index.ts` can be deleted today, alone, with no importer edits.** Wave B repointed all 43 of
   its importers at concrete files; the barrel has been dead since `1c3b1cb`. Confirmed twice — by import
   resolution and by grep for every spelling of the path.
-- **`src/core/index.ts` is a different kind of file** and needs a decision, not a deletion. It re-exports
-  nothing; it is four lines of comment describing what each of the four subdirectories is for, held in
-  the module graph by `export {}`. Deleting it destroys the only place that map is written down. **Where
-  does the comment go? Ask.**
+- **`src/core/index.ts` is a different kind of file**, and it needed a decision rather than a deletion.
+  It re-exports nothing; it is four lines of comment describing what each of the four subdirectories is
+  for, held in the module graph by `export {}`. Deleting it naively would have destroyed the only place
+  that map was written down. **Ruled by the user: the comment goes into
+  [docs/repo-layout.md](../docs/repo-layout.md), and the file is deleted.** In the event almost nothing
+  had to move — the tree in that doc already carried all four subdirectory descriptions in richer form,
+  and only the framing phrase *"orchestrator internals, grouped by concern"* was unique to the comment.
+  It is now on the `core/` line of the tree, so the deletion loses nothing.
 - **Wave E is not one atomic pass, and treating it as one buys a serialization it does not need.**
   `core/session/index.ts`'s 27 `interface/commands` importers overlap wave D's remaining files, so that
   one waits. `core/ui` and `interface` — 0 and 1 importers — wait for nothing.
