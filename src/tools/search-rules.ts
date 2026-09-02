@@ -8,6 +8,7 @@
 
 import { loadCatalog } from '../context/index.js';
 import type { StandardEntry } from '../context/index.js';
+import { errMessage } from '../core/err-message.js'; // an Error's message, or the thrown value stringified
 import { loadsOrRepair } from '../core/llm/index.js';
 import type { Message } from '../core/llm/index.js';
 import type { JsonObject } from './json-object.type.js';
@@ -21,10 +22,6 @@ const SEARCH_SYSTEM_PROMPT =
   "You match a developer's intent to a small catalog of coding-standards documents. Return ONLY a JSON " +
   'array of the matching standard names, drawn verbatim from the catalog. If nothing matches, return []. ' +
   'Do not invent names, do not add prose.';
-
-function messageOf(err: unknown): string {
-  return err instanceof Error ? err.message : String(err);
-}
 
 export const searchRulesTool: ToolModule = {
   name: 'search_rules',
@@ -52,7 +49,7 @@ export const searchRulesTool: ToolModule = {
       catalog = loadCatalog();
     } catch (err) {
       // A malformed catalog is a real fault but recoverable at the turn level — surface it, don't crash.
-      return toolError(`standards catalog is unavailable: ${messageOf(err)}`);
+      return toolError(`standards catalog is unavailable: ${errMessage(err)}`);
     }
     if (catalog.length === 0) {
       return { content: { matches: [] }, display: { summary: 'the standards catalog is empty' } };

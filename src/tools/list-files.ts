@@ -13,7 +13,6 @@
 // like a complete one, or the model concludes a file does not exist and writes it a second time.
 
 import { buildIgnoreFilter } from './build-ignore-filter.js';
-import { messageOf } from './fs-support.js';
 import { listWorkspaceEntries } from './list-workspace-entries.js';
 // readOptionalCount: null when the model omitted the argument, the integer when it is one, and a
 // recoverable message when it is a string, a fraction, or below the floor.

@@ -20,7 +20,7 @@
 import ignore from 'ignore';
 
 import type { SandboxClient } from '../core/container/index.js';
-import { decodeUtf8Strict } from './fs-support.js';
+import { decodeUtf8Strict } from './decode-utf8-strict.js';
 import type { WorkspaceEntry } from './list-files.type.js';
 // The trees search_in_files already refuses to walk — the fallback when there is no .gitignore.
 import { SKIP_DIRS } from './skip-dirs.js';

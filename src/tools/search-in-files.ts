@@ -34,8 +34,9 @@
 
 import path from 'node:path';
 
+import { decodeUtf8Strict } from './decode-utf8-strict.js';
 import { findMatchingLines } from './find-matching-lines.js';
-import { decodeUtf8Strict, globToRegExp } from './fs-support.js';
+import { globToRegExp } from './glob-to-reg-exp.js';
 // One `grep -l` in the container: the project-root-relative paths that hold the pattern, sorted.
 import { listSearchCandidates } from './list-search-candidates.js';
 import { parseSearchRequest } from './parse-search-request.js';

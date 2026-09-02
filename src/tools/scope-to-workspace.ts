@@ -16,7 +16,7 @@
 
 import path from 'node:path';
 
-import { messageOf } from './fs-support.js';
+import { errMessage } from '../core/err-message.js';
 // Asks the container where the path really points, once every symlink on it has been followed.
 import { resolveRealWorkspacePath } from './resolve-real-workspace-path.js';
 import type { ToolContext } from './tool-context.type.js';
@@ -32,7 +32,7 @@ export async function scopeToWorkspace(ctx: ToolContext, relative: string): Prom
     const root = ctx.resolve('.'); // the same root, realpathed the same way
     scoped = path.relative(root, resolved).split(path.sep).join('/');
   } catch (err) {
-    return { ok: false, error: messageOf(err) };
+    return { ok: false, error: errMessage(err) };
   }
 
   const real = await resolveRealWorkspacePath(ctx.sandbox, scoped);

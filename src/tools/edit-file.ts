@@ -8,9 +8,10 @@
 // runs first as the scoping check. Not atomic, and deliberately not pretending to be — nothing else
 // is writing the project while a phase holds the turn (docs/product.md, no parallelism).
 
+import { errMessage } from '../core/err-message.js';
 // The compact +/- diff shown in the scrollback; null when the change is too large to count exactly.
 import { buildFileDiff } from './build-file-diff.js';
-import { decodeUtf8Strict, messageOf } from './fs-support.js';
+import { decodeUtf8Strict } from './decode-utf8-strict.js';
 // Refuses an existing file this window has not read, or has read a now-stale copy of.
 import { guardWriteTarget } from './guard-write-target.js';
 // Validates the path under the project root (throws on escape) and returns it /workspace-relative.
@@ -87,7 +88,7 @@ export const editFileTool: ToolModule = {
       if (err instanceof TypeError) {
         return toolError(`File '${relative}' is not valid UTF-8 text.`);
       }
-      return toolError(`Error reading '${relative}': ${messageOf(err)}`);
+      return toolError(`Error reading '${relative}': ${errMessage(err)}`);
     }
 
     // Look before you write: the window must have read this file, and the bytes it read must still be

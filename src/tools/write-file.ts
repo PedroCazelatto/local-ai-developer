@@ -13,7 +13,7 @@
 import type { ToolCallDisplay } from '../core/ui/types.js';
 // The compact +/- diff shown in the scrollback; null when the change is too large to count exactly.
 import { buildFileDiff } from './build-file-diff.js';
-import { decodeUtf8Strict } from './fs-support.js';
+import { decodeUtf8Strict } from './decode-utf8-strict.js';
 // Refuses an existing file this window has not read, or has read a now-stale copy of.
 import { guardWriteTarget } from './guard-write-target.js';
 // Validates the path under the project root (throws on escape) and returns it /workspace-relative.

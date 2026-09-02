@@ -13,6 +13,7 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 
 import { availablePhaseNames, phasePromptPath } from '../context/index.js';
+import { errMessage } from '../core/err-message.js'; // an Error's message, or the thrown value stringified
 import type { Tool } from '../core/llm/index.js';
 
 /** The one name the Retro window special-cases to patch a global phase instruction file. */
@@ -64,10 +65,6 @@ export type PhaseRuleEdit =
     }
   | { readonly ok: false; readonly error: string; readonly hint?: string };
 
-function messageOf(err: unknown): string {
-  return err instanceof Error ? err.message : String(err);
-}
-
 /** Count non-overlapping occurrences of `needle` in `haystack` (matches edit_file's semantics). */
 function countOccurrences(haystack: string, needle: string): number {
   if (needle === '') return 0;
@@ -102,7 +99,7 @@ export function applyPhaseRuleEdit(phase: unknown, oldString: unknown, newString
   try {
     original = readFileSync(file, 'utf-8');
   } catch (err) {
-    return { ok: false, error: `could not read rules/phases/${normalized}.md: ${messageOf(err)}` };
+    return { ok: false, error: `could not read rules/phases/${normalized}.md: ${errMessage(err)}` };
   }
   const occurrences = countOccurrences(original, oldString);
   if (occurrences === 0) {
@@ -119,7 +116,7 @@ export function applyPhaseRuleEdit(phase: unknown, oldString: unknown, newString
   try {
     writeFileSync(file, updated, 'utf-8');
   } catch (err) {
-    return { ok: false, error: `could not write rules/phases/${normalized}.md: ${messageOf(err)}` };
+    return { ok: false, error: `could not write rules/phases/${normalized}.md: ${errMessage(err)}` };
   }
   return { ok: true, resolvedPath: file, phase: normalized, before: original, after: updated };
 }
