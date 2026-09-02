@@ -34,6 +34,25 @@ excluded) finds **35 files holding 129 declarations**, and they sit in exactly *
 | `src/tools` | 24 | 74 |
 | `src/interface/commands` | 11 | 55 |
 
+**How to reproduce that census**, because the number is worthless if the next person cannot re-derive it.
+It is a throwaway script, so it is not in the repo — rewrite it, in about forty lines. Walk `src/`
+skipping `__tests__`, take every `.ts` that is not `.type.ts` or `.schema.ts`, and parse each with
+`ts.createSourceFile(…, /* setParentNodes */ true)` from the `typescript` already in `node_modules`. Count,
+**over `sourceFile.statements` only** — top level, never a recursive walk:
+
+- every `FunctionDeclaration` and every `ClassDeclaration`;
+- every `VariableStatement` declarator whose initializer is an arrow or function expression;
+- every arrow-property **and method shorthand** on a declarator initialized to an object literal,
+  unwrapping `as` / `satisfies` / parentheses first.
+
+Report the files whose count is greater than one. Two things make this the right shape and a regex the
+wrong one, and both were learned the hard way: **restricting to top-level statements** is what keeps the
+22 arrows that live inside function bodies out of the count, and **counting method shorthand** is the
+thing the regex census declared a pattern for and then forgot to add up.
+
+Run it from the repo root, not from `%TEMP%` — a script outside the repo cannot resolve `typescript`,
+because module resolution walks up from the script rather than from the working directory.
+
 **Every other directory is at zero.** `core/llm`, `core/container`, `core/ui`, `core/session`,
 `context`, `commands`, `phases`, `interface` (top level) and `src/` root are all done and verified.
 
