@@ -55,6 +55,25 @@ test('an in_progress task is NOT skipped', () => {
   assert.equal(taskSkipReason(backlog(task('a', 'in_progress')), 'a'), null);
 });
 
+test('a FAILED task is NOT skipped — /run <id> retries it from scratch', () => {
+  // The load-bearing half of the escalation record: this predicate guards BOTH the single-task /run
+  // path and the batch's per-task check, so a refusal here would refuse the deliberate retry too.
+  // `/run all` skips a failed task in resolveSelector instead, which only the batch selector reaches.
+  assert.equal(taskSkipReason(backlog(task('a', 'failed')), 'a'), null);
+});
+
+test('a failed task with every dependency done is runnable', () => {
+  const all = backlog(task('x', 'done'), task('a', 'failed', ['x']));
+  assert.equal(taskSkipReason(all, 'a'), null);
+});
+
+test('a failed dependency is reported as unmet', () => {
+  // Only `done` counts as met, so the retry gesture is per-task: naming the dependent does not
+  // reopen the failure it waits on.
+  const all = backlog(task('dep', 'failed'), task('a', 'pending', ['dep']));
+  assert.equal(taskSkipReason(all, 'a'), 'waiting on dep (not done).');
+});
+
 // --------------------------------------------------------------------------------- dependencies
 
 test('an unmet dependency is named', () => {

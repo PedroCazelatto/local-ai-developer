@@ -5,9 +5,11 @@ import { readBacklog } from '../../core/session/read-backlog.js';
 import type { CompletionContext } from '../completion-context.type.js';
 
 /**
- * Tab candidates for `/run <selector>`: the two static selectors plus every not-done task id — the same
- * set `all` would sweep, so nothing is offered that resolveSelector would then skip. Only the selector is
- * completable; a comma list past the first id isn't (the partial word carries the commas with it).
+ * Tab candidates for `/run <selector>`: the two static selectors plus every not-done task id. That is a
+ * SUPERSET of what `all` sweeps, by one status: a `failed` task is offered here and skipped by `all`,
+ * because naming it explicitly is the retry gesture and the id has to be typeable for that to work.
+ * Only the selector is completable; a comma list past the first id isn't (the partial word carries the
+ * commas with it).
  */
 export function completeRun(ctx: CompletionContext): string[] {
   if (ctx.args.length > 0) return [];

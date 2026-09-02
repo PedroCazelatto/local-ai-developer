@@ -26,7 +26,7 @@ Each task file carries YAML frontmatter + a Markdown body:
 
 \`\`\`markdown
 ---
-status: pending          # pending | in_progress | done | blocked
+status: pending          # pending | in_progress | done | blocked | failed
 order: 1                 # global execution sequence (integer)
 depends_on: []           # task ids that must be done first, e.g. [epic-auth/story-signup/00-scaffold]
 ---

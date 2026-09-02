@@ -19,6 +19,7 @@ import { test } from 'node:test';
 import { BacklogError } from '../backlog-error.js';
 import type { Backlog } from '../backlog.type.js';
 import { readBacklog } from '../read-backlog.js';
+import { TASK_STATUSES } from '../task-statuses.js';
 import type { Task } from '../task.type.js';
 
 /** Build a throwaway project whose backlog/ holds `files` (keys are paths under backlog/), and read it. */
@@ -62,9 +63,26 @@ test('an empty status key is forgiven as pending', () => {
 });
 
 test('each recognised status is read through unchanged', () => {
-  for (const status of ['pending', 'in_progress', 'done', 'blocked']) {
+  // Driven off the validator's own list, so a status added to the union is covered the day it lands.
+  for (const status of TASK_STATUSES) {
     assert.equal(readOne('a.md', withFrontmatter(`status: ${status}`)).status, status);
   }
+});
+
+test('failed is one of the recognised statuses, and reads back as failed', () => {
+  // The escalation record the execution loop commits: it has to survive a round-trip through the file
+  // that drives scheduling, or `/run all` has nothing to skip on.
+  assert.ok(TASK_STATUSES.includes('failed'), 'failed must be a legal frontmatter status');
+  assert.equal(readOne('a.md', withFrontmatter('status: failed\norder: 3')).status, 'failed');
+  assert.equal(readOne('a.md', withFrontmatter('status: failed\norder: 3')).order, 3);
+});
+
+test('the error naming the legal values lists failed among them', () => {
+  // The message is the only place the Breakdown phase is told the vocabulary, so it must not go stale.
+  assert.throws(
+    () => readOne('a.md', withFrontmatter('status: escalated')),
+    (err: unknown) => err instanceof BacklogError && err.message.includes('failed'),
+  );
 });
 
 test('an unrecognised status fails loud rather than defaulting', () => {

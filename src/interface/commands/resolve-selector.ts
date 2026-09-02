@@ -20,8 +20,13 @@ export function resolveSelector(backlog: Backlog, selector: string): Selection {
   if (selector === 'all') {
     // allTasks: every task in the tree, already sorted by order then id — re-sorted here because the
     // filter is what decides the batch's running order and it must not depend on the reader's sort.
+    //
+    // `failed` is skipped exactly as `done` is, and this is the ONE place that skip lives: an
+    // unattended batch must not spend the night re-failing last night's tasks. It is deliberately not
+    // a taskSkipReason — that predicate also guards `/run <id>`, which stays the deliberate retry
+    // ("I fixed the spec, try again") and needs no flag to say so.
     const ids = allTasks(backlog)
-      .filter((t) => t.status !== 'done')
+      .filter((t) => t.status !== 'done' && t.status !== 'failed')
       .sort((a, b) => a.order - b.order)
       .map((t) => t.id);
     return { ids, isBatch: true };
