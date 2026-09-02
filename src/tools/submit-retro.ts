@@ -12,6 +12,7 @@ import type { Tool } from '../core/llm/index.js';
 import type { RetroScope } from '../core/session/retro-scope.type.js';
 import { RETRO_SCOPES } from '../core/session/retro-scopes.js';
 import type { RetroSubmission } from '../core/session/retro-submission.type.js';
+import { describeValue } from './describe-value.js'; // a string quoted, anything else stringified
 
 /** The one name the Retro window special-cases to capture its diagnosis and end the turn. */
 export const SUBMIT_RETRO = 'submit_retro';
@@ -50,15 +51,11 @@ export type RetroSubmissionParse =
   | { readonly ok: true; readonly submission: RetroSubmission }
   | { readonly ok: false; readonly error: string };
 
-function describe(value: unknown): string {
-  return typeof value === 'string' ? `"${value}"` : String(value);
-}
-
 /** Validate a submit_retro payload into a RetroSubmission (valid scope + a non-empty one-sentence cause). */
 export function parseRetroSubmission(args: Record<string, unknown>): RetroSubmissionParse {
   const scope = args['scope'];
   if (typeof scope !== 'string' || !(RETRO_SCOPES as readonly string[]).includes(scope)) {
-    return { ok: false, error: `"scope" must be one of ${RETRO_SCOPES.join(' | ')} (got ${describe(scope)}).` };
+    return { ok: false, error: `"scope" must be one of ${RETRO_SCOPES.join(' | ')} (got ${describeValue(scope)}).` };
   }
   const rootCause = args['rootCause'];
   if (typeof rootCause !== 'string' || rootCause.trim() === '') {
