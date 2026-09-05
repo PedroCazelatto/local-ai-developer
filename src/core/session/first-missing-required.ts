@@ -4,7 +4,7 @@
 // owns its own verbatim error strings (V1/03) -- so the model gets one voice per problem rather than a
 // generic complaint from the dispatcher and a specific one from the tool.
 
-import type { JSONSchema } from '../../tools/types.js';
+import type { JSONSchema } from '../../tools/json-schema.type.js';
 
 /** First required parameter that is absent, or null if all are present. */
 export function firstMissingRequired(schema: JSONSchema, args: Record<string, unknown>): string | null {

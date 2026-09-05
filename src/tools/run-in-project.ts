@@ -11,9 +11,12 @@ import path from 'node:path';
 import { composeBuild } from '../core/container/compose-build.js';
 import { composeRun } from '../core/container/compose-run.js';
 import { isDaemonError } from '../core/container/is-daemon-error.js';
+import type { JsonObject } from './json-object.type.js';
+import type { ToolAuditExtra } from './tool-audit-extra.type.js';
+import { toolError } from './tool-error.js';
+import type { ToolModule } from './tool-module.type.js';
+import type { ToolResult } from './tool-result.type.js';
 import { truncateHeadTail } from './truncate.js';
-import type { JsonObject, ToolAuditExtra, ToolModule, ToolResult } from './types.js';
-import { toolError } from './types.js';
 
 const DEFAULT_TIMEOUT_S = 120;
 // npm/pip output is verbose — a larger per-stream cap than the plain-shell tool, still head+tail.

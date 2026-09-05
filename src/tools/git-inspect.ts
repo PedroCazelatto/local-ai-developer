@@ -14,8 +14,10 @@ import { DEFAULT_LOG_COUNT } from '../core/session/inspect-log-count.js';
 import { inspectLog } from '../core/session/inspect-log.js';
 import { inspectShow } from '../core/session/inspect-show.js';
 import { refError } from '../core/session/ref-error.js';
-import type { JsonObject, ToolModule, ToolResult } from './types.js';
-import { toolError } from './types.js';
+import type { JsonObject } from './json-object.type.js';
+import { toolError } from './tool-error.js';
+import type { ToolModule } from './tool-module.type.js';
+import type { ToolResult } from './tool-result.type.js';
 
 export const GIT_INSPECT = 'git_inspect';
 

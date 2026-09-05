@@ -9,8 +9,10 @@
 // The same short form its own tool-call lines were marked with, so the block and its answer read as
 // one thing. Imported from its own module rather than from subagents.ts, which imports THIS file.
 import { shortSubagentId } from '../core/session/short-subagent-id.js';
-import type { JsonObject, ToolModule, ToolResult } from './types.js';
-import { toolError } from './types.js';
+import type { JsonObject } from './json-object.type.js';
+import { toolError } from './tool-error.js';
+import type { ToolModule } from './tool-module.type.js';
+import type { ToolResult } from './tool-result.type.js';
 
 export const SPAWN_SUBAGENT = 'spawn_subagent';
 

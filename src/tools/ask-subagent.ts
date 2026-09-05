@@ -4,8 +4,10 @@
 // returns a RECOVERABLE structured `unknown_subagent` error (flat shape, matching the rest of the
 // tool set) so the model can read it and adjust — the turn is never killed.
 
-import type { JsonObject, ToolModule, ToolResult } from './types.js';
-import { toolError } from './types.js';
+import type { JsonObject } from './json-object.type.js';
+import { toolError } from './tool-error.js';
+import type { ToolModule } from './tool-module.type.js';
+import type { ToolResult } from './tool-result.type.js';
 
 export const ASK_SUBAGENT = 'ask_subagent';
 

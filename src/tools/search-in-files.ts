@@ -42,8 +42,9 @@ import { parseSearchRequest } from './parse-search-request.js';
 import { renderFileMatches } from './render-file-matches.js';
 import type { SearchCaps, SearchStopReason } from './search-in-files.type.js';
 import { summarizeSearch } from './summarize-search.js';
-import type { ToolModule, ToolResult } from './types.js';
-import { toolError } from './types.js';
+import { toolError } from './tool-error.js';
+import type { ToolModule } from './tool-module.type.js';
+import type { ToolResult } from './tool-result.type.js';
 
 /**
  * The three ceilings, in one place. 200 output lines is roughly an eighth of a 16k window once the

@@ -19,7 +19,7 @@ import path from 'node:path';
 import { messageOf } from './fs-support.js';
 // Asks the container where the path really points, once every symlink on it has been followed.
 import { resolveRealWorkspacePath } from './resolve-real-workspace-path.js';
-import type { ToolContext } from './types.js';
+import type { ToolContext } from './tool-context.type.js';
 
 export type ScopedPath =
   | { readonly ok: true; readonly relative: string }

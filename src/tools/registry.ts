@@ -27,7 +27,7 @@ import { runInProjectTool } from './run-in-project.js';
 import { searchInFilesTool } from './search-in-files.js';
 import { searchRulesTool } from './search-rules.js';
 import { spawnSubagentTool } from './spawn-subagent.js';
-import type { ToolModule } from './types.js';
+import type { ToolModule } from './tool-module.type.js';
 import { writeFileTool } from './write-file.js';
 
 // The static module list — every tool the model can call. New tools append here and are picked up

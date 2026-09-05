@@ -2,17 +2,15 @@
 // dropped into this dir and listed in registry.ts; which phases may call it is set by the arrays in
 // phases/phase-tool-names.ts. read_file is the first (V1/03 adds the rest of the file tools,
 // V1/04/05 the shell/container tools).
-export type {
-  ToolModule,
-  ToolContext,
-  ToolResult,
-  StructuredToolResult,
-  JSONSchema,
-  JSONSchemaProperty,
-  JsonObject,
-  JsonValue,
-} from './types.js';
-export { toolError } from './types.js';
+export type { ToolModule } from './tool-module.type.js';
+export type { ToolContext } from './tool-context.type.js';
+export type { ToolResult } from './tool-result.type.js';
+export type { StructuredToolResult } from './structured-tool-result.type.js';
+export type { JSONSchema } from './json-schema.type.js';
+export type { JSONSchemaProperty } from './json-schema-property.type.js';
+export type { JsonObject } from './json-object.type.js';
+export type { JsonValue } from './json-value.type.js';
+export { toolError } from './tool-error.js';
 export { createToolContext, resolveInProject, WORKSPACE_PATH } from './context.js';
 export { getTool, toolNames, toolDefinitions } from './registry.js';
 export { readFileTool } from './read-file.js';

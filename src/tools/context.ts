@@ -19,7 +19,7 @@ import type { FileReadTracker } from '../core/session/read-tracker.type.js';
 import type { SubagentHandle } from '../core/session/subagents.type.js';
 // Resolves a path through symlinks without requiring its leaf to exist yet.
 import { realPathOfNearestExisting } from './real-path-of-nearest-existing.js';
-import type { ToolContext } from './types.js';
+import type { ToolContext } from './tool-context.type.js';
 
 /** "/workspace" — where the active project is bind-mounted inside the sandbox (Foundation/04). */
 export const WORKSPACE_PATH = '/workspace';

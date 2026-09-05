@@ -16,8 +16,10 @@ import { branchNameError } from '../core/session/branch-name-error.js';
 import { createBranch } from '../core/session/create-branch.js';
 import { listBranches } from '../core/session/list-branches.js';
 import { switchBranch } from '../core/session/switch-branch.js';
-import type { JsonObject, ToolModule, ToolResult } from './types.js';
-import { toolError } from './types.js';
+import type { JsonObject } from './json-object.type.js';
+import { toolError } from './tool-error.js';
+import type { ToolModule } from './tool-module.type.js';
+import type { ToolResult } from './tool-result.type.js';
 
 export const GIT_BRANCH = 'git_branch';
 

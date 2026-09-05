@@ -10,8 +10,11 @@ import { loadCatalog } from '../context/index.js';
 import type { StandardEntry } from '../context/index.js';
 import { loadsOrRepair } from '../core/llm/index.js';
 import type { Message } from '../core/llm/index.js';
-import type { JsonObject, StructuredToolResult, ToolModule, ToolResult } from './types.js';
-import { toolError } from './types.js';
+import type { JsonObject } from './json-object.type.js';
+import type { StructuredToolResult } from './structured-tool-result.type.js';
+import { toolError } from './tool-error.js';
+import type { ToolModule } from './tool-module.type.js';
+import type { ToolResult } from './tool-result.type.js';
 
 // Kept SHORT on purpose — the catalog grows and rides in the user turn, not here (task V4/02).
 const SEARCH_SYSTEM_PROMPT =

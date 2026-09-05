@@ -18,8 +18,9 @@ import { decodeUtf8Strict } from './fs-support.js';
 import { guardWriteTarget } from './guard-write-target.js';
 // Validates the path under the project root (throws on escape) and returns it /workspace-relative.
 import { scopeToWorkspace } from './scope-to-workspace.js';
-import type { ToolModule, ToolResult } from './types.js';
-import { toolError } from './types.js';
+import { toolError } from './tool-error.js';
+import type { ToolModule } from './tool-module.type.js';
+import type { ToolResult } from './tool-result.type.js';
 
 /** How many lines a piece of text holds; '' is zero lines rather than one empty one. */
 function lineCount(text: string): number {

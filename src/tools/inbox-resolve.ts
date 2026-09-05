@@ -6,8 +6,9 @@
 
 import { canonicalizePhase } from '../core/session/canonicalize-phase.js';
 import { resolveInboxItem } from '../core/session/resolve-inbox-item.js';
-import { toolError } from './types.js';
-import type { ToolModule, ToolResult } from './types.js';
+import { toolError } from './tool-error.js';
+import type { ToolModule } from './tool-module.type.js';
+import type { ToolResult } from './tool-result.type.js';
 
 export const inboxResolveTool: ToolModule = {
   name: 'inbox_resolve',
