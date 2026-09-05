@@ -7,57 +7,19 @@
 // handing a window the whole backlog would spend its num_ctx on the tasks it was deliberately not
 // given (docs/mental-model.md).
 //
-// It renders an epic/story TREE rather than the flat ordered list `/run` selects from — the user's
-// decision: the tree is how Breakdown actually writes the backlog. Every row still carries what the
-// flat list would have shown, including the one `/run next` would pick, which is also restated in the
-// footer so a narrow terminal cutting a row can never hide the answer.
+// This file is the ASSEMBLER: it composes the single-function modules beside it into the one command
+// object the registry registers, and exports that object and nothing else. Its own body is one arrow —
+// show-tasks.ts reads the backlog and prints it, over render-task-tree.ts.
 
-import { BacklogError, nextRunnableTasks, readBacklog } from '../../core/session/index.js';
-import type { Backlog } from '../../core/session/index.js';
-import { renderer } from '../../core/ui/renderer.js';
-import { theme } from '../../core/ui/theme.js';
 import type { Command } from '../command.type.js';
-import { renderTaskTree } from './render-task-tree.js';
-import { writeFittedLine } from './write-fitted-line.js';
-
-/** The slice of the orchestrator /tasks needs — satisfied structurally by SessionOrchestrator. */
-export interface TasksOrchestrator {
-  readonly projectPath: string;
-}
-
-function showTasks(orch: TasksOrchestrator): void {
-  let backlog: Backlog;
-  try {
-    // readBacklog: read + validate the whole backlog/ tree; throws BacklogError when it is missing or
-    // a task's frontmatter is malformed.
-    backlog = readBacklog(orch.projectPath);
-  } catch (err) {
-    // The same recoverable degrade /run does: one line naming what is wrong, never a thrown command.
-    renderer.errorLine(err instanceof BacklogError ? err.message : String(err));
-    return;
-  }
-
-  // nextRunnableTasks: pending tasks whose every dependency is done, in `order` — its head is exactly
-  // what `/run next` would select, so the tree's mark and the command agree by construction.
-  const next = nextRunnableTasks(backlog)[0]?.id ?? null;
-
-  writeFittedLine('', theme.meta);
-  // renderTaskTree: the backlog as a compact epic/story tree — status, order, unmet deps, next pick.
-  for (const row of renderTaskTree(backlog, next)) writeFittedLine(row.text, row.style);
-  writeFittedLine('', theme.meta);
-  writeFittedLine(
-    next === null
-      ? 'Nothing is runnable right now — every task is done, blocked, or waiting on an unmet dependency.'
-      : `Next: /run next → ${next}`,
-    theme.meta,
-  );
-  writeFittedLine('', theme.meta);
-}
+import { showTasks } from './show-tasks.js';
 
 export const tasksCommand: Command = {
   name: 'tasks',
   group: 'execution',
   description: "The backlog as an epic/story tree — status, order, unmet deps, and what /run next picks",
   usage: '/tasks',
+  // showTasks: the backlog as a tree, marking the task `/run next` would pick and restating it in a
+  // footer, or one recoverable line when the backlog is missing or malformed.
   run: (ctx) => showTasks(ctx.orch),
 };
