@@ -17,21 +17,16 @@
 // symlink they meet, so nothing they return was reached through one.
 
 import type { SandboxClient } from '../core/container/index.js';
+// True when a resolved path is /workspace itself or something strictly beneath it.
+import { insideWorkspace } from './inside-workspace.js';
 // Wraps the path as one shell argument, so a filename with a space or a quote survives the shell.
 import { quoteShellArgument } from './quote-shell-argument.js';
-
-/** Where the active project is mounted. The project root IS this path inside the container. */
-const WORKSPACE = '/workspace';
+import { WORKSPACE_PATH } from './workspace-path.js';
 
 export type WorkspaceScope =
   | { readonly ok: true }
   /** `escaped` separates "points outside the project" from "the container could not answer". */
   | { readonly ok: false; readonly escaped: boolean; readonly message: string };
-
-/** True when `resolved` is /workspace itself or something strictly beneath it. */
-function insideWorkspace(resolved: string): boolean {
-  return resolved === WORKSPACE || resolved.startsWith(`${WORKSPACE}/`);
-}
 
 /**
  * Check that `relative` (project-root-relative, posix) really lands inside /workspace once every
@@ -41,7 +36,7 @@ export async function resolveRealWorkspacePath(
   sandbox: SandboxClient,
   relative: string,
 ): Promise<WorkspaceScope> {
-  const target = relative === '' ? WORKSPACE : `${WORKSPACE}/${relative}`;
+  const target = relative === '' ? WORKSPACE_PATH : `${WORKSPACE_PATH}/${relative}`;
   const result = await sandbox.exec(`realpath -m -- ${quoteShellArgument(target)}`);
   if (result.exitCode !== 0) {
     return { ok: false, escaped: false, message: result.stderr.trim() || 'could not resolve the path' };

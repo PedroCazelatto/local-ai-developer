@@ -17,7 +17,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { test } from 'node:test';
 
-import { resolveInProject } from '../context.js';
+import { resolveInProject } from '../resolve-in-project.js';
 
 /** A throwaway project directory plus its realpath — the temp dir is itself a symlink on macOS. */
 interface Fixture {
