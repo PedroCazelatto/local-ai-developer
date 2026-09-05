@@ -66,7 +66,7 @@ export class SessionOrchestrator implements TurnContext {
   private readonly memory: SessionMemory;
   private phase: Phase;
   private lastTokens: TokenCounts = NO_TOKENS;
-  /** Handed to each spawned Worker window; see TaskLoopDeps in run-task-loop.ts and worker-window.ts. */
+  /** Handed to each spawned Worker window; see task-loop-deps.type.ts and worker-window.ts. */
   private readonly evictionThresholdRatio: number;
 
   // Summarization failsafe (V4/05). The trigger point (exact tokens): a phase whose last

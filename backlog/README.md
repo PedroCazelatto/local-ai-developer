@@ -197,8 +197,21 @@ interface — anything the *caller* implements and passes in — gets its own `.
 function takes it; a **result** type folds, because one function produces it and nothing else can. The
 test is **which side of the call constructs the value**. Note why the rule had to be stated that way:
 **counting importers cannot tell the two shapes apart**, since both have exactly one. The clause is in
-`constitution.md`. Three moves follow: `TaskLoopDeps` back out to its own module, `WorkerResult` and
-`ReviewerOutcome` folded in.
+`constitution.md`. **All three moves have landed** (`df5f891`): `TaskLoopDeps` back out to
+`task-loop-deps.type.ts`, `WorkerResult` and `ReviewerOutcome` folded into the functions that build them.
+
+**Each direction was decided by finding where the value is constructed, and the result is the strongest
+argument for the rule's wording.** `SessionOrchestrator.runTaskLoop` builds the `TaskLoopDeps` literal
+inline and `runTaskLoop` only reads `deps.*` and forwards the object — caller-constructed, a seam.
+`WorkerResult` and `ReviewerOutcome` are each returned by exactly one function and by nothing else.
+
+**And the head-count points the wrong way outright.** `TaskLoopDeps` had **zero** non-barrel importers
+before the move — nothing named it, because the literal that builds one is contextually typed — while its
+sibling *result* type `TaskLoopResult` is named in **eleven** files. **A rule phrased in terms of importer
+counts would have folded the seam and split the result**, which is exactly backwards.
+
+Two findings came out of it, filed as [30](dead-exports-and-unused-imports.md): `runWorkerTask` has no
+callers at all, and 40 unused imports sit in 20 files behind an absent `noUnusedLocals`.
 
 **Wave D is CLOSED. Both halves are at zero, and with them the whole census.**
 
@@ -775,6 +788,29 @@ others. Worth knowing where it sits on severity: this sweep has already turned u
 asserted something outright false**, each caught only because someone read the code beside the comment. A
 pointer to a deleted file is the same class of defect — prose a reader is entitled to trust and cannot —
 at a lower grade.
+
+### 30. [Dead exports and unused imports, neither of which the build can see](dead-exports-and-unused-imports.md)
+*Repo hygiene.* Two findings from [1](split-config-into-one-function-per-file.md) that look like one
+problem and are two, separated by whether a compiler flag could ever find them.
+
+**40 unused declarations across 20 files**, every one a named-and-never-used import, invisible because
+`tsconfig.json` sets `noUncheckedIndexedAccess` and `noImplicitOverride` and **neither
+`noUnusedLocals` nor `noUnusedParameters`**. It is copy-paste debris rather than rot — three `.type.ts`
+modules import the same six-name block from `core/llm` and each uses a subset. **Not an artefact of the
+sweep**: 45 at the last wave's start, 40 now, the difference being five dropped when a file was folded.
+The sweep made them countable, not numerous.
+
+**And three exports with no consumer at all** — `ChatRole`, `codeOf`, `runWorkerTask` — which **no flag
+will ever report**, because an `export` is used by definition. `runWorkerTask` is the instructive one: it
+is the **only** construction site of `WorkerResult`, so that type is consumed nowhere either. **A dead
+function was keeping a live-looking type alive behind it**, and deleting the function is what makes the
+type's deadness visible.
+
+**Ships after wave E, and the reason is the point of the item.** A barrel is what hides this class: while
+`index.ts` re-exports a name, the name has an importer and nothing looks unused. Only once the last six
+barrels are gone does *"exported and never imported"* become a meaningful search. Whether
+`noUnusedLocals` goes on is the open decision, and `noUnusedParameters` wants a different answer, since
+an interface-conforming callback often ignores an argument on purpose.
 
 ---
 
