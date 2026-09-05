@@ -115,19 +115,19 @@ export { SHELF_LABEL_PREFIX } from './shelf-label.js';
 export type { ShelfResult } from './shelf-result.type.js';
 export { switchBranch } from './switch-branch.js';
 // The branch a task is developed on — one task, one branch (docs/phases.md).
-export { runBatch, batchSummaryFileName, BATCHES_DIRNAME } from './batch.js';
+export { runBatch } from './run-batch.js';
+export { batchSummaryFileName } from './batch-summary-file-name.js';
+export { BATCHES_DIRNAME } from './batches-dirname.js';
 export { taskBranchName } from './task-branch-name.js';
-export type {
-  BatchSummary,
-  BatchDeps,
-  BatchReporter,
-  BatchPosition,
-  BatchPassed,
-  BatchEscalated,
-  BatchBlocked,
-  BatchCancelled,
-  BatchSkipped,
-} from './batch.type.js';
+export type { BatchSummary } from './batch-summary.type.js';
+export type { BatchDeps } from './batch-deps.type.js';
+export type { BatchReporter } from './batch-reporter.type.js';
+export type { BatchPosition } from './batch-position.type.js';
+export type { BatchPassed } from './batch-passed.type.js';
+export type { BatchEscalated } from './batch-escalated.type.js';
+export type { BatchBlocked } from './batch-blocked.type.js';
+export type { BatchCancelled } from './batch-cancelled.type.js';
+export type { BatchSkipped } from './batch-skipped.type.js';
 // The `/stop` wind-down request behind `/stop` and `/stop round`: armed by the input fence for the
 // length of a run, read by the task loop between rounds and by the batch driver between tasks.
 export type { BlockerRow } from './blocker-row.type.js';
