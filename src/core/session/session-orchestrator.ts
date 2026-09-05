@@ -10,10 +10,11 @@ import { createToolContext } from '../../tools/index.js';
 import type { SandboxClient } from '../container/index.js';
 import type { Message, StreamHandle, TokenCounts, Tool, ToolCall, TurnAbortReason } from '../llm/index.js';
 import { OllamaClient } from '../llm/index.js';
+import { capitalizePhase } from '../ui/capitalize-phase.js';
 import { renderer } from '../ui/renderer.js';
 import { addTokenCounts } from './add-token-counts.js';
 import type { SessionConfig } from './config.js';
-import { dispatchToolCall } from './dispatch.js';
+import { dispatchToolCall } from './dispatch-tool-call.js';
 import { drainAnsweredQuestions } from './drain-answered-questions.js';
 import { appendEvent } from './events-log.js';
 import { generateContextTitle } from './generate-context-title.js';
@@ -34,8 +35,8 @@ import { SubagentManager } from './subagents.js';
 import type { SubagentInfo } from './subagents.type.js';
 import { compactActivePhase } from './summarizer.js';
 import type { Task } from './task.type.js';
-import type { TurnContext } from './turn-loop.js';
-import { processMessage as processTurns } from './turn-loop.js';
+import type { TurnContext } from './turn-context.type.js';
+import { processMessage as processTurns } from './process-message.js';
 
 const NO_TOKENS: TokenCounts = { promptTokens: null, evalTokens: null };
 
@@ -483,7 +484,7 @@ export class SessionOrchestrator implements TurnContext {
     // The EXACT prompt size that tripped the failsafe — the "before" for the V5/04 summarization_fire.
     const before = this.lastPromptTokens.get(phase) ?? null;
     // The one user-visible status line the task specifies.
-    renderer.systemMessage(`Compacting ${titleCase(phase)} history (failsafe)...`);
+    renderer.systemMessage(`Compacting ${capitalizePhase(phase)} history (failsafe)...`);
     // compactActivePhase: collapse the active phase's oldest ~50% visible turns into one `summary`
     // record (throwaway oneShot; append-only on disk; the in-RAM view collapses). Exact tokens only.
     const result = await compactActivePhase({ llm: this.llm, memory: this.memory });
@@ -513,7 +514,7 @@ export class SessionOrchestrator implements TurnContext {
       'user',
       `Answers to question(s) you asked earlier and I had not answered yet:\n\n${body}`,
     );
-    renderer.systemMessage(`Delivered ${answers.length} saved answer(s) to ${titleCase(phase)}.`);
+    renderer.systemMessage(`Delivered ${answers.length} saved answer(s) to ${capitalizePhase(phase)}.`);
   }
 
   /**
@@ -626,9 +627,4 @@ export class SessionOrchestrator implements TurnContext {
     );
     return [{ role: 'system', content: system }, ...this.memory.history];
   }
-}
-
-/** Phase ids are lowercase in-code; display them Titlecased to match the task's `<Phase>` wording. */
-function titleCase(phase: string): string {
-  return phase.charAt(0).toUpperCase() + phase.slice(1);
 }

@@ -7,13 +7,14 @@ export { saveAppState } from './save-app-state.js';
 // Boot model resolution against what Ollama actually has installed (replaces the old hard-coded default).
 export { SessionMemory } from './session-memory.js';
 export type { ChatRole } from './chat-role.type.js';
-export { SessionOrchestrator } from './orchestrator.js';
+export { SessionOrchestrator } from './session-orchestrator.js';
 export { resolveBootModel } from './resolve-boot-model.js';
 // Phase memory is SQLite-backed (projects/<active>/.orchestrator/memory.db): a context is an
 // addressable, titled row rather than a file whose name had to be renamed to change state.
 export { appendAuditRow, OUTPUT_PREVIEW_LIMIT } from './audit.js';
-export type { ToolCallRecord, DispatchDeps } from './dispatch.js';
-export { dispatchToolCall } from './dispatch.js';
+export { dispatchToolCall } from './dispatch-tool-call.js';
+export type { ToolCallRecord } from './tool-call-record.type.js';
+export type { DispatchDeps } from './dispatch-deps.type.js';
 export { CONTEXT_TITLE_LIMIT, generateContextTitle } from './generate-context-title.js';
 export { CONTEXT_SHORT_ID_LEN, shortContextId } from './short-context-id.js';
 export type { ClearResult } from './clear-result.type.js';
@@ -22,8 +23,8 @@ export type { MemoryRecord } from './memory-record.type.js';
 export type { MemoryRole } from './memory-role.type.js';
 export type { PhaseLoad } from './phase-load.type.js';
 export type { TurnTokens } from './turn-tokens.type.js';
-export type { TurnContext } from './turn-loop.js';
-export { MAX_TOOL_ROUNDS } from './turn-loop.js';
+export type { TurnContext } from './turn-context.type.js';
+export { MAX_TOOL_ROUNDS } from './process-message.js';
 // The ONE place a finished tool call is recorded: its durable audit row AND its `←` scrollback line.
 // Every audit-writing site goes through it — including the three runner-level refusals that never
 // reach the dispatcher, which are exactly the calls the record was built to make visible.
@@ -58,8 +59,9 @@ export { taskSkipReason } from './task-skip-reason.js';
 export type { TaskStatus } from './task-status.type.js';
 export { TASK_STATUSES } from './task-statuses.js';
 export type { Task } from './task.type.js';
-export type { WorkerDeps, WorkerResult } from './worker-runner.js';
-export { runWorkerTask } from './worker-runner.js';
+export type { WorkerDeps } from './worker-deps.type.js';
+export type { WorkerResult } from './worker-result.type.js';
+export { runWorkerTask } from './run-worker-task.js';
 // REVIEWER_TOOL_NAMES now lives with every other phase's array in phases/phase-tool-names.ts.
 export type { ChangedFiles } from './capture-changed-files.js';
 export { captureChangedFiles } from './capture-changed-files.js';
@@ -75,8 +77,12 @@ export type { ReviewDecision } from './review-decision.type.js';
 export { REVIEW_DIFF_BUDGET } from './review-diff-budget.js';
 export type { ReviewIssue } from './review-issue.type.js';
 export type { ReviewVerdict } from './review-verdict.type.js';
-export type { ReviewerDeps, ReviewerInput, ReviewerOutcome, ReviewerCommit } from './reviewer-runner.js';
-export { runReviewerTask, ReviewerVerdictError } from './reviewer-runner.js';
+export type { ReviewerDeps } from './reviewer-deps.type.js';
+export type { ReviewerInput } from './reviewer-input.type.js';
+export type { ReviewerOutcome } from './reviewer-outcome.type.js';
+export type { ReviewerCommit } from './reviewer-commit.type.js';
+export { runReviewerTask } from './run-reviewer-task.js';
+export { ReviewerVerdictError } from './reviewer-verdict-error.js';
 export type { GitRun } from './run-git.js';
 export { runGit } from './run-git.js';
 export { runTaskLoop, MAX_ROUNDS } from './run-task-loop.js';

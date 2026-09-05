@@ -197,11 +197,28 @@ Later waves will meet this harder — `interface/commands` has 20 files of near-
 `run`, `complete` and `usage` recur across all of them. Renaming an exported name to dodge a collision
 changes the API to satisfy a file system; the assembler is the answer the rule already provides.
 
-**An assembler may export types beside its object.** "Exports that object and nothing else" bounds
-*values*, not declarations: a type erases at compile time and costs the import surface nothing, so
-`export type { Foo }` next to the object is fine and a second exported *value* is not. This is what
-saves 13 of the 16 files in `src/interface/commands/` from deletion — they pair a command object with
-the type describing it — and it settles the `SessionConfig` question this brief used to park.
+**An assembler MAY export types beside its object — permission, not a mandate.** "Exports that object
+and nothing else" bounds *values*, not declarations: a type erases at compile time and costs the import
+surface nothing, so `export type { Foo }` next to the object is allowed and a second exported *value* is
+not.
+
+> **CORRECTION — an earlier version of this line said the ride-along is "what saves 13 of the 16 files
+> in `src/interface/commands/` from deletion — they pair a command object with the type describing it."
+> That read as *the type must stay in the assembler*, which points the opposite way from the
+> constitution's "a type with an owning function lives in that function's file … it moves when the
+> function moves."** Wave D found the conflict and correctly refused to resolve it itself.
+>
+> **Ruled: the type moves to the function's file.** Those files are saved by the **command object**, not
+> by the type. An assembler that exports one value and no type is *stricter* than the ride-along
+> permits, and therefore still compatible with it — permission is not obligation.
+
+**Where several co-equal functions share one interface, it becomes its own `.type.ts`.**
+`RunOrchestrator` (4 functions) and `ResumeOrchestrator` (2) have no single owner among their users, so
+neither belongs in any one of their files — the same shape `CompletionCycle` took in `7da4b97`. This is
+the sharpened test doing its job: **ask what would own it, not how many import it.** When the honest
+answer is "several, co-equally", nothing owns it.
+
+It also settles the `SessionConfig` question this brief used to park.
 
 **Duplicated helpers are deduped as the sweep goes, not afterwards.** Two have a home already:
 `write` → `src/core/ui/write.ts` and `errMessage` → `src/core/err-message.ts`. **Each later wave
@@ -263,6 +280,13 @@ one. Treat any claim that a directory is finished as something to check against 
   accuracy in either name fixes that. Every other rename recorded here was about a name being *wrong*;
   this one is about two names being *too close*, which is a separate failure and a separate reason to
   rename.
+
+**A private helper whose natural file name is already a command.** `format-audit-row.ts`'s private
+`exit()` could not become `exit.ts` — that is the `/exit` **command**. Renamed `exitLabel`, matching
+`durationLabel` beside it. This is a distinct hazard from the collisions listed above: the name is not
+taken by another *helper*, it is taken by the directory's own vocabulary, and **every command directory
+has this latent** — `run`, `help`, `clear`, `resume` are all plausible helper names and all already
+spoken for.
 
 **Type-vs-function stem collision — the exported name outranks the private helper.** A `.type.ts` may
 not share a stem with a `.ts`, so `ChatRole` (exported type) and `chatRole` (private function) could not
@@ -696,6 +720,23 @@ write, someone else may have landed in the same paragraph.
 > with an empty diff, that you did not edit, is the signature**, and it is exactly the line a reader
 > skims past.
 >
+> **`git add`'s "LF will be replaced by CRLF" warning is NOISE. Do not act on it.** `core.autocrlf=true`
+> with no `.gitattributes`, so git normalises on commit and **every blob is LF**. Measured: a CRLF file
+> (`src/core/ui/write.ts`) and an LF file (`backlog/README.md`) are **both clean** at the same time,
+> because git compares normalised content and **EOL alone is never a diff.**
+>
+> **The tree is MIXED, not LF — 52 CRLF files against 347 LF.** Files git checked out are CRLF; files an
+> agent wrote directly are LF. So a bulk normalisation is **not** a no-op tidy-up: it rewrites 52 real
+> files. Wave D ran one over a glob and rewrote **73 files, 13 of which it had not touched**, dirtying
+> them with empty content diffs — `sed -i` in mirror image, a different tool through the same door.
+>
+> **It caught it by diffing a pathspec-scoped `git status` before and after the bulk operation**, and
+> converting back restored the tree byte-identically. **That is the amended staging rule passing its
+> first real test** — changed from *"enumerate"* to *"enumerate, then read what git thinks changed and
+> account for every line"* precisely for this, and the very next agent to hit it was saved by it.
+> **Generalise: diff a scoped `git status` before and after ANY bulk operation, not only before
+> staging.**
+>
 > **And `git commit -- <pathspec>` cannot reach an untracked file** — it fails with `did not match any
 > file(s) known to git`. The pathspec form silently assumes git already knows the path, so **`git add`
 > your new files first.** Same operation, failure one step earlier than the one above.
@@ -815,6 +856,28 @@ non-redundant, not assumed to be.
 Record the framing that keeps a digest test from being deleted as brittle: **it does not forbid a prompt
 change, it makes one show up in a diff.** Recompute the digest in the same commit as the change.
 
+### Three findings about the instruments themselves
+
+**`ts.createScanner` is the wrong tool for a byte-identity check, and it looks like the right one.**
+With no parser context it cannot re-scan a template continuation: it pairs the wrong backticks and
+swallows real code — identifiers included — inside a single template-text token. Two correctly-renamed
+call sites therefore read as body changes. **Walk the parsed AST instead.** Recorded because it is
+**a plausible-looking tool producing confident nonsense**, which is the category someone reaches for
+again: a scanner is the obvious thing to reach for when you want tokens.
+
+**The AST walk has its own blind spot, and it is one already in this file.** The parser **recovers**
+from a missing closing brace, so a one-line-short range yields identical leaf tokens and stays green —
+the prefix shape again, wearing a different instrument. AST bounds make such a range impossible to
+*produce*, which sounds like the end of it. **But the agent noticed that its control therefore could not
+fire, and a control that cannot fire is not a control.** Fixed by leading the stream with
+`parseDiagnostics.length`. Note the discipline: the safe conclusion was available and it checked anyway.
+
+**`git show` yields LF while a working-tree file may be CRLF**, so a raw comparison reports a difference
+in **every multi-line template literal** — an artefact, since the language normalises CRLF→LF in a
+template's cooked value. **It was located by two instruments disagreeing**, which is the cleanest
+instance yet of why the second instrument earns its keep: neither was wrong about what it measured, and
+the disagreement was the whole signal.
+
 ### Mutation testing answers directly what every other instrument answered by proxy
 
 > **A test that passes is not yet evidence that the code it names is the code being exercised.** Five
@@ -850,6 +913,13 @@ instrument would go green through exactly the change most likely to break someth
 propagation, not just the pass/fail.**
 
 ## Stale prose the compiler will never find
+
+> **Two of these are DEFERRED to a single pass at the end, deliberately.** `src/core/ui/write.ts:2` and
+> `src/core/ui/capitalize-phase.ts:8-11` both list the copies still to be retired as "not swept yet".
+> Those lists become correct **as each wave retires its copy**, so editing them per wave is three edits
+> racing the thing they describe. **One pass when the sweep closes.** Also queued:
+> `README-INCONSISTENCIES.md:122` names `project-templates.ts`, which wave D deletes.
+
 
 **A split leaves stale prose in files that never imported the moved code.** A header saying "see
 `repl.ts`" keeps compiling forever after `repl.ts` is gone. Every wave so far has produced some, and

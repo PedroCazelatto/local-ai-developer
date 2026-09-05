@@ -4,7 +4,7 @@
 import type { SandboxClient } from '../container/index.js';
 import type { OllamaClient, TokenCounts } from '../llm/index.js';
 import type { ReviewVerdict } from './review-verdict.type.js';
-import type { ReviewerCommit } from './reviewer-runner.js';
+import type { ReviewerCommit } from './reviewer-commit.type.js';
 import type { RunStopSignal } from './run-stop-signal.js';
 
 /**

@@ -22,15 +22,15 @@ import type { Message, StreamHandle, TokenCounts, Tool, ToolCall } from '../llm/
 import type { ToolCallDisplay } from '../ui/types.js';
 import { addTokenCounts } from './add-token-counts.js';
 import { candidatePhaseFile } from './candidate-phase-file.js';
-import type { ToolCallRecord } from './dispatch.js';
-import { dispatchToolCall } from './dispatch.js';
+import type { ToolCallRecord } from './tool-call-record.type.js';
+import { dispatchToolCall } from './dispatch-tool-call.js';
 import { isToolErrorResult } from './is-tool-error-result.js';
 import { createReadTracker } from './read-tracker.js';
 import type { FileReadTracker } from './read-tracker.type.js';
 import { recordToolCall } from './record-tool-call.js';
 import type { RetroDeps } from './retro-deps.type.js';
 import type { RetroSubmission } from './retro-submission.type.js';
-import type { TurnContext } from './turn-loop.js';
+import type { TurnContext } from './turn-context.type.js';
 
 // The project-scoped registry tools Retro may use: inspect the backlog/spec, make a TASK-SPECIFIC
 // edit, and signal other phases via the cross-phase inbox (V3/04). No write_file (Retro makes the

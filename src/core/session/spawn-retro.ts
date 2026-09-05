@@ -17,7 +17,7 @@ import type { RetroInput } from './retro-input.type.js';
 import type { RetroResult } from './retro-result.type.js';
 import { RetroWindow } from './retro-window.js';
 import { routeRetroEdit } from './route-retro-edit.js';
-import { processMessage } from './turn-loop.js';
+import { processMessage } from './process-message.js';
 
 // Retro reads a couple of files (task doc / phase file) then makes one edit and submits — lighter than
 // the Worker's implement loop. Give headroom for a few reads + a re-tried edit before the cap trips.
