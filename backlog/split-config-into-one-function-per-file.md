@@ -6,6 +6,265 @@ Item 1 of the execution order. It began as a two-file refactor and is now the re
 the constitution's *one function per file, least responsibility* rule true rather than aspirational.
 **The first increment has shipped; the sweep has not.** This file stays until it does.
 
+## Resuming from cold — start here
+
+**This section is a checkpoint.** It was written so that someone with none of the conversation that
+produced the sweep can pick it up from this file alone. Everything below was **measured at `5ca1d1f`**,
+not remembered. Read *The bar* and the verification section before touching code; read this first to
+know where to point.
+
+### The tree as it stands
+
+`tsc --noEmit` clean. `npm test` **400 / 400**, 0 skips. The index is empty. The working tree is dirty in
+exactly three files — [CLAUDE.md](../CLAUDE.md), [constitution.md](../constitution.md) and
+[docs/repo-layout.md](../docs/repo-layout.md) — and **that is deliberate**: they are review-gated, they
+carry the governance amendment this sweep runs on, and they are waiting on the user. **Do not commit
+them, and do not revert them.** If they are already committed when you arrive, the user did it.
+
+Nothing is half-split. Every agent that was working stopped on a commit boundary, and the two that had
+files left had started nothing on them, so there was nothing to revert.
+
+### What is left, measured at HEAD
+
+A TypeScript-parser census at `5ca1d1f` (562 files scanned, `.type.ts` / `.schema.ts` / `__tests__`
+excluded) finds **35 files holding 129 declarations**, and they sit in exactly **two directories**:
+
+| directory | files | declarations |
+|---|---:|---:|
+| `src/tools` | 24 | 74 |
+| `src/interface/commands` | 11 | 55 |
+
+**How to reproduce that census**, because the number is worthless if the next person cannot re-derive it.
+It is a throwaway script, so it is not in the repo — rewrite it, in about forty lines. Walk `src/`
+skipping `__tests__`, take every `.ts` that is not `.type.ts` or `.schema.ts`, and parse each with
+`ts.createSourceFile(…, /* setParentNodes */ true)` from the `typescript` already in `node_modules`. Count,
+**over `sourceFile.statements` only** — top level, never a recursive walk:
+
+- every `FunctionDeclaration` and every `ClassDeclaration`;
+- every `VariableStatement` declarator whose initializer is an arrow or function expression;
+- every arrow-property **and method shorthand** on a declarator initialized to an object literal,
+  unwrapping `as` / `satisfies` / parentheses first.
+
+Report the files whose count is greater than one. Two things make this the right shape and a regex the
+wrong one, and both were learned the hard way: **restricting to top-level statements** is what keeps the
+22 arrows that live inside function bodies out of the count, and **counting method shorthand** is the
+thing the regex census declared a pattern for and then forgot to add up.
+
+Run it from the repo root, not from `%TEMP%` — a script outside the repo cannot resolve `typescript`,
+because module resolution walks up from the script rather than from the working directory.
+
+**Every other directory is at zero.** `core/llm`, `core/container`, `core/ui`, `core/session`,
+`context`, `commands`, `phases`, `interface` (top level) and `src/` root are all done and verified.
+
+> **The 129 is larger than the 113 the ledger last reported, and the sweep did not go backwards.** The
+> baseline census was a regex pass; it declared a `METHOD` pattern for object-literal **method
+> shorthand** and then never added it to the total. A parser census counts it. So `src/tools` — nearly
+> every file of which is `export const xTool = { …, execute(…) {…} }` — was always understated. The row
+> in *The partition* below says 20 / 60; the truth at HEAD is 24 / 74. **The census having been wrong is
+> not the sweep having regressed**, and the usual caveat still applies to the baseline: it is measured at
+> `a0e9e31` and will not reproduce against a live tree.
+
+### Settled: method shorthand counts, and it is why `src/tools` is 24 / 74
+
+**Does a method shorthand on a top-level object literal count as a declaration?** The parser census
+raised the question, because the bar as written counted functions, classes and **arrow properties** on a
+top-level object literal, and the user had ruled separately that **a class's methods do not count**. An
+`execute(…) {…}` written as method shorthand on an object literal was none of those three things.
+
+**Ruled by the user: it counts, exactly as an arrow property does.** `execute(x) {…}` and
+`execute: (x) => {…}` are the same declaration written two ways, and the bar cannot depend on which
+spelling someone reached for. The clause is now in [constitution.md](../constitution.md) under *What
+counts, exactly*, with the reason it does not contradict the class rule: **a class's methods are exempt
+because the class is itself one declaration that owns them, whereas an object literal declares nothing of
+its own, so its members are the only declarations there are.**
+
+This is what makes `src/tools` **24 files / 74 declarations** rather than 19 / 63 — nearly every file
+there is `export const xTool = { name, description, execute(…) {…} }`, so every tool object becomes an
+assembler over a separate `execute` file. Under the rejected reading, five files would have conformed as
+they stood (`debate.ts`, `edit-file.ts`, `execute-command.ts`, `git-branch.ts`, `load-rule.ts`) — and the
+trap in that reading is worth recording: each of those five still holds one private helper whose name is
+not the file's name, so they would have stopped being *multi-declaration* violations while still not
+satisfying the rule. The ruling closes both questions at once.
+
+`interface/commands` was never affected either way: its command objects use `run: async (…) => …`, an
+arrow property, settled and counted from the start.
+
+### `src/interface/commands` — 11 files, 55 declarations, all measured
+
+Wave D shipped 9 of the 20 files in four commits (`458c2ab`, `6b5d5d9`, `a27f9a0`, `5ca1d1f`) and
+started nothing on these:
+
+| file | decls | what is in it |
+|---|---:|---|
+| `run.ts` | 14 | 13 functions + `runCommand.run` |
+| `resume.ts` | 12 | 11 functions + `resumeCommand.run` |
+| `subagents.ts` | 6 | 5 functions + `subagentsCommand.run` |
+| `answer.ts` | 4 | 3 functions + `answerCommand.run` |
+| `batch.ts` · `blockers.ts` · `clear.ts` · `inbox.ts` · `questions.ts` | 3 each | 2 functions + the command's `run` |
+| `audit.ts` · `tasks.ts` | 2 each | 1 function + the command's `run` |
+
+**All 11 survive as assemblers** — each is a command object the registry takes as one thing, which is the
+assembler test answering in the affirmative. None is deleted. Contrast `project-templates.ts`, which
+**was** deleted: its one importer took six named things from it, not one thing.
+
+Four things to know before starting, none of them derivable from the code:
+
+- **`titleCase` is still declared twice** — `clear.ts:22` and `resume.ts:53`, identical bodies. The
+  shared home already exists at [src/core/ui/capitalize-phase.ts](../src/core/ui/capitalize-phase.ts).
+  Repoint both and delete both copies. (`src/core/session/title-case.ts` was the third copy; wave C
+  deleted it in `ffbc4f0`.)
+- **`localStamp` at `resume.ts:63` is `formatLocalStamp`** — already extracted to
+  `interface/commands/format-local-stamp.ts`. The two bodies differ only in the names of three locals.
+  Verified line by line; this is a dedupe, not a look-alike.
+- **Nine orchestrator interfaces move into the file of the function that takes them.** Two do not:
+  `RunOrchestrator` and `ResumeOrchestrator` have more than one taker each, so they become `.type.ts`
+  modules under the one-unowned-type rule.
+- **The obvious stem is usually taken.** `resumeContext` cannot become `resume.ts`, because `resume.ts`
+  is the command file. This is the general form of the `exit()` hazard: in this directory the command
+  files own the plain stems, so an extracted helper needs a name that stands alone beside them. Grep the
+  tree for any name you are about to promote — extraction turns a private helper's name into a
+  repo-visible file name, and four same-name/different-body collisions have already been found this way
+  (`toPosix`, `splitFrontmatter`, `appendEvent`, `buildRegistry`).
+
+### `src/tools` — 24 files, 74 declarations, unstarted
+
+Nothing has begun here. It was gated on `core/session`, which is now closed, so **it is unblocked.**
+Largest first: `build-file-diff.ts` 5, `parse-ask-questions.ts` 5, `search-rules.ts` 5,
+`submit-verdict.ts` 5, `commit-changes.ts` 4, `fs-support.ts` 4, `git-inspect.ts` 4, `registry.ts` 4,
+then nine files at 3 and seven at 2.
+
+- **`registry.ts:85` still holds a `buildRegistry`** whose body differs from the one
+  `interface/command-registry.ts` was built around. Same name, different function. Do not assume the
+  earlier work covered it — this directory was reported "finished" once in conversation and was not.
+- **`tools/types.ts` rides with this wave.** 50 importers, but **exactly one outside the directory**
+  (`core/session/dispatch.ts`).
+- **Eight old-style `.type.ts` pairs live here** and die with the files they sit beside:
+  `compose-commit-message`, `guard-write-target`, `list-files`, `parse-ask-questions`, `raise-blocker`,
+  `read-optional-count`, `render-numbered-slice`, `search-in-files`. They are not a separate job, and
+  they are **not** the type retrofit having been left half-done.
+- **`DEFAULT_IMAGE` is not yours to change.** [item 21](node-version-hardcoded-in-the-images.md) owns the
+  hardcoded Node tag. Carry it across unchanged and report where it landed.
+
+### `src/core/session` is closed, and what that unblocks
+
+Zero violations, down from 28 files / 181 declarations, in **14 commits** ending at `9c51bfb`. Six
+differential harnesses were re-run after every one of them. **Six old-style `.type.ts` pairs remain** —
+`events-log`, `evict-stale-tool-results`, `read-tracker`, `run-stop-signal`, `run-task-loop`,
+`subagents` — and each dies with the `.ts` beside it.
+
+**Take `read-tracker.type.ts` last, and alone.** It has nine importers, three of them in `src/tools`, so
+folding it while anyone is working in `tools` puts two agents in the same files.
+
+Closing this directory unblocked three things at once: the whole `src/tools` wave, the `core/ui/types.ts`
+retrofit (which needed `core/session`'s three importers to settle), and the visible-turn agreement test
+below.
+
+### Wave E — the barrels, measured rather than counted from the plan
+
+The plan says "nine barrels, one final pass". **The measurement says something more useful.** There are
+ten `index.ts` files under `src/`; here is what each actually is, with its importers at HEAD:
+
+| `index.ts` | re-export lines | importers | verdict |
+|---|---:|---:|---|
+| `src/core/llm/` | 25 | **65** | barrel — the big one (41 importers in `core/session`) |
+| `src/core/session/` | 150 | 37 | barrel — 27 importers in `interface/commands` |
+| `src/core/container/` | 12 | 13 | barrel |
+| `src/context/` | 11 | 11 | barrel |
+| `src/phases/` | 5 | 7 | barrel — all 7 importers in `core/session` |
+| `src/tools/` | 38 | 5 | barrel — all 5 importers in `core/session` |
+| `src/interface/` | 2 | 1 | barrel — one importer, in `src/boot` |
+| `src/core/ui/` | 34 | **0** | barrel, **already orphaned** |
+| `src/core/` | 0 | 0 | **not a barrel** — a comment block over `export {}` |
+| `src/` | 0 | 0 | **the entry point. It survives.** |
+
+Three consequences the plan does not carry:
+
+- **`core/ui/index.ts` can be deleted today, alone, with no importer edits.** Wave B repointed all 43 of
+  its importers at concrete files; the barrel has been dead since `1c3b1cb`. Confirmed twice — by import
+  resolution and by grep for every spelling of the path.
+- **`src/core/index.ts` is a different kind of file**, and it needed a decision rather than a deletion.
+  It re-exports nothing; it is four lines of comment describing what each of the four subdirectories is
+  for, held in the module graph by `export {}`. Deleting it naively would have destroyed the only place
+  that map was written down. **Ruled by the user: the comment goes into
+  [docs/repo-layout.md](../docs/repo-layout.md), and the file is deleted.** In the event almost nothing
+  had to move — the tree in that doc already carried all four subdirectory descriptions in richer form,
+  and only the framing phrase *"orchestrator internals, grouped by concern"* was unique to the comment.
+  It is now on the `core/` line of the tree, so the deletion loses nothing.
+- **Wave E is not one atomic pass, and treating it as one buys a serialization it does not need.**
+  `core/session/index.ts`'s 27 `interface/commands` importers overlap wave D's remaining files, so that
+  one waits. `core/ui` and `interface` — 0 and 1 importers — wait for nothing.
+
+**Three files must NOT be deleted by the barrel pass**, and the mechanical test that distinguishes them
+is *one exported value, no function declaration, zero re-export lines*:
+
+- `src/index.ts` — the entry point. **`find src -name index.ts` returns it**, so the obvious wave-E
+  command sweeps it up. Its `import 'dotenv/config'` must also stay the **first import in the file**:
+  ESM evaluates imports in source order, and moving it down leaves `OLLAMA_NUM_CTX` undefined with **no
+  error at all**, while every context window silently runs at Ollama's default ceiling.
+- `src/interface/command-registry.ts` — a `ReadonlyMap` **value module**. 1 export, 0 re-exports.
+- `src/core/llm/daemon.ts` — the same shape. 1 export, 0 re-exports.
+
+Both value modules say so in their own headers, precisely so that the barrel pass does not read them as
+shells.
+
+### Open follow-ups, with what each is waiting on
+
+- **The SQL-versus-JS visible-turn agreement test.** *"Still in the phase's live history"* is defined
+  twice — as SQL in `core/session/visible-turn-where.ts` and as JS in `core/session/visible-turns.ts` —
+  and **the two must agree, or a flush changes what a phase can see.** It cannot be deduped: two
+  languages, two execution sites. `core/session` closing removed one blocker; the other is the runtime
+  below, because this is the first test that would touch `node:sqlite`.
+- **Re-run the suite under Node 24.** All 400 pass on **22.14.0**; `.nvmrc` pins **24.14.0**. `npm test`
+  invokes `node --test` directly and never passes through `scripts/run.mjs`, so nothing enforces the pin
+  on that path. `node:sqlite` is **experimental on 22.x and stable from 24** — and the `test` script
+  passes `--disable-warning=ExperimentalWarning`, which switches off the one signal that would have
+  announced it. **This is a user action** (install nvm-windows, then Node 24.14.0). The ruling was to fix
+  the runtime rather than gate `npm test`, because gating it would have refused on this box and stripped
+  every agent of its behavioural gate mid-sweep.
+- **`config.ts` still owes its assembler reshape.** See *Owed* below. It is the one piece of wave-C-era
+  work that did not land with its directory.
+- **`ChatRole` is dead vocabulary** — no consumer but its own declaration and one barrel line. Delete it
+  on purpose, after the barrel pass.
+- **`core/ui` header cleanup**, plus `README-INCONSISTENCIES.md:122`.
+- **Tests for `StreamFilter` / `recoverToolCalls` and for `src/context/` are done**, not pending —
+  `d3e0f42` and `48af6f5`. Any entry listing them as deferred is stale.
+
+### Traps that cost real time, and are invisible in the code
+
+- **A bash heredoc here silently collapses a doubled backslash into a single one.** It broke three
+  scratch files before anyone noticed, and it does not error — it produces a file that parses
+  differently. Write `String.fromCharCode(92)` rather than a literal doubled backslash in any generated
+  script. The same bite reaches `sed` expressions.
+- **`sed -i` over a glob rewrites CRLF to LF on read.** It dirties files it did not otherwise touch, with
+  diffs that show as empty. **Positive enumeration of paths does not catch this** — only reading a
+  pathspec-scoped `git status` afterwards and accounting for every line does. One bulk normalisation
+  rewrote 73 files including 13 untouched ones and had to be reversed byte-identically.
+- **The working tree is mixed EOL, not LF** — 62 CRLF files against 438 LF-only, measured. Anything that
+  assumes uniformity will look like a no-op and will not be one.
+- **Node's `/tmp` is not Git Bash's `/tmp`** on this box. A script that writes one and reads the other
+  finds nothing and reports success.
+- **A scratch script placed in `%TEMP%` cannot resolve `typescript`** — module resolution walks up from
+  the script, not from the repo. Import it by absolute `file:///` URL, or keep the script inside the repo
+  and delete it afterwards.
+- **The git *index* is shared state between concurrent agents.** `git commit -- <paths>` is safe;
+  `git reset` is not, because it discards whatever another agent has staged mid-commit.
+- **A module-level value read across an import cycle must be read inside a function body.** A top-level
+  `const CAP = config.N` throws `ReferenceError: Cannot access 'config' before initialization`. Driven
+  against Node's real loader in four entry orders, including the failing one.
+- **`src/interface/commands/help.ts` cannot be the first module imported** — `ReferenceError: Cannot
+  access 'helpCommand' before initialization`, at HEAD and before it. See
+  [item 25](help-command-cannot-be-imported-first.md); it blocks a test someone will want to write.
+
+### Required reading, and why it is not optional
+
+The verification section below — *A green differential proves nothing until a control has gone red — AND
+been shown to run* — is the most expensive thing in this file. **Six distinct shapes of vacuous green**
+were found during this sweep, and **not one of them was caught by a green result looking wrong.** Every
+one was caught because an instrument was made to fail on purpose and refused to. Mutation testing was run
+twice and produced a survivor both times, and both survivors improved a test.
+
+The rule that generalises all of it: **prove the instrument can distinguish, and prove that it ran.** A
+harness with `main()` defined and never called printed `probes=58 mismatches=0`.
 ## What has already landed
 
 `src/core/session/config.ts` held four functions — `resolveNumCtx`, `resolveRatio`, `resolveTimeoutMs`

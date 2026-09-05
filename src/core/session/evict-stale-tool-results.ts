@@ -1,58 +1,12 @@
-// Late-batch eviction — the missing middle between "keep every tool result forever" and "summarize the
-// whole history". It replaces older tool results with a one-line stub, costs no inference at all, and is
-// the ONLY bound the Worker's window has ever had.
-//
-// WHY "LATE" IS THE WHOLE DESIGN, and it was measured rather than assumed. Ollama reuses the KV cache
-// for the COMMON PREFIX of two consecutive calls on the same model. Appending preserves that prefix;
-// rewriting an earlier message destroys it from the edit point onward, and everything after has to be
-// prompt-evaluated again. Measured on this project's settings (num_ctx 16384, an ~11.6k-token window,
-// counts read from Ollama's own response fields):
-//
-//   append a message                          prompt_eval_duration  0.39s (14b)   3.32s (32b)
-//   stub the NEWEST tool result               prompt_eval_duration  0.22s (14b)
-//   stub the OLDEST tool result              prompt_eval_duration 12.38s (14b)  31.26s (32b)
-//   resend either mutated prompt unchanged    prompt_eval_duration  0.07s (14b)
-//
-// Two things follow, and they are the reason this file exists in the shape it does. First, the penalty
-// is ONE-TIME — the mutated prefix is cached immediately afterwards — so eviction is not the recurring
-// tax it was feared to be. Second, the cost is a pure function of HOW EARLY the earliest rewritten
-// message is: at the tail it is cheaper than a plain append, at the head it is a full re-evaluation.
-//
-// Hence the invariant this file enforces: NEVER REWRITE A MESSAGE EARLIER THAN THE NEWEST SURVIVING
-// HALF OF THE WINDOW. A pass that would have to reach into the head does nothing at all and waits. That
-// is not a heuristic, it is the measurement expressed as a rule.
-//
-// WHAT IT BUYS, stated honestly so nobody expects the wrong thing: HEADROOM, not wall clock. With the
-// cache warm a turn's prompt evaluation is a fraction of a second whether the window is 9.8k tokens or
-// 11.7k, so eviction never makes a turn faster. It buys room to keep working, once, for a fixed price.
-//
-// THE LIMITATION, equally honest: a window whose bulk sits in its FIRST half cannot be helped by this.
-// The pass will correctly decline and the window will keep growing until Ollama silently drops its
-// oldest tokens. That residual is a different problem and has its own file —
-// backlog/spawned-windows-have-no-failsafe.md.
-//
-// LIVE-VIEW ONLY, and Worker-scoped. The Worker's window is RAM-only, so a stub is simply a rewritten
-// entry in its array and there is nothing durable to reconcile. NOTE FOR WHOEVER EXTENDS THIS TO THE
-// INTERACTIVE PHASES: their history is persisted, and the decision taken here was that eviction does NOT
-// gain a third hidden state next to `replaced_by` and `cancelled_at` — so a persisted context reopened
-// with `/resume` would come back LARGER than the window that was running, and re-evict on its own
-// schedule. That is consistent with "nothing is ever deleted", but it is surprising the first time and
-// is the thing to write into docs/mental-model.md when that half is built.
+// Evict stale tool results from a window's history to reclaim context, replacing each with a stub
+// that records what was called. The recent tail is protected; nothing the model is still using goes.
 
-import type { Message, ToolCall } from '../llm/index.js';
 import type { EvictionRewrite } from './evict-stale-tool-results.type.js';
+import type { Message, ToolCall } from '../llm/index.js';
 import { formatEvictedStub } from './format-evicted-stub.js';
 import { isEvictableTool } from './is-evictable-tool.js';
-
-/**
- * How many of the newest tool results always survive verbatim.
- *
- * A COUNT, deliberately, and not a token budget. A budget over tool output that has not been evaluated
- * yet could only be computed from string length, and a length-based token figure is exactly what the
- * constitution forbids — estimates drift and they are the wrong basis for a VRAM-safety decision. A
- * count of messages is exact by construction, and predictable to reason about besides.
- */
-export const KEEP_RECENT_TOOL_RESULTS = 3;
+import { protectedTailStart } from './protected-tail-start.js';
+import { toolCallArgsByIndex } from './tool-call-args-by-index.js';
 
 /**
  * The fewest tool results a pass will rewrite. Below this it does nothing and lets more accumulate.
@@ -77,6 +31,16 @@ export const KEEP_RECENT_TOOL_RESULTS = 3;
  * larger; lowering it to 1 reintroduces the defect it was added to close.
  */
 export const MIN_BATCH_TOOL_RESULTS = 2;
+
+/**
+ * How many of the newest tool results always survive verbatim.
+ *
+ * A COUNT, deliberately, and not a token budget. A budget over tool output that has not been evaluated
+ * yet could only be computed from string length, and a length-based token figure is exactly what the
+ * constitution forbids — estimates drift and they are the wrong basis for a VRAM-safety decision. A
+ * count of messages is exact by construction, and predictable to reason about besides.
+ */
+export const KEEP_RECENT_TOOL_RESULTS = 3;
 
 /**
  * Decide which tool results to stub in `messages`. Returns the rewrites in ascending index order, or an
@@ -119,47 +83,4 @@ export function evictStaleToolResults(messages: readonly Message[]): readonly Ev
   // "five rewrites that each reclaim a little" this design exists to avoid. Wait instead: the floor
   // advances as the window grows, so the band fills up on its own.
   return rewrites.length < MIN_BATCH_TOOL_RESULTS ? [] : rewrites;
-}
-
-/**
- * The index at which the protected tail begins — the KEEP_RECENT_TOOL_RESULTS-th tool result counting
- * back from the end. Returns 0 when the window holds fewer than that many, which empties the band and
- * makes the pass decline: a window with almost no tool results has nothing worth reclaiming anyway.
- */
-function protectedTailStart(messages: readonly Message[]): number {
-  let seen = 0;
-  for (let index = messages.length - 1; index >= 0; index -= 1) {
-    if (messages[index]?.role !== 'tool') continue;
-    seen += 1;
-    if (seen === KEEP_RECENT_TOOL_RESULTS) return index;
-  }
-  return 0;
-}
-
-/**
- * Pair each `tool` message with the arguments of the call that produced it.
- *
- * The turn loop stores one assistant turn carrying `tool_calls`, then pushes one `tool` message per call
- * in the same order, so the k-th result after an assistant turn belongs to its k-th call. A turn cut
- * mid-dispatch leaves fewer results than calls; the next assistant turn simply resets the pairing, and
- * any result that finds no call is left out of the map rather than matched to a neighbour's arguments.
- */
-function toolCallArgsByIndex(messages: readonly Message[]): Map<number, Record<string, unknown>> {
-  const byIndex = new Map<number, Record<string, unknown>>();
-  let pending: ToolCall[] = [];
-  let next = 0;
-  for (let index = 0; index < messages.length; index += 1) {
-    const message = messages[index];
-    if (message === undefined) continue;
-    if (message.role === 'assistant') {
-      pending = message.tool_calls ?? [];
-      next = 0;
-      continue;
-    }
-    if (message.role !== 'tool') continue;
-    const call = pending[next];
-    next += 1;
-    if (call !== undefined) byIndex.set(index, call.function.arguments);
-  }
-  return byIndex;
 }

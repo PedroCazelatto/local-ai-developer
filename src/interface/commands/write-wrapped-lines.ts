@@ -12,7 +12,7 @@ import { singleLine } from '../../core/ui/single-line.js';
 import { terminalColumns } from '../../core/ui/terminal-columns.js';
 import { wordWrap } from '../../core/ui/word-wrap.js';
 import { writeFittedLine } from './write-fitted-line.js';
-import type { RowStyle } from './write-fitted-line.type.js';
+import type { RowStyle } from './row-style.type.js';
 
 /**
  * Write `text` under `indent`, wrapped at spaces to the terminal's width and painted with `style`.

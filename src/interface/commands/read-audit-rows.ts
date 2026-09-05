@@ -11,48 +11,37 @@
 // that silently drops rows is the one thing an audit view must never do.
 
 import { existsSync, readFileSync } from 'node:fs';
-import path from 'node:path';
 
-import type { AuditRow, AuditTail } from './read-audit-rows.type.js';
-
-/** Absolute path to a project's tool-call audit log (durable session state under .orchestrator/). */
-function auditLogFile(projectPath: string): string {
-  return path.join(projectPath, '.orchestrator', 'tool_audit.jsonl');
-}
-
-/** A row field that must be a non-empty string, or undefined when it is anything else. */
-function readText(raw: unknown): string | undefined {
-  return typeof raw === 'string' && raw !== '' ? raw : undefined;
-}
-
-/** A row field that must be a finite number, else null — surfaced as unknown, never defaulted to 0. */
-function readNumber(raw: unknown): number | null {
-  return typeof raw === 'number' && Number.isFinite(raw) ? raw : null;
-}
+import { errMessage } from '../../core/err-message.js'; // an Error's message, or the thrown value stringified
+import type { AuditRow } from './audit-row.type.js';
+import { auditLogFile } from './audit-log-file.js'; // <projectPath>/.orchestrator/tool_audit.jsonl
+import { toAuditRow } from './to-audit-row.js'; // narrow one parsed line to the printable slice
 
 /**
- * Narrow one parsed JSON value to the AuditRow slice, or undefined when it is not a usable row. Only
- * `ts`, `phase` and `tool` are required: they are what identifies a call, and a row missing any of
- * them names nothing. A missing exit status or duration is kept as null and reported as unknown.
+ * The tail of the audit log, or the reason it could not be read. `ok: false` is the recoverable path
+ * — a project that has never dispatched a tool has no file, which is a normal state to report in one
+ * line, not an error to throw out of a command.
  */
-function toAuditRow(value: unknown): AuditRow | undefined {
-  if (typeof value !== 'object' || value === null) return undefined;
-  const row = value as Record<string, unknown>;
-  const ts = readText(row['ts']);
-  const phase = readText(row['phase']);
-  const tool = readText(row['tool']);
-  if (ts === undefined || phase === undefined || tool === undefined) return undefined;
-  const subagentId = readText(row['subagent_id']);
-  return {
-    ts,
-    phase,
-    tool,
-    exitStatus: readNumber(row['exit_status']),
-    durationMs: readNumber(row['duration_ms']),
-    // A master-phase call omits the field entirely (audit.ts) — keep it absent rather than null.
-    ...(subagentId !== undefined ? { subagentId } : {}),
-  };
-}
+export type AuditTail =
+  | {
+      readonly ok: true;
+      /** The last N intact rows, OLDEST FIRST (the order the file holds them in). */
+      readonly rows: readonly AuditRow[];
+      /** Every intact row in the file, so a listing can say which slice of the whole it is showing. */
+      readonly total: number;
+      /** Lines that were not readable as a row (a torn last line at worst) — reported, never hidden. */
+      readonly malformed: number;
+    }
+  | {
+      readonly ok: false;
+      /**
+       * True when the log simply is not there — a project where no tool has run yet, which is a normal
+       * state to state plainly. False when the file exists and could not be read, which is a fault and
+       * is surfaced as one. The two must not print the same way.
+       */
+      readonly absent: boolean;
+      readonly error: string;
+    };
 
 /**
  * The last `limit` intact rows of the project's audit log, oldest first, with the intact total and the
@@ -69,8 +58,7 @@ export function readAuditRows(projectPath: string, limit: number): AuditTail {
   try {
     text = readFileSync(file, 'utf-8');
   } catch (err) {
-    const why = err instanceof Error ? err.message : String(err);
-    return { ok: false, absent: false, error: `Could not read .orchestrator/tool_audit.jsonl: ${why}` };
+    return { ok: false, absent: false, error: `Could not read .orchestrator/tool_audit.jsonl: ${errMessage(err)}` };
   }
 
   const rows: AuditRow[] = [];
