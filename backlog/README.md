@@ -21,7 +21,7 @@ the answer can **delete** the task rather than shape it.
 
 ## The order
 
-### 1. [Split `config.ts` into one function per file](split-config-into-one-function-per-file.md)
+### 1. [One function per file, across `src/`](split-config-into-one-function-per-file.md)
 *Repo hygiene.* **Widened, and partly landed.** The four-function env-resolution exception is over:
 `resolveNumCtx`, `resolveRatio`, `resolveTimeoutMs` and `loadConfig` each hold their own file, `config.ts`
 keeps the `DEFAULT_*` constants and re-exports them, and `ollama-models.ts` is gone — `list-models.ts`,
@@ -29,18 +29,20 @@ keeps the `DEFAULT_*` constants and re-exports them, and `ollama-models.ts` is g
 increment, not its completion**, which is why this line is not struck and the task file is still here.
 
 **What the first increment found.** #94's answer said *"after it, no multi-function files remain in
-`src/`"*. That was never true. **95** of the 212 code files under `src/` declare more than one function —
-**461** functions between them — and **27** export more than one: `memory-db.ts` 11, `renderer.ts` 10,
+`src/`"*. That was never true. **96** of the 213 code files under `src/` declare more than one function —
+**464** functions between them — and **27** export more than one: `memory-db.ts` 11, `renderer.ts` 10,
 `project-git.ts` and `backlog.ts` 8 each. `config.ts` and `ollama-models.ts` were only the two that had
 *written the exception down*.
 
 **So item 1 is now the whole sweep, at the wider bar — any function declaration, not just an exported
 one**, which is the bar `config.ts` was judged by, since its three resolvers were private. It absorbs a
 second reversal: **types no longer live in `.type.ts` siblings**, they live in the file that owns the
-function, so the **55** sibling type files fold in as the sweep reaches them. `constitution.md` and
-`CLAUDE.md` state the opposite today; the amendment is drafted, review-gated, and **must be reviewed
-before any sweep work begins**. The task file carries the per-directory census the sweep is partitioned
-across.
+function, so the **55** sibling type files fold in as the sweep reaches them. It absorbs a third: every
+pure re-export module is deleted, **including all 9 directory `index.ts` barrels**, so an import names
+the file that serves it. `constitution.md` and `CLAUDE.md` state the opposite of all three today; the
+amendment is drafted, review-gated, and **must be reviewed and committed before any sweep work begins**.
+The task file carries the per-directory census, the barrel table and the import-graph analysis that
+decide how the sweep is partitioned and why it is mostly sequential.
 
 **Why first:** unchanged in substance and now much stronger. Stated in its own file and in
 [item 12](budget-ceilings-for-runs-and-batches.md): ship it **before** the budget ceilings, so the new
@@ -292,6 +294,27 @@ evidence."* [Item 11](in-turn-progress-reporting.md) removes one of its two just
 decision to rest on whether it helps the **model**, which needs a measurement that does not exist yet.
 The lowest-confidence item in the folder, and the one most likely to end in a deletion rather than a
 build. Measure rounds-to-pass with and without, on the same tasks, before keeping it.
+
+### 21. [The Node version is still hardcoded in the sandbox and the runner](node-version-hardcoded-in-the-images.md)
+*Repo hygiene.* [3](node-version-is-not-enforced.md) closed on *"four declarations, none enforced, become
+one declaration enforced in three places."* The arithmetic was wrong: **three more survive**, all spelling
+the tag by hand — `sandbox.ts:35`'s `DEFAULT_IMAGE`, `project-templates.ts:43`'s runner scaffold, and
+`projects/hello-world/docker-compose.yml:3` — plus four comments naming the tag descriptively.
+
+**It is not one cleanup, and that is the whole point of the file.** Under the two-tier Docker model,
+`sandbox.ts`'s `DEFAULT_IMAGE` is plainly the same declaration item 3 was consolidating — the root sandbox
+is the orchestrator's own tool-execution container, and *the Node a project is built against is the Node
+the orchestrator runs on* applies to it verbatim. **The per-project `runner` is a different container**,
+and whether a project the model is building inherits the orchestrator's pin is the user's decision, not an
+oversight to sweep up. Two of the four comments reason about the image being Debian-based rather than about
+its version, and may be right as they stand. Ask; do not assume the second follows from the first.
+
+**Why last, and why it is not urgent:** nothing depends on it, and the defect is **latent rather than
+live** — `.nvmrc` is `24.14.0` and every hardcoded tag is `node:24-slim`, so the majors agree today and
+only drift when the pin's major moves. It is filed rather than folded into
+[1](split-config-into-one-function-per-file.md) deliberately: that sweep rewrites `sandbox.ts`, and burying
+a behaviour change inside a no-behaviour-change refactor is how a defect stops being reviewable. **Item 1
+carries `DEFAULT_IMAGE` across unchanged and reports where it lands.**
 
 ---
 
