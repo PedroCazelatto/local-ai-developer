@@ -81,8 +81,13 @@ export class SessionMemory {
 
   /**
    * `numCtx` is the EXACT OLLAMA_NUM_CTX every context created in this session is stamped with, and the
-   * ceiling every listing filters on — a context built under a different one is hidden rather than
+   * ceiling every listing filters against. The filter is `<=`, not `=`: a context built for a SMALLER
+   * window replays safely into this one, while a context built for a LARGER one is hidden rather than
    * replayed into a window that would silently drop its oldest tokens.
+   *
+   * This is the RAW configured value and must stay that way — never a per-window ceiling. See the
+   * `numCtx` field on SessionOrchestrator: this file does not import resolve-window-ctx.ts, so no
+   * derived number can reach the stamp or the filter.
    */
   constructor(projectPath: string, private readonly numCtx: number) {
     this.db = openMemoryDb(projectPath);
@@ -268,7 +273,8 @@ export class SessionMemory {
 
   /**
    * The active phase's last `limit` contexts, most recently active first, EXCLUDING the live one.
-   * Contexts written under a different `num_ctx` are omitted (see memory-db.listContexts).
+   * Contexts written under a LARGER `num_ctx` are omitted; ones written under a smaller ceiling are
+   * listed, carrying their own `numCtx` so the caller can mark them (see memory-db.listContexts).
    */
   contextsForActive(limit: number): ContextSummary[] {
     const phase = this.requireActive();
@@ -278,16 +284,28 @@ export class SessionMemory {
   /**
    * Reopen one of the active phase's contexts, addressed by its UUID or any unique leading prefix.
    * Flushes the live context first (it keeps its turns and stays reopenable), then replays the chosen
-   * context's visible turns into RAM. Returns null when the address matches no single context of this
-   * phase — the caller turns that into a recoverable line rather than acting on a guess.
+   * context's visible turns into RAM. Returns null for EXACTLY ONE reason — the address matches no
+   * single context of this phase — which the caller turns into a recoverable line rather than acting on
+   * a guess. Every other failure throws, so null never has to be interpreted.
+   *
+   * The returned PhaseLoad carries the context's listing row, because a reopen by address has no listing
+   * behind it and `/resume` still has to say whether the restored history was written for a smaller
+   * window.
    */
   reopenActiveContext(address: string): PhaseLoad | null {
     const phase = this.requireActive();
-    // resolveContextId: a full UUID or a unique prefix, restricted to this phase and the current num_ctx.
+    // resolveContextId: a full UUID or a unique prefix, restricted to this phase and to contexts written
+    // under a ceiling at or below the session's — the same predicate the listing uses.
     const contextId = resolveContextId(this.db, phase, this.numCtx, address);
     if (contextId === null) return null;
     this.flush();
     const summary = readContextSummary(this.db, contextId);
+    if (summary === null) {
+      // Unreachable by construction: resolveContextId matched this exact row one statement ago, on this
+      // same synchronous connection. Fail loud rather than degrade — the caller's null means "no such
+      // context", and returning it here would report nothing reopened while the history below was.
+      throw new Error(`memory.db: context '${contextId}' resolved but could not be read back`);
+    }
     const records = readVisibleMessages(this.db, contextId);
     this.phases.set(phase, {
       contextId,
@@ -296,7 +314,7 @@ export class SessionMemory {
       // Past the highest seq EVER used, collapsed turns included — a reused seq would collide with
       // `UNIQUE (context_id, seq)` and abort the next flush.
       nextSeq: maxSeq(this.db, contextId) + 1,
-      title: summary?.title ?? null,
+      title: summary.title,
       // A reopened context that still has no title gets one more chance, from the next answer in this
       // session. Note what it is titled FROM: generateContextTitle reads the whole visible history, so
       // that attempt sees the entire REPLAYED context, not only the turns added since the reopen. That
@@ -304,7 +322,9 @@ export class SessionMemory {
       // latest turn does not — and it is why buildTranscript bounds what the titler is handed.
       titleAttempted: false,
     });
-    return { contextId, turns: records.length, lastPromptTokens: lastPromptTokensOf(records) };
+    // `summary` rides out with the load: it was read here anyway, and `/resume <address>` has no listing
+    // to take the reopened context's `numCtx` from.
+    return { contextId, turns: records.length, lastPromptTokens: lastPromptTokensOf(records), summary };
   }
 
   /**

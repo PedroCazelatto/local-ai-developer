@@ -65,6 +65,14 @@ export interface ContextSummary {
   readonly createdAt: string;
   /** Newest turn's timestamp, falling back to `createdAt` for a context with no turns. */
   readonly lastActivityAt: string;
+  /**
+   * The EXACT `OLLAMA_NUM_CTX` this context was WRITTEN under — a fact about the row, never about the
+   * session reading it. A context is listed and reopenable while this is at or below the session's
+   * ceiling; a value BELOW it means the history was written to fit a smaller window, which is what
+   * `/resume` marks in the listing and warns about on the restore. A value above it never reaches a
+   * caller: those contexts are filtered out (see memory-db.listContexts).
+   */
+  readonly numCtx: number;
   /** Visible turns (turns a summary has collapsed do not count). */
   readonly turnCount: number;
   /** Sum of every turn's prompt + completion tokens, `null` treated as 0 — a display total only. */
@@ -93,4 +101,12 @@ export interface PhaseLoad {
   /** Visible turns rebuilt into the prompt by the reopen. */
   readonly turns: number;
   readonly lastPromptTokens: number | null;
+  /**
+   * The reopened context's own listing row, carried out rather than re-read: `/resume <address>` has no
+   * listing to take it from, and it needs `numCtx` to say whether the restored history was written for a
+   * smaller window. NOT nullable — the row was resolved one statement earlier on the same connection, so
+   * a miss here is a database contradicting itself and SessionMemory throws rather than reporting it as
+   * "no such context", which would tell the user nothing was reopened when something was.
+   */
+  readonly summary: ContextSummary;
 }

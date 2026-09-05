@@ -317,7 +317,7 @@ export function maxSeq(db: DatabaseSync, contextId: string): number {
 // agree with each other and with what a reopen would actually replay. `models` is comma-joined by
 // group_concat — model names cannot contain a comma — and its order is unspecified.
 const LIST_SELECT = `
-  SELECT c.id, c.phase, c.title, c.created_at,
+  SELECT c.id, c.phase, c.title, c.created_at, c.num_ctx,
          COUNT(m.seq) AS turns,
          COALESCE(SUM(m.prompt_tokens), 0) + COALESCE(SUM(m.completion_tokens), 0) AS tokens,
          COALESCE(MAX(m.created_at), c.created_at) AS last_at,
@@ -335,6 +335,7 @@ function toSummary(row: Record<string, SQLOutputValue>): ContextSummary {
     title: asTextOrNull(row['title']),
     createdAt: asText(row['created_at']),
     lastActivityAt: asText(row['last_at']),
+    numCtx: asInt(row['num_ctx']),
     turnCount: asInt(row['turns']),
     totalTokens: asInt(row['tokens']),
     models: models === null || models === '' ? [] : models.split(','),
@@ -345,9 +346,14 @@ function toSummary(row: Record<string, SQLOutputValue>): ContextSummary {
  * The last `limit` contexts of one phase, MOST RECENTLY ACTIVE FIRST, excluding `excludeId` (the live
  * context — reopening the one you are already in is a no-op).
  *
- * Contexts written under a DIFFERENT `num_ctx` are omitted, never deleted: Ollama silently discards the
- * oldest tokens past the ceiling, so replaying a history built under a larger window would leave the
- * phase reasoning from turns it can no longer see. Restoring the old OLLAMA_NUM_CTX brings them back.
+ * The `num_ctx` filter is an INEQUALITY, and the asymmetry is the whole point: a context written under
+ * a ceiling AT OR BELOW `numCtx` replays safely, because a history that fitted 8 192 fits 16 384. One
+ * written under a LARGER ceiling is omitted — never deleted — because Ollama silently discards the
+ * oldest tokens past the ceiling, so replaying it here would leave the phase reasoning from turns it
+ * can no longer see. Raising OLLAMA_NUM_CTX back brings those contexts into view again.
+ *
+ * What is written is untouched by this: `contexts.num_ctx` is still stamped with the EXACT value the
+ * turns really ran under (see flushContext), so a row always states its own history, never the reader's.
  */
 export function listContexts(
   db: DatabaseSync,
@@ -358,7 +364,7 @@ export function listContexts(
 ): ContextSummary[] {
   const rows = db
     .prepare(
-      `${LIST_SELECT} WHERE c.phase = ? AND c.num_ctx = ? AND c.id IS NOT ? ` +
+      `${LIST_SELECT} WHERE c.phase = ? AND c.num_ctx <= ? AND c.id IS NOT ? ` +
         'GROUP BY c.id ORDER BY last_at DESC LIMIT ?',
     )
     .all(phase, numCtx, excludeId, limit);
@@ -379,14 +385,15 @@ export function shortContextId(contextId: string): string {
 /**
  * Resolve a user- or model-supplied address to exactly one context of `phase`: a full UUID or any
  * unique leading prefix of one (`design/7a888b1f`). Ambiguous or unknown input resolves to null, so a
- * caller never acts on a guess. Restricted to the phase's own contexts and to the current `num_ctx`,
- * so an address cannot reach a context the listing refuses to show.
+ * caller never acts on a guess. Restricted to the phase's own contexts and to `num_ctx <= ?` — the SAME
+ * predicate listContexts uses, so an address can never reach a context the listing refuses to show, and
+ * never fails to reach one it does show.
  */
 export function resolveContextId(db: DatabaseSync, phase: string, numCtx: number, address: string): string | null {
   const wanted = address.trim().toLowerCase();
   if (wanted === '') return null;
   const rows = db
-    .prepare("SELECT id FROM contexts WHERE phase = ? AND num_ctx = ? AND id LIKE ? || '%'")
+    .prepare("SELECT id FROM contexts WHERE phase = ? AND num_ctx <= ? AND id LIKE ? || '%'")
     .all(phase, numCtx, wanted);
   return rows.length === 1 ? asText(rows[0]?.['id']) : null;
 }
