@@ -172,10 +172,38 @@ Closing this directory unblocked three things at once: the whole `src/tools` wav
 retrofit (which needed `core/session`'s three importers to settle), and the visible-turn agreement test
 below.
 
+### READ BEFORE MEASURING ANYTHING: a direct-import census undercounts through `export *`
+
+**Every coupling and blast-radius figure in this file was produced by resolving each `from '…'`
+specifier to a concrete file. That method cannot see a name that arrives through a barrel's
+`export *`, and it silently undercounted at least once.**
+
+The `config.ts` reshape was briefed with **six** importers — every file that names `'./config.js'`
+directly, correctly enumerated. The true figure was **eight**. `src/core/session/index.ts:2` was
+`export * from './config.js'`, so two files outside the directory took config's names *through the
+barrel* and were invisible to the census: `src/boot/resolve-or-exit.ts` (`loadConfig`, `SessionConfig`)
+and `src/interface/run-repl.ts` (`SUGGESTED_MODEL`). A direct-import census counted them as importers of
+`index.ts`, which they are — and not of `config.ts`, which they also are.
+
+`run-repl.ts` makes the consequence concrete: once the constants live inside the object, `SUGGESTED_MODEL`
+has no standalone export anywhere, so **no arrangement of the barrel could have left that file alone.**
+The job was impossible within the briefed six.
+
+**Why this is a live hazard and not a footnote: the parcel guarantees in this file are stated as "zero
+file overlap", and they were computed with the undercounting method.** In the event the overlap really
+was zero — the agent measured 16 importers of the other live parcel and confirmed neither extra file was
+among them — but that was diligence catching it, not the measurement being right.
+
+**So: when a parcel's names can flow through a barrel, resolve `export *` transitively before trusting an
+overlap of zero.** This matters most for the wave below, which is *entirely* about barrels: each deletion
+must find not only the files that name the barrel, but every name the barrel forwards and every file that
+takes one.
+
 ### Wave E — the barrels, measured rather than counted from the plan
 
-The plan says "nine barrels, one final pass". **The measurement says something more useful.** There are
-ten `index.ts` files under `src/`; here is what each actually is, with its importers at HEAD:
+The plan says "nine barrels, one final pass". **The measurement says something more useful.** There were
+ten `index.ts` files under `src/`; here is what each actually was, with its importers at the checkpoint.
+**Three are now deleted and seven remain — the entry point and six barrels.**
 
 | `index.ts` | re-export lines | importers | verdict |
 |---|---:|---:|---|
@@ -185,10 +213,15 @@ ten `index.ts` files under `src/`; here is what each actually is, with its impor
 | `src/context/` | 11 | 11 | barrel |
 | `src/phases/` | 5 | 7 | barrel — all 7 importers in `core/session` |
 | `src/tools/` | 38 | 5 | barrel — all 5 importers in `core/session` |
-| `src/interface/` | 2 | 1 | barrel — one importer, in `src/boot` |
-| `src/core/ui/` | 34 | **0** | barrel, **already orphaned** |
-| `src/core/` | 0 | 0 | **not a barrel** — a comment block over `export {}` |
+| ~~`src/interface/`~~ | 2 | 1 | **deleted, `93dc209`** — its one importer was in `src/boot` |
+| ~~`src/core/ui/`~~ | 34 | **0** | **deleted, `93dc209`** — already orphaned by wave B |
+| ~~`src/core/`~~ | 0 | 0 | **deleted, `530f273`** — not a barrel; a comment block over `export {}` |
 | `src/` | 0 | 0 | **the entry point. It survives.** |
+
+> **The importer numbers in that table are direct-import counts and are therefore LOWER BOUNDS**, for
+> the `export *` reason given directly above. `core/session/index.ts`'s 150 re-export lines include star
+> re-exports; whoever deletes it must resolve every forwarded name, not just the files that spell
+> `session/index.js`.
 
 Three consequences the plan does not carry:
 
@@ -1148,6 +1181,38 @@ what the harness printed rather than from how the process exited.** A driver tha
 `mismatches=` has a third hole in the same family — the `tools` wave hit it, where one mutation was killed
 by sending the code into an **infinite loop**, which produces no mismatch line at all and would score as
 clean.
+
+### The entry order that cannot see the bug you just wrote
+
+From the `config.ts` reshape, and it sharpens the TDZ constraint into something actionable.
+
+The reshape's gate drove **five** ESM entry orders in **one process each** — a shared module registry
+would mean the second order tests nothing — and all five resolved. It was then pointed at a copy of the
+real tree with the illegal shape injected: one top-level `const CAP = config.DEFAULT_NUM_CTX` in a module
+the object imports. **Four of the five threw `ReferenceError: Cannot access 'config' before
+initialization'`. The fifth passed.**
+
+**The one that passes is the entry at the violating module itself.** A root module's own body runs *last*,
+after its whole import subtree — including `config.ts` — has finished initialising, so the illegal
+top-level read succeeds. Which means: **editing a resolver and then running only that resolver is the
+single entry order that cannot detect the defect you have just introduced.** It is also the most natural
+thing to do.
+
+The gate now asserts that asymmetry per entry — four throw, one does not — so it cannot pass by never
+firing.
+
+### `tsc --noEmit` is silent on a broken side-effect import
+
+Also from that round, and it is a false-green generator for any deletion check.
+
+`tsc --noEmit` reports **TS2307** for `import { x } from './missing.js'` — but says **nothing at all**
+about `import './missing.js'`, the side-effect-only form. A control built on the silent shape produced a
+false green, and it was caught only because the agent watched the control refuse to fire.
+
+This bites deletions specifically. `src/core/index.ts` **exported nothing**, so a side-effect import was
+the *only* shape a real importer of it could have had — precisely the shape `tsc` cannot see. **The
+exhaustive specifier enumeration is what carries a "zero importers" claim for such a file; the
+type-checker cannot.**
 
 ### Two more instrument findings from the same round
 

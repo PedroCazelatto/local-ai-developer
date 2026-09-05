@@ -11,7 +11,7 @@
 //   3. otherwise, the smallest installed model              → the VRAM-safest thing that exists.
 //   4. nothing installed at all                             → offer to pull SUGGESTED_MODEL (y/n).
 //   5. every offer declined                                 → undefined; the REPL boots model-less and
-//                                                             prints the pull hint (repl.ts).
+//                                                             prints the pull hint (run-repl.ts).
 // A declined pull is never followed by a second offer for a different model — one ask per boot.
 
 import { listModels, matchesModelName, pickSmallestModel } from '../llm/index.js';

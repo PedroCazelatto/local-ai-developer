@@ -11,7 +11,7 @@ import { narrowAppState } from './narrow-app-state.js';
  * Load the global app state. A missing file is normal (fresh install) → `{}` silently. A corrupt file
  * (unparseable / not an object) is surfaced with a console.warn and treated as `{}` so the caller falls
  * back to its defaults — boot never crashes over it (task 02: "never crash boot over it"). console.warn
- * matches config.ts's other boot fallbacks (resolveNumCtx / resolveThresholdRatio).
+ * matches the other boot fallbacks behind config (resolveNumCtx / resolveRatio).
  */
 export function loadAppState(): AppState {
   // appStateFile: ~/.local-ai-developer/state.json.
