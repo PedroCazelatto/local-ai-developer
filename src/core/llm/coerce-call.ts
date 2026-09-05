@@ -3,7 +3,7 @@
 // JSON string rather than an object. Everything that does not resolve to { name, arguments } is
 // rejected here, so nothing downstream has to re-check the shape.
 
-import type { ToolCall } from './types.js';
+import type { ToolCall } from 'ollama';
 
 /** Coerce a decoded object into a ToolCall, tolerating the name/args key variants qwen emits. */
 export function coerceCall(obj: unknown): ToolCall | null {

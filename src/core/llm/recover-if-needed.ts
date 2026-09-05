@@ -2,8 +2,9 @@
 // Both of OllamaClient's paths run a finished message through here, so the streamed turn and the
 // non-streamed one cannot drift into disagreeing about whether a call was made.
 
+import type { Message } from 'ollama';
+
 import { recoverToolCalls } from './recover-tool-calls.js';
-import type { Message } from './types.js';
 
 /**
  * When Ollama returned no structured tool_calls, recover any the model wrote as text and fold

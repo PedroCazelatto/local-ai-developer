@@ -14,7 +14,8 @@
 
 import { appendEvent } from '../core/session/events-log.js';
 import { runDebate } from '../core/session/run-debate.js';
-import type { DebateOutcome, DebateRequest } from '../core/session/run-debate.type.js';
+import type { DebateOutcome } from '../core/session/debate-outcome.type.js';
+import type { DebateRequest } from '../core/session/debate-request.type.js';
 import { renderDebateSummary } from '../core/ui/render-debate-summary.js';
 import { renderDebateTurn } from '../core/ui/render-debate-turn.js';
 import type { JsonObject, StructuredToolResult, ToolModule, ToolResult } from './types.js';

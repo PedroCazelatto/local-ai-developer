@@ -10,13 +10,15 @@
 // Scrollback is preserved: a plain readline interface writes to the normal buffer (no alt-screen). The
 // one-time clearScreen() at boot wipes launcher noise; the status bar reserves the bottom rows (see
 // status-bar.ts) but the conversation and input stay in the scrolling area, copyable as ever.
+//
+// The loop is all that is left here. Every step it takes is its own file — is-completion-key.ts,
+// complete-at-cursor.ts, request-cancel.ts, handle-stop-line.ts, update-status.ts, run-input.ts — and
+// ReplOrchestrator stays with the function that takes it, which is this one.
 
 import { createInterface } from 'node:readline/promises';
-import type { Interface as ReadlineInterface } from 'node:readline/promises';
 import type { Key } from 'node:readline';
 import { stdin, stdout } from 'node:process';
 
-import { TurnAbortedError } from '../core/llm/index.js';
 import type {
   ClearResult,
   ContextSummary,
@@ -29,19 +31,21 @@ import type {
   TaskLoopResult,
 } from '../core/session/index.js';
 import { SUGGESTED_MODEL } from '../core/session/index.js';
+import { activityLine } from '../core/ui/activity-line.js';
+import { bindNewlineKey } from '../core/ui/bind-newline-key.js';
+import { inputFence } from '../core/ui/input-fence.js';
 import { INPUT_PROMPT } from '../core/ui/input-prompt.js';
+import { messageQueue } from '../core/ui/message-queue.js';
 import { renderer } from '../core/ui/renderer.js';
 import { statusActivity } from '../core/ui/status-activity.js';
 import { statusBar } from '../core/ui/status-bar.js';
-import { activityLine } from '../core/ui/activity-line.js';
-import { inputFence } from '../core/ui/input-fence.js';
-import { messageQueue } from '../core/ui/message-queue.js';
-import { bindNewlineKey } from '../core/ui/bind-newline-key.js';
-import { theme } from '../core/ui/theme.js';
-import { getCommand } from './command-registry.js';
-import { cycleCompletion } from './cycle-completion.js';
-import type { CompletionCycle } from './cycle-completion.type.js';
-import { replaceInputLine } from './replace-input-line.js';
+import { completeAtCursor } from './complete-at-cursor.js'; // one Tab press: swap in the next candidate, return the cycle
+import type { CompletionCycle } from './completion-cycle.type.js';
+import { handleStopLine } from './handle-stop-line.js'; // claims /stop and /stop round typed into the fence mid-run
+import { isCompletionKey } from './is-completion-key.js'; // a plain forward Tab, and nothing else
+import { requestCancel } from './request-cancel.js'; // Ctrl+C mid-turn: stop the model call, say so in the scrollback
+import { runInput } from './run-input.js'; // one line of input; shows and swallows any error it raises
+import { updateStatus } from './update-status.js'; // recompute the two pinned status lines and paint them
 
 /** How often (ms) the status + activity line repaint while a turn runs, to tick the elapsed timer. */
 const STATUS_TICK_MS = 100;
@@ -258,153 +262,4 @@ export async function runRepl(orch: ReplOrchestrator): Promise<void> {
     statusBar.disable(); // release the reserved rows and restore normal scrolling
     rl.close();
   }
-}
-
-/**
- * True for a PLAIN forward Tab, the only key completion answers to. Shift+Tab is excluded on purpose —
- * it is unbound, not a reverse cycle and no longer the phase-cycle it once was — and so are Ctrl/Alt+Tab,
- * which belong to the terminal and the window manager.
- */
-function isCompletionKey(key: Key | undefined): boolean {
-  return key !== undefined && key.name === 'tab' && key.shift !== true && key.ctrl !== true && key.meta !== true;
-}
-
-/**
- * One Tab press, returning the cycle to carry into the next one (null when there was nothing to
- * complete: a chat line, an unknown command, or an argument position offering no candidates).
- *
- * cycleCompletion: swaps the word under the cursor for the next candidate, wrapping after the last —
- * so Tab never prints anything and the pinned rows are never disturbed by a candidate list. It is
- * SYNCHRONOUS by contract, which is the constraint the whole feature is shaped around: this runs inline
- * in the keypress handler while the pinned rows are repainted from a setImmediate scheduled by that same
- * handler, so an awaited lookup would resolve after the repaint and leave those rows blank.
- */
-function completeAtCursor(
-  orch: ReplOrchestrator,
-  rl: ReadlineInterface,
-  active: CompletionCycle | null,
-): CompletionCycle | null {
-  const step = cycleCompletion({ line: rl.line, cursor: rl.cursor, orch, active });
-  if (step === null) return null;
-  replaceInputLine(rl, step.line, step.cursor); // write readline's own buffer + a cursor-preserving refresh
-  return step.cycle;
-}
-
-/**
- * Ctrl+C mid-turn. Claims the press when there was something to stop, and says so in the scrollback —
- * a turn that simply stopped producing text, with no line explaining why, is indistinguishable from a
- * turn that died. The line also states the second half of the keymap, because the escape hatch changing
- * shape is exactly the thing a user needs told at the moment they reach for it.
- *
- * Returns false when nothing was generating and nothing was already armed, which lets the key fall
- * through to readline and end the session as it always has.
- */
-function requestCancel(orch: ReplOrchestrator): boolean {
-  if (!orch.cancelActiveTurn()) return false;
-  renderer.interjectLine(theme.meta('⎋ stopping this turn — press Ctrl+C again to quit'));
-  return true;
-}
-
-/**
- * A `/stop` line typed into the fence while a run is in flight. Claimed HERE rather than queued because
- * the queue drains only when the whole `/run` ends — which is the very thing being asked to stop.
- *
- * Strict about what it claims: only `/stop` and `/stop round`. Anything else falls through to the queue
- * and reaches the command registry, so a typo is reported as an unknown command instead of being
- * swallowed by the fence and quietly arming nothing.
- */
-function handleStopLine(orch: ReplOrchestrator, line: string): boolean {
-  if (!orch.runStop.active) return false;
-  const words = line.trim().toLowerCase().split(/\s+/);
-  if (words[0] !== '/stop') return false;
-  if (words.length > 2) return false;
-  const arg = words[1];
-  if (arg !== undefined && arg !== 'round') return false;
-
-  if (arg === 'round') {
-    orch.runStop.request('round');
-    renderer.interjectLine(theme.meta('⏸ will stop after this round — the task ends without a verdict'));
-    return true;
-  }
-  orch.runStop.request('task');
-  renderer.interjectLine(theme.meta('⏸ will stop after this task — it finishes and commits first'));
-  return true;
-}
-
-/**
- * Repaint the two pinned STATUS lines:
- *   line 1  `Phase: <Name> | Ctx: N%`  — the active phase (Capitalized, in its theme color) and the
- *           context-window fill: the phase's EXACT cumulative tokens as a percent of num_ctx.
- *   line 2  `Model: <model> | Project: <project>`.
- * Ctx is an EXACT count (constitution) shown as `0%` when the phase has no completed turn yet — never
- * a `?%` and never a length-based estimate. `no model` when none is selected, so the line never
- * implies a loaded model when a turn would fail.
- */
-function updateStatus(orch: ReplOrchestrator): void {
-  const filled = orch.activePhaseTokenTotal ?? 0;
-  const ctxPct = orch.numCtx > 0 ? Math.round((filled / orch.numCtx) * 100) : 0;
-  const line1 =
-    theme.phase(orch.activePhase)(`Phase: ${capitalize(orch.activePhase)}`) + theme.meta(` | Ctx: ${ctxPct}%`);
-  const line2 = theme.meta(`Model: ${orch.model ?? 'no model'} | Project: ${orch.project}`);
-  statusBar.setStatus(line1, line2);
-}
-
-/** Capitalize the first letter for display (discovery → Discovery). */
-function capitalize(s: string): string {
-  return s.charAt(0).toUpperCase() + s.slice(1);
-}
-
-/**
- * Run ONE line of input — a `/command` or a chat message — returning true only when it asked to exit.
- *
- * Any error is SHOWN and swallowed here rather than at the loop: one bad turn (a dropped Ollama stream,
- * a tool blowup) must never kill the session, and must not strand the messages queued behind it either.
- * Only genuinely fatal errors that escape to `main().catch` (boot failures, Node runtime faults) end
- * the app, printing to the console.
- */
-async function runInput(orch: ReplOrchestrator, input: string, rl: ReadlineInterface): Promise<boolean> {
-  try {
-    if (input.startsWith('/')) return await handleCommand(orch, input, rl);
-    await orch.processMessage(input);
-  } catch (err) {
-    activityLine.hide(); // the activity line may still be up if the turn threw mid-stream
-    // A cancelled turn is not a failure and must not be dressed as one: the user asked for it, the
-    // exchange has already been branched off the history by the orchestrator, and the prompt below is
-    // about to reopen ready for a rewrite. A TIMEOUT is a fault, so it keeps the error styling — its
-    // message already says what to check.
-    if (err instanceof TurnAbortedError && err.reason === 'user') {
-      renderer.systemMessage('⎋ Turn cancelled. The message and its partial reply were set aside.');
-    } else {
-      renderer.errorLine(`✖ ${err instanceof Error ? err.message : String(err)}`);
-    }
-  }
-  return false;
-}
-
-/**
- * Dispatch a `/command` through the registry (every command lives there now — V5/03). Unknown commands
- * get a recoverable hint. Returns true only when a command requested exit (`/exit`), signalling the loop
- * to stop; every other command returns false.
- */
-async function handleCommand(orch: ReplOrchestrator, input: string, rl: ReadlineInterface): Promise<boolean> {
-  const withoutSlash = input.slice(1);
-  const [command, ...rest] = withoutSlash.split(/\s+/);
-
-  const registered = getCommand(command ?? '');
-  if (registered === undefined) {
-    renderer.errorLine(`Unknown command: /${command ?? ''}. Type /help for the list.`);
-    return false;
-  }
-
-  let exitRequested = false;
-  await registered.run({
-    orch,
-    rl,
-    args: rest,
-    raw: withoutSlash,
-    requestExit: () => {
-      exitRequested = true;
-    },
-  });
-  return exitRequested;
 }

@@ -137,6 +137,23 @@ assembler is the expected shape, not a special case.** The six `core/ui` singlet
 `status-bar`, `input-fence`, `status-activity`, `activity-line`, `message-queue` — take it, holding 179
 call sites still.
 
+> **An assembler is NOT a device for keeping a diff inside your directory.** `command-registry.ts`
+> could have become one, touching zero files outside `src/interface/` — or could be deleted per the
+> rule's default, needing six `import type` lines in `src/commands/`. **The deletion was right**, and
+> the reason is the test: **inventing an assembler to route around an ownership boundary is using the
+> wrong tool for a scheduling problem.** An assembler is for a module callers already treat as one
+> thing. If your reason for reaching for it mentions *whose files change*, it is the wrong reason. This
+> is the first time the rule has been correctly **declined**, which is as useful a precedent as the two
+> times it was correctly applied.
+
+> **Check BOTH facts before applying the `core/ui` precedent.** The assembler + state-module shape is a
+> response to **two** things: a module consumed as a **namespace**, *and* module-level **mutable
+> state**. `repl.ts` looked exactly like `core/ui`'s six stateful singletons and is neither — it has no
+> module-level mutable state at all (`processing`, `cycle`, `firstPrompt`, `repaintScheduled` and
+> `ticker` all live inside `runRepl`'s own body) and it is consumed by one named import, not as a
+> namespace. Following the precedent would have minted **six pointless `<name>-state.ts` modules**. The
+> agent proved both facts rather than pattern-matching the shape; do the same.
+
 **Singleton state moves to a `<name>-state.ts` value module**, since the functions that shared a
 module-private variable no longer share a module. **The cost is real and was accepted knowingly**: six
 sets of module-private state become six exported mutable objects, and the invariant that only the owning
@@ -229,6 +246,23 @@ Three data points in one sweep, which is what makes this a rule rather than an a
 | `appendEvent` | a **duplicate** — the fourth copy of `append-jsonl-line.ts` | deleted, callers repointed |
 | `splitFrontmatter` | **different bodies**: `context/`'s takes one argument, returns `{name, body}`, never throws; `backlog.ts`'s took the task path for its error message, returned `{data, body}`, threw `BacklogError` | newcomer renamed `splitTaskFrontmatter`; `context/` kept the plain name it already had |
 | `toPosix` | **different bodies**, neither a superset | session half renamed `toPosixTrimmed`; `src/tools/` still owes its half to wave D |
+| `buildRegistry` | **different bodies** — `interface/command-registry.ts:102` over `Command`, `tools/registry.ts:85` over `ToolModule` | newcomer renamed `buildCommandRegistry`, **before it landed**, because the grep rule ran |
+
+**`src/tools` is NOT swept.** It is wave D and unstarted, which is exactly why `tools/registry.ts` still
+holds its own private `buildRegistry` and why the grep caught a live collision rather than a historical
+one. Treat any claim that a directory is finished as something to check against the ledger.
+
+**A rename can be for meaning, or for distance — they are different jobs.** Two from one commit:
+
+- **`asBoolean` → `looseBoolean`** — for **meaning**. The old name described the *return type*, which
+  every predicate shares and which therefore said nothing. The new one names the **decision**: it
+  accepts a quoted `"true"` because a local model writes one, and refuses `"yes"` because that is a
+  verdict it declines to interpret. **The tolerance is the function**, and the name now says so.
+- **`digestLine` / `digestLineList` deliberately NOT `digest-line.ts` / `digest-lines.ts`** — for
+  **distance**. Two file names one letter apart is how a reader opens the wrong one, and no amount of
+  accuracy in either name fixes that. Every other rename recorded here was about a name being *wrong*;
+  this one is about two names being *too close*, which is a separate failure and a separate reason to
+  rename.
 
 **Type-vs-function stem collision — the exported name outranks the private helper.** A `.type.ts` may
 not share a stem with a `.ts`, so `ChatRole` (exported type) and `chatRole` (private function) could not
@@ -241,6 +275,16 @@ Ollama's `Message['role']`, not this folder's `ChatRole`, so its old name claime
 had. That is the **second** time a forced rename has exposed a name that was lying — `splitFrontmatter`
 was the first. A collision is often a naming defect presenting itself, which is the same lesson the
 duplicate check teaches from the other side.
+
+**The CONCERN decides the home, not the domain the value came from.** `capitalize` had four identical
+bodies — `repl.ts`, `core/session/orchestrator.ts`, `interface/commands/clear.ts`,
+`interface/commands/resume.ts` — all formatting a phase name for display. Ruled:
+**`src/core/ui/capitalize-phase.ts`**. It is display formatting, so it goes to `core/ui` *even though
+the value is a phase* — exactly as `write` did. `src/phases/` was declined because it holds phase
+**definitions**, not display; the root of `core/` was declined to stop it becoming the drawer everything
+cross-cutting lands in. The `interface` wave created it; `core/session` and `interface/commands` repoint
+their own copies as their waves reach them (`orchestrator.ts:632`, `clear.ts:23`, `resume.ts:54` still
+declare theirs).
 
 **A shared destination is created once, by the first wave that needs it, and named here before a second
 wave can invent a rival.** This rule has a scar. `b63092e` committed
@@ -363,6 +407,12 @@ reaches them. Classified by who imports them:
   **The trap waits wherever a single consumer is the sole importer.** Three importers or more and the
   type really is folder vocabulary; one, and you are probably looking at a return type that wandered.
 
+  **The cleanest disproof of "one importer means owned" came later, and it is structural rather than a
+  head-count.** `CommandContext` and `CompletionContext` are **parameters of interface *methods***, not
+  of any declaration — so there is no function file to fold them into and they are unowned no matter how
+  few files name them. **Ask what would own it, not how many import it.** If the answer is "a method on
+  an interface", nothing owns it.
+
   **Two disproofs, both on the record.** `ChatResult` never had a `.type.ts` *at all* and was still
   ruled **owned**, folding into `client.ts` — so the structural test gets it wrong in both directions.
   And `sandbox-file.type.ts`'s two types, `SandboxRead` and `SandboxWrite`, are each the return type of
@@ -393,6 +443,26 @@ where a reader loses the thread, so: **owned types have never moved.**
 **sibling** of a function file — a `<name>.ts` / `<name>.type.ts` pair. It now names a **standalone
 module holding exactly one unowned type**, with deliberately **no `.ts` file of the same stem**. Do not
 recreate the old pairing; a type that has a function to sit beside belongs *inside* it.
+
+### The two remaining retrofits, measured
+
+Recorded so whoever takes them starts from measurement rather than from scratch — though the agent that
+measured them noted it would **re-measure rather than trust its own notes** when the work is handed
+over, which is the standing rule working as intended.
+
+- **`src/tools/types.ts` and `src/core/ui/types.ts` are coupled — ONE owner takes both.**
+  `tools/types.ts` imports `ToolCallDisplay` from `core/ui/types.js`, and also pulls `Message`,
+  `OneShotResult` and `OneShotRole` from `core/llm/index.js`.
+- **`tools/types.ts` is not a pure type module**, and the exception is bigger than it looks: it exports
+  **`toolError`**, referenced by **26 files**. Note it is a **function**, not a constant — so this is
+  *not* the `task-statuses.ts` / `severities.ts` constant-module case. It is the ordinary
+  one-function-per-file rule: it becomes **`tool-error.ts`**, and the nine types around it become nine
+  `.type.ts` modules.
+- **That makes it the first retrofit a normal differential harness can verify**, because for once there
+  is a runtime value to import. Use the ordinary recipe, not the checker-level structural tool the
+  pure-type moves needed.
+- **`core/ui/types.ts` stays blocked until wave C clears.** Three importers still sit in `core/session`
+  — `dispatch.ts`, `retro-runner.ts`, `turn-loop.ts`.
 
 **Retrofit, not forward-only — and scheduled, not now.** All five surviving `types.ts` files split:
 `core/session` (26 declarations), `tools` (9), `core/llm` (6), `core/ui` (5), `core/container` (3). The
@@ -525,8 +595,9 @@ these was more parallel than the plan assumed:
 - **`core/session` and `interface` have ZERO deep edges in either direction.** They can run at the same
   time. (Both do import each other's *barrels*, which is precisely why the barrels survive to wave E:
   a barrel absorbs a split so its importers never see one.)
-- **`phases`, `core/llm/types.ts` and `core/container/types.ts` are fully self-contained** — 9 and 3
-  importers respectively, every one inside its own directory. One agent can hold all three.
+- **`phases`, `core/llm/types.ts` and `core/container/types.ts` were fully self-contained** — 9 and 3
+  importers respectively, every one inside its own directory. One agent held all three, and **all three
+  are now done** (`5d74ad4`, `2b3e381`, `602f62f`); both `types.ts` files are gone.
 - **Only three genuine blockers remain:** `core/session` ↔ `tools` (mutual, 17 and 10 files),
   `interface` ↔ `interface/commands` (15 and 1), and the `core/ui/types.ts` retrofit.
 - **`tools/types.ts` rides with the `tools` wave.** 50 importers, but **exactly one** outside its own
@@ -585,6 +656,22 @@ write, someone else may have landed in the same paragraph.
 > repo** so you have a gate that is unambiguously yours. This is the natural sibling of scoping
 > `git status` with a pathspec: in a shared tree, narrow every instrument to your own work before you
 > read a result off it.
+>
+> **That scoped `tsconfig` needs an explicit `typeRoots`, or it produces confident nonsense.**
+> `typeRoots` resolves relative to **the config file's own directory**, so from a scratch folder
+> outside the repo `@types/node` is never found and you get `Cannot find name 'AbortSignal' / 'fetch' /
+> 'setTimeout'` — a **false red about code that is fine.** Point it explicitly at the repo's
+> `node_modules/@types`. This matters more than an ordinary bug: a false red from your own narrow
+> instrument is worse than having no instrument, because it is the one you would believe **over** the
+> noisy whole-repo run. (An earlier version of this advice omitted it and passed only because the
+> directory it was used on touches no Node global — a latent bug that looked like a working recipe.)
+>
+> **This is a trigger, not a mandate.** Wave C **declined** the scoped config and was right to: the
+> whole-repo gate had stayed clean for it, and **adopting tooling against a problem you do not have is
+> how you acquire a second thing that can be wrong** — which the `typeRoots` bug above demonstrates
+> exactly. **Adopt it when the repo-wide gate starts going red on other agents' saves.** Until then,
+> re-run a red before believing it. The repo-wide typecheck has gone transiently red twice so far, both
+> times resolving within seconds.
 
 > **RULE — NEVER BUILD A STAGE LIST BY EXCLUSION.** Enumerate the paths you created and modified and
 > stage those. **Never subtract a known-bad set from everything dirty** — no "`git status --porcelain`
@@ -596,6 +683,22 @@ write, someone else may have landed in the same paragraph.
 > the way it did when you wrote it, it stops being correct silently, and **nothing tells you.** A
 > positive list can only ever be wrong about your own work, which is the only thing you can actually
 > check.
+>
+> **The rule is now two steps, because enumeration alone is not enough: ENUMERATE, then READ what git
+> thinks changed and account for EVERY line.** A pathspec-scoped `git status` before staging, with an
+> explanation for each entry — and if you cannot explain one, stop.
+>
+> The gap that forced this: **`sed -i` over a glob rewrites every file it matched, including the ones it
+> changed nothing in.** It reads CRLF and writes LF, and with this repo's `core.autocrlf=true` that
+> leaves untouched files **dirty with a completely empty content diff.** Two files the `interface` agent
+> did not own sat modified as pure churn. **Positive enumeration would not have caught it** — the glob
+> would have written itself into the stage list. Only reading the status did. **A file showing modified
+> with an empty diff, that you did not edit, is the signature**, and it is exactly the line a reader
+> skims past.
+>
+> **And `git commit -- <pathspec>` cannot reach an untracked file** — it fails with `did not match any
+> file(s) known to git`. The pathspec form silently assumes git already knows the path, so **`git add`
+> your new files first.** Same operation, failure one step earlier than the one above.
 
 This nearly cost the sweep a corrupted commit. A wave C agent's recipe was "`git status --porcelain`
 minus the four governance docs" — **correct and safe for six commits**, while it was the only agent
@@ -616,6 +719,92 @@ were aimed at two agents editing one file — but *never stage speculatively, ke
 and always commit by pathspec* is exactly what makes an agent's sudden death cost nothing. Keep doing all
 three even when you are the only one working.
 
+## A green differential proves nothing until a control has gone red — AND been shown to run
+
+> **THE RULE HAS TWO HALVES, AND ONLY ONE IS OBVIOUS.**
+> 1. **Prove the instrument can distinguish** — a negative control that fires on a deliberate
+>    difference.
+> 2. **Prove the instrument ran** — a **coverage control** asserting the probe total.
+>
+> A negative control proves the harness *can* go red. **It does not prove it executed.** A control that
+> never runs never fails either, so half a rule is not most of a rule here — it is a harness that
+> passes both ways.
+
+**Why the second half exists.** Wave C's harness had `main()` **defined and never called** — an earlier
+restructure to dodge `tsx`'s top-level-`await` limit had replaced the invocation with the definition.
+Sixteen probes silently did not execute and it printed `probes=58 mismatches=0`. **No negative control
+could have caught it.** It was found by reading the file's tail, by eye — which is exactly the argument
+for the coverage control existing: *so the next person does not need the same luck.* That harness now
+prints `controls: same() fires on a difference; 94/94 probes ran`, and the total went 58 → 94 once both
+defects were fixed. **Every remaining harness carries both lines.**
+
+**Five** separate green-and-worthless harnesses have now been caught in this sweep. They are recorded
+together because they are one failure with five faces, and **not one of them was caught by reading the
+green result**:
+
+| shape | how it stayed green | how it was caught |
+|---|---|---|
+| **type-only baseline** | `tsx` erases type imports, so the baseline kept resolving after the module had moved | a runtime value happened to be in the import and broke loudly — **luck** |
+| **already-migrated fixture** | `addCancelledAtColumn` early-returns on every fresh database, so the probe migrated nothing | a separate check proving the fixture really was pre-migration |
+| **wrong-shaped grid** | probed `{function:{name,arguments}}` — the shape `coerceCall` *returns*, not the one it accepts — so every probe returned `null` on **both** sides | **a negative control refused to fire** |
+| **self-comparison** | `same(f(v), f(v))` — the harness compared the new implementation with **itself**, which passes unconditionally | reading the comparison, not running it |
+| **harness never ran** | `main()` defined and never called; 16 probes skipped, `probes=58 mismatches=0` printed | reading the file's tail — **a coverage control now** |
+| **prefix match** | `haystack.includes(needle)` is true for a **prefix**, so four declarations certified VERBATIM while every range was one line short, closing brace excluded | **a different instrument failed on the same input** — `tsc` threw `'}' expected` |
+
+The wrong-shaped grid is the purest form: a harness comparing `null` to `null`, thousands of times,
+reporting perfect agreement. Nothing in the output distinguishes it from a real proof.
+
+**Self-comparison is the likeliest of the four, because the road to it is honest.** The baseline's
+helper is *private*, so it genuinely cannot be imported — and comparing the new implementation with
+itself is the path of least resistance from a real obstacle rather than carelessness. **The answer is
+the `%TEMP%` baseline recipe below: take `HEAD`'s file, add `export` to its private declarations, change
+no body.** That recipe exists precisely to dissolve the obstacle that produces shape four; if you find
+yourself about to write `same(f(v), f(v))`, that is the entry to go and read.
+
+**A substring check can only ever prove a prefix — anchor it on the closing token.** `includes()` will
+happily certify a range that stops before the closing brace, and every probe stays green.
+
+> **THE PRINCIPLE THE TABLE HAS BEEN BUILDING TOWARD: two instruments with different failure modes catch
+> what either alone will not.** The prefix bug was invisible to the byte-identity check *by
+> construction* and immediate to a parser. This is not redundancy — it is choosing a second instrument
+> that fails **differently**, not a second one that fails the same way twice.
+
+The worked example is the same agent's pair of type checks: **byte-identity** catches a dropped
+`readonly`, and **mutual assignability** proves every importer resolves to *that* declaration. Neither
+subsumes the other. And it **demonstrated** the `readonly` blind spot rather than inheriting the claim
+from this file — ran the control, got zero errors, recorded it. **Inheriting a claimed blind spot is
+itself a green you have not tested.**
+
+**A control that fires on MORE than you perturbed is evidence about *what* is being compared.** In the
+`core/llm` type-identity proof, perturbing `WindowRole` or `OneShotRole` also flagged **`CallRole`** —
+which proves `CallRole` is compared **expanded**, not matched by name. That matters precisely because
+splitting a union from its members into separate files is now the standard shape: a name-matching
+instrument would go green through exactly the change most likely to break something. **Read the
+propagation, not just the pass/fail.**
+
+## Stale prose the compiler will never find
+
+**A split leaves stale prose in files that never imported the moved code.** A header saying "see
+`repl.ts`" keeps compiling forever after `repl.ts` is gone. Every wave so far has produced some, and
+**no compiler, test or harness will ever surface one** — only a reader who notices, or a grep for the
+dead name. **When you delete or rename a file, grep the repo for its bare name in prose**, not just for
+its import specifier.
+
+Outstanding at the time of writing — eleven sites naming `repl.ts`, `batch-summary.ts`,
+`retro-prompt.ts` or `review-prompt.ts` as though they still exist, **none of them imports**:
+
+| file | note |
+|---|---|
+| `src/core/ui/write.ts:2` | names all three deleted renderers, **and** its "not swept yet" claim is now wrong for `interface/` |
+| `src/core/ui/index.ts:12`, `message-queue.ts:8`, `renderer.ts:19`, `repaint-status-bar.ts:6`, `text-input.ts:2`, `theme.ts:41,51` | `core/ui`, already swept — so a swept directory is no guarantee |
+| `src/core/session/resolve-boot-model.ts:14` | live `core/session` wave |
+| `src/interface/commands/resume.ts:8,45,185` | wave D |
+
+The `src/interface` wave fixed the four inside its own grant and left these, correctly — they are other
+directories' files. **`backlog/ux-gaps-vs-claude-code.md:27` was the same defect in the docs** and is
+fixed. Note that a *historical* reference is fine and should not be swept: `first-line-preview.ts:4` and
+`retro-patched-path.ts:2` both name an old file deliberately and give its successor.
+
 ## Hazards found during the first increment
 
 - **A differential harness whose baseline imports only types proves nothing.** `tsx` **strips
@@ -625,6 +814,14 @@ three even when you are the only one working.
   runtime value. **Every remaining wave builds one of these harnesses, so: a differential baseline
   must import at least one runtime value from the module under test, or its green result is not
   evidence.** Check that before trusting a byte-identical comparison.
+- **The `%TEMP%` differential-baseline recipe — the next waves all need it.** A baseline materialised
+  **outside the repo** (so no scratch ever sits in the tree) cannot keep its relative specifiers.
+  Rewrite them to absolute `file:///C:/…/x.ts` URLs, which `tsx` resolves — and drop an
+  `{"type":"module"}` `package.json` beside the baseline, or esbuild treats it as CJS and rejects
+  top-level `await`. The half that makes the technique work at all: **take `HEAD`'s file and add
+  `export` to its private declarations, changing no body.** That is what makes a private helper
+  differentiable without altering what it does. **This is the answer to the self-comparison shape
+  above** — reach for it the moment you notice the baseline's helper is private.
 - **A pure-type move cannot satisfy the runtime-value rule, and saying so is the point.**
   `core/container/types.ts` exported **zero** runtime values, so *"a differential baseline must import
   at least one runtime value"* was **unsatisfiable** — any harness built over it would have run
@@ -665,10 +862,12 @@ three even when you are the only one working.
   same way, and a suite that polices file layout rather than behaviour is a different instrument from
   the one item 2 built. Do not re-propose it.
 
-- **`docs/mental-model.md:27` links `src/core/llm/call-role.type.ts` by path.** `CallRole` moves to
-  `src/core/llm/types.ts`, which is a stable path, so **retarget the link there** in the same change that
-  moves the file. `docs/` is governance-gated: that edit is handed to the user for review, never
-  committed by the agent that makes it.
+- ~~`docs/mental-model.md:27` must be retargeted to `src/core/llm/types.ts`~~ — **closed, and it
+  round-tripped.** `CallRole` went to `types.ts` in the consolidation and came back to
+  `call-role.type.ts` in the one-type-per-file retrofit, so the doc link is at its original path and the
+  edit tracking it was reverted to exactly what `HEAD` already said. **Two rulings in one sweep can
+  cancel out**: before editing a governance doc to chase a moving file, check whether the move is
+  settled. `docs/` is governance-gated, so each of those edits would otherwise have cost a review.
 - **`backlog/README.md`'s item 1 pointer** has been retargeted to this file's new title; the edit is in
   the working tree and rides along with the first sweep commit rather than getting a commit of its own.
 

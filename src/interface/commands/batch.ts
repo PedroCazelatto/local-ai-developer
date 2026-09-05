@@ -15,8 +15,8 @@
 // re-read report and the one printed the night it ran can never drift apart.
 
 import { renderer } from '../../core/ui/renderer.js';
-import { renderBatchSummary } from '../batch-summary.js';
-import type { Command } from '../command-registry.js';
+import { renderBatchSummary } from '../render-batch-summary.js';
+import type { Command } from '../command.type.js';
 import { listBatchFiles } from './list-batch-files.js';
 import type { BatchFile } from './list-batch-files.type.js';
 import { readBatchSummaryFile } from './read-batch-summary-file.js';

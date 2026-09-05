@@ -6,8 +6,9 @@
 // dropped.
 
 import { theme } from '../../core/ui/theme.js';
-import type { Command, CommandGroup } from '../command-registry.js';
-import { listCommands } from '../command-registry.js';
+import type { CommandGroup } from '../command-group.type.js';
+import type { Command } from '../command.type.js';
+import { listCommands } from '../list-commands.js';
 
 /** Display order + human labels for the `/help` sections. A command's `group` keys into this. */
 const GROUPS: readonly { readonly id: CommandGroup; readonly label: string }[] = [

@@ -7,7 +7,7 @@ import { formatSize } from '../core/ui/format-size.js';
 import { renderer } from '../core/ui/renderer.js';
 import { theme } from '../core/ui/theme.js';
 import { write } from '../core/ui/write.js';
-import type { CommandContext } from '../interface/command-registry.js';
+import type { CommandContext } from '../interface/command-context.type.js';
 import { formatModified } from './format-modified.js';
 
 /** `/models list` — print the installed models with the active one marked, or a hint if none are pulled. */

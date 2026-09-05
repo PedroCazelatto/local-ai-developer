@@ -2,9 +2,10 @@
 // parse is tried first and the repair pass is the fallback — the opposite emphasis to the bare-JSON
 // path, which has no delimiter and must repair-decode to find where the object ends at all.
 
+import type { ToolCall } from 'ollama';
+
 import { coerceCall } from './coerce-call.js';
 import { repairDecode } from './repair-decode.js';
-import type { ToolCall } from './types.js';
 
 /** Decode one tagged tool-call payload into a ToolCall, or null when it is not one. */
 export function parseCall(payload: string): ToolCall | null {

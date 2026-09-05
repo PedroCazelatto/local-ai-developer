@@ -4,7 +4,9 @@ export { OllamaClient } from './client.js';
 export type { StreamHandle } from './client.js';
 // Every model call names the ROLE it plays, and that role is what picks its num_ctx ceiling. The union
 // is closed, so a call site cannot invent one; resolveWindowCtx is the single place a ceiling is chosen.
-export type { CallRole, OneShotRole, WindowRole } from './types.js';
+export type { CallRole } from './call-role.type.js';
+export type { OneShotRole } from './one-shot-role.type.js';
+export type { WindowRole } from './window-role.type.js';
 export { resolveWindowCtx } from './resolve-window-ctx.js';
 // V4/02: a fresh, history-free Ollama call (same model, not in session memory, ceiling from its role) —
 // used by search_rules and shared with summarization (V4/05).
@@ -31,4 +33,9 @@ export { loadsOrRepair } from './loads-or-repair.js';
 export { repairDecode } from './repair-decode.js';
 export { recoverToolCalls } from './recover-tool-calls.js';
 export type { Recovery } from './recover-tool-calls.js';
-export type { ChatResult, Message, TokenCounts, Tool, ToolCall } from './types.js';
+// Message/Tool/ToolCall are the ollama package's own structural types. They are re-exported here,
+// on the barrel, so outside callers keep one import site; inside core/llm every file now takes them
+// straight from the package, which is what client.ts already did.
+export type { Message, Tool, ToolCall } from 'ollama';
+export type { ChatResult } from './client.js';
+export type { TokenCounts } from './token-counts.type.js';

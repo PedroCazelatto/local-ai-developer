@@ -6,7 +6,7 @@
 import type { SubagentInfo } from '../../core/session/index.js';
 import { renderer } from '../../core/ui/renderer.js';
 import { theme } from '../../core/ui/theme.js';
-import type { Command } from '../command-registry.js';
+import type { Command } from '../command.type.js';
 
 /** The slice of the orchestrator /subagents needs — satisfied structurally by SessionOrchestrator. */
 export interface SubagentsOrchestrator {
