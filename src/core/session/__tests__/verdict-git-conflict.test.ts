@@ -11,9 +11,9 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import type { ReviewIssue, ReviewVerdict } from '../review-types.js';
+import type { ReviewIssue, ReviewVerdict } from '../types.js';
 import { verdictGitConflict } from '../verdict-git-conflict.js';
-import type { VerdictGitState } from '../verdict-git-conflict.type.js';
+import type { VerdictGitState } from '../verdict-git-conflict.js';
 
 /** A shape-valid verdict; every case overrides only what it is about. */
 function verdict(result: 'pass' | 'fail', issues: readonly ReviewIssue[] = []): ReviewVerdict {
@@ -96,7 +96,7 @@ test('the fail path does not care whether the task is marked done', () => {
   assert.deepEqual(both, [null, null]);
 });
 
-// ---------------------------------------------------------------------- path matching (toPosix)
+// --------------------------------------------------------------- path matching (toPosixTrimmed)
 
 test('a backslash path in the verdict covers the same file reported with slashes', () => {
   // The model echoes whatever separator it saw; normalizing is what keeps a real issue from being

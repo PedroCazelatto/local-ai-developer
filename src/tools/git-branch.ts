@@ -12,12 +12,10 @@
 //   the checkout or ride onto a branch it does not belong to. The model commits or shelves first.
 // `create` on a branch that already exists is therefore a switch, and inherits the switch rule.
 
-import {
-  branchNameError,
-  createBranch,
-  listBranches,
-  switchBranch,
-} from '../core/session/project-git-branch.js';
+import { branchNameError } from '../core/session/branch-name-error.js';
+import { createBranch } from '../core/session/create-branch.js';
+import { listBranches } from '../core/session/list-branches.js';
+import { switchBranch } from '../core/session/switch-branch.js';
 import type { JsonObject, ToolModule, ToolResult } from './types.js';
 import { toolError } from './types.js';
 

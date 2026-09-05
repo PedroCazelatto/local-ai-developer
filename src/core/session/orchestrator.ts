@@ -18,7 +18,7 @@ import { dispatchToolCall } from './dispatch.js';
 import { appendEvent } from './events-log.js';
 import { generateContextTitle } from './generate-context-title.js';
 import { SessionMemory } from './memory.js';
-import { drainAnsweredQuestions } from './question-store.js';
+import { drainAnsweredQuestions } from './drain-answered-questions.js';
 import { createReadTracker } from './read-tracker.js';
 import type { FileReadTracker } from './read-tracker.type.js';
 import { compactActivePhase } from './summarizer.js';

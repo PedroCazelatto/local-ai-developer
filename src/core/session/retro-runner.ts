@@ -34,7 +34,7 @@ import type { ToolCallRecord } from './dispatch.js';
 import { dispatchToolCall } from './dispatch.js';
 import { createReadTracker } from './read-tracker.js';
 import type { FileReadTracker } from './read-tracker.type.js';
-import { commitPaths } from './project-git.js';
+import { commitPaths } from './commit-paths.js';
 import type { RetroDeps, RetroInput, RetroResult, RetroSubmission } from './retro-runner.type.js';
 import { processMessage } from './turn-loop.js';
 import type { TurnContext } from './turn-loop.js';

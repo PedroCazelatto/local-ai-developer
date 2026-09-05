@@ -5,19 +5,17 @@
 // anything else is stashed, and the task loop stashes on its own schedule. The labels live in a
 // namespace disjoint from the task loop's own `lad-stash:<taskId>` records — the stashed failed
 // attempt Retro reads and the user reviews — so nothing the model does here can reach one. See
-// project-git-stash.ts for why that separation is the whole reason this file exists.
+// shelf-label.ts for why that separation is the whole reason this file exists.
 //
 // Withheld from the Worker: it could otherwise shelve the very work the Reviewer is about to judge,
 // leaving the Reviewer a clean tree and no code (worker-runner refuses it; phase-tool-names omits it).
 
-import {
-  dropShelf,
-  isValidShelfLabel,
-  listShelves,
-  popShelf,
-  saveShelf,
-  shelfLabelError,
-} from '../core/session/project-git-stash.js';
+import { dropShelf } from '../core/session/drop-shelf.js';
+import { isValidShelfLabel } from '../core/session/is-valid-shelf-label.js';
+import { listShelves } from '../core/session/list-shelves.js';
+import { popShelf } from '../core/session/pop-shelf.js';
+import { saveShelf } from '../core/session/save-shelf.js';
+import { shelfLabelError } from '../core/session/shelf-label-error.js';
 import type { JsonObject, JsonValue, ToolModule, ToolResult } from './types.js';
 import { toolError } from './types.js';
 

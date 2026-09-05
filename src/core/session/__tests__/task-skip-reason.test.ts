@@ -5,7 +5,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { taskSkipReason } from '../backlog.js';
+import { taskSkipReason } from '../task-skip-reason.js';
 import type { Backlog, Task, TaskStatus } from '../types.js';
 
 function task(id: string, status: TaskStatus, dependsOn: readonly string[] = []): Task {

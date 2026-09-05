@@ -5,7 +5,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { nextRunnableTasks } from '../backlog.js';
+import { nextRunnableTasks } from '../next-runnable-tasks.js';
 import type { Backlog, Task, TaskStatus } from '../types.js';
 
 /** A Task with only the fields the gate reads; body/paths are inert here. */

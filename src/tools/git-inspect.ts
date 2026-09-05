@@ -9,13 +9,11 @@
 // This is the one git tool EVERY phase gets, the Worker included: reading history cannot damage
 // anything, and a Worker that can see how a file got the way it is writes a better change.
 
-import {
-  DEFAULT_LOG_COUNT,
-  inspectDiff,
-  inspectLog,
-  inspectShow,
-  refError,
-} from '../core/session/project-git-inspect.js';
+import { inspectDiff } from '../core/session/inspect-diff.js';
+import { DEFAULT_LOG_COUNT } from '../core/session/inspect-log-count.js';
+import { inspectLog } from '../core/session/inspect-log.js';
+import { inspectShow } from '../core/session/inspect-show.js';
+import { refError } from '../core/session/ref-error.js';
 import type { JsonObject, ToolModule, ToolResult } from './types.js';
 import { toolError } from './types.js';
 

@@ -14,7 +14,9 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { test } from 'node:test';
 
-import { BacklogError, readBacklog, setTaskStatus } from '../backlog.js';
+import { BacklogError } from '../backlog-error.js';
+import { readBacklog } from '../read-backlog.js';
+import { setTaskStatus } from '../set-task-status.js';
 import type { TaskStatus } from '../types.js';
 
 /** Write `text` as backlog/a.md, flip it to `status`, and hand back the exact bytes on disk after. */

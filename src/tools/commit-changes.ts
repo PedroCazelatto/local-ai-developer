@@ -11,7 +11,9 @@
 // edit (the orchestrator's own rules/, which lives outside every project) from ever being committed
 // by a model.
 
-import { commitPaths, diffPaths, listChangedPaths } from '../core/session/project-git.js';
+import { commitPaths } from '../core/session/commit-paths.js';
+import { diffPaths } from '../core/session/diff-paths.js';
+import { listChangedPaths } from '../core/session/list-changed-paths.js';
 import { composeCommitMessage } from './compose-commit-message.js';
 import type { JsonObject, ToolModule, ToolResult } from './types.js';
 import { toolError } from './types.js';

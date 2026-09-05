@@ -1,8 +1,9 @@
 // core/session/ — session orchestrator, per-phase isolated memory, and config.
 export * from './config.js';
 // V5/02: host-global app state (~/.local-ai-developer/state.json) — the persisted `/models use` choice.
-export { loadAppState, saveAppState } from './app-state.js';
-export type { AppState } from './app-state.type.js';
+export { loadAppState } from './load-app-state.js';
+export { saveAppState } from './save-app-state.js';
+export type { AppState } from './types.js';
 // Boot model resolution against what Ollama actually has installed (replaces the old hard-coded default).
 export { resolveBootModel } from './resolve-boot-model.js';
 export { SessionOrchestrator } from './orchestrator.js';
@@ -26,27 +27,22 @@ export { shortSubagentId } from './short-subagent-id.js';
 export { appendJsonlLine } from './append-jsonl-line.js';
 // Questions the user skipped during an ask_user round (V6/01) — durable, re-asked by /questions, and
 // delivered back to the phase that asked on its next turn.
-export {
-  saveUnansweredQuestions,
-  readPendingQuestions,
-  answerQuestion,
-  drainAnsweredQuestions,
-} from './question-store.js';
-export type { PendingQuestion, AnsweredQuestion, QuestionRow } from './question-store.type.js';
+export { saveUnansweredQuestions } from './save-unanswered-questions.js';
+export { readPendingQuestions } from './read-pending-questions.js';
+export { answerQuestion } from './answer-question.js';
+export { drainAnsweredQuestions } from './drain-answered-questions.js';
+export type { PendingQuestion, AnsweredQuestion, QuestionRow } from './types.js';
 export { appendEvent } from './events-log.js';
 export type { OrchestratorEvent, OrchestratorEventInput, OrchestratorEventType } from './events-log.type.js';
-export {
-  readBacklog,
-  setTaskStatus,
-  nextRunnableTasks,
-  allTasks,
-  findTask,
-  taskSkipReason,
-  levelDocs,
-  backlogRoot,
-  BACKLOG_DIRNAME,
-  BacklogError,
-} from './backlog.js';
+export { readBacklog } from './read-backlog.js';
+export { setTaskStatus } from './set-task-status.js';
+export { nextRunnableTasks } from './next-runnable-tasks.js';
+export { allTasks } from './all-tasks.js';
+export { findTask } from './find-task.js';
+export { taskSkipReason } from './task-skip-reason.js';
+export { levelDocs } from './level-docs.js';
+export { backlogRoot, BACKLOG_DIRNAME } from './backlog-root.js';
+export { BacklogError } from './backlog-error.js';
 export type { Backlog, Task, TaskStatus } from './types.js';
 export { TASK_STATUSES } from './types.js';
 export { runWorkerTask } from './worker-runner.js';
@@ -59,36 +55,53 @@ export { formatEvictedStub } from './format-evicted-stub.js';
 export { runReviewerTask, ReviewerVerdictError } from './reviewer-runner.js';
 export type { ReviewerDeps, ReviewerInput, ReviewerOutcome, ReviewerCommit } from './reviewer-runner.js';
 export { verdictGitConflict } from './verdict-git-conflict.js';
-export type { VerdictGitState } from './verdict-git-conflict.type.js';
+export type { VerdictGitState } from './verdict-git-conflict.js';
 export { runTaskLoop, MAX_ROUNDS } from './run-task-loop.js';
 export type { TaskLoopResult, TaskLoopOutcome, TaskLoopDeps, TaskLoopReporter } from './run-task-loop.type.js';
-export type { ReviewVerdict, ReviewIssue, Severity, ReviewDecision } from './review-types.js';
-export { SEVERITIES } from './review-types.js';
-export {
-  isWorkingTreeDirty,
-  captureChangedFiles,
-  listChangedPaths,
-  diffPaths,
-  commitPaths,
-  stashTaskAttempt,
-  readTaskStashDiff,
-  dropTaskStash,
-  REVIEW_DIFF_BUDGET,
-} from './project-git.js';
-export type { ChangedFiles, ChangedPaths, CommitResult } from './project-git.js';
+export type { ReviewVerdict, ReviewIssue, Severity, ReviewDecision } from './types.js';
+export { SEVERITIES } from './types.js';
+export { isWorkingTreeDirty } from './is-working-tree-dirty.js';
+export { captureChangedFiles } from './capture-changed-files.js';
+export type { ChangedFiles } from './capture-changed-files.js';
+export { listChangedPaths } from './list-changed-paths.js';
+export type { ChangedPaths } from './list-changed-paths.js';
+export { diffPaths } from './diff-paths.js';
+export { commitPaths } from './commit-paths.js';
+export type { CommitResult } from './commit-paths.js';
+export { stashTaskAttempt } from './stash-task-attempt.js';
+export { readTaskStashDiff } from './read-task-stash-diff.js';
+export { dropTaskStash } from './drop-task-stash.js';
+export { REVIEW_DIFF_BUDGET } from './review-diff-budget.js';
 export { runGit } from './run-git.js';
-export type { GitRun } from './run-git.type.js';
+export type { GitRun } from './run-git.js';
 // The model-facing git operations behind git_stash / git_branch / git_push / git_inspect. The shelf
-// prefix is deliberately disjoint from project-git.ts's task-keyed `lad-stash:` — see
-// project-git-stash.ts.
-export { saveShelf, listShelves, popShelf, dropShelf, isValidShelfLabel, shelfLabelError, SHELF_LABEL_PREFIX } from './project-git-stash.js';
-export type { Shelf, ShelfResult } from './project-git-stash.type.js';
-export { createBranch, switchBranch, listBranches, branchExists, currentBranch, branchNameError } from './project-git-branch.js';
-export type { BranchList, BranchResult } from './project-git-branch.type.js';
-export { pushCurrentBranch } from './project-git-push.js';
-export type { PushResult } from './project-git-push.type.js';
-export { inspectDiff, inspectLog, inspectShow, refError, DEFAULT_LOG_COUNT, MAX_LOG_COUNT } from './project-git-inspect.js';
-export type { InspectResult } from './project-git-inspect.type.js';
+// prefix is deliberately disjoint from the task loop's `lad-stash:` — see shelf-label.ts and
+// task-stash-label-prefix.ts.
+export { saveShelf } from './save-shelf.js';
+export { listShelves } from './list-shelves.js';
+export type { Shelf } from './list-shelves.js';
+export { popShelf } from './pop-shelf.js';
+export { dropShelf } from './drop-shelf.js';
+export { isValidShelfLabel } from './is-valid-shelf-label.js';
+export { shelfLabelError } from './shelf-label-error.js';
+export { SHELF_LABEL_PREFIX } from './shelf-label.js';
+export type { ShelfResult } from './types.js';
+export { createBranch } from './create-branch.js';
+export { switchBranch } from './switch-branch.js';
+export { listBranches } from './list-branches.js';
+export type { BranchList } from './list-branches.js';
+export { branchExists } from './branch-exists.js';
+export { currentBranch } from './current-branch.js';
+export { branchNameError } from './branch-name-error.js';
+export type { BranchResult } from './types.js';
+export { pushCurrentBranch } from './push-current-branch.js';
+export type { PushResult } from './push-current-branch.js';
+export { inspectDiff } from './inspect-diff.js';
+export { inspectLog } from './inspect-log.js';
+export { inspectShow } from './inspect-show.js';
+export { refError } from './ref-error.js';
+export { DEFAULT_LOG_COUNT, MAX_LOG_COUNT } from './inspect-log-count.js';
+export type { InspectResult } from './types.js';
 // The branch a task is developed on — one task, one branch (docs/phases.md).
 export { taskBranchName } from './task-branch-name.js';
 export { runBatch, batchSummaryFileName, BATCHES_DIRNAME } from './batch.js';
@@ -108,8 +121,11 @@ export type {
 export { RunStopSignal } from './run-stop-signal.js';
 export type { StopScope } from './run-stop-signal.type.js';
 export { rulesPhasesDirty } from './rules-phases-dirty.js';
-export { raiseBlocker, resolveBlocker, openBlockerForTask, readBlockerRows } from './blocker-store.js';
-export type { RaisedBlocker, ResolvedBlocker, BlockerRow } from './blocker-store.type.js';
+export { raiseBlocker } from './raise-blocker.js';
+export { resolveBlocker } from './resolve-blocker.js';
+export { openBlockerForTask } from './open-blocker-for-task.js';
+export { readBlockerRows } from './read-blocker-rows.js';
+export type { RaisedBlocker, ResolvedBlocker, BlockerRow } from './types.js';
 export { spawnRetro, RetroError } from './retro-runner.js';
 export type { RetroInput, RetroResult, RetroScope, RetroDeps, RetroSubmission } from './retro-runner.type.js';
 // Model-to-model deliberation (backlog/model-to-model-dialogue.md): challenger ⇄ proponent on throwaway

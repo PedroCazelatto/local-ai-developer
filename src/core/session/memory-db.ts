@@ -2,7 +2,7 @@
 // per-phase JSONL files + archive/ directory — a context is now a row that can be listed, titled and
 // reopened, instead of a filename that had to be renamed to change state.
 //
-// A cohesive store module (like inbox-store.ts / blocker-store.ts / app-state.ts): a few tightly-related
+// A cohesive store module (like the inbox / blocker / app-state stores): a few tightly-related
 // readers/writers over one store, not one function per file. SessionMemory (memory.ts) is the only
 // consumer — it owns the in-RAM history and delegates every database touch here.
 //

@@ -17,7 +17,9 @@ import path from 'node:path';
 
 import type { TokenCounts } from '../llm/index.js';
 import { addTokenCounts } from './add-token-counts.js';
-import { findTask, readBacklog, taskSkipReason } from './backlog.js';
+import { findTask } from './find-task.js';
+import { readBacklog } from './read-backlog.js';
+import { taskSkipReason } from './task-skip-reason.js';
 import type {
   BatchBlocked,
   BatchCancelled,
@@ -29,9 +31,10 @@ import type {
   BatchSkipped,
   BatchSummary,
 } from './batch.type.js';
-import { isWorkingTreeDirty, stashTaskAttempt } from './project-git.js';
+import { isWorkingTreeDirty } from './is-working-tree-dirty.js';
 import { rulesPhasesDirty } from './rules-phases-dirty.js';
 import type { TaskLoopResult } from './run-task-loop.type.js';
+import { stashTaskAttempt } from './stash-task-attempt.js';
 
 /** Folder under .orchestrator/ holding one JSON file per batch (git-ignored session state). */
 export const BATCHES_DIRNAME = 'batches';
