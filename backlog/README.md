@@ -410,6 +410,14 @@ and whether a project the model is building inherits the orchestrator's pin is t
 oversight to sweep up. Two of the four comments reason about the image being Debian-based rather than about
 its version, and may be right as they stand. Ask; do not assume the second follows from the first.
 
+**The general form, because this is the second time the same arithmetic has come up short.** Item 3
+closed on *"one declaration, enforced in three places."* It was true of every chokepoint that existed —
+and then `npm test` was added to `package.json` by a different agent, invoking `node` **directly** rather
+than through `scripts/run.mjs`, so the pin is unenforced there. **A rule enforced at every chokepoint
+that exists does not cover the next chokepoint someone builds**, which is a sharper failure than a missed
+case. So: **an enforcement count is a claim about today's surface, and a doc that states one should say
+so.**
+
 **Why last, and why it is not urgent:** nothing depends on it, and the defect is **latent rather than
 live** — `.nvmrc` is `24.14.0` and every hardcoded tag is `node:24-slim`, so the majors agree today and
 only drift when the pin's major moves. It is filed rather than folded into

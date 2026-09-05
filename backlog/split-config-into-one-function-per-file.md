@@ -981,12 +981,26 @@ Two items are outstanding, and one that was listed here has been **withdrawn**:
 - **Tests for `StreamFilter` and `recoverToolCalls`** — item 2 deferred them while `core/llm` was
   mid-split. That directory has landed, so they are unblocked.
 - **Tests for `src/context/`** — likewise deferred; the directory landed in `daf08cf`.
+- **Re-run the whole suite under Node 24, before item 2's work is relied on.** All 400 tests are green
+  on **22.14.0**; `.nvmrc` pins **24.14.0**. `npm test` runs `node --test` **directly** and never passes
+  through `scripts/run.mjs`, so nothing enforces the pin on that path the way item 3 enforces it for
+  `start` and `install`. **The ruling was to fix the runtime, not to gate `npm test`** — gating it would
+  have refused on this box, where there is no Node 24 and no nvm, and stripped every agent of its
+  behavioural gate mid-sweep.
+
+  **This is concrete, not tidiness.** `node:sqlite` is **experimental on 22.x and stable from 24**, and
+  the visible-turn agreement test below is the first test that would touch it. A test that passes on 22
+  and fails on the pinned runtime is exactly the waste this closes. Worth knowing: the `test` script
+  passes `--disable-warning=ExperimentalWarning`, so the one signal that would announce the experimental
+  API is switched off.
 - **A test asserting the two halves of the visible-turn predicate agree.** *"Still in the phase's live
   history"* is now defined **twice**: as SQL in `visible-turn-where.ts` for turns read from `memory.db`,
   and as JS in `visible-turns.ts` for turns still held in RAM. **It cannot be deduped** — two languages,
   two execution sites — and **the two must agree or a flush changes what a phase can see.** Both headers
   now cross-reference each other, which is the best guard available in prose, but this is precisely the
-  shape that wants a test and does not have one. Note the framing, which is the sweep's recurring theme:
+  shape that wants a test and does not have one. **Held pending either Node 24 or an explicit decision to
+  proceed on 22 with the experimental `node:sqlite` API** — and blocked on `core/session` closing
+  regardless, so the timing may resolve itself. Note the framing, which is the sweep's recurring theme:
   **the duplication was always there; one file was hiding it.**
 - **Remove `ChatRole`, deliberately and not as sweep work.** It has no consumer at all — only its own
   declaration and the barrel line re-exporting it. Wave C left it in place because the barrel's name set
