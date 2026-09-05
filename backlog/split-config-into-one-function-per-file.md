@@ -35,7 +35,7 @@
 > one function per file and had nowhere else that owned it.
 >
 > **If you are here to learn something, read *A green differential proves nothing until a control has
-> gone red — AND been shown to run*.** Seven distinct shapes of a test that passes while proving nothing,
+> gone red — AND been shown to run*.** Eight distinct shapes of a test that passes while proving nothing,
 > every one caught by making an instrument fail on purpose rather than by a green result looking wrong.
 > That section is the reason this file is still here.
 >
@@ -112,6 +112,76 @@ because module resolution walks up from the script rather than from the working 
 > in *The partition* below says 20 / 60; the truth at HEAD is 24 / 74. **The census having been wrong is
 > not the sweep having regressed**, and the usual caveat still applies to the baseline: it is measured at
 > `a0e9e31` and will not reproduce against a live tree.
+
+### Correction: this census only ever measured HALF the rule
+
+**Stated plainly because every "0 violations" figure in this file is affected.** The rule has two
+halves — one declaration per file, **and** *"the kebab-case file name names that function's job"*
+(constitution, same sentence). The census above counts declarations per file. **It never checked a
+single name.**
+
+The gap is not theoretical. `src/commands/run.ts` declares `export async function run` and is the
+**`/models` dispatcher**; its own header says so. A count census passes it, and so does a name census —
+`run` in `run.ts` is an exact match — because the thing that disagrees is the **job**. So:
+
+- **Name-to-filename agreement is checkable.** A first scan found 62 disagreements over 753 files, of
+  which **56 are the established conventions** (23 `xTool`, 15 `xCommand`, 10 PascalCase classes, 3
+  SCREAMING_CASE constants, 5 deliberate suffixes) and **3 are real**
+  (`appendAuditRow`/`audit.ts`, `appendEvent`/`events-log.ts`, `SubagentManager`/`subagents.ts`), with 3
+  more needing a ruling. Filed as [item 36](README.md).
+- **Name-to-job agreement is not checkable**, and no future instrument will make it so.
+
+### A control placed AFTER the action it guards is not a gate
+
+Found on item 6, and it is the cheapest mistake in this file to make. An agent was budgeted at two
+model loads. Its harness seeded a cache at one ceiling, probed at another — where all nine models were
+of course pending — and **then** asserted that at most one model should have been pending. The
+assertion was correct, could fire, and **did** fire. It was still worthless: about two minutes of GPU
+had already been spent by the time it spoke.
+
+**The rule: a precondition that guards an expensive or irreversible action must THROW BEFORE the
+action, not report after it.** "The control fired" is only evidence when firing could still have
+prevented something. This is a sibling of the *harness never ran* shape rather than a new one — both
+are about a check whose position, not whose logic, is what makes it useless.
+
+### A census reported at the end must be run AFTER the last commit
+
+The item 6 probe agent reported `764 files, 595 declarations, 0 violations` as its closing figure. The
+tree at that moment held **779 files and 606 declarations** — its number was measured *before its own
+twenty-four new files existed*, so the zero it reported had never covered the code it was reporting on.
+The tell was exact and available: its test-file count, 32, was precisely the pre-task figure.
+
+The conclusion happened to survive — an independent re-run after the last commit also found zero — but
+it survived by luck rather than by evidence. **A census is a statement about a tree, so it must name
+the commit it was run against**, and a task that adds files must re-run it last. The same applies to a
+test count: `543 pass` means nothing without "at `5fe2f2b`".
+
+### Two traps in the file LIST, which is upstream of every count in this file
+
+Both found while re-deriving the census after item 1 had shipped, and both silent.
+
+- **`git ls-files "src/**/*.ts"` does not match `src/index.ts`.** Git's `**` will not match zero
+  directories in that position, so the glob silently drops every file sitting directly in `src/` — which
+  is exactly one file, the entry point. A census run that way is one file short and says nothing about it.
+  Use `git ls-files "src/*.ts" "src/**/*.ts"` (or walk the tree), and **assert the total** against
+  `git ls-files src | grep '\.ts$'` rather than trusting the glob.
+- **A file COUNT is meaningless without its exclusion list.** The recipe above skips `__tests__`,
+  `.type.ts` and `.schema.ts`. A census that skips only `__tests__` is measuring a strict superset and
+  will report a different, larger number for the same tree — neither figure is wrong, and quoting either
+  without its scope invites exactly the "your number disagrees with mine" exchange that cost time twice
+  in this sweep. Two agents did compare 763 against 764 and reached for `.schema.ts` as the explanation;
+  the real cause was `src/index.ts`, and the `.schema.ts` difference was a second, independent deviation
+  that happened to cancel out in the total.
+
+**The saving grace, and the reason the conclusion survived both:** zero violations over a **superset** of
+the files implies zero over any subset. A count is scope-dependent; a zero is not. Prefer reporting the
+zero and the scope over reporting the count.
+
+**The generalisable lesson, which is this file's subject:** an instrument that measures one half of a
+two-part rule and reports "0" is an eighth shape of vacuous green — not a test that cannot fail, but a
+test whose *scope* is narrower than the claim it gets read as making. The seven shapes were all about
+whether a check can distinguish. This one is about whether it is checking the thing you said it was.
+The fix is not a better parser; it is reporting the scope alongside the number.
 
 ### Settled: method shorthand counts, and it is why `src/tools` is 24 / 74
 
@@ -340,7 +410,7 @@ shells.
 ### Required reading, and why it is not optional
 
 The verification section below — *A green differential proves nothing until a control has gone red — AND
-been shown to run* — is the most expensive thing in this file. **Six distinct shapes of vacuous green**
+been shown to run* — is the most expensive thing in this file. **Eight distinct shapes of vacuous green**
 were found during this sweep, and **not one of them was caught by a green result looking wrong.** Every
 one was caught because an instrument was made to fail on purpose and refused to. Mutation testing was run
 twice and produced a survivor both times, and both survivors improved a test.
@@ -1142,11 +1212,13 @@ green result**:
 | **self-comparison** | `same(f(v), f(v))` — the harness compared the new implementation with **itself**, which passes unconditionally | reading the comparison, not running it |
 | **harness never ran** | `main()` defined and never called; 16 probes skipped, `probes=58 mismatches=0` printed | reading the file's tail — **a coverage control now** |
 | **prefix match** | `haystack.includes(needle)` is true for a **prefix**, so four declarations certified VERBATIM while every range was one line short, closing brace excluded | **a different instrument failed on the same input** — `tsc` threw `'}' expected` |
+| **false KILL** | `rmSync` over ~25 real git repos exits non-zero *after* the harness printed GREEN, and the driver read the **exit code** as its verdict — scoring a branch no probe reached as KILLED | reading what the harness *printed* instead of how the process *exited* (full account below) |
+| **half-measured rule** | the declaration census reported **0 violations** against a rule with **two** halves, having checked only one — `src/commands/run.ts` declares `run` and dispatches `/models`, passing both a count check and a name check | comparing the instrument's scope to the rule's own wording, not its output |
 
 The wrong-shaped grid is the purest form: a harness comparing `null` to `null`, thousands of times,
 reporting perfect agreement. Nothing in the output distinguishes it from a real proof.
 
-**Self-comparison is the likeliest of the four, because the road to it is honest.** The baseline's
+**Self-comparison is the likeliest of them, because the road to it is honest.** The baseline's
 helper is *private*, so it genuinely cannot be imported — and comparing the new implementation with
 itself is the path of least resistance from a real obstacle rather than carelessness. **The answer is
 the `%TEMP%` baseline recipe below: take `HEAD`'s file, add `export` to its private declarations, change

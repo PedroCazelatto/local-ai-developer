@@ -52,13 +52,51 @@ cannot.
   be the better answer, and is a change of style rather than a correction.
 - **Is `OPEN-QUESTIONS.md` in scope?** It is a historical record of answered questions, so a present-tense
   reference to a since-deleted file may be correct *as of when it was written*. If so, it wants a dated
-  note rather than an edit.
-- **Should the barrel-relative sites wait for wave E?** `tools/index.ts:34` is inside a barrel that wave E
-  deletes, which resolves one site for free.
+  note rather than an edit. **This is the biggest open call in the item, and it is now measured** — see
+  the table below.
+- ~~**Should the barrel-relative sites wait for wave E?**~~ **Resolved: wave E shipped.**
+  `tools/index.ts:34` was inside a barrel it deleted, so that site is gone — thirteen remain in `src/`.
 
 ## Why it sits where it does
 
-Small, independent, and nothing depends on it. **Ships after wave E**, which deletes one of the fourteen
-sites outright and may move others. Filed rather than folded into item 1 for the reason that governed the
-whole sweep: an edit to a directory a wave does not own is contention, and a comment change buried in a
-mechanical refactor is a change nobody reviews.
+Small, independent, and nothing depends on it. **Wave E has since shipped**, deleting one of the fourteen
+sites outright, so this is no longer blocked on anything. Filed rather than folded into item 1 for the
+reason that governed the whole sweep: an edit to a directory a wave does not own is contention, and a
+comment change buried in a mechanical refactor is a change nobody reviews.
+
+## Measured: `OPEN-QUESTIONS.md` names ten files that no longer exist
+
+Scripted rather than eyeballed — every `src/**.ts` path the file mentions, checked against the tree:
+
+| dead path | lines |
+|---|---|
+| `src/interface/repl.ts` | 460 ×2, 2014 ×2 |
+| `src/core/session/project-git.ts` | 135 ×2, 1035 |
+| `src/core/session/batch.ts` | 291 ×2, 1404 |
+| `src/core/session/types.ts` | 160 ×2 |
+| `src/core/llm/types.ts` | 1898 ×2 |
+| `src/core/llm/pick-smallest-model.ts` | 85 ×2 |
+| `src/core/session/memory-db.ts` | 1191 |
+| `src/core/session/retro-runner.ts` | 830 |
+| `src/core/session/reviewer-runner.ts` | 829 |
+| `src/core/llm/ollama-models.ts` | 2232 |
+
+**`README-INCONSISTENCIES.md` is clean** — zero dead paths — so this is a property of the one file.
+
+Two things sharpen the open question rather than answer it:
+
+- **Nine of the ten predate this measurement; `pick-smallest-model.ts` was deleted by
+  **item 6** (shipped — see [the ledger](README.md)).** So the file does not merely hold stale history — it
+  **acquires** new staleness every time shipped work deletes a file, which means "leave it, it is
+  historical" is a decision to let the count grow rather than a decision to stop touching it.
+- **One entry is a stale *claim*, not just a stale path.** `OPEN-QUESTIONS.md:352` states
+  `InstalledModel` is `{ name, size, modifiedAt }` and that the capability field is *"dropped before
+  `pickSmallestModel` ever sees it"*. Both halves are now false: the projection carries `capabilities`
+  and `digest`, and `pickSmallestModel` does not exist. A dead path costs a reader one lookup; a
+  confidently wrong sentence costs them a wrong mental model, which is the distinction this file already
+  draws under *What makes it more than tidiness*.
+
+**The cheap middle option, if the history is to stay untouched:** one dated note at the top of
+`OPEN-QUESTIONS.md` saying that file paths in it are accurate as of the answer's date and that
+[item 1](split-config-into-one-function-per-file.md) moved most of `src/`. That costs one edit, ages
+well, and does not rewrite a single answer.

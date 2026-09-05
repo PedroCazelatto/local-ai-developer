@@ -28,7 +28,6 @@ import type { TaskLoopResult } from '../core/session/run-task-loop.js';
 import type { SubagentInfo } from '../core/session/subagent-info.type.js';
 import type { TaskLoopReporter } from '../core/session/task-loop-reporter.type.js';
 import type { Task } from '../core/session/task.type.js';
-import { config } from '../core/session/config.js';
 import { activityLine } from '../core/ui/activity-line.js';
 import { bindNewlineKey } from '../core/ui/bind-newline-key.js';
 import { inputFence } from '../core/ui/input-fence.js';
@@ -108,10 +107,17 @@ export async function runRepl(orch: ReplOrchestrator): Promise<void> {
   statusBar.enable(); // reserve the bottom rows so all output scrolls above them
   updateStatus(orch); // paint the two status lines immediately (there is no boot banner anymore)
   // A model-less session is valid but can't take a turn, so say so where it STICKS. Boot resolved the
-  // model (and offered a download) before we were called, but clearScreen above just wiped that
-  // exchange — this is the one surface the user still sees. The status line shows the same state live.
+  // model before we were called, but clearScreen above just wiped that exchange — this is the one
+  // surface the user still sees. The status line shows the same state live.
+  //
+  // It NAMES NO MODEL (OPEN-QUESTIONS.md #8), and that is a decision rather than brevity. The reason
+  // there is none may be an empty machine or a machine full of models that cannot call tools, and this
+  // line cannot tell which — while config.SUGGESTED_MODEL is a suggestion for the EMPTY case whose own
+  // tool support has never been verified. Naming it here would answer a capability problem with an
+  // unverified model. Boot's own recommendation covers the empty machine (resolve-boot-model.ts), and
+  // `/models list` marks tool support on a surface that survives the clearScreen above.
   if (orch.model === undefined) {
-    renderer.systemMessage(`No model selected. Pull one with  /models pull ${config.SUGGESTED_MODEL}`);
+    renderer.systemMessage('No model selected. Pull one with tool support:  /models pull <name>');
   }
   // The no-op completer exists to SWALLOW Tab, and that is its whole job: with a completer registered,
   // readline neither self-inserts a literal tab nor runs its own completion. Both matter. Its inline
