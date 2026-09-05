@@ -20,7 +20,7 @@
 // base — the fail-loud property resolve-phase-tools.ts gets from a throw, taken here from the type
 // system instead, because this resolves per call rather than once per phase.
 
-import type { CallRole } from './call-role.type.js';
+import type { CallRole } from './types.js';
 
 /**
  * The ceiling for the BOUNDED one-shots — the three whose input has a known hard maximum.

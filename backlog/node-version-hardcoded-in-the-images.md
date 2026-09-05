@@ -13,12 +13,12 @@ all of them still spelling the version by hand:
 
 | Where | What it does |
 |---|---|
-| `src/core/container/sandbox.ts:35` | `const DEFAULT_IMAGE = 'node:24-slim'` — the fallback container-create path, used when the compose-managed sandbox is absent |
+| `src/core/container/sandbox.ts:36` | `const DEFAULT_IMAGE = 'node:24-slim'` — the fallback container-create path, used when the compose-managed sandbox is absent |
 | `src/interface/commands/project-templates.ts:43` | `compose: runnerCompose('node:24-slim')` — the image every **new** project's runner is scaffolded with |
 | `projects/hello-world/docker-compose.yml:3` | `image: node:24-slim` — the same tag, already baked into the one committed example project |
 
 Four comments also name the tag as descriptive prose rather than as a declaration:
-`sandbox.ts:52`, `project-templates.ts:24`, `project-git.ts:3` and `list-workspace-entries.ts:6`.
+`sandbox.ts:53`, `project-templates.ts:24`, `project-git.ts:3` and `list-workspace-entries.ts:6`.
 The last two are reasoning *about* the image (it is Debian-based, so it ships GNU findutils; it ships
 no git), which is a fact about the base image rather than about the version — those may well be
 better left alone. Decide deliberately rather than sweeping them.

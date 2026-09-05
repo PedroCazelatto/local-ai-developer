@@ -22,8 +22,9 @@ import Docker from 'dockerode';
 
 import { decodeTarFile } from './decode-tar-file.js';
 import { encodeTar } from './encode-tar.js';
-import type { SandboxRead, SandboxWrite } from './sandbox-file.type.js';
-import type { TarEntry } from './tar-entry.type.js';
+import { messageOf } from './message-of.js';
+import { statusCodeOf } from './status-code-of.js';
+import type { SandboxRead, SandboxWrite, TarEntry } from './types.js';
 
 /** The long-lived root sandbox container (created by `docker compose up -d`). */
 export const SANDBOX_CONTAINER = 'ai_sandbox';
@@ -58,19 +59,6 @@ export interface SandboxOptions {
 interface ExecOptions {
   readonly workdir?: string;
   readonly timeoutMs?: number;
-}
-
-/** dockerode/docker HTTP errors carry a numeric statusCode; narrow without asserting `any`. */
-function statusCodeOf(err: unknown): number | undefined {
-  if (typeof err === 'object' && err !== null && 'statusCode' in err) {
-    const code = (err as { statusCode: unknown }).statusCode;
-    return typeof code === 'number' ? code : undefined;
-  }
-  return undefined;
-}
-
-function messageOf(err: unknown): string {
-  return err instanceof Error ? err.message : String(err);
 }
 
 export class SandboxClient {

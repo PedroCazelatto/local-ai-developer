@@ -348,7 +348,7 @@ size and never asks what a model can do.
 is the smallest thing installed. The first tool-capable model is 83 MB larger.
 
 **Where the work actually is.** `listModels`
-([src/core/llm/ollama-models.ts](src/core/llm/ollama-models.ts)) projects each model down to
+([src/core/llm/list-models.ts](src/core/llm/list-models.ts)) projects each model down to
 `{ name, size, modifiedAt }` — the capability is **dropped before `pickSmallestModel` ever sees it**, so
 `InstalledModel` grows a field first. And there are **four call sites, not one**: the saved-model branch,
 the re-pull branch, the pick rule, and `/models use`.
@@ -1894,7 +1894,7 @@ candidate source for #10's "print some recommendations" on an empty machine — 
 **What the task is.** Six one-shot roles exist. Could the cheap ones run on a *small* model instead of the
 session model, so they cost less and evict nothing?
 
-**Today.** `OneShotRole` ([call-role.type.ts](src/core/llm/call-role.type.ts)) is closed at six:
+**Today.** `OneShotRole` ([src/core/llm/types.ts](src/core/llm/types.ts)) is closed at six:
 `context-title`, `summarize`, `search-rules`, `commit-message`, `debate-turn`, `debate-digest`. Three of
 them (`context-title`, `search-rules`, `commit-message`) already sit at the bounded 8 192 ceiling; the
 other three sit at base.

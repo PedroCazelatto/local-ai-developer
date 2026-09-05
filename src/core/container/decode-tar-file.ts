@@ -7,25 +7,19 @@
 // describe the member that FOLLOWS them, and Go's archive/tar writer emits them for long paths.
 // Their bodies are not needed here — the caller already knows which path it asked for.
 
-import type { TarFileRead } from './decode-tar-file.type.js';
+import { paddedLength } from './padded-length.js';
+import { readOctal } from './read-octal.js';
+import { BLOCK } from './tar-format.js';
 
-const BLOCK = 512;
 /** Members that describe the NEXT header rather than carrying content of their own. */
 const METADATA_TYPEFLAGS = new Set(['L', 'K', 'x', 'g']);
 
-/** Read a NUL/space-terminated octal field. Returns 0 for an all-NUL (absent) field. */
-function readOctal(buffer: Buffer, offset: number, width: number): number {
-  const raw = buffer.subarray(offset, offset + width).toString('latin1');
-  const digits = raw.replace(/[\0 ]/g, '');
-  if (digits === '') return 0;
-  const value = Number.parseInt(digits, 8);
-  return Number.isNaN(value) ? 0 : value;
-}
-
-/** Round `length` up to the next 512-byte boundary — how far past a body the next header sits. */
-function padded(length: number): number {
-  return Math.ceil(length / BLOCK) * BLOCK;
-}
+// What the first member of a getArchive tar turned out to be. read_file needs the distinction:
+// asking for a directory is a different model-facing error from asking for a file that is not there.
+export type TarFileRead =
+  | { readonly kind: 'file'; readonly bytes: Uint8Array }
+  | { readonly kind: 'directory' }
+  | { readonly kind: 'empty' };
 
 export function decodeTarFile(archive: Buffer): TarFileRead {
   let offset = 0;
@@ -33,12 +27,14 @@ export function decodeTarFile(archive: Buffer): TarFileRead {
     const header = archive.subarray(offset, offset + BLOCK);
     if (header.every((byte) => byte === 0)) return { kind: 'empty' }; // terminating zero block
 
+    // readOctal parses one NUL/space-terminated octal header field; paddedLength rounds a body length up
+    // to the block boundary the next header starts on.
     const size = readOctal(header, 124, 12);
     const typeflag = String.fromCharCode(header[156] ?? 0);
     const bodyStart = offset + BLOCK;
 
     if (METADATA_TYPEFLAGS.has(typeflag)) {
-      offset = bodyStart + padded(size);
+      offset = bodyStart + paddedLength(size);
       continue;
     }
     if (typeflag === '5') return { kind: 'directory' };

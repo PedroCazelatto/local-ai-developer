@@ -1,7 +1,7 @@
 // Tolerant JSON decoding for the classic local-model fault: literal control characters
 // (newlines / tabs / carriage returns) inside string values. qwen2.5-coder writes multi-line
 // content with real newlines instead of \n, which JSON.parse rejects. Port of
-// core/llm/json_repair.py; reused by the StreamFilter and (later) tool-call recovery.
+// core/llm/json_repair.py; reused by loads-or-repair.ts and by tool-call recovery.
 
 const CONTROL_ESCAPES: Readonly<Record<string, string>> = {
   '\n': '\\n',
@@ -58,23 +58,4 @@ export function repairDecode(text: string): { value: unknown; consumed: number }
     }
   }
   return null;
-}
-
-/**
- * `JSON.parse` with the repair pass as fallback. Returns the parsed value or `null`. The
- * repaired parse must consume the whole text (modulo trailing whitespace) to count.
- */
-export function loadsOrRepair(text: string): unknown {
-  try {
-    return JSON.parse(text);
-  } catch {
-    // fall through to the repair pass
-  }
-  const trimmed = text.trim();
-  const decoded = repairDecode(trimmed);
-  if (decoded === null) return null;
-  if (trimmed.slice(decoded.consumed).trim() !== '') {
-    return null;
-  }
-  return decoded.value;
 }

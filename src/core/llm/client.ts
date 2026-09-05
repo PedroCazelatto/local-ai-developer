@@ -8,14 +8,14 @@ import { Ollama } from 'ollama';
 import type { ChatResponse, Message, Tool, ToolCall } from 'ollama';
 
 import { beginModelCall } from './begin-model-call.js';
-import type { ModelCallLifetime } from './begin-model-call.type.js';
-import type { CallRole, WindowRole } from './call-role.type.js';
+import type { ModelCallLifetime } from './begin-model-call.js';
+import { exactCount } from './exact-count.js';
 import { ollamaWithSignal } from './ollama-with-signal.js';
+import { recoverIfNeeded } from './recover-if-needed.js';
 import { resolveWindowCtx } from './resolve-window-ctx.js';
 import { StreamFilter } from './stream-filter.js';
-import { recoverToolCalls } from './tool-call-recovery.js';
 import { TurnAbortedError } from './turn-aborted-error.js';
-import type { ChatResult, TokenCounts } from './types.js';
+import type { CallRole, ChatResult, TokenCounts, WindowRole } from './types.js';
 
 const NO_TOKENS: TokenCounts = { promptTokens: null, evalTokens: null };
 
@@ -188,6 +188,7 @@ export class OllamaClient {
         // is chosen; see resolve-window-ctx.ts for why the base is structurally exact.
         options: { num_ctx: resolveWindowCtx(role, this.baseNumCtx) },
       });
+      // recoverIfNeeded folds in any tool call the model wrote as text when Ollama lifted none itself.
       return { message: recoverIfNeeded(response.message), tokens: this.captureTokens(response) };
     } catch (err) {
       // An abort surfaces here as a rejected fetch; abortReason disambiguates it from a real fault the
@@ -331,6 +332,7 @@ export class OllamaClient {
    * length-based estimate, never a silent 0). Preserves "0 tokens" vs "not reported".
    */
   private captureTokens(response: ChatResponse): TokenCounts {
+    // exactCount passes a reported number through and turns an absent metric into null, never 0.
     const tokens: TokenCounts = {
       promptTokens: exactCount(response.prompt_eval_count),
       evalTokens: exactCount(response.eval_count),
@@ -338,20 +340,4 @@ export class OllamaClient {
     this.lastTokens = tokens;
     return tokens;
   }
-}
-
-function exactCount(value: number | undefined | null): number | null {
-  return typeof value === 'number' ? value : null;
-}
-
-/**
- * When Ollama returned no structured tool_calls, recover any the model wrote as text and fold
- * them into the message (with the call text stripped from `content`). A no-op when the message
- * already has structured calls or the content holds none.
- */
-function recoverIfNeeded(message: Message): Message {
-  if (message.tool_calls && message.tool_calls.length > 0) return message;
-  const { cleaned, calls } = recoverToolCalls(message.content);
-  if (calls.length === 0) return message;
-  return { ...message, content: cleaned, tool_calls: calls };
 }

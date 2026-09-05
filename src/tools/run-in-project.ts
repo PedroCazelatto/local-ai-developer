@@ -8,7 +8,9 @@
 import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 
-import { composeBuild, composeRun, isDaemonError } from '../core/container/project-runner.js';
+import { composeBuild } from '../core/container/compose-build.js';
+import { composeRun } from '../core/container/compose-run.js';
+import { isDaemonError } from '../core/container/is-daemon-error.js';
 import { truncateHeadTail } from './truncate.js';
 import type { JsonObject, ToolAuditExtra, ToolModule, ToolResult } from './types.js';
 import { toolError } from './types.js';
