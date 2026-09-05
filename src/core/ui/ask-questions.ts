@@ -22,21 +22,37 @@
 
 import { stdin, stdout } from 'node:process';
 import { emitKeypressEvents } from 'node:readline';
-import type { Key } from 'node:readline';
 
-import type { AskOutcome, AskQuestion, QuestionPanelMode } from './ask-questions.type.js';
 import { isNewlineKey } from './is-newline-key.js';
 import { renderQuestionPanel } from './render-question-panel.js';
-import { singleLine } from './single-line.js';
-import { terminalColumns } from './terminal-columns.js';
-import { truncateToWidth } from './truncate-to-width.js';
-import { theme } from './theme.js';
+import type { QuestionPanelMode } from './render-question-panel.js';
+import type { KeypressListener } from './types.js';
+import { writeQuestionTranscript } from './write-question-transcript.js';
 
 /** The free-text choice appended below every question's model-supplied options. */
 const OTHER_LABEL = 'Other (type your own)';
 
-/** A `keypress` listener as `emitKeypressEvents` emits them: the decoded string plus the parsed key. */
-type KeypressListener = (str: string | undefined, key: Key | undefined) => void;
+// The widget is deliberately id-free: it answers by POSITION, so the caller owns identity. ask_user has
+// no ids yet at ask time (the store mints them only for questions that end up unanswered), while
+// /questions re-asks questions that already have ids — one widget serves both because neither has to
+// teach it their id scheme.
+
+/** One question to put to the user. `options` is what the MODEL proposed — never the full list. */
+export interface AskQuestion {
+  readonly question: string;
+  /** The model's suggested answers. The widget appends its own free-text choice below them. */
+  readonly options: readonly string[];
+}
+
+/** The result of one widget session. */
+export interface AskOutcome {
+  /**
+   * Index-aligned with the questions passed in: the chosen option / typed text, or null where the
+   * user moved on without answering. A null is not a failure — it is a question the caller must
+   * persist so it can be answered later (question-store.ts).
+   */
+  readonly answers: readonly (string | null)[];
+}
 
 /**
  * Put `questions` to the user and block until they submit or close the widget. Answers are returned
@@ -209,27 +225,7 @@ export async function askQuestions(phase: string, questions: readonly AskQuestio
     stdin.setRawMode(priorRaw);
   }
 
-  writeTranscript(phase, questions, answers);
+  // writeQuestionTranscript: the one static, copyable summary the erased panel leaves behind.
+  writeQuestionTranscript(phase, questions, answers);
   return { answers };
-}
-
-/**
- * Print the permanent record of the exchange: the live panel is gone, so this is what the user (and
- * their scrollback) keeps. Append-only and copyable, like every other line in the conversation.
- */
-function writeTranscript(phase: string, questions: readonly AskQuestion[], answers: readonly (string | null)[]): void {
-  const width = terminalColumns();
-  const answered = answers.filter((answer) => answer !== null).length;
-  stdout.write(`${theme.phase(phase)(`${phase} asked`)} ${theme.meta(`· ${answered} of ${questions.length} answered`)}\n`);
-  questions.forEach((question, index) => {
-    const answer = answers[index];
-    stdout.write(`  ${theme.meta(`${index + 1}.`)} ${truncateToWidth(question.question, width - 5)}\n`);
-    if (answer === undefined || answer === null) {
-      stdout.write(`     ${theme.meta(truncateToWidth('saved — answer it later with /questions', width - 6))}\n`);
-    } else {
-      // singleLine: this is a one-row summary, so a multi-line answer is flattened before measuring —
-      // a surviving newline would both mis-measure the truncation and break the two-rows-per-question shape.
-      stdout.write(`     ${theme.success(`→ ${truncateToWidth(singleLine(answer), width - 8)}`)}\n`);
-    }
-  });
 }

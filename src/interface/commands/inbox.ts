@@ -17,7 +17,7 @@
 
 import { canonicalizePhase, readInbox } from '../../core/session/inbox-store.js';
 import type { InboxItem, Phase } from '../../core/session/inbox-store.type.js';
-import * as renderer from '../../core/ui/renderer.js';
+import { renderer } from '../../core/ui/renderer.js';
 import { theme } from '../../core/ui/theme.js';
 import type { Command } from '../command-registry.js';
 import { formatLocalStamp } from './format-local-stamp.js';

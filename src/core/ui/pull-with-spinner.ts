@@ -4,21 +4,24 @@
 
 import ora from 'ora';
 
+import { errMessage } from '../err-message.js';
 import { pullModel } from '../llm/pull-model.js';
-import type { PullProgress } from '../llm/pull-model.js';
-import { formatSize } from './format-size.js';
-import type { PullResult, SigintSource } from './pull-with-spinner.type.js';
-import * as renderer from './renderer.js';
+import { pullProgressText } from './pull-progress-text.js';
+import { renderer } from './renderer.js';
 
-/** Live status line for a streamed pull event (some events carry no byte totals — show just the status). */
-function progressText(name: string, p: PullProgress): string {
-  const status = p.status ?? '';
-  if (p.total > 0 && p.completed >= 0) {
-    const pct = Math.floor((p.completed / p.total) * 100);
-    return `pulling ${name} · ${status} · ${pct}% (${formatSize(p.completed)}/${formatSize(p.total)})`;
-  }
-  return `pulling ${name} · ${status}`;
+/**
+ * Whatever emits `SIGINT` for the Ctrl-C that aborts a pull. Two callers, two emitters: inside the REPL
+ * it is the live `readline` interface (which owns the TTY and emits its own 'SIGINT'), and at boot —
+ * before any readline exists — it is `process` itself. Both satisfy this structurally, so the pull does
+ * not care which context it runs in.
+ */
+export interface SigintSource {
+  once(event: 'SIGINT', listener: () => void): unknown;
+  removeListener(event: 'SIGINT', listener: () => void): unknown;
 }
+
+/** Outcome of a streamed pull, so callers decide the follow-up (print a hint vs. switch to the model). */
+export type PullResult = 'ok' | 'cancelled' | 'error';
 
 /**
  * Stream a pull with a live ora line and BLOCK until it finishes, returning the outcome without printing
@@ -35,7 +38,7 @@ export async function pullWithSpinner(name: string, sigint: SigintSource): Promi
   const spinner = ora({ text: `pulling ${name}…`, spinner: 'dots', discardStdin: false }).start();
   try {
     // pullModel streams progress and resolves only when the pull completes or is aborted (cancelled:true).
-    const outcome = await pullModel(name, (p) => (spinner.text = progressText(name, p)), controller.signal);
+    const outcome = await pullModel(name, (p) => (spinner.text = pullProgressText(name, p)), controller.signal);
     spinner.stop();
     if (outcome.cancelled) {
       renderer.systemMessage(`Pull of ${name} cancelled (a partial blob is Ollama's to clean up).`);
@@ -44,7 +47,8 @@ export async function pullWithSpinner(name: string, sigint: SigintSource): Promi
     return 'ok';
   } catch (err) {
     spinner.stop();
-    renderer.errorLine(`Couldn't pull ${name}: ${err instanceof Error ? err.message : String(err)}`);
+    // errMessage: an Error's message, or the thrown value stringified.
+    renderer.errorLine(`Couldn't pull ${name}: ${errMessage(err)}`);
     return 'error';
   } finally {
     sigint.removeListener('SIGINT', onSigint);

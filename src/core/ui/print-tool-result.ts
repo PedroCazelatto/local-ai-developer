@@ -4,9 +4,9 @@
 // rather than once per row — the activity line is still up at this point, because the call only ends
 // after its result has been recorded.
 
-import * as renderer from './renderer.js';
 import { formatToolResultLines } from './format-tool-result-lines.js';
-import type { ToolResultLinesInput } from './format-tool-result-lines.type.js';
+import type { ToolResultLinesInput } from './format-tool-result-lines.js';
+import { renderer } from './renderer.js';
 import { terminalColumns } from './terminal-columns.js';
 
 /** What printToolResult needs, minus the width it reads from the terminal itself. */

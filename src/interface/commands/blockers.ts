@@ -12,7 +12,7 @@
 
 import { readBlockerRows } from '../../core/session/index.js';
 import type { BlockerRow, RaisedBlocker } from '../../core/session/index.js';
-import * as renderer from '../../core/ui/renderer.js';
+import { renderer } from '../../core/ui/renderer.js';
 import { theme } from '../../core/ui/theme.js';
 import type { Command } from '../command-registry.js';
 import { formatLocalStamp } from './format-local-stamp.js';

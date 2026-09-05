@@ -8,12 +8,12 @@
 
 import { TurnAbortedError } from '../llm/index.js';
 import type { Message, StreamHandle, TokenCounts, ToolCall, TurnAbortReason } from '../llm/index.js';
-import type { MarkdownStream } from '../ui/markdown-stream.type.js';
+import type { MarkdownStream } from '../ui/types.js';
 import { printToolCall } from '../ui/print-tool-call.js';
-import * as renderer from '../ui/renderer.js';
-import * as statusActivity from '../ui/status-activity.js';
-import * as activityLine from '../ui/activity-line.js';
-import * as inputFence from '../ui/input-fence.js';
+import { renderer } from '../ui/renderer.js';
+import { statusActivity } from '../ui/status-activity.js';
+import { activityLine } from '../ui/activity-line.js';
+import { inputFence } from '../ui/input-fence.js';
 
 /** Exact value ported from main.py — caps the implement/continue rounds per user message. */
 export const MAX_TOOL_ROUNDS = 8;

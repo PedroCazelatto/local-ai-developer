@@ -14,7 +14,7 @@
 
 import { BacklogError, nextRunnableTasks, readBacklog } from '../../core/session/index.js';
 import type { Backlog } from '../../core/session/index.js';
-import * as renderer from '../../core/ui/renderer.js';
+import { renderer } from '../../core/ui/renderer.js';
 import { theme } from '../../core/ui/theme.js';
 import type { Command } from '../command-registry.js';
 import { renderTaskTree } from './render-task-tree.js';

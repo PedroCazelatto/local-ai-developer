@@ -4,7 +4,7 @@
 // hence it lives here in interface/commands/, not in src/tools/. Read-only: it only reports.
 
 import type { SubagentInfo } from '../../core/session/index.js';
-import * as renderer from '../../core/ui/renderer.js';
+import { renderer } from '../../core/ui/renderer.js';
 import { theme } from '../../core/ui/theme.js';
 import type { Command } from '../command-registry.js';
 

@@ -19,7 +19,7 @@ import process from 'node:process';
 import { listModels, matchesModelName, pickSmallestModel } from '../llm/index.js';
 import { confirmKey } from '../ui/confirm-key.js';
 import { pullWithSpinner } from '../ui/pull-with-spinner.js';
-import * as renderer from '../ui/renderer.js';
+import { renderer } from '../ui/renderer.js';
 import { loadAppState } from './app-state.js';
 import { SUGGESTED_MODEL } from './config.js';
 

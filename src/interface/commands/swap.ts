@@ -2,7 +2,7 @@
 // no auto-clear — CLAUDE.md). Migrated off the REPL switch into the registry (V5/03). The persistent
 // color-coded phase field on the status line reflects the change.
 
-import * as renderer from '../../core/ui/renderer.js';
+import { renderer } from '../../core/ui/renderer.js';
 import type { Command } from '../command-registry.js';
 
 export const swapCommand: Command = {

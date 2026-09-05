@@ -18,7 +18,7 @@
 import { stdout } from 'node:process';
 
 import { echoedRows } from './echoed-rows.js';
-import type { MarkdownStream } from './markdown-stream.type.js';
+import type { MarkdownStream } from './types.js';
 import { renderMarkdownLine } from './render-markdown-line.js';
 import { terminalColumns } from './terminal-columns.js';
 import { wordWrap } from './word-wrap.js';

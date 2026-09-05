@@ -440,8 +440,9 @@ very differently:
 
 ### ✅ #11 — Does `/models use <name>` get the check?
 
-**Today.** `useSubcommand` ([src/commands/models.ts](src/commands/models.ts)) checks one thing: whether
-the model is pulled. If it is not, it offers an inline single-keypress download and then switches.
+**Today.** `useSubcommand`
+([src/commands/use-subcommand.ts](src/commands/use-subcommand.ts)) checks one thing: whether the
+model is pulled. If it is not, it offers an inline single-keypress download and then switches.
 Capability is never consulted. On success it calls `orch.useModel(name)` and persists to `state.json`.
 
 **Why this is a question.** A deliberate choice is not an inferred default — but the resulting session is

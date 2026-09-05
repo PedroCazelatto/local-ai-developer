@@ -12,7 +12,7 @@
 // Rows print OLDEST FIRST, which is both the file's own order and the useful one here: the last thing
 // that happened ends up nearest the prompt, where the reader already is.
 
-import * as renderer from '../../core/ui/renderer.js';
+import { renderer } from '../../core/ui/renderer.js';
 import { theme } from '../../core/ui/theme.js';
 import type { Command } from '../command-registry.js';
 import { formatAuditRow } from './format-audit-row.js';

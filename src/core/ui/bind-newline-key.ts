@@ -16,9 +16,9 @@
 
 import type { Interface as ReadlineInterface } from 'node:readline/promises';
 
-import type { KeypressListener, KeypressSource } from './bind-newline-key.type.js';
 import { insertNewline } from './insert-newline.js';
 import { isNewlineKey } from './is-newline-key.js';
+import type { KeypressListener, KeypressSource } from './types.js';
 
 /**
  * Route the newline key on `input` into `rl`'s edit buffer. Returns the undo: it detaches the wrapper

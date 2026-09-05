@@ -13,7 +13,7 @@ import { GIT_PUSH } from '../../tools/git-push.js';
 import { GIT_STASH } from '../../tools/git-stash.js';
 import type { SandboxClient } from '../container/index.js';
 import type { OllamaClient, Message, StreamHandle, TokenCounts, Tool, ToolCall } from '../llm/index.js';
-import * as renderer from '../ui/renderer.js';
+import { renderer } from '../ui/renderer.js';
 import { addTokenCounts } from './add-token-counts.js';
 import { recordToolCall } from './record-tool-call.js';
 import type { ToolCallRecord } from './dispatch.js';

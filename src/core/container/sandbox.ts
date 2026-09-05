@@ -20,9 +20,9 @@ import { Writable } from 'node:stream';
 
 import Docker from 'dockerode';
 
+import { errMessage } from '../err-message.js';
 import { decodeTarFile } from './decode-tar-file.js';
 import { encodeTar } from './encode-tar.js';
-import { messageOf } from './message-of.js';
 import { statusCodeOf } from './status-code-of.js';
 import type { SandboxRead, SandboxWrite, TarEntry } from './types.js';
 
@@ -154,8 +154,10 @@ export class SandboxClient {
       const info = await exec.inspect();
       return { exitCode: info.ExitCode ?? -1, stdout, stderr };
     } catch (err) {
-      // Container-not-found, image error, exec failure → structured, recoverable result.
-      return { exitCode: 1, stdout: '', stderr: messageOf(err) };
+      // Container-not-found, image error, exec failure → structured, recoverable result. Every catch
+      // in this class answers with a VALUE rather than a throw, and errMessage — an Error's message,
+      // or the thrown value stringified — is what fills it.
+      return { exitCode: 1, stdout: '', stderr: errMessage(err) };
     }
   }
 
@@ -180,7 +182,7 @@ export class SandboxClient {
       return { ok: true, kind: 'file', bytes: member.bytes };
     } catch (err) {
       const notFound = statusCodeOf(err) === 404;
-      return { ok: false, notFound, message: messageOf(err) };
+      return { ok: false, notFound, message: errMessage(err) };
     }
   }
 
@@ -208,7 +210,7 @@ export class SandboxClient {
       await container.putArchive(encodeTar(entries), { path: WORKSPACE });
       return { ok: true };
     } catch (err) {
-      return { ok: false, message: messageOf(err) };
+      return { ok: false, message: errMessage(err) };
     }
   }
 

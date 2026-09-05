@@ -29,7 +29,24 @@
 // readline's job and resumes the moment the prompt reopens.
 
 import { isNewlineKey } from './is-newline-key.js';
-import type { KeypressListener, KeypressSource, TypeAheadHandlers } from './capture-type-ahead.type.js';
+import type { KeypressListener, KeypressSource } from './types.js';
+
+/** What the capture does with the keys it claims. The buffer itself stays inside the capture. */
+export interface TypeAheadHandlers {
+  /** The buffer changed (a character, a backspace, a recall) — repaint the row. */
+  onChange(text: string): void;
+  /** Enter on a non-empty buffer: the message is the caller's now, and the buffer is cleared. */
+  onSubmit(text: string): void;
+  /** ↑: the caller returns a message to put back in the buffer, or null when it has none. */
+  onRecall(): string | null;
+  /**
+   * Ctrl+C mid-turn. Return true to CLAIM the press as a cancel (the turn stops, the session lives);
+   * return false to decline it, and the key falls through to readline exactly as it always did and ends
+   * the session. Declining is what keeps the escape hatch honest: a press that cannot cancel anything —
+   * nothing is generating, or the turn was already cancelled and is still unwinding — must still quit.
+   */
+  onCancel(): boolean;
+}
 
 /** C0 controls + DEL. Stripped from a keystroke so a pasted newline can never enter the buffer. */
 const CONTROL = /[\x00-\x1f\x7f]/g;

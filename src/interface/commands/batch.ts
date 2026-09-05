@@ -14,7 +14,7 @@
 // It re-prints through renderBatchSummary, the SAME renderer the live end-of-batch summary uses, so a
 // re-read report and the one printed the night it ran can never drift apart.
 
-import * as renderer from '../../core/ui/renderer.js';
+import { renderer } from '../../core/ui/renderer.js';
 import { renderBatchSummary } from '../batch-summary.js';
 import type { Command } from '../command-registry.js';
 import { listBatchFiles } from './list-batch-files.js';
