@@ -9,12 +9,14 @@
 // own change cannot talk the log into agreeing. The phase's `intent` rides along only as the "why".
 
 import type { Message, OneShotResult, OneShotRole } from '../core/llm/index.js';
+import { stripAttributionTrailers } from './strip-attribution-trailers.js'; // no trailer may ever name a person
+import { unwrapCommitMessage } from './unwrap-commit-message.js'; // NOT unwrapTitle: a message has a body
 
 /** Subject-line ceiling; the writer is asked for ≤72 and anything longer is hard-truncated. */
 const SUBJECT_LIMIT = 72;
 
 // No author/co-author trailer and no human name may ever reach a commit message (constitution: the
-// user's name is never written into any file). The prompt forbids it AND stripTrailers drops any the
+// user's name is never written into any file). The prompt forbids it AND stripAttributionTrailers drops any the
 // model invents anyway — a confidently-wrong local model must not be able to sign a commit.
 const SYSTEM_PROMPT = `You write git commit messages. You are given the real diff of a change and a one-line statement of why it was made. Reply with the commit message and NOTHING else.
 
@@ -25,23 +27,6 @@ Rules:
 - Describe only what the diff actually shows. Never invent a change that is not there.
 - Never add Signed-off-by, Co-authored-by, Author, or any other trailer. Never name a person.
 - No markdown, no code fences, no quotes around the message, no preamble such as "Here is".`;
-
-/** Drop fences/quotes/preamble a local model wraps its answer in, leaving the bare message. */
-function unwrap(raw: string): string {
-  let text = raw.trim();
-  // A fenced block (```/```text/```git) — take its contents.
-  const fenced = /^```[a-z]*\n([\s\S]*?)\n?```$/i.exec(text);
-  if (fenced?.[1] !== undefined) text = fenced[1].trim();
-  // A whole-message wrapping quote pair.
-  const quoted = /^"([\s\S]*)"$/.exec(text) ?? /^'([\s\S]*)'$/.exec(text);
-  if (quoted?.[1] !== undefined) text = quoted[1].trim();
-  return text;
-}
-
-/** Remove any attribution trailer the writer invented, whatever the prompt said. */
-function stripTrailers(lines: string[]): string[] {
-  return lines.filter((line) => !/^\s*(signed-off-by|co-authored-by|authored-by|author|committer)\s*:/i.test(line));
-}
 
 export interface ComposeCommitMessageInput {
   /**
@@ -83,7 +68,7 @@ export async function composeCommitMessage(input: ComposeCommitMessageInput): Pr
   // 'commit-message' is a BOUNDED role — safe under a smaller ceiling because the diff above is already
   // capped at REVIEW_DIFF_BUDGET, whose 12 000 characters measure 3 298 prompt tokens at their worst.
   const { content } = await input.oneShot(messages, 'commit-message');
-  const lines = stripTrailers(unwrap(content).split(/\r?\n/)).map((line) => line.trimEnd());
+  const lines = stripAttributionTrailers(unwrapCommitMessage(content).split(/\r?\n/)).map((line) => line.trimEnd());
 
   const subjectIndex = lines.findIndex((line) => line.trim() !== '');
   if (subjectIndex === -1) {

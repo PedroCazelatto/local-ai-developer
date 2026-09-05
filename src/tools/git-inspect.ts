@@ -14,39 +14,15 @@ import { DEFAULT_LOG_COUNT } from '../core/session/inspect-log-count.js';
 import { inspectLog } from '../core/session/inspect-log.js';
 import { inspectShow } from '../core/session/inspect-show.js';
 import { refError } from '../core/session/ref-error.js';
+import { INSPECT_WHATS } from './inspect-whats.js';
+import { isInspectWhat } from './is-inspect-what.js';
 import type { JsonObject } from './json-object.type.js';
+import { readOptionalPaths } from './read-optional-paths.js'; // an absent list means no filter
 import { toolError } from './tool-error.js';
 import type { ToolModule } from './tool-module.type.js';
 import type { ToolResult } from './tool-result.type.js';
 
 export const GIT_INSPECT = 'git_inspect';
-
-const WHATS = ['diff', 'log', 'show'] as const;
-type InspectWhat = (typeof WHATS)[number];
-
-function isWhat(value: unknown): value is InspectWhat {
-  return typeof value === 'string' && (WHATS as readonly string[]).includes(value);
-}
-
-/** git speaks forward slashes on every platform; accept whatever separator the model emitted. */
-function toPosix(value: string): string {
-  return value.replace(/\\/g, '/').replace(/\/+$/, '');
-}
-
-/** Validate `paths` into a clean posix list, or return the model-facing reason it isn't one. */
-function readPaths(raw: unknown): { readonly ok: true; readonly paths: string[] } | { readonly ok: false; readonly error: string } {
-  if (raw === undefined || raw === null) return { ok: true, paths: [] };
-  if (!Array.isArray(raw)) return { ok: false, error: "'paths' must be an array of project-relative file paths." };
-  const paths: string[] = [];
-  for (const entry of raw) {
-    if (typeof entry !== 'string' || entry.trim() === '') {
-      return { ok: false, error: "every entry in 'paths' must be a non-empty string." };
-    }
-    const normalized = toPosix(entry.trim());
-    if (normalized !== '' && !paths.includes(normalized)) paths.push(normalized);
-  }
-  return { ok: true, paths };
-}
 
 export const gitInspectTool: ToolModule = {
   name: GIT_INSPECT,
@@ -86,8 +62,8 @@ export const gitInspectTool: ToolModule = {
 
   async execute(ctx, args): Promise<ToolResult> {
     const what = args['what'];
-    if (!isWhat(what)) {
-      return toolError(`'what' must be one of: ${WHATS.join(', ')}.`);
+    if (!isInspectWhat(what)) {
+      return toolError(`'what' must be one of: ${INSPECT_WHATS.join(', ')}.`);
     }
 
     const rawRef = args['ref'];
@@ -102,7 +78,7 @@ export const gitInspectTool: ToolModule = {
       if (bad !== null) return toolError(bad);
     }
 
-    const parsed = readPaths(args['paths']);
+    const parsed = readOptionalPaths(args['paths']);
     if (!parsed.ok) return toolError(parsed.error);
     // Path scoping: ctx.resolve rejects anything escaping the project root, so an inspection can never
     // be aimed at the orchestrator's own files.

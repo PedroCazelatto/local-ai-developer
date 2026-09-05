@@ -11,30 +11,18 @@ import path from 'node:path';
 import { composeBuild } from '../core/container/compose-build.js';
 import { composeRun } from '../core/container/compose-run.js';
 import { isDaemonError } from '../core/container/is-daemon-error.js';
+import { composeDeclaresBuild } from './compose-declares-build.js'; // a Dockerfile runner needs a build first
 import type { JsonObject } from './json-object.type.js';
 import type { ToolAuditExtra } from './tool-audit-extra.type.js';
 import { toolError } from './tool-error.js';
 import type { ToolModule } from './tool-module.type.js';
 import type { ToolResult } from './tool-result.type.js';
 import { truncateHeadTail } from './truncate.js';
+import { uniqueContainerName } from './unique-container-name.js';
 
 const DEFAULT_TIMEOUT_S = 120;
 // npm/pip output is verbose — a larger per-stream cap than the plain-shell tool, still head+tail.
 const RUN_OUTPUT_LIMIT = 50_000;
-
-/** Does the compose file declare a `build:` for a service (a Dockerfile-based runner)? */
-function composeDeclaresBuild(composePath: string): boolean {
-  try {
-    return /^\s*build:/m.test(readFileSync(composePath, 'utf-8'));
-  } catch {
-    return false;
-  }
-}
-
-function uniqueContainerName(project: string): string {
-  const safe = project.replace(/[^a-zA-Z0-9_.-]/g, '_');
-  return `lad_${safe}_run_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-}
 
 export const runInProjectTool: ToolModule = {
   name: 'run_in_project',

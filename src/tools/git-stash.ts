@@ -12,32 +12,22 @@
 
 import { dropShelf } from '../core/session/drop-shelf.js';
 import { isValidShelfLabel } from '../core/session/is-valid-shelf-label.js';
-import { listShelves } from '../core/session/list-shelves.js';
 import { popShelf } from '../core/session/pop-shelf.js';
 import { saveShelf } from '../core/session/save-shelf.js';
 import { shelfLabelError } from '../core/session/shelf-label-error.js';
+import { isStashAction } from './is-stash-action.js';
 import type { JsonObject } from './json-object.type.js';
-import type { JsonValue } from './json-value.type.js';
+import { shelvesPayload } from './shelves-payload.js'; // the model's own shelves only, never the task loop's
+import type { StashAction } from './stash-action.type.js';
+import { STASH_ACTIONS } from './stash-actions.js';
 import { toolError } from './tool-error.js';
 import type { ToolModule } from './tool-module.type.js';
 import type { ToolResult } from './tool-result.type.js';
 
 export const GIT_STASH = 'git_stash';
 
-const ACTIONS = ['save', 'list', 'pop', 'drop'] as const;
-type StashAction = (typeof ACTIONS)[number];
-
 /** The actions that address one specific shelf, and so require a label. */
 const LABEL_REQUIRED: readonly StashAction[] = ['save', 'pop', 'drop'];
-
-function isAction(value: unknown): value is StashAction {
-  return typeof value === 'string' && (ACTIONS as readonly string[]).includes(value);
-}
-
-/** The shelf list as model-facing JSON — also the `available` list on a bad-label error. */
-function shelvesPayload(projectPath: string): JsonValue[] {
-  return listShelves(projectPath).map((shelf) => ({ label: shelf.label, branch: shelf.branch, when: shelf.when }));
-}
 
 export const gitStashTool: ToolModule = {
   name: GIT_STASH,
@@ -66,9 +56,9 @@ export const gitStashTool: ToolModule = {
 
   async execute(ctx, args): Promise<ToolResult> {
     const action = args['action'];
-    if (!isAction(action)) {
+    if (!isStashAction(action)) {
       return toolError(
-        `'action' must be one of: ${ACTIONS.join(', ')}.`,
+        `'action' must be one of: ${STASH_ACTIONS.join(', ')}.`,
         'Call git_stash with action:"list" to see what is shelved.',
       );
     }
@@ -76,7 +66,7 @@ export const gitStashTool: ToolModule = {
     const metadata: JsonObject = { project: ctx.projectName, action };
 
     if (action === 'list') {
-      // listShelves: `git stash list`, filtered to the model's own `lad-shelf:` entries — a task-loop
+      // shelvesPayload: `git stash list`, filtered to the model's own `lad-shelf:` entries — a task-loop
       // stash is never shown, and so can never be named back at pop/drop.
       const shelves = shelvesPayload(ctx.projectPath);
       return {
