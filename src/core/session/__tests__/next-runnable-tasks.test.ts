@@ -42,8 +42,28 @@ test('only pending tasks are runnable', () => {
     task('running', 'in_progress', 2),
     task('finished', 'done', 3),
     task('stuck', 'blocked', 4),
+    task('burnt', 'failed', 5),
   );
   assert.deepEqual(ids(nextRunnableTasks(all)), ['pending']);
+});
+
+test('a failed task is not runnable, so /run next never lands on one', () => {
+  // The escalation record has to hold against the `next` selector as well as `all`: an unattended
+  // batch that re-picks last night's failure is the defect the status exists to close.
+  assert.deepEqual(ids(nextRunnableTasks(backlog(task('burnt', 'failed', 1)))), []);
+});
+
+test('a failed task is still the FIRST task by order, and is passed over anyway', () => {
+  // The trigger trusts `order` for sequence, so the skip must not depend on the failure being late.
+  const all = backlog(task('burnt', 'failed', 1), task('next-up', 'pending', 2));
+  assert.deepEqual(ids(nextRunnableTasks(all)), ['next-up']);
+});
+
+test('a dependency that FAILED does not count as met', () => {
+  // Only `done` opens a dependent task. A failed dependency holds its dependents back exactly as a
+  // pending one does — the work it was supposed to deliver is not there.
+  const all = backlog(task('dep', 'failed', 1), task('a', 'pending', 2, ['dep']));
+  assert.deepEqual(ids(nextRunnableTasks(all)), []);
 });
 
 test('a backlog with nothing pending yields nothing', () => {

@@ -18,6 +18,7 @@ import { BacklogError } from '../backlog-error.js';
 import { readBacklog } from '../read-backlog.js';
 import { setTaskStatus } from '../set-task-status.js';
 import type { TaskStatus } from '../task-status.type.js';
+import { TASK_STATUSES } from '../task-statuses.js';
 
 /** Write `text` as backlog/a.md, flip it to `status`, and hand back the exact bytes on disk after. */
 function rewrite(text: string, status: TaskStatus = 'done'): string {
@@ -67,9 +68,23 @@ test('a status line below the closing fence is body text and is left alone', () 
 });
 
 test('every status value round-trips through the file', () => {
-  for (const status of ['pending', 'in_progress', 'done', 'blocked'] as const) {
+  for (const status of TASK_STATUSES) {
     assert.equal(rewrite('---\nstatus: pending\n---\n', status), `---\nstatus: ${status}\n---\n`);
   }
+});
+
+test('failed is written as a plain frontmatter status like any other', () => {
+  // The record the execution loop commits on an escalation. Spelled out rather than left to the loop
+  // above, because this exact byte sequence is what resolveSelector('all') then skips on.
+  assert.equal(
+    rewrite('---\nstatus: in_progress\norder: 1\n---\n\n# T\n', 'failed'),
+    '---\nstatus: failed\norder: 1\n---\n\n# T\n',
+  );
+});
+
+test('a failed task can be flipped again — the record is not a one-way door', () => {
+  // /run <id> retries a failed task from scratch, so the loop sets it in_progress again over the top.
+  assert.equal(rewrite('---\nstatus: failed\n---\n', 'in_progress'), '---\nstatus: in_progress\n---\n');
 });
 
 // =============================================================================== CRLF handling

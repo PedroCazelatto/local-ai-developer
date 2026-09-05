@@ -7,6 +7,9 @@ import type { Task } from './task.type.js';
  * Tasks eligible to run now — status `pending` AND every `depends_on` id already `done` — sorted by
  * `order`. A dependency that doesn't exist counts as unmet (defense in depth: the trigger trusts
  * `order` for sequence but still skips a task whose deps aren't done).
+ *
+ * `pending` and nothing else, so `/run next` never lands on a `failed` task either — it is the same
+ * skip `/run all` makes, arrived at without a second rule to keep in step. Naming the id is the retry.
  */
 export function nextRunnableTasks(backlog: Backlog): Task[] {
   const statusById = new Map(backlog.tasks.map((task) => [task.id, task.status]));

@@ -3,4 +3,4 @@
 
 import type { TaskStatus } from './task-status.type.js';
 
-export const TASK_STATUSES: readonly TaskStatus[] = ['pending', 'in_progress', 'done', 'blocked'];
+export const TASK_STATUSES: readonly TaskStatus[] = ['pending', 'in_progress', 'done', 'blocked', 'failed'];
