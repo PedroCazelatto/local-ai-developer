@@ -3,7 +3,7 @@
 // is why the scrollback's `display` rides here rather than being handed round separately.
 
 import type { JsonObject } from '../../tools/json-object.type.js';
-import type { ToolCallDisplay } from '../ui/types.js';
+import type { ToolCallDisplay } from '../ui/tool-call-display.type.js';
 
 /** Raw materials for one audit row, handed to the audit sink (V1/06 formats + writes the JSONL). */
 export interface ToolCallRecord {

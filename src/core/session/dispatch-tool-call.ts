@@ -22,7 +22,7 @@ import { toolError } from '../../tools/tool-error.js';
 import { toolNames } from '../../tools/tool-names.js';
 import { errMessage } from '../err-message.js';
 import { TurnAbortedError } from '../llm/index.js';
-import type { ToolCallDisplay } from '../ui/types.js';
+import type { ToolCallDisplay } from '../ui/tool-call-display.type.js';
 import type { DispatchDeps } from './dispatch-deps.type.js';
 import { firstMissingRequired } from './first-missing-required.js';
 import { normalizeToolArgs } from './normalize-tool-args.js';

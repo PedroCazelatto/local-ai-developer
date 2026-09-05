@@ -19,7 +19,7 @@ import { createToolContext, resolveInProject, toolError } from '../../tools/inde
 import { READ_PHASE_RULE, readPhaseRule } from '../../tools/read-phase-rule.js';
 import { parseRetroSubmission, SUBMIT_RETRO } from '../../tools/submit-retro.js';
 import type { Message, StreamHandle, TokenCounts, Tool, ToolCall } from '../llm/index.js';
-import type { ToolCallDisplay } from '../ui/types.js';
+import type { ToolCallDisplay } from '../ui/tool-call-display.type.js';
 import { addTokenCounts } from './add-token-counts.js';
 import { candidatePhaseFile } from './candidate-phase-file.js';
 import type { ToolCallRecord } from './tool-call-record.type.js';

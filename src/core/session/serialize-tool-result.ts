@@ -9,7 +9,7 @@
 import type { JsonObject } from '../../tools/json-object.type.js';
 import type { ToolAuditExtra } from '../../tools/tool-audit-extra.type.js';
 import type { ToolResult } from '../../tools/tool-result.type.js';
-import type { ToolCallDisplay } from '../ui/types.js';
+import type { ToolCallDisplay } from '../ui/tool-call-display.type.js';
 import { toolResultError } from './tool-result-error.js';
 
 export interface SerializedResult {

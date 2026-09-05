@@ -2,7 +2,7 @@
 // actor spells it the same way. The Worker is told this exact string in its seed and passes it to
 // git_branch; nothing has to guess, and a re-run or a later fix round lands on the same branch.
 //
-// Shape: `task/<id>-<title-slug>`. A task id is already a PATH under backlog/ (see types.ts —
+// Shape: `task/<id>-<title-slug>`. A task id is already a PATH under backlog/ (see task.type.ts —
 // "epic-auth/story-signup/01-add-hashing-test"), and git branch names take slashes, so the id maps
 // straight through and the branch mirrors the backlog tree. The title slug is appended so the branch
 // says what the task IS — except when the id's own leaf already ends with it, which is the normal

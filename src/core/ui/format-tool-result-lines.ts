@@ -25,8 +25,8 @@ import { RIGHT_MARGIN, SUBAGENT_INDENT } from './format-tool-call-line.js';
 import { singleLine } from './single-line.js';
 import { stripControlChars } from './strip-control-chars.js';
 import { theme } from './theme.js';
+import type { ToolCallDisplay } from './tool-call-display.type.js';
 import { truncateToWidth } from './truncate-to-width.js';
-import type { ToolCallDisplay } from './types.js';
 import { visibleWidth } from './visible-width.js';
 
 // The input is deliberately a flat view of ToolCallRecord rather than the record itself: the formatter

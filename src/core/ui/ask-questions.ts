@@ -24,9 +24,9 @@ import { stdin, stdout } from 'node:process';
 import { emitKeypressEvents } from 'node:readline';
 
 import { isNewlineKey } from './is-newline-key.js';
+import type { KeypressListener } from './keypress-listener.type.js';
 import { renderQuestionPanel } from './render-question-panel.js';
 import type { QuestionPanelMode } from './render-question-panel.js';
-import type { KeypressListener } from './types.js';
 import { writeQuestionTranscript } from './write-question-transcript.js';
 
 /** The free-text choice appended below every question's model-supplied options. */

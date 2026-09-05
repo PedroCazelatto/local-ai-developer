@@ -7,10 +7,10 @@
 import type { Message, StreamHandle, TokenCounts, ToolCall, TurnAbortReason } from '../llm/index.js';
 import { TurnAbortedError } from '../llm/index.js';
 import { activityLine } from '../ui/activity-line.js';
+import type { MarkdownStream } from '../ui/markdown-stream.type.js';
 import { printToolCall } from '../ui/print-tool-call.js';
 import { renderer } from '../ui/renderer.js';
 import { statusActivity } from '../ui/status-activity.js';
-import type { MarkdownStream } from '../ui/types.js';
 import type { TurnContext } from './turn-context.type.js';
 
 /** Carries the partial assistant message from whichever turn was cut out to the rollback. */

@@ -11,12 +11,9 @@
 
 import { stdin } from 'node:process';
 import { emitKeypressEvents } from 'node:readline';
-import type { Key } from 'node:readline';
 
+import type { KeypressListener } from './keypress-listener.type.js';
 import { theme } from './theme.js';
-
-/** A `keypress` listener as `emitKeypressEvents` emits them: the decoded string plus the parsed key. */
-type KeypressListener = (str: string | undefined, key: Key | undefined) => void;
 
 /**
  * Prompt `message` and BLOCK on a single keypress: `y`/`Y` → true, `n`/`N` → false, Esc or Ctrl-C →
