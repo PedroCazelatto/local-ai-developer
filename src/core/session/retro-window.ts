@@ -1,25 +1,17 @@
-// Retro runner (V3/03) — spawns a FRESH, ISOLATED Retro window after the user resolves a Reviewer
-// blocker. It sees ONLY { task, misunderstanding, answer } (never the Worker's/Reviewer's turns —
-// CLAUDE.md memory model), diagnoses the root cause, and patches EXACTLY ONE file so the mistake can't
-// recur. The window is one-shot: discarded when spawnRetro returns.
+// A single Retro window implementing the turn loop's TurnContext against its OWN messages array --
+// isolated from the session's per-phase histories and from the Worker and Reviewer.
 //
-// Two edit roots, per the design decision (two narrow tools, one per root):
-//   - TASK-SPECIFIC → the project doc, via the project-scoped edit_file (+ read tools) dispatched
-//     through the shared registry (host-side, scoped under projects/<active>).
-//   - SYSTEMIC → a global phase file under rules/phases/, via the phase-scoped edit_phase_rule /
-//     read_phase_rule handled directly in this window (the registry tools can't reach rules/).
+// TWO EDIT ROOTS, two dispatch paths. Project read/edit tools go through the shared registry, audited
+// as phase "retro"; the rules-scoped read_phase_rule / edit_phase_rule and submit_retro are answered
+// here directly, because the registry tools cannot reach rules/.
 //
-// TWO INVARIANTS the orchestrator enforces itself (never trusting the model):
-//   1. ONE file per Retro. The window locks onto the first file it SUCCESSFULLY edits; a later edit to
-//      a DIFFERENT file is refused (recoverable) and the model is told to re-classify. Two files = a
-//      mis-classification.
-//   2. The commit fate is decided by the RESOLVED edited path, not the model's submitted scope: under
-//      rules/phases/ ⇒ systemic ⇒ NEVER auto-committed, left uncommitted + a loud review warning; under
-//      projects/<active>/ ⇒ task-specific ⇒ committed with the project's work.
+// THE ONE-FILE LOCK SPANS BOTH ROOTS. The window locks onto the first file it SUCCESSFULLY edits, and a
+// later edit to a DIFFERENT file is refused with a recoverable message telling the model to
+// re-classify. Two files means a mis-classification, and the orchestrator enforces that itself rather
+// than trusting the model to.
 
 import path from 'node:path';
 
-import { availablePhaseNames, buildSystemPrompt, loadPhasePrompt, phasePromptPath, PHASES_DIR } from '../../context/index.js';
 import { PHASE_SCOPED_TOOL_NAMES, RETRO_TOOL_NAMES, resolvePhaseTools } from '../../phases/index.js';
 import { buildFileDiff } from '../../tools/build-file-diff.js';
 import { applyPhaseRuleEdit, EDIT_PHASE_RULE } from '../../tools/edit-phase-rule.js';
@@ -29,20 +21,16 @@ import { parseRetroSubmission, SUBMIT_RETRO } from '../../tools/submit-retro.js'
 import type { Message, StreamHandle, TokenCounts, Tool, ToolCall } from '../llm/index.js';
 import type { ToolCallDisplay } from '../ui/types.js';
 import { addTokenCounts } from './add-token-counts.js';
-import { commitPaths } from './commit-paths.js';
+import { candidatePhaseFile } from './candidate-phase-file.js';
 import type { ToolCallRecord } from './dispatch.js';
 import { dispatchToolCall } from './dispatch.js';
+import { isToolErrorResult } from './is-tool-error-result.js';
 import { createReadTracker } from './read-tracker.js';
 import type { FileReadTracker } from './read-tracker.type.js';
 import { recordToolCall } from './record-tool-call.js';
-import type { RetroDeps, RetroInput, RetroResult, RetroSubmission } from './retro-runner.type.js';
-import type { Task } from './task.type.js';
+import type { RetroDeps } from './retro-deps.type.js';
+import type { RetroSubmission } from './retro-submission.type.js';
 import type { TurnContext } from './turn-loop.js';
-import { processMessage } from './turn-loop.js';
-
-// Retro reads a couple of files (task doc / phase file) then makes one edit and submits — lighter than
-// the Worker's implement loop. Give headroom for a few reads + a re-tried edit before the cap trips.
-const RETRO_MAX_ROUNDS = 16;
 
 // The project-scoped registry tools Retro may use: inspect the backlog/spec, make a TASK-SPECIFIC
 // edit, and signal other phases via the cross-phase inbox (V3/04). No write_file (Retro makes the
@@ -58,42 +46,13 @@ const RETRO_PROJECT_TOOL_NAMES: readonly string[] = RETRO_TOOL_NAMES.filter(
 /** The project-scoped edit tool whose success locks the window's single-file target. */
 const PROJECT_EDIT_TOOL = 'edit_file';
 
-/** Retro ended without a usable outcome (never edited a file, or never submitted its diagnosis). */
-export class RetroError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = 'RetroError';
-  }
-}
-
-/**
- * Detect a structured recoverable error in a dispatched tool's string result (the shape the file tools
- * return via toolError: a JSON object carrying an `error` field). A plain-string result is a success
- * (e.g. edit_file's "Edited '...'."). Used to lock the single-file target ONLY on a real edit.
- */
-function isToolErrorResult(result: string): boolean {
-  try {
-    const parsed: unknown = JSON.parse(result);
-    return typeof parsed === 'object' && parsed !== null && typeof (parsed as Record<string, unknown>)['error'] === 'string';
-  } catch {
-    return false; // not JSON ⇒ a plain success string
-  }
-}
-
-/** True when `abs` resolves to `root` itself or strictly under it (the path-guard primitive). */
-function isUnder(abs: string, root: string): boolean {
-  const r = path.resolve(root);
-  const a = path.resolve(abs);
-  return a === r || a.startsWith(r + path.sep);
-}
-
 /**
  * A single Retro window implementing the turn loop's TurnContext against its OWN messages array —
  * isolated from the session's per-phase histories and from the Worker/Reviewer. Project read/edit tools
  * dispatch through the shared registry (audited as phase "retro"); the rules-scoped read/edit and
  * submit_retro are handled here directly. The one-file lock spans BOTH edit roots.
  */
-class RetroWindow implements TurnContext {
+export class RetroWindow implements TurnContext {
   readonly activePhase = 'retro';
   readonly messages: Message[];
 
@@ -371,135 +330,4 @@ class RetroWindow implements TurnContext {
     };
     recordToolCall(this.deps.projectPath, record);
   }
-}
-
-/**
- * The absolute rules/phases/<phase>.md path for a candidate `phase` arg (for the single-file lock check),
- * or null if it isn't an existing phase file — so an unknown-phase edit falls through to
- * applyPhaseRuleEdit's own error instead of being mis-reported as a "second file".
- */
-function candidatePhaseFile(phase: unknown): string | null {
-  if (typeof phase !== 'string' || phase.trim() === '') return null;
-  const normalized = phase.trim().toLowerCase();
-  return availablePhaseNames().includes(normalized) ? phasePromptPath(normalized) : null;
-}
-
-// --------------------------------------------------------------------------------------- seed + spawn
-
-/** Assemble the seed user message: the inputs + the classification rules + the tool + one-file contract. */
-function buildRetroSeed(input: RetroInput): string {
-  const { task, misunderstanding, answer, failedAttempt } = input;
-  // The stashed failed attempt (V3/05) is advisory evidence of HOW the ambiguity misled implementation —
-  // included only when present; never presented as correct (the Worker redoes the task from scratch).
-  const attemptSection =
-    failedAttempt !== undefined && failedAttempt.trim() !== ''
-      ? `\n## The failed Worker attempt that triggered the blocker (stashed diff — evidence, NOT correct code)
-Use this to see HOW the ambiguous task misled implementation; do not treat it as a solution to preserve.
-\`\`\`diff
-${failedAttempt.trim()}
-\`\`\`
-`
-      : '';
-  return `You are the Retro phase. A Reviewer raised a blocker on ONE task, the user answered it, and your job is to make the SMALLEST edit to ONE file so this class of misunderstanding cannot recur. Diagnose the ROOT cause — what upstream gap let an ambiguous task reach execution — classify it, patch exactly one file, then call ${SUBMIT_RETRO}.
-
-## Task that blocked: ${task.title}
-(backlog id: ${task.id})
-
-${task.body}
-
-## The misunderstanding (the Reviewer's blocker question)
-${misunderstanding}
-
-## The user's resolving answer
-${answer}
-${attemptSection}
-How to patch (choose ONE file — editing two means you mis-classified):
-- SYSTEMIC gap — a question the protocol should ALWAYS ask, or a check the Reviewer should ALWAYS run (it should have been caught in Discovery / Design / Review). Fix the matching GLOBAL phase file: read it with ${READ_PHASE_RULE}, then patch it with ${EDIT_PHASE_RULE} (discovery | design | breakdown | worker | reviewer). This edit is left UNCOMMITTED for the user to review.
-- TASK-SPECIFIC gap — a one-off hole in THIS task's wording or acceptance criteria. Fix the project doc: read it with read_file, then patch the task's backlog file (or PRODUCT_SPEC.md) with edit_file.
-- You may inspect first with read_file / list_files / search_in_files / ${READ_PHASE_RULE}.
-- Make the SMALLEST correct edit — do not rewrite a whole phase or a whole doc.
-- Patch EXACTLY ONE file. If the fix seems to belong in two places, you mis-classified — re-check and pick the single correct one.
-- When the edit is done, call ${SUBMIT_RETRO} EXACTLY ONCE with { scope, rootCause } (rootCause = one sentence). Do not call any tool after ${SUBMIT_RETRO}.`;
-}
-
-/** The convention message for a task-specific Retro commit — no human name (constitution). */
-function buildRetroCommitMessage(task: Task, rootCause: string): string {
-  const subject = `docs(task ${task.id}): clarify task after blocker`;
-  const lines = [subject, '', rootCause.trim(), '', 'Retro-patched a task-specific gap surfaced by a resolved blocker.'];
-  return lines.join('\n');
-}
-
-/**
- * Route the window's single edit to its authoritative fate BY RESOLVED PATH (never the model's claim):
- * a file under rules/phases/ is SYSTEMIC — never auto-committed, returned with a loud review warning; a
- * file under the project is TASK-SPECIFIC — committed via the V2/03 commit flow. A file under neither
- * (should be impossible given the root-scoped tools) is a hard error, committing nothing.
- */
-function routeEdit(
-  deps: RetroDeps,
-  task: Task,
-  editedAbs: string,
-  submission: RetroSubmission,
-  tokens: TokenCounts,
-): RetroResult {
-  if (isUnder(editedAbs, PHASES_DIR)) {
-    const rel = `rules/phases/${path.basename(editedAbs)}`;
-    return {
-      scope: 'systemic',
-      rootCause: submission.rootCause,
-      editedFile: editedAbs,
-      committed: false,
-      reviewWarning:
-        `A GLOBAL phase instruction file was patched: ${rel}. It is UNCOMMITTED. Review the change and ` +
-        `commit it MANUALLY in the orchestrator repo before continuing — the orchestrator's own ` +
-        `instruction set must never mutate silently (constitution).`,
-      tokens,
-    };
-  }
-  if (isUnder(editedAbs, deps.projectPath)) {
-    const rel = path.relative(deps.projectPath, editedAbs);
-    // commitPaths stages ONLY this path and refuses anything escaping the project repo (defense in depth
-    // behind this path guard) — a rules edit could never ride along here even if mis-routed.
-    const commit = commitPaths(deps.projectPath, buildRetroCommitMessage(task, submission.rootCause), [rel]);
-    const result: RetroResult = {
-      scope: 'task-specific',
-      rootCause: submission.rootCause,
-      editedFile: editedAbs,
-      committed: commit.committed,
-      tokens,
-    };
-    if (!commit.committed) {
-      return { ...result, reviewWarning: `Retro edited ${rel} but the commit failed: ${commit.error ?? 'unknown error'}. Commit it manually.` };
-    }
-    return result;
-  }
-  throw new RetroError(`Retro edited a file outside both rules/phases and the project: ${editedAbs}`);
-}
-
-/**
- * Spawn a fresh Retro window, run it to completion (streaming to the REPL, all tool calls audited), and
- * route its single edit to a RetroResult. The window is discarded when this resolves. Throws RetroError
- * if the Retro produced no edit or never submitted a diagnosis (best-effort learning — the caller keeps
- * the session alive and the answer already recorded).
- */
-export async function spawnRetro(deps: RetroDeps, input: RetroInput): Promise<RetroResult> {
-  // Same pure resolve the window uses for its own defs, so the prompt's "# Your Tools" list names
-  // read_phase_rule/edit_phase_rule/submit_retro exactly as the window sends them.
-  const systemPrompt = buildSystemPrompt(
-    loadPhasePrompt('retro'),
-    resolvePhaseTools('retro'),
-    `Project: ${deps.projectName}`,
-  );
-  const window = new RetroWindow(deps, systemPrompt);
-  await processMessage(window, buildRetroSeed(input), RETRO_MAX_ROUNDS);
-
-  const editedAbs = window.editedFile;
-  const submission = window.submission;
-  if (editedAbs === null) {
-    throw new RetroError(`The Retro ended after ${RETRO_MAX_ROUNDS} rounds without patching any file.`);
-  }
-  if (submission === null) {
-    throw new RetroError(`The Retro edited ${editedAbs} but ended without calling ${SUBMIT_RETRO}.`);
-  }
-  return routeEdit(deps, input.task, editedAbs, submission, window.tokens);
 }
