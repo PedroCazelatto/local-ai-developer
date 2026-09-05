@@ -6,8 +6,8 @@
 import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 
-import { levelDocs } from '../../core/session/index.js';
-import type { Task } from '../../core/session/index.js';
+import { levelDocs } from '../../core/session/level-docs.js';
+import type { Task } from '../../core/session/task.type.js';
 import { extractSection } from './extract-section.js';
 
 /** Characters of any one document the slice will carry — each level doc, and the Architecture excerpt. */

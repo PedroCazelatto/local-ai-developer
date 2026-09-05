@@ -3,7 +3,8 @@
 // "headline" — render-verdict.ts's PASS/FAIL line and render-retro-result.ts's scope line — and a
 // file called headline.ts would be the one a reader opens by mistake.
 
-import type { Task, TaskStatus } from '../../core/session/index.js';
+import type { TaskStatus } from '../../core/session/task-status.type.js';
+import type { Task } from '../../core/session/task.type.js';
 import { TASK_STATUS_LABEL } from './task-status-label.js';
 
 /** `6 tasks · 2 done · 3 pending · 1 blocked` — only the statuses actually present are named. */

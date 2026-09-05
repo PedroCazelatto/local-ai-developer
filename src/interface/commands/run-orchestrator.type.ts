@@ -3,7 +3,10 @@
 // dispatch-run.ts and run-with-stop-armed.ts all take it, co-equally, and none of them is the one the
 // others serve. The test is what would own it, not how many files import it.
 
-import type { RunStopSignal, Task, TaskLoopReporter, TaskLoopResult } from '../../core/session/index.js';
+import type { RunStopSignal } from '../../core/session/run-stop-signal.js';
+import type { TaskLoopResult } from '../../core/session/run-task-loop.js';
+import type { TaskLoopReporter } from '../../core/session/task-loop-reporter.type.js';
+import type { Task } from '../../core/session/task.type.js';
 
 /** The slice of the orchestrator /run needs — satisfied structurally by SessionOrchestrator. */
 export interface RunOrchestrator {

@@ -4,6 +4,11 @@
 // Python SDK) onto dockerode, plus the ROADMAP pivot: the sandbox is now NETWORKED + hardened
 // (rootless, capped) so projects can `npm i` / `pip install`, reversing the old network_mode:none.
 //
+// Foundation task 04, and the point of the tag: the model touches ONLY these containers, never the
+// host filesystem. The provenance was carried by the core/container/ barrel, which the
+// one-function-per-file sweep deleted; it is recorded here because nothing else in the directory
+// held it.
+//
 // The whole security model is the mount boundary: only the active project is bind-mounted at
 // /workspace, so `..` / `$(...)` / symlinks inside a command cannot escape a container that
 // simply never had the host mounted. Do not add more mounts.

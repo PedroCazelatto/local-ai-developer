@@ -1,10 +1,46 @@
-# One function per file, across `src/`
+# One function per file, across `src/` — SHIPPED
 
 **Category:** Repo hygiene
 
-Item 1 of the execution order. It began as a two-file refactor and is now the repo-wide sweep that makes
-the constitution's *one function per file, least responsibility* rule true rather than aspirational.
-**The first increment has shipped; the sweep has not.** This file stays until it does.
+> # ⚠ THIS IS NOT PENDING WORK
+>
+> **The sweep is complete and item 1 is struck in [README.md](README.md).** It began as a two-file
+> refactor and became the repo-wide pass that made the constitution's *one function per file, least
+> responsibility* rule true rather than aspirational. Measured against `src/` today:
+>
+> | invariant | at the baseline `a0e9e31` | now |
+> |---|---:|---:|
+> | files holding more than one declaration | 104 (**504** declarations) | **0** |
+> | old-style `.type.ts` pairs (a `.type.ts` beside a `.ts` of the same stem) | **50** | **0** |
+> | per-folder `types.ts` modules | 3, later **5** | **0** |
+> | directory `index.ts` barrels | **8** | **0** |
+> | value `export { … } from` anywhere in `src/` | many | **0** |
+>
+> Two of those rows are worth a sentence, because a careless reading of this file's own history gets
+> them wrong. **The pair count is 50 at the baseline, not the 14 the checkpoint reported** — 14 was what
+> remained mid-sweep, after waves C and D had already folded their own. And **`types.ts` went up before
+> it went down**: three existed at the baseline, and waves B and the container work *created* two more by
+> folding old-style siblings into them, which was correct under the per-folder convention in force at the
+> time. The type reversal then retired all five. A count that rises mid-sweep is not drift; it is one
+> convention being replaced by another.
+>
+> `find src -name index.ts` returns exactly one path — `src/index.ts`, the entry point. The only
+> surviving re-export in the tree is `config.ts`'s `export type { SessionConfig }`, which the
+> constitution allows as an assembler's type ride-along.
+>
+> **This file survives its own completion by the user's decision, and it is the only backlog file that
+> does** — the convention is that a task file is deleted in the commit that ships the work, and the
+> exception is recorded in [docs/repo-layout.md](../docs/repo-layout.md). It survives because it stopped
+> being a task file: it carries the **verification methodology** the sweep developed, which is not about
+> one function per file and had nowhere else that owned it.
+>
+> **If you are here to learn something, read *A green differential proves nothing until a control has
+> gone red — AND been shown to run*.** Seven distinct shapes of a test that passes while proving nothing,
+> every one caught by making an instrument fail on purpose rather than by a green result looking wrong.
+> That section is the reason this file is still here.
+>
+> Everything else below is the sweep's record: what was decided and why, what was measured, what the
+> plan got wrong, and the traps that cost real time. Section banners mark the parts that are historical.
 
 ## Resuming from cold — start here
 

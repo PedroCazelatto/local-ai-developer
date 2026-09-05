@@ -1,6 +1,10 @@
 // The Phase abstraction — the TS replacement for the Python Agent/"persona". A phase is just a
 // name + its loaded instruction markdown + the tools it may use. There is NO "persona"/"role"
 // vocabulary anywhere in the TS tree (hard terminology rule — CLAUDE.md / ROADMAP).
+//
+// Foundation task 06 — this interface and the PhaseFactory beside it (factory.ts) are what that task
+// added. The provenance tag was carried by the phases/ barrel, which the one-function-per-file sweep
+// deleted; it is recorded here because nothing else in the directory held it.
 
 export interface Phase {
   /** Lowercased phase id, e.g. "discovery" (was Agent.role). */

@@ -2,9 +2,13 @@
 // tracker and one-shot channel are wired together. It runs once per dispatched call, which is why
 // nothing stateful is built here — see readTracker below.
 
-import type { SandboxClient } from '../core/container/index.js';
-import { oneShot } from '../core/llm/index.js';
-import type { Message, OllamaClient, OneShotResult, OneShotRole } from '../core/llm/index.js';
+import type { Message } from 'ollama';
+
+import type { SandboxClient } from '../core/container/sandbox.js';
+import { oneShot } from '../core/llm/one-shot.js';
+import type { OllamaClient } from '../core/llm/client.js';
+import type { OneShotRole } from '../core/llm/one-shot-role.type.js';
+import type { OneShotResult } from '../core/llm/one-shot.js';
 import type { FileReadTracker } from '../core/session/file-read-tracker.type.js';
 import type { SubagentHandle } from '../core/session/subagent-handle.type.js';
 // Joins a path onto the project root and throws on any escape, symlinks resolved.

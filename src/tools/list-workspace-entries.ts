@@ -10,7 +10,7 @@
 // `-maxdepth` is always passed: the caller's depth is the only bound on how much of the tree comes
 // back, and an unbounded walk of a project with dependencies installed is megabytes off the wire.
 
-import type { SandboxClient } from '../core/container/index.js';
+import type { SandboxClient } from '../core/container/sandbox.js';
 // Wraps a model-supplied value as one shell argument, so a path with a space stays one path.
 import { quoteShellArgument } from './quote-shell-argument.js';
 import type { WorkspaceEntry } from './workspace-entry.type.js';

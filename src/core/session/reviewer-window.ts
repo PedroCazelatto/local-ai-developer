@@ -5,8 +5,11 @@
 // a "pass" that left files uncommitted, or a "fail" that left a file unexplained, is handed back as a
 // recoverable error rather than believed.
 
+import type { Message, Tool, ToolCall } from 'ollama';
+
 import type { FileReadTracker } from './file-read-tracker.type.js';
-import type { OllamaClient, Message, StreamHandle, TokenCounts, Tool, ToolCall } from '../llm/index.js';
+import type { OllamaClient, StreamHandle } from '../llm/client.js';
+import type { TokenCounts } from '../llm/token-counts.type.js';
 import type { RaisedBlocker } from './raised-blocker.type.js';
 import type { ReviewVerdict } from './review-verdict.type.js';
 import type { ReviewerCommit } from './reviewer-commit.type.js';
@@ -17,19 +20,20 @@ import type { TurnContext } from './turn-context.type.js';
 import { BACKLOG_DIRNAME } from './backlog-root.js';
 import { COMMIT_CHANGES } from '../../tools/commit-changes.js';
 import { MARK_TASK_DONE } from '../../tools/mark-task-done.js';
-import { PHASE_SCOPED_TOOL_NAMES, REVIEWER_TOOL_NAMES, resolvePhaseTools } from '../../phases/index.js';
+import { PHASE_SCOPED_TOOL_NAMES, REVIEWER_TOOL_NAMES } from '../../phases/phase-tool-names.js';
+import { resolvePhaseTools } from '../../phases/resolve-phase-tools.js';
 import { RAISE_BLOCKER, validateBlockerRequest } from '../../tools/raise-blocker.js';
 import { ReviewerVerdictError } from './reviewer-verdict-error.js';
 import { SUBMIT_VERDICT, parseVerdict } from '../../tools/submit-verdict.js';
 import { addTokenCounts } from './add-token-counts.js';
 import { createReadTracker } from './read-tracker.js';
-import { createToolContext } from '../../tools/index.js';
+import { createToolContext } from '../../tools/create-tool-context.js';
 import { dispatchToolCall } from './dispatch-tool-call.js';
 import { listChangedPaths } from './list-changed-paths.js';
 import { raiseBlocker } from './raise-blocker.js';
 import { recordToolCall } from './record-tool-call.js';
 import { setTaskStatus } from './set-task-status.js';
-import { toolError } from '../../tools/index.js';
+import { toolError } from '../../tools/tool-error.js';
 import { verdictGitConflict } from './verdict-git-conflict.js';
 
 // The Reviewer inspects (a few reads + maybe a test re-run) then submits — lighter than the Worker's

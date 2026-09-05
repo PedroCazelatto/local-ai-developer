@@ -1,7 +1,7 @@
 // Narrow a parsed JSON value back to the BatchSummary the end-of-batch renderer prints. Split out of
 // read-batch-summary-file.ts.
 
-import type { BatchSummary } from '../../core/session/index.js';
+import type { BatchSummary } from '../../core/session/batch-summary.type.js';
 import { isFiniteNumber } from './is-finite-number.js';
 import { isRecord } from '../../core/llm/is-record.js'; // a non-null, non-array object (never null, never an array)
 import { isString } from './is-string.js';

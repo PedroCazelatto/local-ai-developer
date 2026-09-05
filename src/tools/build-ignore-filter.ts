@@ -19,7 +19,7 @@
 
 import ignore from 'ignore';
 
-import type { SandboxClient } from '../core/container/index.js';
+import type { SandboxClient } from '../core/container/sandbox.js';
 import { decodeUtf8Strict } from './decode-utf8-strict.js';
 import { hasSkippedSegment } from './has-skipped-segment.js'; // the fallback when there is no .gitignore
 import type { WorkspaceEntry } from './workspace-entry.type.js';

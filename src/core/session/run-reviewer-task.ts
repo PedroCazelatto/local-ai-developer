@@ -8,19 +8,21 @@
 // loop in run-task-loop.ts only READS one. Contrast ReviewerDeps beside it, which stays a standalone
 // module precisely because the CALLER constructs that one.
 
-import type { TokenCounts } from '../llm/index.js';
+import type { TokenCounts } from '../llm/token-counts.type.js';
 import type { RaisedBlocker } from './raised-blocker.type.js';
 import type { ReviewVerdict } from './review-verdict.type.js';
 import type { ReviewerCommit } from './reviewer-commit.type.js';
 import type { ReviewerDeps } from './reviewer-deps.type.js';
 import type { ReviewerInput } from './reviewer-input.type.js';
-import { PHASE_SCOPED_TOOL_NAMES, REVIEWER_TOOL_NAMES, resolvePhaseTools } from '../../phases/index.js';
+import { PHASE_SCOPED_TOOL_NAMES, REVIEWER_TOOL_NAMES } from '../../phases/phase-tool-names.js';
+import { resolvePhaseTools } from '../../phases/resolve-phase-tools.js';
 import { REVIEWER_MAX_ROUNDS } from './reviewer-window.js';
 import { ReviewerVerdictError } from './reviewer-verdict-error.js';
 import { ReviewerWindow } from './reviewer-window.js';
 import { SUBMIT_VERDICT, parseVerdict } from '../../tools/submit-verdict.js';
 import { buildReviewerSeed } from './build-reviewer-seed.js';
-import { buildSystemPrompt, loadPhasePrompt } from '../../context/index.js';
+import { loadPhasePrompt } from '../../context/load-phase-prompt.js';
+import { buildSystemPrompt } from '../../context/system-prompt.js';
 import { processMessage } from './process-message.js';
 
 /**

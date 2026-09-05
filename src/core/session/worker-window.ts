@@ -5,8 +5,11 @@
 // Worker must not reach is refused here, audited, and reported back as a recoverable error, rather
 // than being left out of the tool list and silently hallucinated.
 
+import type { Message, Tool, ToolCall } from 'ollama';
+
 import type { FileReadTracker } from './file-read-tracker.type.js';
-import type { OllamaClient, Message, StreamHandle, TokenCounts, Tool, ToolCall } from '../llm/index.js';
+import type { OllamaClient, StreamHandle } from '../llm/client.js';
+import type { TokenCounts } from '../llm/token-counts.type.js';
 import type { ToolCallRecord } from './tool-call-record.type.js';
 import type { TurnContext } from './turn-context.type.js';
 import type { WorkerDeps } from './worker-deps.type.js';
@@ -15,15 +18,17 @@ import { GIT_PUSH } from '../../tools/git-push.js';
 import { GIT_STASH } from '../../tools/git-stash.js';
 import { addTokenCounts } from './add-token-counts.js';
 import { appendEvent } from './events-log.js';
-import { buildSystemPrompt, loadPhasePrompt } from '../../context/index.js';
+import { loadPhasePrompt } from '../../context/load-phase-prompt.js';
+import { buildSystemPrompt } from '../../context/system-prompt.js';
 import { createReadTracker } from './read-tracker.js';
-import { createToolContext } from '../../tools/index.js';
+import { createToolContext } from '../../tools/create-tool-context.js';
 import { dispatchToolCall } from './dispatch-tool-call.js';
 import { evictStaleToolResults } from './evict-stale-tool-results.js';
 import { recordToolCall } from './record-tool-call.js';
 import { renderer } from '../ui/renderer.js';
-import { resolvePhaseTools } from '../../phases/index.js';
-import { toolError, truncateHeadTail } from '../../tools/index.js';
+import { resolvePhaseTools } from '../../phases/resolve-phase-tools.js';
+import { toolError } from '../../tools/tool-error.js';
+import { truncateHeadTail } from '../../tools/truncate.js';
 
 // A test-first implement loop (write test → run → implement → run → summarize) needs more rounds
 // than an interactive chat turn, so give the Worker generous headroom before the loop cap trips.

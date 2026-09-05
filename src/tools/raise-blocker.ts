@@ -9,7 +9,7 @@
 // Reviewer raises it IMMEDIATELY on genuine ambiguity/under-specification/self-contradiction — NOT for
 // ordinary review failures, which go back as fix feedback in the verdict.
 
-import type { Tool } from '../core/llm/index.js';
+import type { Tool } from 'ollama';
 
 /** The one name the Reviewer window special-cases to capture a raised blocker. */
 export const RAISE_BLOCKER = 'raise_blocker';

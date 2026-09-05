@@ -2,11 +2,14 @@
 // `summary` turn, written by a throwaway window. Nothing is deleted -- the collapsed turns stay on
 // disk and only leave the VISIBLE view.
 
+import type { Message } from 'ollama';
+
 import type { CompactDeps } from './compact-deps.type.js';
 import type { CompactResult } from './compact-result.type.js';
-import type { Message, OllamaClient, TokenCounts } from '../llm/index.js';
+import type { OllamaClient } from '../llm/client.js';
+import type { TokenCounts } from '../llm/token-counts.type.js';
 import { buildSummaryTranscript } from './build-summary-transcript.js';
-import { oneShot } from '../llm/index.js';
+import { oneShot } from '../llm/one-shot.js';
 import { selectOldest } from './select-oldest.js';
 
 // Terse, artifact-preserving compression — the three requirements from the task, verbatim in intent.

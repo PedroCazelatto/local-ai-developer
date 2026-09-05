@@ -10,13 +10,16 @@
 // never the master's history; and the master's history is never polluted by the sub-agent's internal
 // turns — the master only ever sees the { id, response } tool result.
 
-import { resolvePhaseTools } from '../../phases/index.js';
+import type { Message, Tool } from 'ollama';
+
+import { resolvePhaseTools } from '../../phases/resolve-phase-tools.js';
 import { ASK_SUBAGENT } from '../../tools/ask-subagent.js';
 import { DISMISS_SUBAGENT } from '../../tools/dismiss-subagent.js';
-import { createToolContext } from '../../tools/index.js';
+import { createToolContext } from '../../tools/create-tool-context.js';
 import { SPAWN_SUBAGENT } from '../../tools/spawn-subagent.js';
-import type { SandboxClient } from '../container/index.js';
-import type { Message, OllamaClient, TokenCounts, Tool } from '../llm/index.js';
+import type { SandboxClient } from '../container/sandbox.js';
+import type { OllamaClient } from '../llm/client.js';
+import type { TokenCounts } from '../llm/token-counts.type.js';
 import { printToolCall } from '../ui/print-tool-call.js';
 import { addTokenCounts } from './add-token-counts.js';
 import { dispatchToolCall } from './dispatch-tool-call.js';
@@ -84,9 +87,10 @@ export interface SubagentDeps {
 export const SUBAGENT_TOOL_NAMES: readonly string[] = [SPAWN_SUBAGENT, ASK_SUBAGENT, DISMISS_SUBAGENT];
 
 // The short-id length lives in its own file so spawn_subagent can name the sub-agent that answered
-// without importing this module (which imports the tool). Re-exported here because that is where
-// `/subagents` and core/session/index.ts have always read it from.
-export { SUBAGENT_SHORT_ID_LEN } from './short-subagent-id.js';
+// without importing this module (which imports the tool). It used to be re-exported from here, because
+// the barrel and `/subagents` read it through this file; the barrel is gone and `/subagents` never
+// referenced it, so the re-export had no consumer left and went with the barrel pass. Take it from
+// short-subagent-id.ts.
 
 // A sub-agent may read a couple of files before answering; give it headroom before the loop cap trips,
 // but far less than the Worker's implement loop (a sub-agent is a focused side-task, not a full build).

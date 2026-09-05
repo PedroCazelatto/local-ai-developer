@@ -5,7 +5,7 @@
 // (constitution: token counts are always exact). Start an accumulator at { promptTokens: 0,
 // evalTokens: 0 } and fold each turn's counts through this.
 
-import type { TokenCounts } from '../llm/index.js';
+import type { TokenCounts } from '../llm/token-counts.type.js';
 
 /** Combine two token readings into their exact field-wise sum; either `null` ⇒ that field is `null`. */
 export function addTokenCounts(a: TokenCounts, b: TokenCounts): TokenCounts {

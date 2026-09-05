@@ -3,7 +3,7 @@
 // It says `not reported` for a metric Ollama omitted rather than printing 0 or a length-based
 // estimate — the constitution's exact-token invariant: a missing metric is surfaced, never guessed at.
 
-import type { TokenCounts } from '../../core/llm/index.js';
+import type { TokenCounts } from '../../core/llm/token-counts.type.js';
 
 /** Exact loop-cost line — never a length estimate; says "not reported" when a metric was omitted. */
 export function tokenCostLine(tokens: TokenCounts): string {

@@ -1,7 +1,7 @@
 // The routed outcome of one Retro: the single patched file plus its authoritative, path-derived fate.
 
 import type { RetroScope } from './retro-scope.type.js';
-import type { TokenCounts } from '../llm/index.js';
+import type { TokenCounts } from '../llm/token-counts.type.js';
 
 /** The routed outcome of one Retro: the single patched file + its authoritative (path-derived) fate. */
 export interface RetroResult {

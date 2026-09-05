@@ -7,7 +7,7 @@
 
 import type { Interface as ReadlineInterface } from 'node:readline/promises';
 
-import { shortContextId } from '../../core/session/index.js';
+import { shortContextId } from '../../core/session/short-context-id.js';
 import { capitalizePhase } from '../../core/ui/capitalize-phase.js';
 import { renderer } from '../../core/ui/renderer.js';
 import { statusBar } from '../../core/ui/status-bar.js';

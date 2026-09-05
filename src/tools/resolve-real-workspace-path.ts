@@ -16,7 +16,7 @@
 // exists to close. The two inspection tools do NOT pay it — `grep -r` and `find` never traverse a
 // symlink they meet, so nothing they return was reached through one.
 
-import type { SandboxClient } from '../core/container/index.js';
+import type { SandboxClient } from '../core/container/sandbox.js';
 // True when a resolved path is /workspace itself or something strictly beneath it.
 import { insideWorkspace } from './inside-workspace.js';
 // Wraps the path as one shell argument, so a filename with a space or a quote survives the shell.

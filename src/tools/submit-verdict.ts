@@ -8,7 +8,8 @@
 // other tool uses (client.ts recovers calls the local model emits as bare JSON / <tool_call> tags) —
 // reliable across any model/hardware. Validation is strict here because downstream trusts the shape.
 
-import type { Tool } from '../core/llm/index.js';
+import type { Tool } from 'ollama';
+
 import type { ReviewIssue } from '../core/session/review-issue.type.js';
 import type { ReviewVerdict } from '../core/session/review-verdict.type.js';
 import { describeValue } from './describe-value.js'; // a string quoted, anything else stringified

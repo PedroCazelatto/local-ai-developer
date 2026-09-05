@@ -1,6 +1,9 @@
 // Part of the summarizer contract.
 
-import type { Message, OllamaClient, TokenCounts } from '../llm/index.js';
+import type { Message } from 'ollama';
+
+import type { OllamaClient } from '../llm/client.js';
+import type { TokenCounts } from '../llm/token-counts.type.js';
 
 /**
  * Outcome of one compaction: how many turns collapsed + the throwaway call's EXACT tokens (for the

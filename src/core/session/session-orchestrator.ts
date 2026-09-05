@@ -3,13 +3,18 @@
 // OllamaClient (03), the SandboxClient (04), and the exact tokens from the last turn. Drives the
 // tool-dispatch turn loop (turn-loop.ts) and exposes the small surface the REPL (05) needs.
 
-import { buildSystemPrompt } from '../../context/index.js';
-import type { Phase } from '../../phases/index.js';
-import { PhaseFactory, resolvePhaseTools } from '../../phases/index.js';
-import { createToolContext } from '../../tools/index.js';
-import type { SandboxClient } from '../container/index.js';
-import type { Message, StreamHandle, TokenCounts, Tool, ToolCall, TurnAbortReason } from '../llm/index.js';
-import { OllamaClient } from '../llm/index.js';
+import type { Message, Tool, ToolCall } from 'ollama';
+
+import { buildSystemPrompt } from '../../context/system-prompt.js';
+import type { Phase } from '../../phases/phase.js';
+import { PhaseFactory } from '../../phases/factory.js';
+import { resolvePhaseTools } from '../../phases/resolve-phase-tools.js';
+import { createToolContext } from '../../tools/create-tool-context.js';
+import type { SandboxClient } from '../container/sandbox.js';
+import type { StreamHandle } from '../llm/client.js';
+import type { TokenCounts } from '../llm/token-counts.type.js';
+import type { TurnAbortReason } from '../llm/turn-aborted-error.js';
+import { OllamaClient } from '../llm/client.js';
 import { capitalizePhase } from '../ui/capitalize-phase.js';
 import { renderer } from '../ui/renderer.js';
 import { addTokenCounts } from './add-token-counts.js';

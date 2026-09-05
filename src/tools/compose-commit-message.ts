@@ -8,7 +8,10 @@
 // The writer is shown the REAL diff, not the phase's description of it — a phase that misdescribes its
 // own change cannot talk the log into agreeing. The phase's `intent` rides along only as the "why".
 
-import type { Message, OneShotResult, OneShotRole } from '../core/llm/index.js';
+import type { Message } from 'ollama';
+
+import type { OneShotRole } from '../core/llm/one-shot-role.type.js';
+import type { OneShotResult } from '../core/llm/one-shot.js';
 import { stripAttributionTrailers } from './strip-attribution-trailers.js'; // no trailer may ever name a person
 import { unwrapCommitMessage } from './unwrap-commit-message.js'; // NOT unwrapTitle: a message has a body
 

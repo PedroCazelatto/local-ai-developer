@@ -8,7 +8,7 @@ import type { BatchCancelled } from './batch-cancelled.type.js';
 import type { BatchEscalated } from './batch-escalated.type.js';
 import type { BatchPassed } from './batch-passed.type.js';
 import type { BatchSkipped } from './batch-skipped.type.js';
-import type { TokenCounts } from '../llm/index.js';
+import type { TokenCounts } from '../llm/token-counts.type.js';
 
 /** One unattended batch's persisted outcome — written under .orchestrator/batches/ for the morning after. */
 export interface BatchSummary {

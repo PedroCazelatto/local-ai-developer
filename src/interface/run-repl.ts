@@ -19,17 +19,15 @@ import { createInterface } from 'node:readline/promises';
 import type { Key } from 'node:readline';
 import { stdin, stdout } from 'node:process';
 
-import type {
-  ClearResult,
-  ContextSummary,
-  RetroInput,
-  RetroResult,
-  RunStopSignal,
-  SubagentInfo,
-  Task,
-  TaskLoopReporter,
-  TaskLoopResult,
-} from '../core/session/index.js';
+import type { ClearResult } from '../core/session/clear-result.type.js';
+import type { ContextSummary } from '../core/session/context-summary.type.js';
+import type { RetroInput } from '../core/session/retro-input.type.js';
+import type { RetroResult } from '../core/session/retro-result.type.js';
+import type { RunStopSignal } from '../core/session/run-stop-signal.js';
+import type { TaskLoopResult } from '../core/session/run-task-loop.js';
+import type { SubagentInfo } from '../core/session/subagent-info.type.js';
+import type { TaskLoopReporter } from '../core/session/task-loop-reporter.type.js';
+import type { Task } from '../core/session/task.type.js';
 import { config } from '../core/session/config.js';
 import { activityLine } from '../core/ui/activity-line.js';
 import { bindNewlineKey } from '../core/ui/bind-newline-key.js';

@@ -1,6 +1,6 @@
 // One `blocked` row of a persisted batch summary. Split out of read-batch-summary-file.ts.
 
-import type { BatchBlocked } from '../../core/session/index.js';
+import type { BatchBlocked } from '../../core/session/batch-blocked.type.js';
 import { isString } from './is-string.js';
 import { readBatchCommits } from './read-batch-commits.js'; // the row's short SHAs, oldest first
 

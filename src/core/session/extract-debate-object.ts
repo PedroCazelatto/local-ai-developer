@@ -8,7 +8,7 @@
 // Named extractDebateObject rather than the module-private `extractObject` it was extracted from.
 
 import { isRecord } from '../llm/is-record.js';
-import { loadsOrRepair } from '../llm/index.js';
+import { loadsOrRepair } from '../llm/loads-or-repair.js';
 
 /** The first JSON object in the reply, as a plain record; null when there is none. */
 export function extractDebateObject(raw: string): Record<string, unknown> | null {

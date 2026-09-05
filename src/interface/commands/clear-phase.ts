@@ -11,8 +11,8 @@
 // /resume. The NEW context is not named, because it does not exist yet — a context row is created
 // lazily on its first flush, and naming an id now would be inventing one.
 
-import type { ClearResult } from '../../core/session/index.js';
-import { shortContextId } from '../../core/session/index.js';
+import type { ClearResult } from '../../core/session/clear-result.type.js';
+import { shortContextId } from '../../core/session/short-context-id.js';
 import { capitalizePhase } from '../../core/ui/capitalize-phase.js';
 import { renderer } from '../../core/ui/renderer.js';
 

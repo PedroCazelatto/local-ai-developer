@@ -7,7 +7,7 @@
 // Blank strings ARE dropped rather than failing, which is what makes the caller's minimum-options
 // check meaningful: `["yes", ""]` is one real choice, not two.
 
-import { loadsOrRepair } from '../core/llm/index.js';
+import { loadsOrRepair } from '../core/llm/loads-or-repair.js';
 
 /** Coerce one entry's options into a list of non-empty strings, tolerating a JSON-string list. */
 export function extractQuestionOptions(value: unknown): string[] | null {

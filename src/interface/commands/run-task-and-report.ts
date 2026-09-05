@@ -6,7 +6,8 @@
 // one is the inner step — loop, then render; run-single-task.ts is the guarded selector path that
 // calls it, and the name now says which is which.
 
-import type { Task, TaskLoopResult } from '../../core/session/index.js';
+import type { TaskLoopResult } from '../../core/session/run-task-loop.js';
+import type { Task } from '../../core/session/task.type.js';
 import { errMessage } from '../../core/err-message.js'; // an Error's message, or the thrown value stringified
 import { renderer } from '../../core/ui/renderer.js';
 import { buildSpecSlice } from './build-spec-slice.js';

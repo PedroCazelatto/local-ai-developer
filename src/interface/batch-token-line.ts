@@ -4,7 +4,7 @@
 // `completion` where the others say `eval`. Deliberately NOT merged behind a label parameter; they were
 // never one function.
 
-import type { BatchSummary } from '../core/session/index.js';
+import type { BatchSummary } from '../core/session/batch-summary.type.js';
 import { theme } from '../core/ui/theme.js';
 
 /** Exact token line — never a length estimate; says "not reported" when a metric was omitted (constitution). */

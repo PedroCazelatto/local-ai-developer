@@ -3,8 +3,9 @@
 // exactly what needs attention), then the EXACT total token spend and where the report was saved. Pure
 // printing; wraps naturally, no horizontal scroll. Mirrors render-verdict.ts / render-retro-result.ts.
 
-import type { BatchSummary } from '../core/session/index.js';
-import { batchSummaryFileName, BATCHES_DIRNAME } from '../core/session/index.js';
+import type { BatchSummary } from '../core/session/batch-summary.type.js';
+import { batchSummaryFileName } from '../core/session/batch-summary-file-name.js';
+import { BATCHES_DIRNAME } from '../core/session/batches-dirname.js';
 import { theme } from '../core/ui/theme.js';
 import { write } from '../core/ui/write.js';
 import { batchTokenLine } from './batch-token-line.js'; // exact prompt/completion counts, "not reported" for a missing one

@@ -1,8 +1,11 @@
 // What runDebate needs from its caller: one throwaway model call, and somewhere to send each finished
 // turn. Injected rather than imported, so the loop stays pure orchestration and prints nothing itself.
 
+import type { Message } from 'ollama';
+
 import type { DebateTurn } from './debate-turn.type.js';
-import type { Message, OneShotResult, OneShotRole } from '../llm/index.js';
+import type { OneShotRole } from '../llm/one-shot-role.type.js';
+import type { OneShotResult } from '../llm/one-shot.js';
 
 /** What runDebate needs: one throwaway model call, and somewhere to send each finished turn. */
 export interface DebateDeps {

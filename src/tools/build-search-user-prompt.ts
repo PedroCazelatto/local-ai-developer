@@ -5,7 +5,7 @@
 // prompt is kept short and stable while the catalog grows, and none of this ever enters the calling
 // phase's memory — the call is history-free and discarded.
 
-import type { StandardEntry } from '../context/index.js';
+import type { StandardEntry } from '../context/load-catalog.js';
 
 /** Assemble the throwaway user turn: one `name: description` line per standard, then the intent. */
 export function buildSearchUserPrompt(catalog: StandardEntry[], intent: string): string {

@@ -8,7 +8,7 @@
 // search_rules is a legitimate answer ("nothing matches") and is what keeps a malformed reply from
 // killing the turn.
 
-import { loadsOrRepair } from '../core/llm/index.js';
+import { loadsOrRepair } from '../core/llm/loads-or-repair.js';
 
 /** Best-effort extraction of a JSON array from the reply (tolerates code fences / stray prose). */
 export function extractJsonArray(content: string): unknown[] {

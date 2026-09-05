@@ -4,8 +4,8 @@
 // context, then load_rule pulls only the CHOSEN body into the main context. An unknown name is a
 // RECOVERABLE structured error listing the available names — the turn never dies (V1/02).
 
-import { loadStandardBody } from '../context/index.js';
-import type { StandardBody } from '../context/index.js';
+import { loadStandardBody } from '../context/load-standard-body.js';
+import type { StandardBody } from '../context/load-standard-body.js';
 import { errMessage } from '../core/err-message.js'; // an Error's message, or the thrown value stringified
 import type { JsonObject } from './json-object.type.js';
 import { toolError } from './tool-error.js';

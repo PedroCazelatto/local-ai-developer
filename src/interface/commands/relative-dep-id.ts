@@ -1,6 +1,6 @@
 // A dependency id shortened against the task that depends on it. Split out of render-task-tree.ts.
 
-import type { Task } from '../../core/session/index.js';
+import type { Task } from '../../core/session/task.type.js';
 
 /**
  * A dependency id with the part the reader is already standing in stripped off: a sibling in the same

@@ -4,7 +4,8 @@
 // The replay is the point — nothing records "open" as a field, so the answer is always computed from
 // the rows themselves and a reader can never be looking at a stale flag.
 
-import type { BlockerRow, RaisedBlocker } from '../../core/session/index.js';
+import type { BlockerRow } from '../../core/session/blocker-row.type.js';
+import type { RaisedBlocker } from '../../core/session/raised-blocker.type.js';
 
 /** Every raised blocker with no matching `resolved` row, oldest first (the order they were raised in). */
 export function openBlockers(rows: readonly BlockerRow[]): RaisedBlocker[] {

@@ -6,8 +6,10 @@
 // have shown, including the one `/run next` would pick, which is also restated in the footer so a
 // narrow terminal cutting a row can never hide the answer.
 
-import { BacklogError, nextRunnableTasks, readBacklog } from '../../core/session/index.js';
-import type { Backlog } from '../../core/session/index.js';
+import { BacklogError } from '../../core/session/backlog-error.js';
+import { nextRunnableTasks } from '../../core/session/next-runnable-tasks.js';
+import { readBacklog } from '../../core/session/read-backlog.js';
+import type { Backlog } from '../../core/session/backlog.type.js';
 import { renderer } from '../../core/ui/renderer.js';
 import { theme } from '../../core/ui/theme.js';
 import { renderTaskTree } from './render-task-tree.js';

@@ -7,7 +7,7 @@
 // error. Each says what is already committed, because a Reviewer commits in pieces and "the rest is
 // uncommitted" is only useful next to what is not.
 
-import type { TaskLoopResult } from '../../core/session/index.js';
+import type { TaskLoopResult } from '../../core/session/run-task-loop.js';
 import { renderer } from '../../core/ui/renderer.js';
 import { tokenCostLine } from './token-cost-line.js';
 

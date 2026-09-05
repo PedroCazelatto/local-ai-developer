@@ -1,7 +1,8 @@
 // One task's row in the /tasks tree. Split out of render-task-tree.ts.
 
 import { theme } from '../../core/ui/theme.js';
-import type { Task, TaskStatus } from '../../core/session/index.js';
+import type { TaskStatus } from '../../core/session/task-status.type.js';
+import type { Task } from '../../core/session/task.type.js';
 import type { FittedRow } from './fitted-row.type.js';
 import { TASK_STATUS_LABEL } from './task-status-label.js';
 import { TREE_INDENT } from './tree-indent.js';

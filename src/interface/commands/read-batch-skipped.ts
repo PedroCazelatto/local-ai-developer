@@ -1,6 +1,6 @@
 // One `skipped` row of a persisted batch summary. Split out of read-batch-summary-file.ts.
 
-import type { BatchSkipped } from '../../core/session/index.js';
+import type { BatchSkipped } from '../../core/session/batch-skipped.type.js';
 import { isString } from './is-string.js';
 
 /** A task the batch never attempted: its id and the reason it was passed over. */

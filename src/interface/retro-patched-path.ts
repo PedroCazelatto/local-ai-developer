@@ -4,7 +4,7 @@
 
 import path from 'node:path';
 
-import type { RetroResult } from '../core/session/index.js';
+import type { RetroResult } from '../core/session/retro-result.type.js';
 
 /** A readable path for the patched file: project-relative when inside the project, else as resolved. */
 export function retroPatchedPath(result: RetroResult, projectPath: string): string {

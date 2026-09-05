@@ -15,8 +15,8 @@
 // head-count would have folded the seam and split the result, exactly backwards. The test is which
 // side of the call constructs the value, never how many files mention the name.
 
-import type { SandboxClient } from '../container/index.js';
-import type { OllamaClient } from '../llm/index.js';
+import type { SandboxClient } from '../container/sandbox.js';
+import type { OllamaClient } from '../llm/client.js';
 import type { RunStopSignal } from './run-stop-signal.js';
 
 /** The session infrastructure the loop binds a Worker/Reviewer window to (supplied by the orchestrator). */

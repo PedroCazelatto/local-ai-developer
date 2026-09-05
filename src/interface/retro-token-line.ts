@@ -2,7 +2,7 @@
 // live in this directory (batch-token-line.ts, reviewer-token-line.ts) with different labels; see the
 // note in batch-token-line.ts for why they are three functions and not one.
 
-import type { RetroResult } from '../core/session/index.js';
+import type { RetroResult } from '../core/session/retro-result.type.js';
 import { theme } from '../core/ui/theme.js';
 
 /** Exact token line — never a length estimate; says "not reported" when a metric was omitted. */

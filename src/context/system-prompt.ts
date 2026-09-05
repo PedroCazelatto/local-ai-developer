@@ -1,11 +1,16 @@
-// Minimal system-prompt builder (ports context/builder.py's ContextBuilder). Assembles the
-// system message from the active phase's instructions + the tools that phase actually holds +
-// shared tool-use mechanics + how output is displayed + a one-line project state. The phase
+// Minimal system-prompt builder (Foundation task 06; ports context/builder.py's ContextBuilder).
+// Assembles the system message from the active phase's instructions + the tools that phase actually
+// holds + shared tool-use mechanics + how output is displayed + a one-line project state. The phase
 // markdown says WHICH tools to reach for; these blocks say WHAT exists, HOW to call them, what to
 // do with their results, and how the reply will be rendered — kept in code so the six phase files
 // don't each repeat it.
+//
+// The "Foundation task 06" tag above was carried by the context/ barrel, which the
+// one-function-per-file sweep deleted; it is recorded here because nothing else in the directory
+// held it.
 
-import type { Tool } from '../core/llm/index.js';
+import type { Tool } from 'ollama';
+
 import { buildToolSection } from './build-tool-section.js';
 
 // The model writes PLAIN markdown and never names a color: the terminal renderer (theme.ts +

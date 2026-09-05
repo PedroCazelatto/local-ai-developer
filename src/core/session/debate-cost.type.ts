@@ -1,7 +1,7 @@
 // What every debate outcome carries whether it succeeded or not -- the argument was paid for either way
 // and the cost must be reported. Referenced only by DebateOutcome, which intersects it with each arm.
 
-import type { TokenCounts } from '../llm/index.js';
+import type { TokenCounts } from '../llm/token-counts.type.js';
 
 /** Fields every outcome carries, successful or not — the cost was real either way and must be reported. */
 export interface DebateCost {

@@ -9,7 +9,7 @@
 import { existsSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 
-import { BATCHES_DIRNAME } from '../../core/session/index.js';
+import { BATCHES_DIRNAME } from '../../core/session/batches-dirname.js';
 
 /**
  * One persisted batch summary on disk, addressed by the seq its own report prints as `Batch #N`. A

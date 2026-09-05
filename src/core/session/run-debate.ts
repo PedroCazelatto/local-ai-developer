@@ -17,8 +17,10 @@
 // Nothing here prints or persists. `onTurn` is where the caller renders each turn live, and the caller
 // owns the events-log row; this file is the argument and nothing else.
 
+import type { Message } from 'ollama';
+
 import { loadPrompt } from '../../context/load-prompt.js';
-import type { Message, TokenCounts } from '../llm/index.js';
+import type { TokenCounts } from '../llm/token-counts.type.js';
 import { addTokenCounts } from './add-token-counts.js';
 import type { DebateDeps } from './debate-deps.type.js';
 import type { DebateOutcome } from './debate-outcome.type.js';

@@ -5,8 +5,8 @@
 // a flat folder says nothing about what is being addressed, and `address` is a word four other files
 // use as a local for something else.
 
-import { shortContextId } from '../../core/session/index.js';
-import type { ContextSummary } from '../../core/session/index.js';
+import { shortContextId } from '../../core/session/short-context-id.js';
+import type { ContextSummary } from '../../core/session/context-summary.type.js';
 
 /** The address form the user types and the listing shows — `design/7a888b1f`. */
 export function contextAddress(context: ContextSummary): string {

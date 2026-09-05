@@ -6,7 +6,7 @@
 // Same dependency inversion as the per-task seam: runBatch drives the ids sequentially and never
 // imports a renderer.
 
-import type { BatchReporter } from '../../core/session/index.js';
+import type { BatchReporter } from '../../core/session/batch-reporter.type.js';
 import { renderer } from '../../core/ui/renderer.js';
 import { renderBatchSummary } from '../render-batch-summary.js';
 import { renderTaskOutcome } from './render-task-outcome.js';

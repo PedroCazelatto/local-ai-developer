@@ -2,7 +2,8 @@
 // lock check -- or null when it is not an existing phase file, so an unknown-phase edit falls through
 // to applyPhaseRuleEdit's own error instead of being mis-reported as "a second file".
 
-import { availablePhaseNames, phasePromptPath } from '../../context/index.js';
+import { availablePhaseNames } from '../../context/available-phase-names.js';
+import { phasePromptPath } from '../../context/phase-prompt-path.js';
 
 /**
  * The absolute rules/phases/<phase>.md path for a candidate `phase` arg (for the single-file lock check),

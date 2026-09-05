@@ -1,7 +1,7 @@
 // The line /resume prints after restoring a context that was written to fit a smaller window. Split
 // out of resume.ts.
 
-import type { ContextSummary } from '../../core/session/index.js';
+import type { ContextSummary } from '../../core/session/context-summary.type.js';
 import { theme } from '../../core/ui/theme.js';
 import { write } from '../../core/ui/write.js';
 import { ceilingLabel } from './ceiling-label.js';

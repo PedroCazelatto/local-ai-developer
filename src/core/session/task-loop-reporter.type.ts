@@ -9,7 +9,7 @@
 // loop be driven with no renderer at all — the same reading that put KeypressSource in its own file,
 // and the shape batch-reporter.type.ts already takes beside runBatch.
 
-import type { TokenCounts } from '../llm/index.js';
+import type { TokenCounts } from '../llm/token-counts.type.js';
 import type { ReviewVerdict } from './review-verdict.type.js';
 
 /**

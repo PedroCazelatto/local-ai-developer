@@ -1,7 +1,7 @@
 // `/models use <name>` (V5/02) — switch the live session model, offering to download it first when it
 // isn't pulled yet. The model never picks its own runtime, so this is a user command and never a tool.
 
-import { hasModel } from '../core/llm/index.js';
+import { hasModel } from '../core/llm/has-model.js';
 import { confirmKey } from '../core/ui/confirm-key.js';
 import { pullWithSpinner } from '../core/ui/pull-with-spinner.js';
 import { renderer } from '../core/ui/renderer.js';

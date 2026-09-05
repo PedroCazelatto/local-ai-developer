@@ -11,8 +11,8 @@
 // is refused unless the repo agrees. So a round can land commits even when the verdict is a fail, and
 // a `pass` is proof the tree was already clean — the loop just reports what the Reviewer committed.
 
-import type { TokenCounts } from '../llm/index.js';
-import { TurnAbortedError } from '../llm/index.js';
+import type { TokenCounts } from '../llm/token-counts.type.js';
+import { TurnAbortedError } from '../llm/turn-aborted-error.js';
 import { addTokenCounts } from './add-token-counts.js';
 import { buildWorkerFixMessage } from './build-worker-fix-message.js';
 import { captureChangedFiles } from './capture-changed-files.js';

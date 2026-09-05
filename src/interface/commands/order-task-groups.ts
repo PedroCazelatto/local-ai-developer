@@ -2,7 +2,7 @@
 // render-task-tree.ts; `orderGroups` was qualified to `orderTaskGroups` to match the TaskGroup it
 // sorts — "groups" alone names no subject in a flat folder.
 
-import type { Task } from '../../core/session/index.js';
+import type { Task } from '../../core/session/task.type.js';
 import type { TaskGroup } from './task-group.type.js';
 
 /**

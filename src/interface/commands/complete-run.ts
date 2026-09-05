@@ -1,6 +1,7 @@
 // Tab candidates for /run. Split out of run.ts.
 
-import { allTasks, readBacklog } from '../../core/session/index.js';
+import { allTasks } from '../../core/session/all-tasks.js';
+import { readBacklog } from '../../core/session/read-backlog.js';
 import type { CompletionContext } from '../completion-context.type.js';
 
 /**

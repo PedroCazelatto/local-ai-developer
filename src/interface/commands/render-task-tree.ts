@@ -12,7 +12,7 @@
 // a narrow terminal cuts the tail: the marker, status and order first, then the id, then the
 // dependencies, and the title last — it is the only field that is not load-bearing.
 
-import type { Backlog } from '../../core/session/index.js';
+import type { Backlog } from '../../core/session/backlog.type.js';
 import { theme } from '../../core/ui/theme.js';
 import type { FittedRow } from './fitted-row.type.js';
 import { TASK_STATUS_LABEL } from './task-status-label.js';

@@ -1,7 +1,7 @@
 // Map each tool result back to the arguments of the call that produced it, so an evicted result can
 // be replaced by a stub that still says WHAT was called and with what.
 
-import type { Message, ToolCall } from '../llm/index.js';
+import type { Message, ToolCall } from 'ollama';
 
 /**
  * Pair each `tool` message with the arguments of the call that produced it.

@@ -8,7 +8,7 @@
 import { execFileSync } from 'node:child_process';
 import path from 'node:path';
 
-import { PHASES_DIR } from '../../context/index.js';
+import { PHASES_DIR } from '../../context/phase-prompt.js';
 
 // PHASES_DIR is <orchestratorRoot>/rules/phases; the repo root is two dirs up. Resolved from the module
 // (via PHASES_DIR), never from cwd — the guard must check the orchestrator's own repo regardless of where
