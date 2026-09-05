@@ -23,16 +23,17 @@ import type { ContextSummary } from './context-summary.type.js';
 import type { PhaseLoad } from './phase-load.type.js';
 import { SessionMemory } from './session-memory.js';
 import { createReadTracker } from './read-tracker.js';
-import type { FileReadTracker } from './read-tracker.type.js';
+import type { FileReadTracker } from './file-read-tracker.type.js';
 import { recordToolCall } from './record-tool-call.js';
 import type { RetroInput } from './retro-input.type.js';
 import type { RetroResult } from './retro-result.type.js';
 import { spawnRetro as spawnRetroWindow } from './spawn-retro.js';
 import { RunStopSignal } from './run-stop-signal.js';
 import { runTaskLoop } from './run-task-loop.js';
-import type { TaskLoopReporter, TaskLoopResult } from './run-task-loop.type.js';
+import type { TaskLoopResult } from './run-task-loop.js';
+import type { TaskLoopReporter } from './task-loop-reporter.type.js';
 import { SubagentManager } from './subagents.js';
-import type { SubagentInfo } from './subagents.type.js';
+import type { SubagentInfo } from './subagent-info.type.js';
 import { compactActivePhase } from './compact-active-phase.js';
 import type { Task } from './task.type.js';
 import type { TurnContext } from './turn-context.type.js';
@@ -65,7 +66,7 @@ export class SessionOrchestrator implements TurnContext {
   private readonly memory: SessionMemory;
   private phase: Phase;
   private lastTokens: TokenCounts = NO_TOKENS;
-  /** Handed to each spawned Worker window; see run-task-loop.type.ts and worker-runner.ts. */
+  /** Handed to each spawned Worker window; see TaskLoopDeps in run-task-loop.ts and worker-window.ts. */
   private readonly evictionThresholdRatio: number;
 
   // Summarization failsafe (V4/05). The trigger point (exact tokens): a phase whose last

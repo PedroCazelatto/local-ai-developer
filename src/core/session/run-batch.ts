@@ -30,7 +30,7 @@ import { persistBatchSummary } from './persist-batch-summary.js';
 import { preflightRefusal } from './preflight-refusal.js';
 import { readBacklog } from './read-backlog.js';
 import { routeBatchOutcome } from './route-batch-outcome.js';
-import type { TaskLoopResult } from './run-task-loop.type.js';
+import type { TaskLoopResult } from './run-task-loop.js';
 import { taskSkipReason } from './task-skip-reason.js';
 
 /**
