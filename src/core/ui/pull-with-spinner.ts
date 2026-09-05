@@ -4,8 +4,8 @@
 
 import ora from 'ora';
 
-import { pullModel } from '../llm/ollama-models.js';
-import type { PullProgress } from '../llm/ollama-models.type.js';
+import { pullModel } from '../llm/pull-model.js';
+import type { PullProgress } from '../llm/pull-model.js';
 import { formatSize } from './format-size.js';
 import type { PullResult, SigintSource } from './pull-with-spinner.type.js';
 import * as renderer from './renderer.js';
@@ -23,7 +23,7 @@ function progressText(name: string, p: PullProgress): string {
 /**
  * Stream a pull with a live ora line and BLOCK until it finishes, returning the outcome without printing
  * a final line — the caller owns that message. Ctrl-C aborts ONLY this pull: a one-shot SIGINT listener
- * on `sigint` trips an AbortController whose signal ollama-models bridges onto the streamed request.
+ * on `sigint` trips an AbortController whose signal pull-model bridges onto the streamed request.
  * `discardStdin: false` matches spinner.ts — a live REPL owns stdin via readline, so ora must not
  * pause/raw-toggle it. `cancelled` and `error` are reported here; `ok` is left for the caller to phrase.
  */

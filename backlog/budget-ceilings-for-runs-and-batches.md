@@ -56,11 +56,11 @@ cannot be budget-checked — surface that rather than treating an unknown as und
   Worker's usage; when the round hands over, the display switches to the Reviewer's. This is task J's
   #63b answered from the other side — one field, one owner, and
   [in-turn-progress-reporting.md](in-turn-progress-reporting.md) builds it.
-- **One function per file** (#47b). `config.ts`'s four-function exception ends: `resolveNumCtx`,
-  `resolveRatio`, `resolveTimeoutMs`, `loadConfig` and the new budget resolver each move to their own
-  file, and **`config.ts` becomes a re-export that assembles them into the config object**. That is
-  wider than this task and is why it has its own file:
-  [split-config-into-one-function-per-file.md](split-config-into-one-function-per-file.md).
+- **One function per file** (#47b). `config.ts`'s four-function exception has already ended —
+  `resolveNumCtx`, `resolveRatio`, `resolveTimeoutMs` and `loadConfig` each hold their own file and
+  `config.ts` is now the `DEFAULT_*` constants plus a re-export over them (backlog item 1, shipped
+  first for exactly this reason). **The new budget resolver is written into that shape**: its own
+  `resolve-*.ts` beside the others, re-exported from `config.ts`, never a fifth function inside it.
 
 ## #40 is almost free, and the reason is worth knowing before building it
 

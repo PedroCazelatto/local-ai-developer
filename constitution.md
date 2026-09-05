@@ -33,12 +33,49 @@ model never reads this file. The split:
 - **One function per file — least responsibility.** Each code file holds **exactly one function**,
   so its responsibility is as small as possible. The kebab-case file name names that function's job.
   No exceptions: a file that would need a second function means a second file. **Cohesion is not an
-  exception** — "these three belong together" is an argument for a folder, not for a file. An
-  **assembler** file that imports single-function modules and re-exports them into one object is
-  allowed, because it holds no second function of its own.
-- **Types and schemas go in sibling files, never inline with a function.** Declare them beside the
-  function they serve, named `<name>.type.<ext>` for types and `<name>.schema.<ext>` for schemas
-  (e.g. `parse-config.ts` pairs with `parse-config.type.ts` and `parse-config.schema.ts`).
+  exception** — "these three belong together" is an argument for a folder, not for a file. **The bar
+  is any function declaration, not any exported one.** A private helper is a second function and means
+  a second file: `config.ts`'s three env resolvers were never exported, and that is precisely what made
+  it a violation. A file holding only constants, or only a value such as a shared client, is not a
+  violation — neither is a function.
+- **A split file survives only if it assembles the parts into an object.** An **assembler** is allowed:
+  a file that imports single-function modules and composes them into **one object value** callers use as
+  a single thing, and it **exports that object and nothing else** — constants and functions alike are
+  properties of it. It holds no second function of its own, so it clears the rule. A file that would
+  survive only by re-exporting the names individually — `export * from`, or `export { a, b, c }` — is
+  **not** an assembler and does not survive: **delete it and repoint every importer at the file that
+  owns the function.**
+- **This reaches a directory's `index.ts` public barrel, with no exception.** Those are pure re-export
+  modules, so they go the same way, and an import names the file that serves it rather than the folder.
+  The cost was weighed and accepted: it turns every through-barrel import into a deep one. A re-export
+  barrel left behind is not an acceptable end state and not an acceptable intermediate one — it is the
+  vestige of a file that has stopped having a reason to exist. The one `index.ts` that survives is
+  `src/index.ts`, which exports nothing at all: it is the application entry point, not a barrel.
+- **One constraint the assembler shape imposes.** When a module inside the assembler's own dependency
+  subtree needs a constant the object carries, it must read `theObject.CONSTANT` **inside a function
+  body**. A module-evaluation-time read — a top-level `const X = theObject.CONSTANT`, or a top-level
+  destructure — runs before the object exists and throws `Cannot access '<name>' before initialization`.
+  Both directions were driven against Node's ESM loader; this is a measured constraint, not a caution.
+- **Types live in the file that owns the function they describe; a type no function owns lives in the
+  folder's `types.ts`.** Declare an interface, type or union in the same file as the function it serves,
+  above it — it is then read where it is used, and it moves when the function moves. When several
+  functions share a type and one of them plainly owns it, it lives there and the others import it.
+  When **no function owns it** — a vocabulary the whole folder speaks, such as a tool-call display
+  contract or a closed role union — it lives in `<folder>/types.ts`. This is the same reasoning the
+  one-function-per-file rule already uses: **cohesion is an argument for a folder, not for a file**,
+  and that holds for types exactly as it holds for functions. The alternative, forcing such a type into
+  one arbitrary function's file, makes several unrelated files import from a sixth for no reason.
+  The shape is not new — `src/tools/types.ts` (9 declarations), `src/core/session/review-types.ts` (5),
+  `src/core/session/types.ts` (4) and `src/core/llm/types.ts` (3) already do this and predate the rule.
+  **`types.ts` is the mandated spelling, one per folder**: `review-types.ts` is a second spelling of the
+  same idea and merges into `src/core/session/types.ts` as the sweep reaches that directory.
+- **There are no `.type.ts` sibling files.** The rule used to require them and is reversed. Each sibling
+  folds into the file that owns its function, or into the folder's `types.ts` when no function owns it,
+  as the one-function-per-file sweep reaches it.
+- **Schemas keep their sibling file**, named `<name>.schema.<ext>` (e.g. `memory-db.ts` pairs with
+  `memory-db.schema.ts`). Types were folded back in because a type erases at compile time and costs the
+  function file nothing; a schema does not — it is a runtime value with its own weight and often its own
+  imports, so it stays out of the way. Schemas do not follow the type rule.
 - **Document complex functions at the call site.** When you call a non-trivial function, add a
   brief comment *where it is used* stating what the function does — so reading the calling file
   tells you the behavior without opening the function's own file.

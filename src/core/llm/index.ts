@@ -10,12 +10,16 @@ export { resolveWindowCtx } from './resolve-window-ctx.js';
 // used by search_rules and shared with summarization (V4/05).
 export { oneShot } from './one-shot.js';
 export type { OneShotResult } from './one-shot.type.js';
-// V5/02: daemon model-management wrappers (list / pull / hasModel) for the `/models` command.
-export { listModels, hasModel, pullModel } from './ollama-models.js';
+// V5/02: daemon model-management wrappers (list / pull / hasModel) for the `/models` command. One
+// function per file over the one shared daemon client in daemon.js.
+export { listModels } from './list-models.js';
+export { hasModel } from './has-model.js';
+export { pullModel } from './pull-model.js';
 // The boot pick rule + the shared name/tag match, used by resolve-boot-model and `/models`.
 export { pickSmallestModel } from './pick-smallest-model.js';
 export { matchesModelName } from './matches-model-name.js';
-export type { InstalledModel, PullProgress, PullProgressHandler, PullOutcome } from './ollama-models.type.js';
+export type { InstalledModel } from './list-models.js';
+export type { PullProgress, PullProgressHandler, PullOutcome } from './pull-model.js';
 // Cancellation: every aborted model call — Ctrl+C or a stalled daemon — surfaces as this one error, on
 // both the streamed and the non-streamed path, so one instanceof check covers every window.
 export { TurnAbortedError } from './turn-aborted-error.js';

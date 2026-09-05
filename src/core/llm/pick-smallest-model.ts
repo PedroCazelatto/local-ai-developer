@@ -6,7 +6,7 @@
 // within it size is the only ordering that tracks the binding constraint — VRAM (CLAUDE.md: everything
 // runs on one 3060). A 3B always beats a 14B, so an unattended boot picks the model most likely to fit.
 
-import type { InstalledModel } from './ollama-models.type.js';
+import type { InstalledModel } from './list-models.js';
 
 /**
  * The smallest installed model by on-disk bytes, or undefined when nothing is installed. Ties break on

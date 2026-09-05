@@ -68,8 +68,7 @@ renumbered.
 optimization target are in [docs/product.md](docs/product.md); the benchmark tables stay here; the
 per-model residency measurements and the boot probe moved to
 [backlog/boot-can-pick-a-toolless-model.md](backlog/boot-can-pick-a-toolless-model.md), which is where
-the tag is painted; and the `/resume` predicate became
-[backlog/resume-across-num-ctx-changes.md](backlog/resume-across-num-ctx-changes.md).
+the tag is painted; and the `/resume` predicate became **backlog item 4**, since shipped.
 
 **The lettered meta-answers** (E, F, H, I, J) were given alongside the numbered ones and are answered or
 sited in their sections: **E** (the tokenizer question) is answered in full at the end of section E,
