@@ -9,7 +9,8 @@
     "start": "node scripts/run.mjs start",
     "stop": "node scripts/run.mjs stop",
     "dev": "tsx --disable-warning=ExperimentalWarning src/index.ts",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "node --disable-warning=ExperimentalWarning --import tsx --test \"src/**/__tests__/*.test.ts\""
   },
   "dependencies": {
     "@clack/prompts": "^0.7.0",
