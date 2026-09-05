@@ -7,7 +7,7 @@
 
 import type { SandboxClient } from '../container/index.js';
 import type { OllamaClient, TokenCounts } from '../llm/index.js';
-import type { Task } from './types.js';
+import type { Task } from './task.type.js';
 
 /** Where the fix belongs — decided by the resolved edited-file path, not the model's claim. */
 export type RetroScope = 'systemic' | 'task-specific';

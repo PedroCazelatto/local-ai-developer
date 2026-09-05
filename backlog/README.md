@@ -60,8 +60,8 @@ table matched exactly. Two agents, two instruments, one number.
 | baseline | 104 | 504 |
 | cleared by wave A | 13 | 50 |
 | cleared by wave B | 14 | 77 |
-| cleared by wave C so far | 12 | 71 |
-| **remaining** | **65** | **306** |
+| cleared by wave C so far | 20 | 140 |
+| **remaining** | **57** | **237** |
 
 **Wave C is running.** `src/` root is **done** (`66d5a39`): `src/index.ts`'s three declarations are now
 `src/boot/{main,resolve-or-exit,fail}.ts`, the entry point declares nothing, three inlined `errMessage`
@@ -70,8 +70,25 @@ the largest directory in the repo — is running across several commits: `038fc8
 (7 files / 39 declarations, five `project-git*` modules and `review-types.ts` deleted, 43 new files, the
 barrel's exported **name set** identical at 91 values / 77 types), `eaeb319` the two follow-ups it owed
 (`hasHead` collapsed to one implementation, `toPosix` renamed to `toPosixTrimmed`), and `c69c1b3` the
-four persistence stores. That leaves `core/session` at **17 files / 113 declarations** — 11 files and 68
-declarations cleared. **`core/llm` is complete** — the
+four persistence stores, `61574a9` the backlog reader (18 declarations) and `9f4d932` the `types.ts`
+retrofit — 26 declarations into 24 one-type `.type.ts` modules, plus `task-statuses.ts` and
+`severities.ts` as plain constant modules, since those are runtime values rather than types. That leaves
+`core/session` at **14 files / 63 declarations** — 14 files and 118 declarations cleared, **65% of the
+wave** — after `463e9ba` took `SessionMemory`. A third agent has closed two of its three jobs:
+**`src/phases` is clean at the bar** (`5d74ad4`), and **`src/core/container` is fully clean**
+(`2b3e381`) — `types.ts` retired into `tar-entry.type.ts` plus two folds into `sandbox.ts`, every file
+now at one declaration or zero, and its barrel unchanged at 8 values / 7 types for the final pass. Job 2
+(`core/llm/types.ts`) is running: four standalone `.type.ts`, `ChatResult` folding into `client.ts`, and
+the `export type { Message, Tool, ToolCall } from 'ollama'` re-export **deleted** by the user's ruling,
+with the five in-folder importers taking them straight from the package. The sixth commit, `45d6313`, took `memory-db.ts`: 26 declarations, the largest single file in
+the whole census and the last "cohesive store module" header in the directory. Four differential
+harnesses now re-run after every commit — five of them, **2725 probes, 0 mismatches** — and the barrel's
+exported name set has held steady at 91 values / 77 types across every commit.
+
+**Ten old-style `.type.ts` pairs still sit in that directory** — `batch`, `memory-db`, `subagents`,
+`retro-runner`, `run-debate`, `run-task-loop`, `run-stop-signal`, `events-log`, `read-tracker`,
+`evict-stale-tool-results`. Each is the sibling of a `.ts` file wave C has not reached yet and **dies
+with it**, so this is not the retrofit having been left half-done. **`core/llm` is complete** — the
 `ollama-with-signal.ts` follow-up this table used to carry was withdrawn once the arrow rule was scoped
 to top-level object literals.
 

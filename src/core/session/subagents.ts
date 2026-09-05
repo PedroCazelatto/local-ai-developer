@@ -10,20 +10,20 @@
 // never the master's history; and the master's history is never polluted by the sub-agent's internal
 // turns — the master only ever sees the { id, response } tool result.
 
+import { resolvePhaseTools } from '../../phases/index.js';
 import { ASK_SUBAGENT } from '../../tools/ask-subagent.js';
 import { DISMISS_SUBAGENT } from '../../tools/dismiss-subagent.js';
-import { SPAWN_SUBAGENT } from '../../tools/spawn-subagent.js';
 import { createToolContext } from '../../tools/index.js';
-import { resolvePhaseTools } from '../../phases/index.js';
+import { SPAWN_SUBAGENT } from '../../tools/spawn-subagent.js';
 import type { Message, TokenCounts, Tool } from '../llm/index.js';
 import { printToolCall } from '../ui/print-tool-call.js';
-import { shortSubagentId } from './short-subagent-id.js';
 import { addTokenCounts } from './add-token-counts.js';
 import { dispatchToolCall } from './dispatch.js';
-import { recordToolCall } from './record-tool-call.js';
 import { appendEvent } from './events-log.js';
 import { generateSubagentId } from './generate-subagent-id.js';
 import { createReadTracker } from './read-tracker.js';
+import { recordToolCall } from './record-tool-call.js';
+import { shortSubagentId } from './short-subagent-id.js';
 import type {
   SubagentAskOutcome,
   SubagentDeps,

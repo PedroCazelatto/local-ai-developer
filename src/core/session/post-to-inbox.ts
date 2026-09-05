@@ -3,8 +3,9 @@
 
 import { appendJsonlLine } from './append-jsonl-line.js';
 import { inboxFile } from './inbox-file.js';
+import type { InboxItem } from './inbox-item.type.js';
 import { nextInboxId } from './next-inbox-id.js';
-import type { InboxItem, Phase } from './types.js';
+import type { Phase } from './phase.type.js';
 
 /**
  * Post a message from `from` to `to`: assign the next global id, stamp UTC now, append a `post` event

@@ -14,5 +14,6 @@ export {
   REVIEWER_TOOL_NAMES,
   RETRO_TOOL_NAMES,
 } from './phase-tool-names.js';
-export { resolvePhaseTools, PhaseToolsError } from './resolve-phase-tools.js';
-export type { ResolvePhaseToolsOptions } from './resolve-phase-tools.type.js';
+export { resolvePhaseTools } from './resolve-phase-tools.js';
+export type { ResolvePhaseToolsOptions } from './resolve-phase-tools.js';
+export { PhaseToolsError } from './phase-tools-error.js';

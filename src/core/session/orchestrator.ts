@@ -4,35 +4,37 @@
 // tool-dispatch turn loop (turn-loop.ts) and exposes the small surface the REPL (05) needs.
 
 import { buildSystemPrompt } from '../../context/index.js';
-import { PhaseFactory, resolvePhaseTools } from '../../phases/index.js';
 import type { Phase } from '../../phases/index.js';
+import { PhaseFactory, resolvePhaseTools } from '../../phases/index.js';
 import { createToolContext } from '../../tools/index.js';
 import type { SandboxClient } from '../container/index.js';
-import { OllamaClient } from '../llm/index.js';
 import type { Message, StreamHandle, TokenCounts, Tool, ToolCall, TurnAbortReason } from '../llm/index.js';
+import { OllamaClient } from '../llm/index.js';
 import { renderer } from '../ui/renderer.js';
 import { addTokenCounts } from './add-token-counts.js';
-import { recordToolCall } from './record-tool-call.js';
 import type { SessionConfig } from './config.js';
 import { dispatchToolCall } from './dispatch.js';
+import { drainAnsweredQuestions } from './drain-answered-questions.js';
 import { appendEvent } from './events-log.js';
 import { generateContextTitle } from './generate-context-title.js';
-import { SessionMemory } from './memory.js';
-import { drainAnsweredQuestions } from './drain-answered-questions.js';
+import type { ClearResult } from './clear-result.type.js';
+import type { ContextSummary } from './context-summary.type.js';
+import type { PhaseLoad } from './phase-load.type.js';
+import { SessionMemory } from './session-memory.js';
 import { createReadTracker } from './read-tracker.js';
 import type { FileReadTracker } from './read-tracker.type.js';
-import { compactActivePhase } from './summarizer.js';
-import type { ClearResult, ContextSummary, PhaseLoad } from './memory-db.type.js';
-import { SubagentManager } from './subagents.js';
-import type { SubagentInfo } from './subagents.type.js';
-import { RunStopSignal } from './run-stop-signal.js';
-import { processMessage as processTurns } from './turn-loop.js';
-import type { TurnContext } from './turn-loop.js';
-import { runTaskLoop } from './run-task-loop.js';
-import type { TaskLoopReporter, TaskLoopResult } from './run-task-loop.type.js';
+import { recordToolCall } from './record-tool-call.js';
 import { spawnRetro as spawnRetroWindow } from './retro-runner.js';
 import type { RetroInput, RetroResult } from './retro-runner.type.js';
-import type { Task } from './types.js';
+import { RunStopSignal } from './run-stop-signal.js';
+import { runTaskLoop } from './run-task-loop.js';
+import type { TaskLoopReporter, TaskLoopResult } from './run-task-loop.type.js';
+import { SubagentManager } from './subagents.js';
+import type { SubagentInfo } from './subagents.type.js';
+import { compactActivePhase } from './summarizer.js';
+import type { Task } from './task.type.js';
+import type { TurnContext } from './turn-loop.js';
+import { processMessage as processTurns } from './turn-loop.js';
 
 const NO_TOKENS: TokenCounts = { promptTokens: null, evalTokens: null };
 

@@ -6,8 +6,9 @@ import { appendJsonlLine } from './append-jsonl-line.js';
 import { foldInboxItems } from './fold-inbox-items.js';
 import { inboxFile } from './inbox-file.js';
 import { PHASES } from './inbox-phases.js';
+import type { InboxResolveResult } from './inbox-resolve-result.type.js';
+import type { Phase } from './phase.type.js';
 import { readInboxEvents } from './read-inbox-events.js';
-import type { InboxResolveResult, Phase } from './types.js';
 
 /**
  * Resolve item `id` on behalf of `resolver`: locate the RECIPIENT file that holds it (an item lives in

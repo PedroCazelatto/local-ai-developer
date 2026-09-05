@@ -3,8 +3,8 @@
 
 import { appendJsonlLine } from './append-jsonl-line.js';
 import { blockersFile } from './blockers-file.js';
+import type { RaisedBlocker } from './raised-blocker.type.js';
 import { readBlockerRows } from './read-blocker-rows.js';
-import type { RaisedBlocker } from './types.js';
 
 /**
  * Record a blocker the Reviewer raised: derive the per-task 1-based id `${taskId}#${n}` by replaying

@@ -7,8 +7,8 @@
 import { existsSync, readFileSync } from 'node:fs';
 
 import { isQuestionRow } from './is-question-row.js';
+import type { QuestionRow } from './question-row.type.js';
 import { questionsFile } from './questions-file.js';
-import type { QuestionRow } from './types.js';
 
 /** Read + parse every row; a malformed line is skipped (a torn last line must not sink replay). */
 export function readQuestionRows(projectPath: string): QuestionRow[] {

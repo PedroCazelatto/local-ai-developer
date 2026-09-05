@@ -1,7 +1,7 @@
 // Why a named task cannot run — the single-task /run path's counterpart to nextRunnableTasks.
 
+import type { Backlog } from './backlog.type.js';
 import { findTask } from './find-task.js';
-import type { Backlog } from './types.js';
 
 /**
  * Why a task can't run right now — already done, blocked awaiting the user's /answer, or a dependency

@@ -12,7 +12,7 @@ import { buildTarHeader } from './build-tar-header.js';
 import { blockPadding } from './block-padding.js';
 import { splitUstarName } from './split-ustar-name.js';
 import { BLOCK, NAME_MAX } from './tar-format.js';
-import type { TarEntry } from './types.js';
+import type { TarEntry } from './tar-entry.type.js';
 
 /**
  * Encode `entries` as a tar archive. Entry order is the caller's: putArchive extracts in order, so

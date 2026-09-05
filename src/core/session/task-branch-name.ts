@@ -11,7 +11,7 @@
 
 import { safeIdPath } from './safe-id-path.js';
 import { slugify } from './slugify.js';
-import type { Task } from './types.js';
+import type { Task } from './task.type.js';
 
 /**
  * The branch name for `task`. Falls back to the id alone when the title adds nothing — see the file

@@ -2,10 +2,11 @@
 // an answer being re-injected into the same window every turn — which would quietly burn context on a
 // VRAM-bound box — and they survive a restart, so "exactly once" holds across one too.
 
+import type { AnsweredQuestion } from './answered-question.type.js';
 import { appendJsonlLine } from './append-jsonl-line.js';
+import type { PendingQuestion } from './pending-question.type.js';
 import { questionsFile } from './questions-file.js';
 import { readQuestionRows } from './read-question-rows.js';
-import type { AnsweredQuestion, PendingQuestion } from './types.js';
 
 /**
  * Take the answers owed to `phase` and mark them delivered in the same breath: an `answered` row

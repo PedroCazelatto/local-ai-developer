@@ -5,7 +5,7 @@
 // status key, and a fence that does not. The first two prepend a fresh block rather than guessing at
 // repairing the file.
 
-import type { TaskStatus } from './types.js';
+import type { TaskStatus } from './task-status.type.js';
 
 /** Replace (or insert) the frontmatter `status:` line, preserving the rest of the file verbatim. */
 export function replaceStatus(text: string, status: TaskStatus): string {

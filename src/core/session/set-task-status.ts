@@ -9,7 +9,7 @@ import { errMessage } from '../err-message.js';
 import { BacklogError } from './backlog-error.js';
 import { backlogRoot } from './backlog-root.js';
 import { replaceStatus } from './replace-status.js';
-import type { TaskStatus } from './types.js';
+import type { TaskStatus } from './task-status.type.js';
 
 /** Flip one task's status in its own .md file. Throws BacklogError if the id isn't in the backlog. */
 export function setTaskStatus(projectPath: string, taskId: string, status: TaskStatus): void {

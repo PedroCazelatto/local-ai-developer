@@ -12,9 +12,9 @@
 // wrote and still fail the task for work that is missing entirely.
 
 import { issueCoversFile } from './issue-covers-file.js';
+import type { ReviewVerdict } from './review-verdict.type.js';
+import { SEVERITIES } from './severities.js';
 import { toPosixTrimmed } from './to-posix-trimmed.js';
-import type { ReviewVerdict } from './types.js';
-import { SEVERITIES } from './types.js';
 
 export interface VerdictGitState {
   /** The parsed, shape-valid verdict the Reviewer just submitted. */

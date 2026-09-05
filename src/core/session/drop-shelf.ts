@@ -3,7 +3,7 @@
 
 import { findShelfRef } from './find-shelf-ref.js';
 import { runGit } from './run-git.js';
-import type { ShelfResult } from './types.js';
+import type { ShelfResult } from './shelf-result.type.js';
 
 /** Discard `label` without restoring it. Unknown label ⇒ recoverable refusal. */
 export function dropShelf(projectPath: string, label: string): ShelfResult {

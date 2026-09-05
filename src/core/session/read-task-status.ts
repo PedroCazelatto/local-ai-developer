@@ -9,8 +9,8 @@
 // and must be told rather than silently defaulted.
 
 import { BacklogError } from './backlog-error.js';
-import { TASK_STATUSES } from './types.js';
-import type { TaskStatus } from './types.js';
+import type { TaskStatus } from './task-status.type.js';
+import { TASK_STATUSES } from './task-statuses.js';
 
 /** Absent -> `pending` (forgiving of a model that omits it); present-but-invalid -> a loud error. */
 export function readTaskStatus(raw: unknown, where: string): TaskStatus {

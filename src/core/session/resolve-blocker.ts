@@ -3,7 +3,7 @@
 
 import { appendJsonlLine } from './append-jsonl-line.js';
 import { blockersFile } from './blockers-file.js';
-import type { ResolvedBlocker } from './types.js';
+import type { ResolvedBlocker } from './resolved-blocker.type.js';
 
 /** Record the user's answer to a raised blocker: stamp UTC now, append the `resolved` row, return it. */
 export function resolveBlocker(

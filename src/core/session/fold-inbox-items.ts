@@ -4,7 +4,8 @@
 //
 // Named foldInboxItems rather than the module-private `foldItems` it was extracted from.
 
-import type { InboxEvent, InboxItem } from './types.js';
+import type { InboxEvent } from './inbox-event.type.js';
+import type { InboxItem } from './inbox-item.type.js';
 
 /** Fold one recipient's events (posts + resolves) into InboxItems, oldest first (sequential id order). */
 export function foldInboxItems(events: InboxEvent[]): InboxItem[] {

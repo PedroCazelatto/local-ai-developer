@@ -24,7 +24,7 @@ import { errMessage } from '../err-message.js';
 import { decodeTarFile } from './decode-tar-file.js';
 import { encodeTar } from './encode-tar.js';
 import { statusCodeOf } from './status-code-of.js';
-import type { SandboxRead, SandboxWrite, TarEntry } from './types.js';
+import type { TarEntry } from './tar-entry.type.js';
 
 /** The long-lived root sandbox container (created by `docker compose up -d`). */
 export const SANDBOX_CONTAINER = 'ai_sandbox';
@@ -55,6 +55,22 @@ export interface SandboxOptions {
   readonly nanoCpus?: number;
   readonly memoryBytes?: number;
 }
+
+// The results of the two file-transport methods below. RECOVERABLE exactly like ExecResult: a missing
+// file, a stopped container or a daemon error comes back as a VALUE, never a throw — the file tools
+// turn each into the structured error the model reads and retries from, and a thrown error would kill
+// the turn instead. They sit here with ExecResult and SandboxOptions because they are the same thing:
+// the vocabulary of SandboxClient's own methods, owned by the class that returns them.
+
+/** What `readWorkspaceFile` answers with — bytes, a directory, or a recoverable failure. */
+export type SandboxRead =
+  | { readonly ok: true; readonly kind: 'file'; readonly bytes: Uint8Array }
+  | { readonly ok: true; readonly kind: 'directory' }
+  /** `notFound` separates "no such path" (the model's typo) from a daemon/container failure. */
+  | { readonly ok: false; readonly notFound: boolean; readonly message: string };
+
+/** What `writeWorkspaceFile` answers with — done, or a recoverable failure carrying the reason. */
+export type SandboxWrite = { readonly ok: true } | { readonly ok: false; readonly message: string };
 
 interface ExecOptions {
   readonly workdir?: string;

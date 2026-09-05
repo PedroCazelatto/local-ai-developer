@@ -17,8 +17,9 @@ import path from 'node:path';
 import { test } from 'node:test';
 
 import { BacklogError } from '../backlog-error.js';
+import type { Backlog } from '../backlog.type.js';
 import { readBacklog } from '../read-backlog.js';
-import type { Backlog, Task } from '../types.js';
+import type { Task } from '../task.type.js';
 
 /** Build a throwaway project whose backlog/ holds `files` (keys are paths under backlog/), and read it. */
 function readFixture(files: Readonly<Record<string, string>>): Backlog {

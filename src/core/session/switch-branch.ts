@@ -6,9 +6,9 @@
 // of the repo true — it commits or shelves first, deliberately, and nothing moves behind its back.
 
 import { branchExists } from './branch-exists.js';
+import type { BranchResult } from './branch-result.type.js';
 import { isWorkingTreeDirty } from './is-working-tree-dirty.js';
 import { runGit } from './run-git.js';
-import type { BranchResult } from './types.js';
 
 /**
  * Check out an EXISTING branch. Refuses a dirty working tree (see the file header) and refuses an

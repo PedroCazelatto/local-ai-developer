@@ -11,10 +11,10 @@
 // call failed", reason about it, and carry on, which is the exact opposite of what the key press meant.
 // It is audited first (the call did happen) and then rethrown.
 
-import { TurnAbortedError } from '../llm/index.js';
 import { getTool, toolNames } from '../../tools/registry.js';
 import type { JSONSchema, JsonObject, ToolAuditExtra, ToolContext, ToolResult } from '../../tools/types.js';
 import { toolError } from '../../tools/types.js';
+import { TurnAbortedError } from '../llm/index.js';
 import type { ToolCallDisplay } from '../ui/types.js';
 
 /** Raw materials for one audit row, handed to the audit sink (V1/06 formats + writes the JSONL). */

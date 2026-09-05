@@ -4,7 +4,7 @@
 
 import path from 'node:path';
 
-import type { Phase } from './types.js';
+import type { Phase } from './phase.type.js';
 
 /** Absolute path to a recipient phase's inbox file (lowercased name, e.g. `worker.jsonl`). */
 export function inboxFile(projectPath: string, phase: Phase): string {

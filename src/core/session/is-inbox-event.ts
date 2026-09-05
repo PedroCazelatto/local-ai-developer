@@ -1,7 +1,7 @@
 // Defensive narrowing for one line of a recipient's inbox file. The file is both hand-inspectable and
 // machine-fed, so a row that does not match its own `kind` is dropped rather than trusted.
 
-import type { InboxEvent } from './types.js';
+import type { InboxEvent } from './inbox-event.type.js';
 
 /** Narrow a parsed JSON value to an InboxEvent (defensive — the file is hand-inspectable + machine-fed). */
 export function isInboxEvent(value: unknown): value is InboxEvent {

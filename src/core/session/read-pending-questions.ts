@@ -1,7 +1,7 @@
 // What /questions re-asks: the questions still owed an answer, derived by replay.
 
+import type { PendingQuestion } from './pending-question.type.js';
 import { readQuestionRows } from './read-question-rows.js';
-import type { PendingQuestion } from './types.js';
 
 /** Every question still awaiting an answer — an `asked` row with no matching `answered` row. */
 export function readPendingQuestions(projectPath: string): PendingQuestion[] {

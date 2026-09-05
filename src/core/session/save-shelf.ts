@@ -3,7 +3,7 @@
 import { findShelfRef } from './find-shelf-ref.js';
 import { runGit } from './run-git.js';
 import { SHELF_LABEL_PREFIX } from './shelf-label.js';
-import type { ShelfResult } from './types.js';
+import type { ShelfResult } from './shelf-result.type.js';
 
 /**
  * Shelve the whole uncommitted working tree under `label`. Includes untracked files (`-u`) but never

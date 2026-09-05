@@ -1,7 +1,7 @@
 // Defensive narrowing for one line of questions.jsonl — the file is hand-inspectable, so a row that
 // does not match its own `kind` is dropped rather than trusted.
 
-import type { QuestionRow } from './types.js';
+import type { QuestionRow } from './question-row.type.js';
 
 /** Narrow a parsed JSON value to a QuestionRow (defensive — the file is hand-inspectable). */
 export function isQuestionRow(value: unknown): value is QuestionRow {

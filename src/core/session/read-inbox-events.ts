@@ -6,9 +6,10 @@
 
 import { existsSync, readFileSync } from 'node:fs';
 
+import type { InboxEvent } from './inbox-event.type.js';
 import { inboxFile } from './inbox-file.js';
 import { isInboxEvent } from './is-inbox-event.js';
-import type { InboxEvent, Phase } from './types.js';
+import type { Phase } from './phase.type.js';
 
 /** Read + parse a recipient's events; a malformed line is skipped (a torn last line must not sink replay). */
 export function readInboxEvents(projectPath: string, phase: Phase): InboxEvent[] {

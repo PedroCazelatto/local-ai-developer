@@ -20,10 +20,21 @@ $ git check-ref-format refs/heads/task/a..b-go
 (exit 1 — INVALID)
 ```
 
-Verified against the real tool, not inferred from the rules. `git check-ref-format` rejects any ref
-containing `..`, which is why this is a hard failure rather than a cosmetic one: the branch cannot be
-created, so the task cannot start, and the failure surfaces from git rather than from the function
-whose stated job was to prevent it.
+Verified against the real tool, not inferred from the rules — `git check-ref-format --branch` on the
+branch form, and `git check-ref-format refs/heads/…` on the full ref, both reject it. git refuses any
+ref containing `..`, which is why this is a hard failure rather than a cosmetic one: the branch cannot
+be created, so the task cannot start, and the failure surfaces from git rather than from the function
+whose stated job was to prevent it. It nests the same way — `id: 'epic/a..b/01-x'` with title `'Thing'`
+gives `task/epic/a..b/01-x-thing`, also rejected.
+
+> **The obvious reproducer is the wrong one, and it fails silently.** `id: 'a/../b'` — the
+> path-traversal spelling — **does not reproduce this defect.** `safeIdPath` splits on `/` *before*
+> sanitising, so `..` arrives as a whole segment, the leading/trailing-dot strip empties it, and the
+> empty segment is filtered out: the result is a clean `task/a/b-thing`.
+>
+> That is the trap. `..` must be **inside a segment** to survive — `a..b`, not `a/../b`. Anyone who
+> reaches for the traversal form first will watch it pass and conclude the defect is already fixed. **A
+> green result from `a/../b` is a false negative, not a fix.**
 
 Whether a task id can contain `..` today is a separate question from whether this function should
 handle it. It claims to handle it. Note also that `resolveInProject` exists because `..` in

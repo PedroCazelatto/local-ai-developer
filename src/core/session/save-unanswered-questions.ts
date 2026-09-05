@@ -3,9 +3,9 @@
 // owed, and must outlive the turn, the phase swap, and a restart.
 
 import { appendJsonlLine } from './append-jsonl-line.js';
+import type { PendingQuestion } from './pending-question.type.js';
 import { questionsFile } from './questions-file.js';
 import { readQuestionRows } from './read-question-rows.js';
-import type { PendingQuestion } from './types.js';
 
 /**
  * Persist the questions the user left unanswered, minting each id as `${phase}#${n}` from the count

@@ -152,6 +152,13 @@ single owning function, it goes in its own file named for the thing, not for a c
 more are coming: `BACKLOG_DIRNAME`, `MAX_TOOL_ROUNDS`, `KEEP_RECENT_TOOL_RESULTS`,
 `CONTEXT_TITLE_LIMIT`, `MAX_DEBATE_ROUNDS` among them.
 
+**Two near-identical functions are two files when the difference is an invariant, not a flag.**
+`sql-int.ts` and `sql-int-or-null.ts` were kept apart deliberately rather than merged behind a boolean.
+NULL-means-zero for a `COUNT` and NULL-means-Ollama-reported-nothing are exactly the distinction the
+**exact-token invariant** rests on — which `harness-gaps-vs-claude-code.md` lists among the things that
+must not be traded away. A flag would have pushed that judgement out to every call site, where it would
+eventually be got wrong. When collapsing two similar helpers, ask what the parameter would be *deciding*.
+
 **The corollary matters as much as the rule: a constant with a single owner rides with that owner.**
 Only a genuinely shared constant earns its own file. Otherwise the sweep trades one over-full file for a
 scatter of one-line modules, which is not what the rule is for.
@@ -203,6 +210,37 @@ times the wave was doing exactly what it was told:
 > `toPosix` for one that says what they do. **Do not resolve this by making one import the other** —
 > they are different functions that were never the same function, and `commit-changes.ts:43` already
 > writes `toPosix(entry.trim())` to make up the difference at the call site.
+
+> **RULE — grep before you name.** Before a private helper becomes a file name, **grep the other
+> directories for that name.** It costs one command and it is the only moment the collision is cheap.
+>
+> **A clean grep is not permission to skip the read.** The rule's real purpose is to make you *look at
+> the name*; catching a collision is the cheaper half. `memory-db.ts`'s split grepped 15 helpers, found
+> **zero** collisions, and renamed **eight of them anyway** — `sqlText`, `sqlIntOrNull`,
+> `toMemoryRecord`, `messageInsertParams` — because a name that was adequate as a local detail is often
+> not adequate as a file name a stranger reads first. Zero hits means keep reading, not move on.
+> Then apply the sequence: **a duplicate → delete it and repoint.** **Genuinely different → rename the
+> newcomer**, leaving the plain name with whoever already had it.
+
+Three data points in one sweep, which is what makes this a rule rather than an anecdote:
+
+| name | what it turned out to be | resolution |
+|---|---|---|
+| `appendEvent` | a **duplicate** — the fourth copy of `append-jsonl-line.ts` | deleted, callers repointed |
+| `splitFrontmatter` | **different bodies**: `context/`'s takes one argument, returns `{name, body}`, never throws; `backlog.ts`'s took the task path for its error message, returned `{data, body}`, threw `BacklogError` | newcomer renamed `splitTaskFrontmatter`; `context/` kept the plain name it already had |
+| `toPosix` | **different bodies**, neither a superset | session half renamed `toPosixTrimmed`; `src/tools/` still owes its half to wave D |
+
+**Type-vs-function stem collision — the exported name outranks the private helper.** A `.type.ts` may
+not share a stem with a `.ts`, so `ChatRole` (exported type) and `chatRole` (private function) could not
+both be `chat-role`. **`ChatRole` kept the stem**; the helper moved to `to-message-role.ts`. The sweep
+has had three function-vs-function collisions and this is its first type-vs-function one, so the
+tie-break is written down rather than re-derived.
+
+The part worth keeping is that **the rename was more correct, not a workaround**: the helper returns
+Ollama's `Message['role']`, not this folder's `ChatRole`, so its old name claimed a return type it never
+had. That is the **second** time a forced rename has exposed a name that was lying — `splitFrontmatter`
+was the first. A collision is often a naming defect presenting itself, which is the same lesson the
+duplicate check teaches from the other side.
 
 **A shared destination is created once, by the first wave that needs it, and named here before a second
 wave can invent a rival.** This rule has a scar. `b63092e` committed
@@ -308,15 +346,36 @@ reaches them. Classified by who imports them:
   into the sibling, retarget the barrel line, done.
 - **21 shared** — imported by files beyond their sibling. Still mechanical, just wide: each importer
   changes one path. Widest are `read-tracker.type.ts` (8 importers) and `memory-db.type.ts` (5).
-- **5 orphans** — **no `.ts` sibling at all**, so no function owns them. These are the ones that bite:
+- **5 files with no `.ts` sibling.** That is a **structural** fact and nothing more.
 
-  | file | non-barrel importers |
-  |---|---|
-  | `src/core/ui/tool-call-display.type.ts` | 6 — `dispatch.ts`, `retro-runner.ts`, `build-file-diff.ts`, `write-file.ts`, `types.ts`, `format-tool-result-lines.type.ts` |
-  | `src/core/llm/call-role.type.ts` | 3 — `client.ts`, `one-shot.ts`, `resolve-window-ctx.ts` |
-  | `src/core/ui/markdown-stream.type.ts` | 3 — `turn-loop.ts`, `create-markdown-stream.ts`, `renderer.ts` |
-  | `src/core/container/tar-entry.type.ts` | 2 — `encode-tar.ts`, `sandbox.ts` |
-  | `src/core/container/sandbox-file.type.ts` | 1 — `sandbox.ts` |
+  > **THE TABLE'S OLD HEADING SAID "so no function owns them". THAT INFERENCE IS WRONG — do not carry
+  > it into the two remaining retrofits.** A missing stem-mate says nothing about ownership.
+  > **Measure the importers; do not trust the label.**
+
+  | file | non-barrel importers | verdict |
+  |---|---|---|
+  | `src/core/ui/tool-call-display.type.ts` | 6 — `dispatch.ts`, `retro-runner.ts`, `build-file-diff.ts`, `write-file.ts`, `types.ts`, `format-tool-result-lines.type.ts` | genuinely unowned |
+  | `src/core/llm/call-role.type.ts` | 3 — `client.ts`, `one-shot.ts`, `resolve-window-ctx.ts` | genuinely unowned |
+  | `src/core/ui/markdown-stream.type.ts` | 3 — `turn-loop.ts`, `create-markdown-stream.ts`, `renderer.ts` | genuinely unowned |
+  | `src/core/container/tar-entry.type.ts` | 2 — `encode-tar.ts`, `sandbox.ts` | genuinely unowned |
+  | `src/core/container/sandbox-file.type.ts` | 1 — `sandbox.ts` | **OWNED — the label was wrong** |
+
+  **The trap waits wherever a single consumer is the sole importer.** Three importers or more and the
+  type really is folder vocabulary; one, and you are probably looking at a return type that wandered.
+
+  **Two disproofs, both on the record.** `ChatResult` never had a `.type.ts` *at all* and was still
+  ruled **owned**, folding into `client.ts` — so the structural test gets it wrong in both directions.
+  And `sandbox-file.type.ts`'s two types, `SandboxRead` and `SandboxWrite`, are each the return type of
+  a `SandboxClient` method, with `sandbox.ts` their only non-barrel importer and nothing outside the
+  folder naming either. They folded into `sandbox.ts` beside **`ExecResult`** — their exact structural
+  peer, which wave A left there and which no rule has ever proposed moving.
+
+  **The stronger disproof is documentary.** The retired `core/container/types.ts` justified its
+  folder-level home by asserting those types were *"returned by SandboxClient and **read by the file
+  tools**"*. `grep -rl 'SandboxRead\|SandboxWrite' src/tools/` returns **nothing** — the tools call the
+  methods and destructure structurally. **The load-bearing justification had been false for as long as
+  it had been written**, and that is the **third** time this sweep has found a header asserting
+  something the code does not do.
 
 > **RULING, third and final revision — read this before writing any type.** An unowned type gets **its
 > own file: one type per file, named `<kebab-type-name>.type.ts`.** `blocker-row.type.ts`,
@@ -449,10 +508,40 @@ Recorded here rather than held by whoever is coordinating, so it survives a hand
 | **D** | `tools`+`phases`; `interface`+`interface/commands` — two agents | 48 / 193 | each pair is mutually coupled, so one owner each |
 | **E** | the final barrel pass — one agent | 9 barrels | all nine `index.ts` re-export modules deleted at once, after every directory is final |
 
-**Why the pairs in wave D are pairs, not four agents.** `interface` ↔ `interface/commands` is mutual, 15
-edges one way and 4 the other; `phases` imports 7 files from `tools`. Splitting either pair across two
-agents puts both of them in the same files. One owner per pair is not a convenience — it is the only
-shape that does not create the contention the partition exists to avoid.
+**Why a pair is a pair and not two agents.** `interface` ↔ `interface/commands` is mutual, and
+`phases` imports from `tools`. Splitting either pair across two agents puts both of them in the same
+files. One owner per pair is not a convenience — it is the only shape that avoids the contention the
+partition exists to prevent.
+
+> **THE LESSON THAT COST THROUGHPUT: re-measure the coupling at the start of every wave. Never inherit
+> it from this plan.** The import graph **changes as directories complete** — a split retires deep
+> edges, a barrel absorbs others — so a posture that was correct when the plan was written goes stale
+> underneath it. Waves C and D were held more serial than the graph required for exactly that reason,
+> and the cost was real. The plan above is a **starting point, not a schedule.**
+
+**What the graph actually said when re-measured after five directories had landed** — and every one of
+these was more parallel than the plan assumed:
+
+- **`core/session` and `interface` have ZERO deep edges in either direction.** They can run at the same
+  time. (Both do import each other's *barrels*, which is precisely why the barrels survive to wave E:
+  a barrel absorbs a split so its importers never see one.)
+- **`phases`, `core/llm/types.ts` and `core/container/types.ts` are fully self-contained** — 9 and 3
+  importers respectively, every one inside its own directory. One agent can hold all three.
+- **Only three genuine blockers remain:** `core/session` ↔ `tools` (mutual, 17 and 10 files),
+  `interface` ↔ `interface/commands` (15 and 1), and the `core/ui/types.ts` retrofit.
+- **`tools/types.ts` rides with the `tools` wave.** 50 importers, but **exactly one** outside its own
+  directory (`core/session/dispatch.ts`).
+
+**The concurrency ceiling is about four agents.** Past that the blockers above bind and agents start
+waiting on each other rather than working.
+
+**One correction to the blocker list, measured rather than assumed.** The `core/ui/types.ts` retrofit
+was recorded as having to run **alone and last**, reaching `interface/commands`, `core/session`, `tools`
+and `interface`. It does not. The module has **15 importers: 9 inside `core/ui`, 3 in `core/session`
+(`dispatch.ts`, `retro-runner.ts`, `turn-loop.ts`) and 3 in `tools` (`build-file-diff.ts`,
+`write-file.ts`, `types.ts`) — and none at all in `interface` or `interface/commands`**, by import or by
+type-name usage. It conflicts with `core/session` and `tools` only, and **can run beside the
+`interface` pair.**
 
 ## `__tests__` is not a sweep target — but it is an importer
 
@@ -489,6 +578,36 @@ Which is the general rule worth stating on its own: **in a shared tree, re-read 
 before you edit it.** Never write it out from your own last-known state — between your read and your
 write, someone else may have landed in the same paragraph.
 
+> **A red `npm run typecheck` may not be yours.** A whole-repo typecheck in a shared tree is
+> attributable to **whoever is mid-save**, not necessarily to your change: one agent hit six
+> `Cannot find module './run-repl.js'` errors from another agent's write window, and the file existed a
+> second later. **Re-run before believing a red**, and keep a **directory-scoped `tsconfig` outside the
+> repo** so you have a gate that is unambiguously yours. This is the natural sibling of scoping
+> `git status` with a pathspec: in a shared tree, narrow every instrument to your own work before you
+> read a result off it.
+
+> **RULE — NEVER BUILD A STAGE LIST BY EXCLUSION.** Enumerate the paths you created and modified and
+> stage those. **Never subtract a known-bad set from everything dirty** — no "`git status --porcelain`
+> minus the governance docs", no "everything except someone else's directory". Scope every `git status`
+> you run with a pathspec.
+>
+> The reason is general, and it is why this cannot be left to care: **an exclusion filter encodes an
+> assumption about everyone else's work.** It is correct exactly as long as the tree around you looks
+> the way it did when you wrote it, it stops being correct silently, and **nothing tells you.** A
+> positive list can only ever be wrong about your own work, which is the only thing you can actually
+> check.
+
+This nearly cost the sweep a corrupted commit. A wave C agent's recipe was "`git status --porcelain`
+minus the four governance docs" — **correct and safe for six commits**, while it was the only agent
+writing in `src/`. Concurrency was then raised, and the same recipe was one command away from sweeping
+the `src/interface` agent's **22 uncommitted files** into an unrelated commit.
+
+**That was an orchestration error, not the agent's.** The condition the recipe depended on — *"the only
+uncommitted work in `src/` is mine"* — stopped being true, and nobody broadcast it. Which is the point:
+the agent had no way to know, and that is exactly the failure mode an exclusion filter has and a
+positive list does not. **Committing by explicit pathspec is what caught it**, for the third time in
+this sweep.
+
 **The discipline has now been tested by accident, and it held.** Two live agents were killed mid-task by
 a session limit. The tree needed **no recovery of any kind**: nothing was staged, no scratch files sat
 inside the repo, and every commit had been made by explicit pathspec, so no half-finished work was
@@ -499,6 +618,44 @@ three even when you are the only one working.
 
 ## Hazards found during the first increment
 
+- **A differential harness whose baseline imports only types proves nothing.** `tsx` **strips
+  type-only imports**, so a baseline that imports nothing but types from the module under test keeps
+  compiling and passing after that module has moved or been deleted — green, and worthless. Wave C's
+  `verify-backlog` baseline did exactly this and only broke honestly because `TASK_STATUSES` is a
+  runtime value. **Every remaining wave builds one of these harnesses, so: a differential baseline
+  must import at least one runtime value from the module under test, or its green result is not
+  evidence.** Check that before trusting a byte-identical comparison.
+- **A pure-type move cannot satisfy the runtime-value rule, and saying so is the point.**
+  `core/container/types.ts` exported **zero** runtime values, so *"a differential baseline must import
+  at least one runtime value"* was **unsatisfiable** — any harness built over it would have run
+  byte-identical code on both sides and gone green **by construction.** The right move was to **name
+  that as the hazard rather than dress it as mitigation**, then build the instrument that does have
+  power: a TypeScript `Program` rendering each type **structurally** — every property with its
+  optionality and `readonly`, every union arm, recursively, sorted — from `HEAD` and from the live
+  barrel, requiring **identical renders and mutual assignability in both directions**.
+
+  **The eight negative controls are what make it evidence rather than ritual**, and one earns its own
+  sentence: **dropping `readonly` from a property is invisible to mutual assignability** and is caught
+  only by the structural render. A harness with no negative control is a harness nobody has shown can
+  fail.
+
+  The honest companion belongs here too: the same commit's **45 `encodeTar` byte probes pin
+  `encode-tar.ts`, not the type move** — `tsx` erases the type import before the first byte runs. It
+  was recorded that way rather than letting 45 green probes imply more than they carry.
+- **The same trap's second shape: when a probe depends on a fixture being in a particular state, prove
+  the fixture is in that state.** A migration probe is the worked example. `addCancelledAtColumn`
+  early-returns on every fresh database, because `memory-db.schema.ts` already carries `cancelled_at` —
+  so the naive probe opens a new database, migrates nothing, and reports green. Wave C hand-built a
+  **pre-migration** database and then wrote **a separate check proving the builder had produced one**:
+  column absent before the open, present after. Without that second check the probe passes while
+  starting from an already-migrated schema, which is the same worthless green as the type-only baseline
+  one entry above.
+- **False red teaches nothing, and it has two known shapes.** Ten probes in the `memory-db` split were
+  red for reasons that were not behaviour: a dump ordered `BY id` where the ids are **random UUIDs**,
+  and a comparison against a query whose `ORDER BY last_at DESC` had **ties the seed data created**,
+  which SQLite breaks arbitrarily. The danger is not the wasted time — it is that the obvious next move
+  is to "fix" the code until it matches the harness, encoding an artefact of the fixture as behaviour.
+  **Order by something total and deterministic, and make the seed data tie-free.**
 - **`import 'dotenv/config'` must stay the FIRST import in `src/index.ts`.** ESM evaluates a module's
   imports in source order, so being first is what guarantees the whole boot subtree sees a populated
   `process.env`. Move it below `./boot/main.js` and `OLLAMA_NUM_CTX` reads `undefined` **with no error
@@ -558,6 +715,17 @@ Two items are outstanding, and one that was listed here has been **withdrawn**:
 - **Tests for `StreamFilter` and `recoverToolCalls`** — item 2 deferred them while `core/llm` was
   mid-split. That directory has landed, so they are unblocked.
 - **Tests for `src/context/`** — likewise deferred; the directory landed in `daf08cf`.
+- **A test asserting the two halves of the visible-turn predicate agree.** *"Still in the phase's live
+  history"* is now defined **twice**: as SQL in `visible-turn-where.ts` for turns read from `memory.db`,
+  and as JS in `visible-turns.ts` for turns still held in RAM. **It cannot be deduped** — two languages,
+  two execution sites — and **the two must agree or a flush changes what a phase can see.** Both headers
+  now cross-reference each other, which is the best guard available in prose, but this is precisely the
+  shape that wants a test and does not have one. Note the framing, which is the sweep's recurring theme:
+  **the duplication was always there; one file was hiding it.**
+- **Remove `ChatRole`, deliberately and not as sweep work.** It has no consumer at all — only its own
+  declaration and the barrel line re-exporting it. Wave C left it in place because the barrel's name set
+  may not change mid-sweep, which is correct. It is dead vocabulary for someone to delete on purpose,
+  after the barrel pass.
 - ~~`src/core/llm` needs a follow-up for `ollama-with-signal.ts`~~ — **withdrawn, and worth knowing why.**
   It read as one function plus an inline arrow, but the arrow is `fetch: (input, init) => {` on the
   object passed to `new Ollama({…})` **inside the function body**. Under the corrected rule that is not

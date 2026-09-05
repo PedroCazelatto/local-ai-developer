@@ -5,8 +5,10 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
+import type { Backlog } from '../backlog.type.js';
 import { nextRunnableTasks } from '../next-runnable-tasks.js';
-import type { Backlog, Task, TaskStatus } from '../types.js';
+import type { TaskStatus } from '../task-status.type.js';
+import type { Task } from '../task.type.js';
 
 /** A Task with only the fields the gate reads; body/paths are inert here. */
 function task(id: string, status: TaskStatus, order: number, dependsOn: readonly string[] = []): Task {

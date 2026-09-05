@@ -8,7 +8,7 @@ import path from 'node:path';
 import { backlogRoot } from './backlog-root.js';
 import { LEVEL_DOC } from './level-doc.js';
 import { splitTaskFrontmatter } from './split-task-frontmatter.js';
-import type { Task } from './types.js';
+import type { Task } from './task.type.js';
 
 /** README.md bodies documenting the task's epic and story levels (best-effort), for the Worker slice. */
 export function levelDocs(projectPath: string, task: Task): { epic: string | null; story: string | null } {
