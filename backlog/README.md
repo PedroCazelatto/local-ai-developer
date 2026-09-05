@@ -23,7 +23,7 @@ the answer can **delete** the task rather than shape it.
 
 ### 1. [One function per file, across `src/`](split-config-into-one-function-per-file.md)
 
-> **THE DECLARATION CENSUS IS AT ZERO.** A TypeScript-parser pass over all **643** files under `src/`
+> **THE DECLARATION CENSUS IS AT ZERO.** A TypeScript-parser pass over all **641** files under `src/`
 > finds **no file holding more than one declaration** — functions, classes, arrow properties and object
 > method shorthand all counted. From a baseline of 104 files / 504 declarations, every directory is
 > clear. **`tsc --noEmit` clean, `npm test` 400 / 400, 0 skips.**
@@ -119,6 +119,13 @@ added, every one of them a function or type the split gave its own file and the 
 is the invariant worth checking, because removal is what breaks an importer and addition is not. Wave E
 deletes the barrel regardless, so the widened surface is transitional.
 
+**Then a later agent measured 92 / 78 and reported the figure above as wrong. Both numbers are right,
+and the disagreement is the `export *` blind spot reproducing itself in this very ledger.** 91 / 77
+counts the names on explicit `export { … }` lines. The barrel also carries **one** `export *` — for
+`config.js` — which forwards exactly `config` and `SessionConfig`, so the *effective* set is 92 / 78.
+A line-counting instrument cannot see through a star and a resolving one can. **Quote which question a
+name-set figure answers**, because "the barrel's exported names" turns out to be two different numbers.
+
 Closing it unblocked three things at once: the whole `src/tools` wave, the `core/ui/types.ts` retrofit
 (which needed `core/session`'s three importers to settle), and the visible-turn agreement test below.
 
@@ -174,8 +181,24 @@ ten as wave C reached their siblings. Each is the sibling of a `.ts` file the sw
 There were **fourteen**: eight more sat in `src/tools`, unenumerated by anything until the checkpoint
 census found them, and all eight went with that directory's wave in `c88da11` and `abfced0`.
 
-**Take `read-tracker.type.ts` last, and alone** — nine importers, three of them in `src/tools`, so folding
-it while anyone is working there puts two agents in the same files.
+**All six are now gone** (`54eb8b4`, `916a941`, `9cac598`, `aae76ad`), `read-tracker` last and alone as
+planned — nine importers, three in `src/tools`. **Zero old-style pairs remain anywhere under `src/`**, and
+all **116** surviving `.type.ts` modules were audited to hold exactly one type and no other statement.
+Of the 17 types, 9 folded into the function that owns them and 8 became their own modules.
+
+**That wave also settled a rule the tree had been contradicting, and it is the user's ruling.** Folding
+by ownership left `TaskLoopDeps` inside `run-task-loop.ts` while its structural twin `BatchDeps` sat in a
+standalone `batch-deps.type.ts` — same directory, same rule, opposite shapes. Six such modules exist
+(`batch-deps`, `batch-reporter`, `compact-deps`, `dispatch-deps`, `worker-result`, `reviewer-outcome`),
+each with exactly **one** non-barrel importer that plainly owns it.
+
+**Ruled: a dependency seam is not owned by the function that consumes it.** A `Deps` or `Reporter`
+interface — anything the *caller* implements and passes in — gets its own `.type.ts` even when one
+function takes it; a **result** type folds, because one function produces it and nothing else can. The
+test is **which side of the call constructs the value**. Note why the rule had to be stated that way:
+**counting importers cannot tell the two shapes apart**, since both have exactly one. The clause is in
+`constitution.md`. Three moves follow: `TaskLoopDeps` back out to its own module, `WorkerResult` and
+`ReviewerOutcome` folded in.
 
 **Wave D is CLOSED. Both halves are at zero, and with them the whole census.**
 
@@ -728,6 +751,30 @@ at runtime.** That asymmetry is the real argument, and it points at the constant
 item 1 for the usual reason: adding twelve exported constants inside a no-behaviour-change refactor
 buries an API change in a mechanical diff. **The sweep made this visible; it did not cause it** — the
 11/12 split predates it, in the same files, for the same consumers.
+
+### 29. [Fourteen comments still name files the sweep deleted](prose-names-files-the-sweep-deleted.md)
+*Repo hygiene.* Residue of [1](split-config-into-one-function-per-file.md), and **by design rather than
+neglect**: every wave fixed only the stale prose its own change caused, because editing a comment in a
+directory the wave did not own is exactly the contention the per-directory partition existed to prevent.
+
+Fourteen sites point at four files that no longer exist — `turn-loop.ts`, `worker-runner.ts`,
+`reviewer-runner.ts`, `retro-runner.ts` — plus `OPEN-QUESTIONS.md:957`, which names the retired
+`events-log.type.ts` in the present tense. **Nothing will ever surface these**: no compiler error, no
+failing test, no lint. A reader follows the pointer, finds nothing, and reconstructs which file inherited
+the behaviour.
+
+**It is an editing job, not a find-and-replace.** Six of the fourteen sit in `src/tools` and `src/phases`
+describing a *policy boundary* — *"worker-runner refuses this tool; reviewer-runner allows it"* — and the
+successor is not one file: the Worker's refusal now lives in `worker-window.ts`'s `WORKER_REFUSALS` while
+the phase gate lives in `phase-tool-names.ts`. Repointing those at a single file would be **less** accurate
+than leaving them, so the open question is whether they name the concept instead and stop being fragile
+against the next rename.
+
+**Ships after wave E**, which deletes one of the fourteen sites outright (`tools/index.ts:34`) and may move
+others. Worth knowing where it sits on severity: this sweep has already turned up **four headers that
+asserted something outright false**, each caught only because someone read the code beside the comment. A
+pointer to a deleted file is the same class of defect — prose a reader is entitled to trust and cannot —
+at a lower grade.
 
 ---
 

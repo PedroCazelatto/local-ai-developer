@@ -27,7 +27,7 @@ files left had started nothing on them, so there was nothing to revert.
 ### What is left — THE CENSUS IS AT ZERO
 
 > **Updated after the checkpoint: work resumed and both remaining directories closed.** A
-> TypeScript-parser census over all **643** files under `src/` now finds **no file holding more than one
+> TypeScript-parser census over all **641** files under `src/` now finds **no file holding more than one
 > declaration**. From a baseline of 104 files / 504 declarations, **every** directory is clear —
 > `core/llm`, `core/container`, `core/ui`, `core/session`, `context`, `commands`, `phases`, `interface`,
 > `interface/commands`, `tools`, and `src/` root.
