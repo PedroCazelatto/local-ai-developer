@@ -11,7 +11,6 @@
 
 import { loadsOrRepair } from '../core/llm/index.js';
 import type { AskQuestion } from '../core/ui/ask-questions.js';
-import type { AskQuestionsParse } from './parse-ask-questions.type.js';
 
 /**
  * Bounded rounds, straight from rules/phases/discovery.md ("ask in focused rounds (5 questions max
@@ -22,6 +21,11 @@ const MAX_QUESTIONS = 5;
 
 /** Minimum real options per question — one option is not a choice, and zero is a text box. */
 const MIN_OPTIONS = 2;
+
+/** A validated question batch, or a message the model can read and correct its call from. */
+export type AskQuestionsParse =
+  | { readonly ok: true; readonly questions: AskQuestion[] }
+  | { readonly ok: false; readonly error: string };
 
 function invalid(error: string): AskQuestionsParse {
   return { ok: false, error };

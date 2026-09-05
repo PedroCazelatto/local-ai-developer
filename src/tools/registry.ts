@@ -1,12 +1,18 @@
-// Tool registry (V1/02). A STATIC list of every ToolModule (explicit imports the build can check —
-// no runtime fs scan). Duplicate names are rejected loudly at load. `toolDefinitions()` builds the
-// FULL Ollama `tools` array, which is no longer handed to a phase as-is: phases/phase-tool-names.ts
-// holds one allowlist per phase and phases/resolve-phase-tools.ts narrows this set down to it.
-// Registering a tool here makes it AVAILABLE; a phase sees it only once its own array names it.
+// The tool registry (V1/02): a STATIC list of every ToolModule -- explicit imports the build can
+// check, never a runtime fs scan -- indexed by name. Registering a tool here makes it AVAILABLE; a
+// phase sees it only once its own array in phases/phase-tool-names.ts names it.
+//
+// This file declares NO function. It is a VALUE module, the way core/llm/daemon.ts and
+// interface/command-registry.ts are: the one-function-per-file sweep moved getTool, toolNames,
+// toolDefinitions and buildRegistry into their own files, and what is left is the list and the map
+// built from it. It survives for that reason alone, not as a re-export shell -- it exports exactly
+// one value and re-exports nothing.
+//
+// TOOL_MODULES stays private because its single consumer is the map on the next line.
 
-import type { Tool } from '../core/llm/index.js';
 import { askSubagentTool } from './ask-subagent.js';
 import { askUserTool } from './ask-user.js';
+import { buildRegistry } from './build-registry.js'; // indexes by name; throws on a duplicate
 import { commitChangesTool } from './commit-changes.js';
 import { debateTool } from './debate.js';
 import { dismissSubagentTool } from './dismiss-subagent.js';
@@ -79,46 +85,11 @@ const TOOL_MODULES: readonly ToolModule[] = [
   askUserTool,
 ];
 
-/** name → module, built once with a duplicate-name guard (a dup is a build-time mistake, fail loud). */
-const REGISTRY: ReadonlyMap<string, ToolModule> = buildRegistry(TOOL_MODULES);
-
-function buildRegistry(modules: readonly ToolModule[]): Map<string, ToolModule> {
-  const map = new Map<string, ToolModule>();
-  for (const module of modules) {
-    if (map.has(module.name)) {
-      throw new Error(`Duplicate tool name '${module.name}' in the tool registry.`);
-    }
-    map.set(module.name, module);
-  }
-  return map;
-}
-
-/** Look up a tool by name; undefined if unknown (the dispatcher turns that into a recoverable error). */
-export function getTool(name: string): ToolModule | undefined {
-  return REGISTRY.get(name);
-}
-
-/** Every registered tool name (used for the unknown-tool error's `available` list). */
-export function toolNames(): string[] {
-  return [...REGISTRY.keys()];
-}
-
 /**
- * Build the Ollama `tools` array from the registry: one function entry per module. Sent on every
- * call for every phase. The `parameters` schema is structurally the JSON-schema Ollama expects.
+ * name → module, built once with a duplicate-name guard (a dup is a build-time mistake, fail loud).
+ *
+ * Read it from a FUNCTION BODY only. This directory sits in an import cycle with core/session, so a
+ * reader inside this module’s own dependency subtree runs while this binding is still in its temporal
+ * dead zone; a top-level `const x = toolRegistry` there throws. get-tool.ts states it in full.
  */
-export function toolDefinitions(): Tool[] {
-  return [...REGISTRY.values()].map((module) => ({
-    type: 'function',
-    function: {
-      name: module.name,
-      description: module.description,
-      parameters: {
-        type: module.parameters.type,
-        properties: module.parameters.properties,
-        // Copy the readonly required list into a fresh mutable array for Ollama's Tool type.
-        ...(module.parameters.required ? { required: [...module.parameters.required] } : {}),
-      },
-    },
-  }));
-}
+export const toolRegistry: ReadonlyMap<string, ToolModule> = buildRegistry(TOOL_MODULES);

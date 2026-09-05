@@ -8,8 +8,7 @@
 // The writer is shown the REAL diff, not the phase's description of it — a phase that misdescribes its
 // own change cannot talk the log into agreeing. The phase's `intent` rides along only as the "why".
 
-import type { Message } from '../core/llm/index.js';
-import type { ComposeCommitMessageInput } from './compose-commit-message.type.js';
+import type { Message, OneShotResult, OneShotRole } from '../core/llm/index.js';
 
 /** Subject-line ceiling; the writer is asked for ≤72 and anything longer is hard-truncated. */
 const SUBJECT_LIMIT = 72;
@@ -42,6 +41,22 @@ function unwrap(raw: string): string {
 /** Remove any attribution trailer the writer invented, whatever the prompt said. */
 function stripTrailers(lines: string[]): string[] {
   return lines.filter((line) => !/^\s*(signed-off-by|co-authored-by|authored-by|author|committer)\s*:/i.test(line));
+}
+
+export interface ComposeCommitMessageInput {
+  /**
+   * ToolContext.oneShot — a fresh, HISTORY-FREE call to the session model. Passed in rather than
+   * imported so the writer never reaches for the session's client itself (dependency inversion), and
+   * so the committing phase's own context is provably untouched. Takes the role, like the context it
+   * comes from, so this file names the ceiling it runs under rather than inheriting one silently.
+   */
+  readonly oneShot: (messages: Message[], role: OneShotRole) => Promise<OneShotResult>;
+  /** The real `git diff` of exactly the paths being staged — the writer's primary evidence. */
+  readonly diff: string;
+  /** The committing phase's one-line statement of WHY these files changed. Context, not the message. */
+  readonly intent: string;
+  /** Project-relative paths in this commit — listed for the writer when the diff is empty/truncated. */
+  readonly paths: readonly string[];
 }
 
 /**

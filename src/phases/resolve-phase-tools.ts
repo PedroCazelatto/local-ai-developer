@@ -14,7 +14,7 @@ import { raiseBlockerTool } from '../tools/raise-blocker.js';
 import { readPhaseRuleTool } from '../tools/read-phase-rule.js';
 import { submitRetroTool } from '../tools/submit-retro.js';
 import { submitVerdictTool } from '../tools/submit-verdict.js';
-import { toolDefinitions } from '../tools/registry.js';
+import { toolDefinitions } from '../tools/tool-definitions.js';
 import { PhaseToolsError } from './phase-tools-error.js';
 import { PHASE_SCOPED_TOOL_NAMES, PHASE_TOOL_NAMES } from './phase-tool-names.js';
 

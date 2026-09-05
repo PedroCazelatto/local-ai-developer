@@ -34,13 +34,15 @@
 
 import path from 'node:path';
 
+import { decodeUtf8Strict } from './decode-utf8-strict.js';
 import { findMatchingLines } from './find-matching-lines.js';
-import { decodeUtf8Strict, globToRegExp } from './fs-support.js';
+import { globToRegExp } from './glob-to-reg-exp.js';
 // One `grep -l` in the container: the project-root-relative paths that hold the pattern, sorted.
 import { listSearchCandidates } from './list-search-candidates.js';
 import { parseSearchRequest } from './parse-search-request.js';
 import { renderFileMatches } from './render-file-matches.js';
-import type { SearchCaps, SearchStopReason } from './search-in-files.type.js';
+import type { SearchCaps } from './search-caps.type.js';
+import type { SearchStopReason } from './search-stop-reason.type.js';
 import { summarizeSearch } from './summarize-search.js';
 import { toolError } from './tool-error.js';
 import type { ToolModule } from './tool-module.type.js';

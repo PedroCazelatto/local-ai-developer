@@ -6,14 +6,11 @@
 
 import { loadStandardBody } from '../context/index.js';
 import type { StandardBody } from '../context/index.js';
+import { errMessage } from '../core/err-message.js'; // an Error's message, or the thrown value stringified
 import type { JsonObject } from './json-object.type.js';
 import { toolError } from './tool-error.js';
 import type { ToolModule } from './tool-module.type.js';
 import type { ToolResult } from './tool-result.type.js';
-
-function messageOf(err: unknown): string {
-  return err instanceof Error ? err.message : String(err);
-}
 
 export const loadRuleTool: ToolModule = {
   name: 'load_rule',
@@ -43,7 +40,7 @@ export const loadRuleTool: ToolModule = {
       // the frontmatter-stripped body, or found:false carrying the available names.
       result = loadStandardBody(name);
     } catch (err) {
-      return toolError(`standards catalog is unavailable: ${messageOf(err)}`);
+      return toolError(`standards catalog is unavailable: ${errMessage(err)}`);
     }
     if (!result.found) {
       const content: JsonObject = { error: 'unknown standard', name: name.trim(), available: [...result.available] };

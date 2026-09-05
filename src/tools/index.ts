@@ -14,7 +14,9 @@ export { toolError } from './tool-error.js';
 export { createToolContext } from './create-tool-context.js';
 export { resolveInProject } from './resolve-in-project.js';
 export { WORKSPACE_PATH } from './workspace-path.js';
-export { getTool, toolNames, toolDefinitions } from './registry.js';
+export { getTool } from './get-tool.js';
+export { toolNames } from './tool-names.js';
+export { toolDefinitions } from './tool-definitions.js';
 export { readFileTool } from './read-file.js';
 export { listFilesTool } from './list-files.js';
 export { writeFileTool } from './write-file.js';
@@ -27,7 +29,7 @@ export { runInProjectTool } from './run-in-project.js';
 export { listChangesTool, LIST_CHANGES } from './list-changes.js';
 export { commitChangesTool, COMMIT_CHANGES } from './commit-changes.js';
 export { composeCommitMessage } from './compose-commit-message.js';
-export type { ComposeCommitMessageInput } from './compose-commit-message.type.js';
+export type { ComposeCommitMessageInput } from './compose-commit-message.js';
 // The rest of git — global registry tools, gated per phase by phase-tool-names.ts. git_stash and
 // git_push are additionally refused inside the Worker window (see worker-runner).
 export { gitStashTool, GIT_STASH } from './git-stash.js';
