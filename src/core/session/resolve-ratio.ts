@@ -1,5 +1,10 @@
-// The context-pressure ratio env resolver — one of the four functions config.ts used to hold. It takes
-// its fallback as an argument, so it needs none of config.ts's DEFAULT_* constants.
+// The context-pressure ratio env resolver — one of the four functions config.ts used to hold, and now
+// one of the four it assembles into the `config` object.
+//
+// It is the ONE of those four that is NOT in config.ts's import cycle, and that is deliberate: it takes
+// its fallback as an ARGUMENT, so it needs none of config.ts's DEFAULT_* constants and imports nothing
+// from it. Leave it that way — there is no fallback here to read back out of `config`, and putting one
+// there would buy this file the cycle's timing-of-death constraint for nothing.
 
 /**
  * Read a context-pressure ratio from `name`, guarding NaN / a value outside (0, 1] by falling back

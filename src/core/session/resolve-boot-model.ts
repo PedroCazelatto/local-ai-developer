@@ -16,7 +16,7 @@
 
 import { listModels, matchesModelName, pickSmallestModel } from '../llm/index.js';
 import { renderer } from '../ui/renderer.js';
-import { SUGGESTED_MODEL } from './config.js';
+import { config } from './config.js';
 import { loadAppState } from './load-app-state.js';
 import { offerPull } from './offer-pull.js';
 
@@ -49,6 +49,6 @@ export async function resolveBootModel(): Promise<string | undefined> {
   const smallest = pickSmallestModel(installed);
   if (smallest !== undefined) return smallest.name;
 
-  renderer.systemMessage(`No models are installed. Suggested: ${SUGGESTED_MODEL}`);
-  return (await offerPull(SUGGESTED_MODEL)) ? SUGGESTED_MODEL : undefined;
+  renderer.systemMessage(`No models are installed. Suggested: ${config.SUGGESTED_MODEL}`);
+  return (await offerPull(config.SUGGESTED_MODEL)) ? config.SUGGESTED_MODEL : undefined;
 }

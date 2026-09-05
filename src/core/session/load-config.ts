@@ -1,13 +1,16 @@
-// The session config assembly — the entry point config.ts re-exports, and the shape it produces.
+// The session config assembly — the entry point the `config` object in config.ts carries, and the
+// shape it produces.
+//
+// Every DEFAULT_* read below is INSIDE loadConfig's body on purpose: config.ts imports this file to
+// compose that object and this file imports config.ts back for its fallbacks, so a top-level read
+// would run before the `config` binding is initialised and throw. See the TDZ note in config.ts. The
+// three resolvers are imported from their own files rather than off `config`, because they are sibling
+// single-function modules this file depends on directly — nothing about them needs the cycle.
 
 import { existsSync, statSync } from 'node:fs';
 import path from 'node:path';
 
-import {
-  DEFAULT_EVICTION_THRESHOLD_RATIO,
-  DEFAULT_PHASE,
-  DEFAULT_SUMMARIZATION_THRESHOLD_RATIO,
-} from './config.js';
+import { config } from './config.js';
 import { resolveNumCtx } from './resolve-num-ctx.js';
 import { resolveRatio } from './resolve-ratio.js';
 import { resolveTimeoutMs } from './resolve-timeout-ms.js';
@@ -80,11 +83,14 @@ export function loadConfig(projectName: string): SessionConfig {
     // resolveRatio validates a fraction in (0, 1]; both context-pressure triggers share it.
     summarizationThresholdRatio: resolveRatio(
       'SUMMARIZATION_THRESHOLD_RATIO',
-      DEFAULT_SUMMARIZATION_THRESHOLD_RATIO,
+      config.DEFAULT_SUMMARIZATION_THRESHOLD_RATIO,
     ),
-    evictionThresholdRatio: resolveRatio('EVICTION_THRESHOLD_RATIO', DEFAULT_EVICTION_THRESHOLD_RATIO),
+    evictionThresholdRatio: resolveRatio(
+      'EVICTION_THRESHOLD_RATIO',
+      config.DEFAULT_EVICTION_THRESHOLD_RATIO,
+    ),
     // The per-call STALL window, not a cap on turn length — see DEFAULT_TIMEOUT_MS in config.ts.
     timeoutMs: resolveTimeoutMs(),
-    initialPhase: DEFAULT_PHASE,
+    initialPhase: config.DEFAULT_PHASE,
   };
 }
