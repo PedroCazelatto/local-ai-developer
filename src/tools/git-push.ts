@@ -11,8 +11,10 @@
 //
 // Withheld from the Worker, which has no commits of its own to publish (the Reviewer commits).
 
-import { pushCurrentBranch } from '../core/session/project-git-push.js';
-import type { JsonObject, ToolModule, ToolResult } from './types.js';
+import { pushCurrentBranch } from '../core/session/push-current-branch.js';
+import type { JsonObject } from './json-object.type.js';
+import type { ToolModule } from './tool-module.type.js';
+import type { ToolResult } from './tool-result.type.js';
 
 export const GIT_PUSH = 'git_push';
 

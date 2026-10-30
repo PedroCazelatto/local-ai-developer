@@ -11,7 +11,9 @@
 // balance, then emitted in one chunk; likewise for fenced JSON. Display-only: the structured
 // message.tool_calls is captured separately and is unaffected by filtering.
 
-import { loadsOrRepair } from './json-repair.js';
+import { isAlnum } from './is-alnum.js';
+import { isRecord } from './is-record.js';
+import { loadsOrRepair } from './loads-or-repair.js';
 
 type FilterMode =
   | 'prose'
@@ -27,10 +29,6 @@ const TAG_OPEN = '<tool_call>';
 const TAG_CLOSE = '</tool_call>';
 const FENCE_LANG_CHARS = '_-+.';
 const WHITESPACE = ' \t\r\n';
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
 
 export class StreamFilter {
   private mode: FilterMode = 'prose';
@@ -251,11 +249,9 @@ export class StreamFilter {
   }
 
   private isToolCall(text: string): boolean {
+    // loadsOrRepair: JSON.parse, falling back to a pass that escapes the literal control characters
+    // qwen writes inside strings. isRecord rejects null and arrays before the `in` probes below.
     const obj = loadsOrRepair(text);
     return isRecord(obj) && NAME_KEYS.some((k) => k in obj);
   }
-}
-
-function isAlnum(ch: string): boolean {
-  return /[A-Za-z0-9]/.test(ch);
 }

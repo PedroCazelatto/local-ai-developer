@@ -18,7 +18,8 @@
 // than by expiry.
 
 import { hashBytes } from '../../tools/hash-bytes.js';
-import type { FileReadStatus, FileReadTracker } from './read-tracker.type.js';
+import type { FileReadStatus } from './file-read-status.type.js';
+import type { FileReadTracker } from './file-read-tracker.type.js';
 
 /**
  * Build an empty tracker for one window. Keyed by the path string the model used, which is the same

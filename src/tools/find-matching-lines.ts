@@ -5,7 +5,7 @@
 // alongside is the other half of that: a file cut to its first 20 matches must not look like a file
 // with exactly 20 matches, or the model concludes it has seen every use of the symbol it searched for.
 
-import type { MatchedLines } from './search-in-files.type.js';
+import type { MatchedLines } from './matched-lines.type.js';
 
 /**
  * Scan `lines` for `needle`.

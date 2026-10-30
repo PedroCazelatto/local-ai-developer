@@ -20,9 +20,24 @@
 
 import { theme } from './theme.js';
 import { toolCallSubject } from './tool-call-subject.js';
-import type { ToolCallLineInput } from './format-tool-call-line.type.js';
 import { truncateToWidth } from './truncate-to-width.js';
 import { visibleWidth } from './visible-width.js';
+
+/** One tool call, about to be recorded in the scrollback. */
+export interface ToolCallLineInput {
+  /** Tool name as dispatched, e.g. `read_file`. */
+  readonly tool: string;
+  /** The model's normalized arguments — toolCallSubject picks the one field that names the call. */
+  readonly args: Record<string, unknown>;
+  /** Terminal width in columns; everything but a path is truncated to fit it. */
+  readonly width: number;
+  /**
+   * The SHORT id of the sub-agent that made the call, when it was not the phase itself. Present means
+   * two things: the line is indented under its parent's own call line, and it carries a `[sub:abcd]`
+   * marker — a sub-agent's twenty calls stay legible as somebody else's work.
+   */
+  readonly subagentShortId?: string;
+}
 
 /** How far a sub-agent's calls sit under the parent call that spawned them. */
 export const SUBAGENT_INDENT = '  ';

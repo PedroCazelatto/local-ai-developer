@@ -8,16 +8,28 @@ import { Ollama } from 'ollama';
 import type { ChatResponse, Message, Tool, ToolCall } from 'ollama';
 
 import { beginModelCall } from './begin-model-call.js';
-import type { ModelCallLifetime } from './begin-model-call.type.js';
-import type { CallRole, WindowRole } from './call-role.type.js';
+import type { ModelCallLifetime } from './begin-model-call.js';
+import type { CallRole } from './call-role.type.js';
+import { exactCount } from './exact-count.js';
 import { ollamaWithSignal } from './ollama-with-signal.js';
+import { recoverIfNeeded } from './recover-if-needed.js';
 import { resolveWindowCtx } from './resolve-window-ctx.js';
 import { StreamFilter } from './stream-filter.js';
-import { recoverToolCalls } from './tool-call-recovery.js';
+import type { TokenCounts } from './token-counts.type.js';
 import { TurnAbortedError } from './turn-aborted-error.js';
-import type { ChatResult, TokenCounts } from './types.js';
+import type { WindowRole } from './window-role.type.js';
 
 const NO_TOKENS: TokenCounts = { promptTokens: null, evalTokens: null };
+
+/**
+ * One finished model call: the assistant message Ollama returned, and the EXACT token counts it
+ * reported for it. Declared here rather than in a module of its own because OllamaClient owns it —
+ * `chat` returns it, `StreamHandle.result()` returns it, and nothing outside core/llm names it.
+ */
+export interface ChatResult {
+  readonly message: Message; // final assistant message, incl. content AND tool_calls
+  readonly tokens: TokenCounts;
+}
 
 /** A live streaming turn: consume `deltas` fully, then read `result()`. */
 export interface StreamHandle {
@@ -140,11 +152,17 @@ export class OllamaClient {
    * The live session model, or a clear, actionable throw when there is none. The REPL catches it and
    * prints it as one recoverable line, so a model-less session answers "why did nothing happen?" at the
    * moment the user tries — instead of sending `model: undefined` to Ollama and surfacing its 404.
+   *
+   * The line says TOOL SUPPORT and names no model (OPEN-QUESTIONS.md #8). A session gets here with no
+   * model for two reasons — an empty machine, or a machine whose every model failed the `tools` gate —
+   * and this throw cannot tell them apart. config.SUGGESTED_MODEL is a suggestion for the EMPTY case
+   * and has not itself been verified tool-capable, so naming it would answer a capability problem with
+   * an unverified model and move the problem one pull further along.
    */
   requireModel(): string {
     if (this.modelName === undefined) {
       throw new Error(
-        `No model selected. Pull one with  /models pull <name>  (or  /models use <name>  if it's already installed).`,
+        `No model selected. Pull one with tool support:  /models pull <name>  (or  /models use <name>  if it's already installed).`,
       );
     }
     return this.modelName;
@@ -188,10 +206,11 @@ export class OllamaClient {
         // is chosen; see resolve-window-ctx.ts for why the base is structurally exact.
         options: { num_ctx: resolveWindowCtx(role, this.baseNumCtx) },
       });
+      // recoverIfNeeded folds in any tool call the model wrote as text when Ollama lifted none itself.
       return { message: recoverIfNeeded(response.message), tokens: this.captureTokens(response) };
     } catch (err) {
       // An abort surfaces here as a rejected fetch; abortReason disambiguates it from a real fault the
-      // same way ollama-models.ts uses signal.aborted for a cancelled pull.
+      // same way pull-model.ts uses signal.aborted for a cancelled pull.
       throw this.abortedOr(call, err);
     } finally {
       call.settle();
@@ -267,7 +286,7 @@ export class OllamaClient {
           options: { num_ctx: resolveWindowCtx(role, this.baseNumCtx) },
         });
         // The `ollama` package exposes no per-request signal param for chat, so bridge the lifetime onto
-        // the iterator's own abort() — the same bridge ollama-models.ts builds for a cancelled pull. The
+        // the iterator's own abort() — the same bridge pull-model.ts builds for a cancelled pull. The
         // pre-check covers a cancel that landed between opening the lifetime and the request opening.
         if (call.signal.aborted) iterator.abort();
         const onAbort = (): void => iterator.abort();
@@ -331,6 +350,7 @@ export class OllamaClient {
    * length-based estimate, never a silent 0). Preserves "0 tokens" vs "not reported".
    */
   private captureTokens(response: ChatResponse): TokenCounts {
+    // exactCount passes a reported number through and turns an absent metric into null, never 0.
     const tokens: TokenCounts = {
       promptTokens: exactCount(response.prompt_eval_count),
       evalTokens: exactCount(response.eval_count),
@@ -338,20 +358,4 @@ export class OllamaClient {
     this.lastTokens = tokens;
     return tokens;
   }
-}
-
-function exactCount(value: number | undefined | null): number | null {
-  return typeof value === 'number' ? value : null;
-}
-
-/**
- * When Ollama returned no structured tool_calls, recover any the model wrote as text and fold
- * them into the message (with the call text stripped from `content`). A no-op when the message
- * already has structured calls or the content holds none.
- */
-function recoverIfNeeded(message: Message): Message {
-  if (message.tool_calls && message.tool_calls.length > 0) return message;
-  const { cleaned, calls } = recoverToolCalls(message.content);
-  if (calls.length === 0) return message;
-  return { ...message, content: cleaned, tool_calls: calls };
 }

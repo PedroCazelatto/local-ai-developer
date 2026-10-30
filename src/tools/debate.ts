@@ -12,13 +12,18 @@
 // deliberately excluded — see phases/phase-tool-names.ts. Nothing is persisted: the transcript goes to
 // the scrollback, the cost goes to the events log, and the windows die with the call.
 
+import { errMessage } from '../core/err-message.js'; // an Error's message, or the thrown value stringified
 import { appendEvent } from '../core/session/events-log.js';
 import { runDebate } from '../core/session/run-debate.js';
-import type { DebateOutcome, DebateRequest } from '../core/session/run-debate.type.js';
+import type { DebateOutcome } from '../core/session/debate-outcome.type.js';
+import type { DebateRequest } from '../core/session/debate-request.type.js';
 import { renderDebateSummary } from '../core/ui/render-debate-summary.js';
 import { renderDebateTurn } from '../core/ui/render-debate-turn.js';
-import type { JsonObject, StructuredToolResult, ToolModule, ToolResult } from './types.js';
-import { toolError } from './types.js';
+import type { JsonObject } from './json-object.type.js';
+import type { StructuredToolResult } from './structured-tool-result.type.js';
+import { toolError } from './tool-error.js';
+import type { ToolModule } from './tool-module.type.js';
+import type { ToolResult } from './tool-result.type.js';
 
 export const DEBATE = 'debate';
 
@@ -32,10 +37,6 @@ const FAILURE_HINTS = {
   'no-argument': 'Retry with a claim stated as one concrete position, and put the material in `background`.',
   'unreadable-digest': 'Retry once, or decide from your own reasoning and say that the pressure-test was inconclusive.',
 } as const;
-
-function messageOf(err: unknown): string {
-  return err instanceof Error ? err.message : String(err);
-}
 
 export const debateTool: ToolModule = {
   name: DEBATE,
@@ -107,7 +108,7 @@ export const debateTool: ToolModule = {
     } catch (err) {
       // A missing rules/prompts/debate-*.md file or a transport failure — a real fault, surfaced to the
       // model as recoverable so the turn continues without the pressure-test.
-      return toolError(`the debate could not run: ${messageOf(err)}`);
+      return toolError(`the debate could not run: ${errMessage(err)}`);
     }
 
     renderDebateSummary({

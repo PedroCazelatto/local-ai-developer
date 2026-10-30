@@ -13,7 +13,6 @@
 // like a complete one, or the model concludes a file does not exist and writes it a second time.
 
 import { buildIgnoreFilter } from './build-ignore-filter.js';
-import { messageOf } from './fs-support.js';
 import { listWorkspaceEntries } from './list-workspace-entries.js';
 // readOptionalCount: null when the model omitted the argument, the integer when it is one, and a
 // recoverable message when it is a string, a fraction, or below the floor.
@@ -21,8 +20,9 @@ import { readOptionalCount } from './read-optional-count.js';
 import { renderFileTree } from './render-file-tree.js';
 // Validates the path under the project root (throws on escape) and returns it /workspace-relative.
 import { scopeToWorkspace } from './scope-to-workspace.js';
-import type { ToolModule, ToolResult } from './types.js';
-import { toolError } from './types.js';
+import { toolError } from './tool-error.js';
+import type { ToolModule } from './tool-module.type.js';
+import type { ToolResult } from './tool-result.type.js';
 
 /** Entries one call may print. The bound is rows, not depth — see the tool description. */
 const MAX_ENTRIES = 500;

@@ -3,7 +3,7 @@
 //
 // The asymmetry is in the package, not in this code, and it is worth stating because it is invisible
 // from the outside: `ollama` opens its own AbortController for `stream: true` and hands it back as the
-// iterator's abort() (which is what ollama-models.ts bridges onto for `/models pull`), but a
+// iterator's abort() (which is what pull-model.ts bridges onto for `/models pull`), but a
 // `stream: false` request is a bare fetch with NO signal argument at all — so `Ollama.abort()` cannot
 // reach it and neither can anything else. Injecting the signal at the `fetch` seam the constructor
 // already exposes is the one hook that covers that path.

@@ -68,8 +68,7 @@ renumbered.
 optimization target are in [docs/product.md](docs/product.md); the benchmark tables stay here; the
 per-model residency measurements and the boot probe moved to
 [backlog/boot-can-pick-a-toolless-model.md](backlog/boot-can-pick-a-toolless-model.md), which is where
-the tag is painted; and the `/resume` predicate became
-[backlog/resume-across-num-ctx-changes.md](backlog/resume-across-num-ctx-changes.md).
+the tag is painted; and the `/resume` predicate became **backlog item 4**, since shipped.
 
 **The lettered meta-answers** (E, F, H, I, J) were given alongside the numbered ones and are answered or
 sited in their sections: **E** (the tokenizer question) is answered in full at the end of section E,
@@ -349,7 +348,7 @@ size and never asks what a model can do.
 is the smallest thing installed. The first tool-capable model is 83 MB larger.
 
 **Where the work actually is.** `listModels`
-([src/core/llm/ollama-models.ts](src/core/llm/ollama-models.ts)) projects each model down to
+([src/core/llm/list-models.ts](src/core/llm/list-models.ts)) projects each model down to
 `{ name, size, modifiedAt }` — the capability is **dropped before `pickSmallestModel` ever sees it**, so
 `InstalledModel` grows a field first. And there are **four call sites, not one**: the saved-model branch,
 the re-pull branch, the pick rule, and `/models use`.
@@ -441,8 +440,9 @@ very differently:
 
 ### ✅ #11 — Does `/models use <name>` get the check?
 
-**Today.** `useSubcommand` ([src/commands/models.ts](src/commands/models.ts)) checks one thing: whether
-the model is pulled. If it is not, it offers an inline single-keypress download and then switches.
+**Today.** `useSubcommand`
+([src/commands/use-subcommand.ts](src/commands/use-subcommand.ts)) checks one thing: whether the
+model is pulled. If it is not, it offers an inline single-keypress download and then switches.
 Capability is never consulted. On success it calls `orch.useModel(name)` and persists to `state.json`.
 
 **Why this is a question.** A deliberate choice is not an inferred default — but the resulting session is
@@ -1895,7 +1895,7 @@ candidate source for #10's "print some recommendations" on an empty machine — 
 **What the task is.** Six one-shot roles exist. Could the cheap ones run on a *small* model instead of the
 session model, so they cost less and evict nothing?
 
-**Today.** `OneShotRole` ([call-role.type.ts](src/core/llm/call-role.type.ts)) is closed at six:
+**Today.** `OneShotRole` ([src/core/llm/types.ts](src/core/llm/types.ts)) is closed at six:
 `context-title`, `summarize`, `search-rules`, `commit-message`, `debate-turn`, `debate-digest`. Three of
 them (`context-title`, `search-rules`, `commit-message`) already sit at the bounded 8 192 ceiling; the
 other three sit at base.

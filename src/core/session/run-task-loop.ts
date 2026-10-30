@@ -10,20 +10,81 @@
 // only some of them) with commit_changes and marks the task done with mark_task_done, and its verdict
 // is refused unless the repo agrees. So a round can land commits even when the verdict is a fail, and
 // a `pass` is proof the tree was already clean — the loop just reports what the Reviewer committed.
+//
+// DO NOT WRITE THE ESCALATION RECORD HERE. Every exit below sets the task back to `pending`, and an
+// escalated task is recorded as `failed` instead — but not in this file. The callers stash the leftover
+// attempt with `git stash push -u` over the whole tree the moment this function returns, which resets
+// the frontmatter to HEAD, so a `failed` written on any path below would be thrown away with the
+// attempt it describes. The record therefore belongs immediately after that stash, and lives in
+// recordFailedAttempt at the two places that take it: route-batch-outcome.ts and
+// interface/commands/run-single-task.ts. Reverting to `pending` here is what keeps the task file
+// byte-identical to HEAD, and therefore OUT of the stash, so the record can be written cleanly after.
+//
+// Ordering makes the record safe against the Reviewer's verdict check (OPEN-QUESTIONS #77): the paths
+// below are reached only once the last Reviewer has spoken, so a commit made after this function
+// returns cannot contradict a live verdict. Moving the write earlier breaks both properties at once.
 
-import { TurnAbortedError } from '../llm/index.js';
-import type { TokenCounts } from '../llm/index.js';
+import type { TokenCounts } from '../llm/token-counts.type.js';
+import { TurnAbortedError } from '../llm/turn-aborted-error.js';
 import { addTokenCounts } from './add-token-counts.js';
-import { setTaskStatus } from './backlog.js';
 import { buildWorkerFixMessage } from './build-worker-fix-message.js';
+import { captureChangedFiles } from './capture-changed-files.js';
 import { formatReviewFeedback } from './format-review-feedback.js';
-import { captureChangedFiles } from './project-git.js';
-import { ReviewerVerdictError, runReviewerTask } from './reviewer-runner.js';
-import type { ReviewerCommit } from './reviewer-runner.js';
-import type { TaskLoopDeps, TaskLoopReporter, TaskLoopResult } from './run-task-loop.type.js';
-import { processMessage } from './turn-loop.js';
-import type { Task } from './types.js';
-import { buildWorkerSeed, WORKER_MAX_ROUNDS, WorkerWindow } from './worker-runner.js';
+import type { ReviewerCommit } from './reviewer-commit.type.js';
+import { ReviewerVerdictError } from './reviewer-verdict-error.js';
+import { runReviewerTask } from './run-reviewer-task.js';
+import type { TaskLoopDeps } from './task-loop-deps.type.js';
+import type { TaskLoopReporter } from './task-loop-reporter.type.js';
+import { setTaskStatus } from './set-task-status.js';
+import type { Task } from './task.type.js';
+import { processMessage } from './process-message.js';
+import { buildWorkerSeed } from './build-worker-seed.js';
+import { WORKER_MAX_ROUNDS, WorkerWindow } from './worker-window.js';
+
+/**
+ * How one task's loop ended:
+ * - `passed`    — a Reviewer `pass`; everything was committed and the task marked done; loop over.
+ * - `escalated` — MAX_ROUNDS elapsed with no pass (or the Worker changed nothing / the Reviewer
+ *                 produced no verdict); surfaced to the user with the last feedback. This is the one
+ *                 outcome the caller records as `status: failed` after stashing, so `/run all` stops
+ *                 picking the task up — see the header, and recordFailedAttempt.
+ * - `blocked`   — the Reviewer raised a blocker (V3/02); loop halted mid-round.
+ * - `cancelled` — the user stopped it: Ctrl+C cut the model call in flight, or a `/stop round` wind-down
+ *                 ended the loop between rounds. Distinct from `escalated` ON PURPOSE — the task was not
+ *                 tried and found wanting, it was interrupted, and a summary that called it an escalation
+ *                 would be reporting a judgement nobody made.
+ *
+ * `escalated`, `blocked` and `cancelled` none of them imply "nothing committed": the Reviewer commits
+ * partially, so files it accepted in an earlier round are already in git. `commits` is what actually landed.
+ */
+export type TaskLoopOutcome = 'passed' | 'escalated' | 'blocked' | 'cancelled';
+
+/** The single result the loop returns for one task. */
+export interface TaskLoopResult {
+  readonly taskId: string;
+  readonly outcome: TaskLoopOutcome;
+  /** Rounds actually run, 1..MAX_ROUNDS. */
+  readonly rounds: number;
+  /**
+   * Every commit the Reviewer made across all rounds, in order — empty when it accepted nothing.
+   * Present on EVERY outcome: partial acceptance means an escalated or blocked task can still have
+   * landed work.
+   */
+  readonly commits: readonly ReviewerCommit[];
+  /** The Reviewer's blocker question — present only when outcome === "blocked" (V3/02). */
+  readonly question?: string;
+  /** The persisted blocker id (`${taskId}#${n}`) — present only when outcome === "blocked" (V3/02). */
+  readonly blockerId?: string;
+  /** The last Reviewer feedback — present when outcome === "escalated", so a human sees why. */
+  readonly lastFeedback?: string;
+  /** How a `cancelled` loop was stopped, in one line — present only when outcome === "cancelled". */
+  readonly cancelReason?: string;
+  /**
+   * EXACT sum of every Worker AND Reviewer turn's prompt/eval counts across all rounds. A field is
+   * `null` when any contributing turn omitted that metric — surfaced, never estimated (constitution).
+   */
+  readonly tokens: TokenCounts;
+}
 
 /** Hard cap on implement→fix rounds per task — a ceiling, not a target (CLAUDE.md). Assert exactly 5. */
 export const MAX_ROUNDS = 5;
@@ -171,7 +232,8 @@ export async function runTaskLoop(
     setTaskStatus(deps.projectPath, task.id, 'pending');
     // Ctrl+C cut the Worker's or the Reviewer's model call. That is an interruption, not a failed
     // attempt: reporting it as an escalation would put a judgement in the summary that no Reviewer made,
-    // and (once record-attempted-tasks lands) would count a round the user stopped against the task.
+    // and would leave the task marked `failed` for a stop the user asked for. A cancelled task stays
+    // `pending` and stays runnable, which is the whole reason the outcome is distinct.
     if (err instanceof TurnAbortedError) {
       return {
         taskId: task.id,
@@ -200,6 +262,10 @@ export async function runTaskLoop(
 
   // MAX_ROUNDS elapsed with no pass — escalate with the last Reviewer feedback. Whatever the Reviewers
   // accepted along the way is already committed; what is left in the tree is what never passed.
+  //
+  // `pending`, not `failed`, and the header says why: the caller stashes the tree on the way out, so
+  // the record has to be written after that and is written by recordFailedAttempt. Setting it back to
+  // `pending` here is also what keeps the task file out of that stash.
   setTaskStatus(deps.projectPath, task.id, 'pending');
   return {
     taskId: task.id,

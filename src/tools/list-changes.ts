@@ -7,8 +7,10 @@
 // This is the companion to commit_changes: you cannot name the paths to commit without first seeing
 // what changed, and the Reviewer re-reads it after each partial commit to see what is still outstanding.
 
-import { listChangedPaths } from '../core/session/project-git.js';
-import type { JsonObject, ToolModule, ToolResult } from './types.js';
+import { listChangedPaths } from '../core/session/list-changed-paths.js';
+import type { JsonObject } from './json-object.type.js';
+import type { ToolModule } from './tool-module.type.js';
+import type { ToolResult } from './tool-result.type.js';
 
 export const LIST_CHANGES = 'list_changes';
 

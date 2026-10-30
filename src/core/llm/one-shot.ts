@@ -14,10 +14,22 @@
 // because their input is either window-sized (`summarize`) or uncapped (`debate-*`). Passing the role
 // rather than binding a ceiling here is what keeps that decision in one place instead of six.
 
+import type { Message } from 'ollama';
+
 import type { OllamaClient } from './client.js';
-import type { OneShotRole } from './call-role.type.js';
-import type { OneShotResult } from './one-shot.type.js';
-import type { Message } from './types.js';
+import type { OneShotRole } from './one-shot-role.type.js';
+import type { TokenCounts } from './token-counts.type.js';
+
+/**
+ * The model's text reply plus the EXACT token counts Ollama reported for this single throwaway call.
+ * Nulls in `tokens` mean Ollama omitted the metric (see TokenCounts) — never a length-based guess.
+ */
+export interface OneShotResult {
+  /** The model's full text reply. A one-shot requests no tools, so there are no tool calls to handle. */
+  readonly content: string;
+  /** EXACT prompt/eval counts for THIS call — for auditing its cost, kept off the session status line. */
+  readonly tokens: TokenCounts;
+}
 
 export async function oneShot(
   client: OllamaClient,

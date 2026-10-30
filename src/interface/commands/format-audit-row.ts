@@ -9,36 +9,17 @@
 // clock leads because the audit log's question is "what happened, and when": a listing with no time
 // on it cannot be lined up against anything else the user saw.
 
-import type { AuditColumnWidths, AuditRow } from './read-audit-rows.type.js';
+import type { AuditRow } from './audit-row.type.js';
+import { auditClock } from './audit-clock.js'; // the row's UTC stamp as a local HH:mm:ss
+import { durationLabel } from './duration-label.js'; // `840ms` / `4.2s` / `2m 49s`, or `unknown`
+import { exitLabel } from './exit-label.js'; // `exit 0` / `exit -1` / `exit ?`
 
-/**
- * The row's UTC timestamp as a LOCAL `HH:mm:ss`. Time only, not the date: /audit shows a recent tail,
- * so the date is the same on nearly every row and would cost width the tool name needs. A value that
- * will not parse holds its column with `--:--:--` rather than collapsing the table.
- */
-function clock(iso: string): string {
-  const ms = Date.parse(iso);
-  if (Number.isNaN(ms)) return '--:--:--';
-  const when = new Date(ms);
-  const pad = (n: number): string => String(n).padStart(2, '0');
-  return `${pad(when.getHours())}:${pad(when.getMinutes())}:${pad(when.getSeconds())}`;
-}
-
-/** Under a second: whole milliseconds. Under a minute: seconds to one decimal. Beyond: `2m 49s`. */
-function duration(ms: number | null): string {
-  // An unreported duration is stated as unknown rather than shown as 0ms, which would read as a call
-  // that took no time (constitution: surface a missing metric, never substitute a plausible number).
-  if (ms === null) return 'unknown';
-  if (ms < 1000) return `${Math.round(ms)}ms`;
-  const seconds = ms / 1000;
-  if (seconds < 60) return `${seconds.toFixed(1)}s`;
-  const whole = Math.round(seconds);
-  return `${Math.floor(whole / 60)}m ${whole % 60}s`;
-}
-
-/** `exit 0` / `exit -1` (dispatch's "any failure") / `exit ?` when the row carried no status. */
-function exit(status: number | null): string {
-  return status === null ? 'exit ?' : `exit ${status}`;
+/** Column widths the formatter pads to, so a block of rows lines up as a table. */
+export interface AuditColumnWidths {
+  /** Widest phase name in the rows being printed. */
+  readonly phase: number;
+  /** Widest tool name in the rows being printed. */
+  readonly tool: number;
 }
 
 /**
@@ -48,11 +29,11 @@ function exit(status: number | null): string {
  */
 export function formatAuditRow(row: AuditRow, widths: AuditColumnWidths): string {
   const fields = [
-    clock(row.ts),
+    auditClock(row.ts),
     row.phase.padEnd(widths.phase),
     row.tool.padEnd(widths.tool),
-    exit(row.exitStatus).padEnd(7),
-    duration(row.durationMs),
+    exitLabel(row.exitStatus).padEnd(7),
+    durationLabel(row.durationMs),
   ];
   if (row.subagentId !== undefined) fields.push(`sub:${row.subagentId}`);
   return fields.join(' · ');

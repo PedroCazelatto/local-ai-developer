@@ -103,16 +103,26 @@ can be listed, described and reopened by address, which is what lets a phase —
   `OLLAMA_NUM_CTX`, the orchestrator summarizes the oldest turns and replaces them with a single
   summary entry. The originals stay in the database, pointed at the summary that stands in for them.
   This is a safety valve against VRAM exhaustion, not normal operation.
-- **A `num_ctx` change hides every earlier context.** Each context records the exact `OLLAMA_NUM_CTX`
-  it was written under, and a context written under a different ceiling is neither listed nor
-  reopenable — Ollama silently drops the oldest tokens past the ceiling, so replaying a 32k history
-  into an 8k window would leave the phase reasoning from turns it can no longer see. Restoring the old
-  value brings them back; `OLLAMA_NUM_CTX` is read once at boot, so the change can only ever be
-  detected there. The per-role ceilings above cannot disturb this: an interactive turn is a **window**
-  role and so runs at `OLLAMA_NUM_CTX` exactly, and the recording path never consults the role table at
-  all — `SessionMemory` is handed the raw configured value, and `memory.ts` does not import the
-  resolver. The number stamped on a context is the number those turns really ran under, by
-  construction rather than by agreement.
+- **Lowering `num_ctx` hides the contexts written above it; raising it hides nothing.** Each context
+  records the exact `OLLAMA_NUM_CTX` it was written under, and the listing filters on **`<=`** rather
+  than on equality, because the two directions are not symmetric. **A history built for 8 192 replays
+  safely into 16 384; the reverse does not** — Ollama silently drops the oldest tokens past the ceiling,
+  so replaying a 32k history into an 8k window would leave the phase reasoning from turns it can no
+  longer see. So a context written under a **smaller** ceiling stays listed and reopenable, and a
+  context written under a **larger** one is neither listed nor reopenable until the old value is
+  restored. Nothing is deleted in either case.
+
+  A context that is reachable but was built for a smaller window is not reachable *silently*: `/resume`
+  **marks it in the listing**, where the choice is made, and **warns again on the restore**, naming both
+  the ceiling it was written under and the one this session runs at — so a history that looks shorter
+  than expected explains itself instead of having to be inferred.
+
+  `OLLAMA_NUM_CTX` is read once at boot, so the change can only ever be detected there. The per-role
+  ceilings above cannot disturb any of it: an interactive turn is a **window** role and so runs at
+  `OLLAMA_NUM_CTX` exactly, and the recording path never consults the role table at all — `SessionMemory`
+  is handed the raw configured value, and `memory.ts` does not import the resolver. The number stamped on
+  a context is the number those turns really ran under, by construction rather than by agreement, and
+  relaxing the read predicate did not touch it.
 - **Which model wrote which turn is recorded per turn,** so a mid-session `/models use` is visible in
   the history rather than inferred. No model is blocked from reading another's turns.
 - **Documentation files** (rules, plans, specs) exist for one-time reference or human reading — they

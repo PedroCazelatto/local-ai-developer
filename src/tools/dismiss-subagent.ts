@@ -3,8 +3,10 @@
 // so the model never has to reason about whether it already cleaned one up. Any sub-agent not
 // explicitly dismissed is dropped at session end anyway (in-memory only — no persistence).
 
-import type { JsonObject, ToolModule, ToolResult } from './types.js';
-import { toolError } from './types.js';
+import type { JsonObject } from './json-object.type.js';
+import { toolError } from './tool-error.js';
+import type { ToolModule } from './tool-module.type.js';
+import type { ToolResult } from './tool-result.type.js';
 
 export const DISMISS_SUBAGENT = 'dismiss_subagent';
 

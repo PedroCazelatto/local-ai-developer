@@ -19,16 +19,10 @@
 
 import ignore from 'ignore';
 
-import type { SandboxClient } from '../core/container/index.js';
-import { decodeUtf8Strict } from './fs-support.js';
-import type { WorkspaceEntry } from './list-files.type.js';
-// The trees search_in_files already refuses to walk — the fallback when there is no .gitignore.
-import { SKIP_DIRS } from './skip-dirs.js';
-
-/** True when any segment of `path` is a directory nobody wants listed. */
-function hasSkippedSegment(path: string): boolean {
-  return path.split('/').some((segment) => SKIP_DIRS.has(segment));
-}
+import type { SandboxClient } from '../core/container/sandbox.js';
+import { decodeUtf8Strict } from './decode-utf8-strict.js';
+import { hasSkippedSegment } from './has-skipped-segment.js'; // the fallback when there is no .gitignore
+import type { WorkspaceEntry } from './workspace-entry.type.js';
 
 /**
  * A predicate answering "is this entry hidden from the listing?".

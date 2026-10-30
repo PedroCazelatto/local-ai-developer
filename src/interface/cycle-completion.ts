@@ -12,12 +12,27 @@
 // The catalog of WHAT completes where stays in complete-line.ts; this file owns only the stepping.
 
 import { completeLine } from './complete-line.js';
-import type { CompletionCycle, CompletionInput, CompletionStep } from './cycle-completion.type.js';
+import type { CompletionCycle } from './completion-cycle.type.js';
+import { replaceWord } from './replace-word.js'; // splices the current candidate into the line and moves the cursor
+import type { ReplOrchestrator } from './run-repl.js';
 
-/** Swap the cycle's current candidate into `line` in place of the word spanning [start, end). */
-function replaceWord(line: string, start: number, end: number, cycle: CompletionCycle): CompletionStep {
-  const word = cycle.candidates[cycle.index] ?? '';
-  return { line: line.slice(0, start) + word + line.slice(end), cursor: start + word.length, cycle };
+/** The edit one Tab press resolves to: the whole new line, where the cursor lands, and the cycle to carry on. */
+export interface CompletionStep {
+  readonly line: string;
+  readonly cursor: number;
+  readonly cycle: CompletionCycle;
+}
+
+/** Everything this function needs to resolve one Tab press: the live buffer, and the cycle so far. */
+export interface CompletionInput {
+  /** readline's whole edit buffer, which may hold text to the RIGHT of the cursor. */
+  readonly line: string;
+  /** readline's cursor offset into `line` — the completed word ends here. */
+  readonly cursor: number;
+  /** The session orchestrator, which is where a command's completer finds its live candidates. */
+  readonly orch: ReplOrchestrator;
+  /** The cycle the previous Tab left behind, or null when the last key was anything else. */
+  readonly active: CompletionCycle | null;
 }
 
 /**

@@ -4,9 +4,11 @@
 // "all" (full history incl. resolved). The result is a JSON array of InboxItems the model reads at
 // phase start to address open signals before starting new work.
 
-import { canonicalizePhase, readInbox } from '../core/session/inbox-store.js';
-import { toolError } from './types.js';
-import type { ToolModule, ToolResult } from './types.js';
+import { canonicalizePhase } from '../core/session/canonicalize-phase.js';
+import { readInbox } from '../core/session/read-inbox.js';
+import { toolError } from './tool-error.js';
+import type { ToolModule } from './tool-module.type.js';
+import type { ToolResult } from './tool-result.type.js';
 
 export const inboxReadTool: ToolModule = {
   name: 'inbox_read',

@@ -11,7 +11,7 @@
 // `context_lines` advice on a search that asked for none, and no `output_mode:"paths"` advice to a
 // search already running in that mode.
 
-import type { SearchOutcome } from './search-in-files.type.js';
+import type { SearchOutcome } from './search-outcome.type.js';
 
 /** The bracketed closing line for `outcome`. Never empty — a complete search says so explicitly. */
 export function summarizeSearch(outcome: SearchOutcome): string {

@@ -10,7 +10,8 @@
 // not clamped to an invented number: it simply makes the first matching file fill the line budget,
 // which stops the output and says so. The three caps in search-in-files.ts are the only limits.
 
-import type { SearchOutputMode, SearchRequestParse } from './search-in-files.type.js';
+import type { SearchOutputMode } from './search-output-mode.type.js';
+import type { SearchRequestParse } from './search-request-parse.type.js';
 
 export function parseSearchRequest(args: Record<string, unknown>): SearchRequestParse {
   const pattern = args['pattern'];

@@ -12,8 +12,8 @@
 // Rows are right-trimmed. A trailing tab in the source must not become trailing tokens in the window,
 // and CRLF files leave a `\r` on every line that the trim removes (the caller splits on '\n' only).
 
+import type { MatchedLines } from './matched-lines.type.js';
 import { mergeLineRanges } from './merge-line-ranges.js';
-import type { MatchedLines } from './search-in-files.type.js';
 
 /**
  * The output lines for `relativePath`, in order, ready to be counted against the line budget.

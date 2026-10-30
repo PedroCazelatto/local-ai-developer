@@ -5,7 +5,15 @@ services:
     # an ephemeral layer on every command. node:slim ships node + npm and stays small. Language
     # runtimes a *project* needs (Python, Rust) belong to that project's own per-project
     # container — a separate, later concern. (Foundation task 04.)
-    image: node:24-slim
+    #
+    # The TAG is the version pinned in .nvmrc, exported as NODE_VERSION by the launcher
+    # (scripts/run.mjs) the same way ACTIVE_PROJECT reaches the mount below — so the sandbox runs the
+    # exact Node the orchestrator does, not a floating major free to drift a minor ahead of the pin.
+    # .nvmrc is the ONLY place the version is declared, so there is no number to repeat here. Fail
+    # closed: unset, this resolves to a sentinel tag that does not exist, which is how a hand-run
+    # `docker compose` (no launcher, no NODE_VERSION) fails loudly instead of quietly building on some
+    # other Node. See README-INCONSISTENCIES.md #15.
+    image: node:${NODE_VERSION:-__no_version__}-slim
     container_name: ai_sandbox
     # Rootless: the node image ships a non-root `node` user. The model must never run as root.
     user: node

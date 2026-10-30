@@ -4,6 +4,11 @@
 // Python SDK) onto dockerode, plus the ROADMAP pivot: the sandbox is now NETWORKED + hardened
 // (rootless, capped) so projects can `npm i` / `pip install`, reversing the old network_mode:none.
 //
+// Foundation task 04, and the point of the tag: the model touches ONLY these containers, never the
+// host filesystem. The provenance was carried by the core/container/ barrel, which the
+// one-function-per-file sweep deleted; it is recorded here because nothing else in the directory
+// held it.
+//
 // The whole security model is the mount boundary: only the active project is bind-mounted at
 // /workspace, so `..` / `$(...)` / symlinks inside a command cannot escape a container that
 // simply never had the host mounted. Do not add more mounts.
@@ -20,9 +25,10 @@ import { Writable } from 'node:stream';
 
 import Docker from 'dockerode';
 
+import { errMessage } from '../err-message.js';
 import { decodeTarFile } from './decode-tar-file.js';
 import { encodeTar } from './encode-tar.js';
-import type { SandboxRead, SandboxWrite } from './sandbox-file.type.js';
+import { statusCodeOf } from './status-code-of.js';
 import type { TarEntry } from './tar-entry.type.js';
 
 /** The long-lived root sandbox container (created by `docker compose up -d`). */
@@ -55,22 +61,25 @@ export interface SandboxOptions {
   readonly memoryBytes?: number;
 }
 
+// The results of the two file-transport methods below. RECOVERABLE exactly like ExecResult: a missing
+// file, a stopped container or a daemon error comes back as a VALUE, never a throw — the file tools
+// turn each into the structured error the model reads and retries from, and a thrown error would kill
+// the turn instead. They sit here with ExecResult and SandboxOptions because they are the same thing:
+// the vocabulary of SandboxClient's own methods, owned by the class that returns them.
+
+/** What `readWorkspaceFile` answers with — bytes, a directory, or a recoverable failure. */
+export type SandboxRead =
+  | { readonly ok: true; readonly kind: 'file'; readonly bytes: Uint8Array }
+  | { readonly ok: true; readonly kind: 'directory' }
+  /** `notFound` separates "no such path" (the model's typo) from a daemon/container failure. */
+  | { readonly ok: false; readonly notFound: boolean; readonly message: string };
+
+/** What `writeWorkspaceFile` answers with — done, or a recoverable failure carrying the reason. */
+export type SandboxWrite = { readonly ok: true } | { readonly ok: false; readonly message: string };
+
 interface ExecOptions {
   readonly workdir?: string;
   readonly timeoutMs?: number;
-}
-
-/** dockerode/docker HTTP errors carry a numeric statusCode; narrow without asserting `any`. */
-function statusCodeOf(err: unknown): number | undefined {
-  if (typeof err === 'object' && err !== null && 'statusCode' in err) {
-    const code = (err as { statusCode: unknown }).statusCode;
-    return typeof code === 'number' ? code : undefined;
-  }
-  return undefined;
-}
-
-function messageOf(err: unknown): string {
-  return err instanceof Error ? err.message : String(err);
 }
 
 export class SandboxClient {
@@ -166,8 +175,10 @@ export class SandboxClient {
       const info = await exec.inspect();
       return { exitCode: info.ExitCode ?? -1, stdout, stderr };
     } catch (err) {
-      // Container-not-found, image error, exec failure → structured, recoverable result.
-      return { exitCode: 1, stdout: '', stderr: messageOf(err) };
+      // Container-not-found, image error, exec failure → structured, recoverable result. Every catch
+      // in this class answers with a VALUE rather than a throw, and errMessage — an Error's message,
+      // or the thrown value stringified — is what fills it.
+      return { exitCode: 1, stdout: '', stderr: errMessage(err) };
     }
   }
 
@@ -192,7 +203,7 @@ export class SandboxClient {
       return { ok: true, kind: 'file', bytes: member.bytes };
     } catch (err) {
       const notFound = statusCodeOf(err) === 404;
-      return { ok: false, notFound, message: messageOf(err) };
+      return { ok: false, notFound, message: errMessage(err) };
     }
   }
 
@@ -220,7 +231,7 @@ export class SandboxClient {
       await container.putArchive(encodeTar(entries), { path: WORKSPACE });
       return { ok: true };
     } catch (err) {
-      return { ok: false, message: messageOf(err) };
+      return { ok: false, message: errMessage(err) };
     }
   }
 

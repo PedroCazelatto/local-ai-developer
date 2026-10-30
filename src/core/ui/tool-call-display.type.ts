@@ -1,5 +1,5 @@
 // What a tool tells the SCROLLBACK about the call it just finished — the `←` result line, and the
-// diff when the call changed a file.
+// diff when the call changed a file (tool-diff-display.type.ts).
 //
 // This rides on the tool result and on the audit record, but it is NOT audit data: appendAuditRow
 // builds its JSONL row from an explicit field list, so nothing here reaches tool_audit.jsonl and a
@@ -10,6 +10,13 @@
 //
 // A tool that sets nothing still gets a result line: the printer falls back to the tool's own error
 // message (failed) or a plain `ok` (succeeded).
+//
+// Its own module because no function owns it: eight files name it and not one of them defines the
+// contract. src/tools fills it in (build-write-display.ts returns one, and every other tool sets it on
+// its result), core/session carries it through dispatch and onto the stored tool-call record, and
+// core/ui prints it (format-tool-result-lines.ts).
+
+import type { ToolDiffDisplay } from './tool-diff-display.type.js';
 
 /** One tool call's contribution to the `←` line. */
 export interface ToolCallDisplay {
@@ -20,19 +27,4 @@ export interface ToolCallDisplay {
   readonly summary: string;
   /** Present only for a call that changed a file (write_file / edit_file / edit_phase_rule). */
   readonly diff?: ToolDiffDisplay;
-}
-
-/** The compact +/- diff of one changed file, already reduced to the lines that actually changed. */
-export interface ToolDiffDisplay {
-  /** Project-relative path of the changed file. NEVER truncated when printed. */
-  readonly path: string;
-  /** Exact count of added lines. */
-  readonly added: number;
-  /** Exact count of removed lines. */
-  readonly removed: number;
-  /**
-   * The changed lines, each already prefixed `+` or `-`. EMPTY when the change was over the collapse
-   * caps (buildFileDiff decides), which is what turns the result line into `+12 −3 <path>` alone.
-   */
-  readonly lines: readonly string[];
 }

@@ -11,7 +11,7 @@
 import path from 'node:path';
 
 import { appendJsonlLine } from './append-jsonl-line.js';
-import type { ToolCallRecord } from './dispatch.js';
+import type { ToolCallRecord } from './tool-call-record.type.js';
 
 /** Only the first ~1 KB of a tool's result is kept on the row (never the full output). */
 export const OUTPUT_PREVIEW_LIMIT = 1024;

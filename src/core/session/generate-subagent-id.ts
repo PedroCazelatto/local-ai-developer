@@ -7,13 +7,7 @@
 
 import { randomBytes } from 'node:crypto';
 
-/** Crockford base32 alphabet (omits I, L, O, U so the short id is unambiguous when read aloud). */
-const CROCKFORD = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';
-
-/** Map an already-in-range (0..31) index to its Crockford digit; `?? '0'` satisfies noUncheckedIndexedAccess. */
-function digitAt(index: number): string {
-  return CROCKFORD[index] ?? '0';
-}
+import { digitAt } from './digit-at.js';
 
 /** A 26-char ULID-shaped id: 10 timestamp chars + 16 random chars. */
 export function generateSubagentId(): string {

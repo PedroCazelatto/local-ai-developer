@@ -6,26 +6,20 @@
 //
 // The queue is UI state, not session state: nothing here reaches the model, and a message only becomes
 // a turn when the REPL drains it (repl.ts) exactly as if it had been typed at the prompt.
+//
+// An ASSEMBLER: one function per file put the four operations in four files, and this composes them
+// into the single object callers already used it as. It exports that object and nothing else. The
+// queue itself lives in message-queue-state.ts, which only these four may write.
 
-/** Submitted mid-turn, oldest first. */
-const queued: string[] = [];
+import { dequeue } from './dequeue.js';
+import { enqueue } from './enqueue.js';
+import { queuedCount } from './queued-count.js';
+import { recallQueued } from './recall-queued.js';
 
-/** Add a message to the back — Enter while a turn runs (input-fence.ts). */
-export function enqueue(text: string): void {
-  queued.push(text);
-}
-
-/** Take the OLDEST message, or null when the queue is empty. The REPL's drain order. */
-export function dequeue(): string | null {
-  return queued.shift() ?? null;
-}
-
-/** Take the NEWEST message back off the queue, or null when empty — what ↑ pulls into the input. */
-export function recall(): string | null {
-  return queued.pop() ?? null;
-}
-
-/** How many messages are waiting. */
-export function size(): number {
-  return queued.length;
-}
+/** The mid-turn message queue: add at the back, take the oldest to run or the newest back to edit. */
+export const messageQueue = {
+  enqueue,
+  dequeue,
+  recall: recallQueued,
+  size: queuedCount,
+};

@@ -7,7 +7,7 @@
 // blocks would put a separator between rows that are already consecutive, which reads as a gap in the
 // file where there is none.
 
-import type { LineRange } from './search-in-files.type.js';
+import type { LineRange } from './line-range.type.js';
 
 /**
  * The line spans to print for one file, ascending and non-overlapping.

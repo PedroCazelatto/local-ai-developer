@@ -1,6 +1,7 @@
-// Whether an installed model's full tag identifies the model a user named. One predicate, three callers
-// (hasModel, `/models list`'s active marker, the boot resolution) — the tag-matching rule lives here so
-// they can never drift apart.
+// Whether an installed model's full tag identifies the model a user named. One predicate, and every
+// place that has to turn a typed name into an installed model goes through it — `/models list`'s active
+// marker, `/models use`'s presence-and-capability lookup, the boot resolution (bootModelPlan), and
+// hasModel — so the tag-matching rule can never drift apart between them.
 
 /**
  * True when `installedName` (always a full `name:tag` from the daemon) is the model `wanted` names.

@@ -12,8 +12,16 @@
 // phase prompts can now tell the Worker NOT to re-read a file to verify its own edit: the harness
 // knows what the window has seen, so the model does not have to check.
 
-import type { FileReadTracker } from '../core/session/read-tracker.type.js';
-import type { GuardWriteResult } from './guard-write-target.type.js';
+import type { FileReadTracker } from '../core/session/file-read-tracker.type.js';
+
+/**
+ * The guard's answer. A refusal carries BOTH halves the model needs: what is wrong, and which of
+ * the two fixes applies — the whole point of the guard is that "read it first" and "read it again"
+ * are different instructions.
+ */
+export type GuardWriteResult =
+  | { readonly ok: true }
+  | { readonly ok: false; readonly error: string; readonly hint: string };
 
 /**
  * Decide whether this window may change `path`, whose current bytes are `current`.

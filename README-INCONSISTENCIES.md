@@ -109,16 +109,23 @@ answers a blocker**, not after a review.
 
 **Truth:** [docs/phases.md](docs/phases.md).
 
-## 11. Requirements are incomplete, and the Node line will move.
+## 11. Requirements are incomplete, and the Node line is the last stale copy of the version.
 
 - **Git is missing.** The git tools shell out to a host `git`; without it the execution loop cannot
   commit anything.
-- **"Node 24 LTS"** is one of four places the version is declared (`package.json` `engines`, `.nvmrc`,
-  `docker-compose.yml`, here). `.nvmrc` is becoming the single source of truth, so this line should
-  point at it rather than restate a major version.
+- **"Node 24 LTS"** should point at [.nvmrc](.nvmrc) rather than restate a major version.
+  `package.json`'s `engines` is **deleted**, [docker-compose.yml](docker-compose.yml) **interpolates**
+  the pin, and `.nvmrc` is the single source of truth `scripts/run.mjs` refuses against.
 
-**Truth:** *Node version* in [docs/cli.md](docs/cli.md),
-[backlog/node-version-is-not-enforced.md](backlog/node-version-is-not-enforced.md).
+  **This entry used to say "one of four places" and "the one copy left". Both were wrong**, and the
+  correction is the interesting part. Three more hardcoded `node:24-slim` tags were later found in
+  `sandbox.ts`, `project-templates.ts` and `projects/hello-world/docker-compose.yml` — see
+  [backlog item 21](backlog/node-version-hardcoded-in-the-images.md) — and `npm test` was added to
+  `package.json` afterwards, invoking `node` **directly** rather than through `scripts/run.mjs`, so the
+  pin is not enforced on that path at all. **An enforcement count is a claim about the surface that
+  existed when it was counted**, and this file should not restate one as though it were permanent.
+
+**Truth:** *Node version* in [docs/cli.md](docs/cli.md), [.nvmrc](.nvmrc), `scripts/run.mjs`.
 
 ## 12. The "Models used" list was unverified, and three entries cannot run a phase.
 
@@ -177,17 +184,25 @@ gate reads `/api/tags`, because that returns every model's capabilities in **one
 
 This box runs **0.33.2**, far past it.
 
+**The floor is now ENFORCED, not merely stated**, which changes what the README should say. Boot asks
+the daemon its version over `/api/version` and **refuses to start** below `0.9.1`, naming the
+requirement and the version found — the same shape `scripts/run.mjs` uses for the Node major. A daemon
+that reports no version refuses too, for the same reason an unreadable `.nvmrc` does: a check that
+cannot run must not report a pass. The refusal exists because the capability gate fails closed, so
+without it an old daemon produces an accurate symptom attached to a wrong diagnosis.
+
 **Suggested wording for Requirements:** *"Ollama 0.9.1 or newer — earlier versions do not report model
-capabilities, and the orchestrator refuses any model it cannot confirm supports tool calling."*
+capabilities over `/api/tags`, so the orchestrator cannot confirm a model supports tool calling and
+refuses to start. It also refuses any individual model whose tool support it cannot confirm."*
 
 **Truth:** OPEN-QUESTIONS.md #13 and #72,
 [backlog/boot-can-pick-a-toolless-model.md](backlog/boot-can-pick-a-toolless-model.md).
 
 ## 15. Nothing warns that `docker compose` by hand will not work correctly.
 
-Once the Node version is derived from [.nvmrc](.nvmrc) (OPEN-QUESTIONS.md #15, #76), the launcher
-exports it and [docker-compose.yml](docker-compose.yml)'s `image:` interpolates it — the same pattern
-`ACTIVE_PROJECT` already uses in that file.
+The Node version is now derived from [.nvmrc](.nvmrc) (OPEN-QUESTIONS.md #15, #76): the launcher
+exports it as `NODE_VERSION` and [docker-compose.yml](docker-compose.yml)'s `image:` interpolates it —
+the same pattern `ACTIVE_PROJECT` already uses in that file.
 
 The consequence is worth stating plainly, because it is invisible until it bites: **`docker compose up`
 / `docker compose run` typed by hand, without `scripts/run.mjs`, no longer resolves to the right
@@ -197,8 +212,7 @@ circumstances, so a hand-run compose also mounts no project.
 The supported entry points are `npm run start` / `node scripts/run.mjs start <project>`, and the README
 should say so where it shows any compose command.
 
-**Truth:** OPEN-QUESTIONS.md #76,
-[backlog/node-version-is-not-enforced.md](backlog/node-version-is-not-enforced.md),
+**Truth:** OPEN-QUESTIONS.md #76, *Node version* in [docs/cli.md](docs/cli.md),
 [docker-compose.yml](docker-compose.yml).
 
 ---

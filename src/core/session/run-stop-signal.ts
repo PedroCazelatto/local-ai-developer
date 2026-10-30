@@ -11,7 +11,16 @@
 // driven in isolation (constitution: dependency inversion over hard-wired concretions). The session holds
 // one and hands it to every /run; it is armed by the fence's control line and cleared when a run ends.
 
-import type { StopScope } from './run-stop-signal.type.js';
+/**
+ * How far a wind-down lets the work in flight run before it stops.
+ *
+ * - `round` — finish the round the Worker/Reviewer are in, then stop. The task ends without a verdict.
+ * - `task`  — finish the whole task (through its verdict, commits and all), then stop before the next
+ *             one. This is the setting an overnight batch wants: nothing already earned is discarded.
+ *
+ * There is no `now`: stopping instantly is what cancelling is for, and it is a different key.
+ */
+export type StopScope = 'round' | 'task';
 
 export class RunStopSignal {
   /** The narrowest scope requested so far, or null while nothing has asked the run to stop. */

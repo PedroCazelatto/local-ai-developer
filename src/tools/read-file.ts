@@ -11,13 +11,16 @@
 // is 16k. The cap is the default rather than a flag, because a cap the model must opt into never
 // fires; the numbers are what let it come back for a range instead of the file.
 
+import { errMessage } from '../core/err-message.js';
+import { decodeUtf8Strict } from './decode-utf8-strict.js';
 import { formatReadNotice } from './format-read-notice.js';
-import { decodeUtf8Strict, messageOf } from './fs-support.js';
+import type { JsonObject } from './json-object.type.js';
 import { readOptionalCount } from './read-optional-count.js';
 import { READ_FILE_CHAR_LIMIT, READ_FILE_LINE_LIMIT, renderNumberedSlice } from './render-numbered-slice.js';
 import { scopeToWorkspace } from './scope-to-workspace.js';
-import type { JsonObject, ToolModule, ToolResult } from './types.js';
-import { toolError } from './types.js';
+import { toolError } from './tool-error.js';
+import type { ToolModule } from './tool-module.type.js';
+import type { ToolResult } from './tool-result.type.js';
 
 export const readFileTool: ToolModule = {
   name: 'read_file',
@@ -98,7 +101,7 @@ export const readFileTool: ToolModule = {
         // TextDecoder fatal mode throws a TypeError on an invalid UTF-8 sequence.
         return toolError(`File '${path}' is not valid UTF-8 text.`);
       }
-      return toolError(`Error reading '${path}': ${messageOf(err)}`);
+      return toolError(`Error reading '${path}': ${errMessage(err)}`);
     }
 
     // renderNumberedSlice: numbers the requested window of lines and stops at the line cap or the

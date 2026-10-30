@@ -12,7 +12,7 @@
 // step only decides which files are worth transferring, so a locale edge case costs a wasted read
 // rather than a wrong answer.
 
-import type { SandboxClient } from '../core/container/index.js';
+import type { SandboxClient } from '../core/container/sandbox.js';
 // Wraps a model-supplied value as one shell argument, so a pattern with a space or a quote survives.
 import { quoteShellArgument } from './quote-shell-argument.js';
 // The vendored/generated trees search_in_files has always refused to walk.

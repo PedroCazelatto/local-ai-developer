@@ -8,9 +8,11 @@
 // exist on disk (availablePhaseNames), so no `..`/absolute-path traversal can reach the host fs.
 
 import { readFileSync } from 'node:fs';
+import type { Tool } from 'ollama';
 
-import { availablePhaseNames, phasePromptPath } from '../context/index.js';
-import type { Tool } from '../core/llm/index.js';
+import { availablePhaseNames } from '../context/available-phase-names.js';
+import { phasePromptPath } from '../context/phase-prompt-path.js';
+import { errMessage } from '../core/err-message.js'; // an Error's message, or the thrown value stringified
 
 /** The one name the Retro window special-cases to read a global phase instruction file. */
 export const READ_PHASE_RULE = 'read_phase_rule';
@@ -42,10 +44,6 @@ export type PhaseRuleRead =
   | { readonly ok: true; readonly content: string; readonly resolvedPath: string; readonly phase: string }
   | { readonly ok: false; readonly error: string; readonly hint?: string };
 
-function messageOf(err: unknown): string {
-  return err instanceof Error ? err.message : String(err);
-}
-
 /** Read rules/phases/<phase>.md, rejecting any `phase` that is not an existing phase file (no traversal). */
 export function readPhaseRule(phase: unknown): PhaseRuleRead {
   if (typeof phase !== 'string' || phase.trim() === '') {
@@ -60,6 +58,6 @@ export function readPhaseRule(phase: unknown): PhaseRuleRead {
   try {
     return { ok: true, content: readFileSync(file, 'utf-8'), resolvedPath: file, phase: normalized };
   } catch (err) {
-    return { ok: false, error: `could not read rules/phases/${normalized}.md: ${messageOf(err)}` };
+    return { ok: false, error: `could not read rules/phases/${normalized}.md: ${errMessage(err)}` };
   }
 }

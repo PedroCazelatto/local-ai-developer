@@ -8,11 +8,18 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 
-import type { StandardBody } from './load-standard-body.type.js';
-import { loadCatalog, STANDARDS_DIR, StandardsCatalogError } from './standards-catalog.js';
+import { loadCatalog } from './load-catalog.js';
+import { splitFrontmatter } from './split-frontmatter.js';
+import { STANDARDS_DIR, StandardsCatalogError } from './standards-catalog.js';
 
-/** Same leading `---`-delimited frontmatter format loadCatalog parses (see standards-catalog.ts). */
-const FRONTMATTER = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?/;
+/**
+ * Result of loadStandardBody: the frontmatter-stripped body of a standard, or a not-found signal
+ * carrying the available names. The not-found branch feeds load_rule's recoverable
+ * { error, available } — an unknown name never crashes the turn (V1/02).
+ */
+export type StandardBody =
+  | { readonly found: true; readonly body: string }
+  | { readonly found: false; readonly available: readonly string[] };
 
 /**
  * Return the frontmatter-stripped body of the standard named `name`, or { found:false } with the
@@ -29,6 +36,8 @@ export function loadStandardBody(name: string): StandardBody {
   }
 
   for (const file of readdirSync(STANDARDS_DIR).filter((f) => f.endsWith('.md'))) {
+    // splitFrontmatter returns the file's declared `name` plus everything after the `---` block —
+    // the name is what we match the slug against, the body is what load_rule hands the model.
     const parsed = splitFrontmatter(readFileSync(path.join(STANDARDS_DIR, file), 'utf-8'));
     if (parsed.name === wanted) {
       return { found: true, body: parsed.body };
@@ -36,27 +45,4 @@ export function loadStandardBody(name: string): StandardBody {
   }
   // In the catalog but no file carries the name — impossible unless the tree changed mid-call. Fail loud.
   throw new StandardsCatalogError(`standard '${wanted}' is in the catalog but no file carries that name.`);
-}
-
-/**
- * Split the leading frontmatter into its `name` and the body after it. We need only `name` here (to
- * locate the matching file) — loadCatalog already validated the frontmatter, so this stays minimal.
- * Drops the frontmatter block and any blank lines before the first content line.
- */
-function splitFrontmatter(raw: string): { name: string; body: string } {
-  const block = FRONTMATTER.exec(raw);
-  if (block === null) {
-    return { name: '', body: raw };
-  }
-  let name = '';
-  for (const line of (block[1] ?? '').split(/\r?\n/)) {
-    const trimmed = line.trim();
-    const colon = trimmed.indexOf(':');
-    if (colon !== -1 && trimmed.slice(0, colon).trim() === 'name') {
-      name = trimmed.slice(colon + 1).trim();
-      break;
-    }
-  }
-  const consumed = block[0] ?? '';
-  return { name, body: raw.slice(consumed.length).replace(/^\r?\n+/, '') };
 }

@@ -10,10 +10,15 @@
 // `-maxdepth` is always passed: the caller's depth is the only bound on how much of the tree comes
 // back, and an unbounded walk of a project with dependencies installed is megabytes off the wire.
 
-import type { SandboxClient } from '../core/container/index.js';
+import type { SandboxClient } from '../core/container/sandbox.js';
 // Wraps a model-supplied value as one shell argument, so a path with a space stays one path.
 import { quoteShellArgument } from './quote-shell-argument.js';
-import type { WorkspaceEntry, WorkspaceListing } from './list-files.type.js';
+import type { WorkspaceEntry } from './workspace-entry.type.js';
+
+/** The container walk's answer: the entries, or the model-facing reason there are none. */
+export type WorkspaceListing =
+  | { readonly ok: true; readonly entries: readonly WorkspaceEntry[] }
+  | { readonly ok: false; readonly notFound: boolean; readonly message: string };
 
 /**
  * Entries under `relativeDir` (project-root-relative, `.` for the root) down to `depth` levels.

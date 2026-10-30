@@ -2,7 +2,7 @@
 // loop, so this can't return-to-break like the old switch did; instead it calls ctx.requestExit(),
 // which trips the flag the REPL checks after dispatch to stop reading input.
 
-import type { Command } from '../command-registry.js';
+import type { Command } from '../command.type.js';
 
 export const exitCommand: Command = {
   name: 'exit',

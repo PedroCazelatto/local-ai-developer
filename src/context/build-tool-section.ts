@@ -14,7 +14,7 @@
 // VRAM-bound box. This block answers "what do I have"; the `tools` array answers "how do I call it";
 // the phase markdown answers "when should I reach for it".
 
-import type { Tool } from '../core/llm/index.js';
+import type { Tool } from 'ollama';
 
 const HEADING = '# Your Tools';
 

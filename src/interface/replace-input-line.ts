@@ -12,7 +12,7 @@
 
 import type { Interface as ReadlineInterface } from 'node:readline/promises';
 
-import type { EditableLine } from '../core/ui/insert-newline.type.js';
+import type { EditableLine } from '../core/ui/insert-newline.js';
 
 /** Replace `rl`'s current input line with `line`, leaving the cursor at offset `cursor`. */
 export function replaceInputLine(rl: ReadlineInterface, line: string, cursor: number): void {
