@@ -18,6 +18,7 @@ import { StreamFilter } from './stream-filter.js';
 import type { TokenCounts } from './token-counts.type.js';
 import { TurnAbortedError } from './turn-aborted-error.js';
 import type { WindowRole } from './window-role.type.js';
+import { awaitOrAbort } from './await-or-abort.js';
 
 const NO_TOKENS: TokenCounts = { promptTokens: null, evalTokens: null };
 
@@ -277,14 +278,16 @@ export class OllamaClient {
         // A cancel armed during the previous tool call is already on the lifetime — bail before the
         // request is even sent, so a turn the user stopped costs no generation at all.
         if (call.signal.aborted) throw this.abortedOr(call, new Error('cancelled before the call opened'));
-        const iterator = await this.ollama.chat({
-          model,
-          messages,
-          tools,
-          stream: true,
-          // Same single resolution point as chat() — a window role, so in practice this is baseNumCtx.
-          options: { num_ctx: resolveWindowCtx(role, this.baseNumCtx) },
-        });
+        const iterator = await awaitOrAbort(
+          this.ollama.chat({
+            model,
+            messages,
+            tools,
+            stream: true,
+            options: { num_ctx: resolveWindowCtx(role, this.baseNumCtx) },
+          }),
+          call.signal,
+        );
         // The `ollama` package exposes no per-request signal param for chat, so bridge the lifetime onto
         // the iterator's own abort() — the same bridge pull-model.ts builds for a cancelled pull. The
         // pre-check covers a cancel that landed between opening the lifetime and the request opening.

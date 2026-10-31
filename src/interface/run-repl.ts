@@ -43,6 +43,8 @@ import { isCompletionKey } from './is-completion-key.js'; // a plain forward Tab
 import { requestCancel } from './request-cancel.js'; // Ctrl+C mid-turn: stop the model call, say so in the scrollback
 import { runInput } from './run-input.js'; // one line of input; shows and swallows any error it raises
 import { updateStatus } from './update-status.js'; // recompute the two pinned status lines and paint them
+import { installLegacyInput } from '../core/ui/translate-legacy-input.js';
+import { enableKeyboardProtocol } from '../core/ui/enable-keyboard-protocol.js';
 
 /** How often (ms) the status + activity line repaint while a turn runs, to tick the elapsed timer. */
 const STATUS_TICK_MS = 100;
@@ -104,6 +106,8 @@ export interface ReplOrchestrator {
 /** Run the REPL until the user types `/exit` (or EOF). */
 export async function runRepl(orch: ReplOrchestrator): Promise<void> {
   renderer.clearScreen(); // one-time: wipe the launcher's boot noise for a clean start
+  installLegacyInput(stdin);
+  const restoreKeyboard = enableKeyboardProtocol();
   statusBar.enable(); // reserve the bottom rows so all output scrolls above them
   updateStatus(orch); // paint the two status lines immediately (there is no boot banner anymore)
   // A model-less session is valid but can't take a turn, so say so where it STICKS. Boot resolved the
@@ -265,5 +269,6 @@ export async function runRepl(orch: ReplOrchestrator): Promise<void> {
     if (stdin.isTTY) stdin.removeListener('keypress', onKeypress);
     statusBar.disable(); // release the reserved rows and restore normal scrolling
     rl.close();
+    restoreKeyboard();
   }
 }

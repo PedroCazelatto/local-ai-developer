@@ -14,14 +14,12 @@
 // config. Ctrl+J is byte-identical to Shift+Enter's LF and therefore also breaks the line; there is no
 // way to tell them apart, and no reason to.
 
+/** True when `key` should insert a line break into the buffer instead of submitting it. */
 import type { Key } from 'node:readline';
 
-/** True when `key` should insert a line break into the buffer instead of submitting it. */
 export function isNewlineKey(key: Key | undefined): boolean {
   if (key === undefined) return false;
-  // Alt/Meta + either newline key. readline itself ignores meta+return entirely, so nothing else
-  // competes for it — the line is ours to edit.
+  if (key.name === 'return' && key.shift === true) return true; // Shift+Enter
   if (key.meta === true) return key.name === 'return' || key.name === 'enter';
-  // A bare LF. `return` (CR) is deliberately excluded: that is the submit key.
   return key.name === 'enter';
 }
