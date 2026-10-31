@@ -90,6 +90,7 @@ export async function main(): Promise<void> {
   // The launcher's `finally` stops Docker on exit, so we don't stop the sandbox here.
   try {
     await runRepl(orchestrator);
+    process.exit(0);
   } finally {
     // shutdown: commit whatever any phase left buffered and close memory.db (checkpointing its WAL).
     // In a `finally` so a crash in the REPL still commits the turns it had rather than dropping them.
