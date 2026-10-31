@@ -5,6 +5,7 @@ import { statusBar } from '../core/ui/status-bar.js';
 import { theme } from '../core/ui/theme.js';
 import { capitalizePhase } from '../core/ui/capitalize-phase.js'; // discovery -> Discovery, for display only
 import type { ReplOrchestrator } from './run-repl.js';
+import { exitHintState } from './exit-hint-state.js';
 
 /**
  * Repaint the two pinned STATUS lines:
@@ -20,6 +21,10 @@ export function updateStatus(orch: ReplOrchestrator): void {
   const ctxPct = orch.numCtx > 0 ? Math.round((filled / orch.numCtx) * 100) : 0;
   const line1 =
     theme.phase(orch.activePhase)(`Phase: ${capitalizePhase(orch.activePhase)}`) + theme.meta(` | Ctx: ${ctxPct}%`);
-  const line2 = theme.meta(`Model: ${orch.model ?? 'no model'} | Project: ${orch.project}`);
+  const hint = exitHintState.text;
+  const line2 =
+    hint !== null
+      ? theme.meta(hint)
+      : theme.meta(`Model: ${orch.model ?? 'no model'} | Project: ${orch.project}`);
   statusBar.setStatus(line1, line2);
 }

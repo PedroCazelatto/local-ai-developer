@@ -46,6 +46,7 @@ import { updateStatus } from './update-status.js'; // recompute the two pinned s
 import { installLegacyInput } from '../core/ui/translate-legacy-input.js';
 import { enableKeyboardProtocol } from '../core/ui/enable-keyboard-protocol.js';
 import { createExitGuard } from './create-exit-guard.js';
+import { exitHintState } from './exit-hint-state.js';
 
 /** How often (ms) the status + activity line repaint while a turn runs, to tick the elapsed timer. */
 const STATUS_TICK_MS = 100;
@@ -148,7 +149,17 @@ export async function runRepl(orch: ReplOrchestrator): Promise<void> {
   // Tab completion to idle — a completion redraws the prompt, which must never happen over a reply.
   let processing = false;
 
-  const exitGuard = createExitGuard(() => rl.close());
+  const paintHint = (text: string | null): void => {
+    exitHintState.text = text;
+    updateStatus(orch); // recompute line 2 with (or without) the hint
+    statusBar.repaint(); // and put the pinned rows back on screen
+  };
+
+  const exitGuard = createExitGuard({
+    onExit: () => rl.close(),
+    show: (text) => paintHint(text),
+    hide: () => paintHint(null),
+  });
   // With a 'SIGINT' listener on the interface, readline no longer closes itself on Ctrl+C — this decides.
   rl.on('SIGINT', () => {
     // A press that got past requestCancel mid-turn keeps its old meaning: quit now.
