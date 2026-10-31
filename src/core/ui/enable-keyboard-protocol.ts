@@ -17,6 +17,7 @@ export function enableKeyboardProtocol(): () => void {
   const restore = (): void => {
     if (restored) return;
     restored = true;
+    stdout.write('\x1b[?25h');
     stdout.write('\x1b[<u'); // kitty: desfaz
     stdout.write('\x1b[>4;0m'); // modifyOtherKeys: desfaz
   };

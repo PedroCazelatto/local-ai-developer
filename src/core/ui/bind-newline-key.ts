@@ -20,6 +20,7 @@ import { insertNewline } from './insert-newline.js';
 import { isNewlineKey } from './is-newline-key.js';
 import type { KeypressListener } from './keypress-listener.type.js';
 import type { KeypressSource } from './keypress-source.type.js';
+import { pendingSubmission } from './pending-submission.js';
 
 /**
  * Route the newline key on `input` into `rl`'s edit buffer. Returns the undo: it detaches the wrapper
@@ -40,6 +41,8 @@ export function bindNewlineKey(rl: ReadlineInterface, input: KeypressSource): ()
       insertNewline(rl); // splice `\n` in at the cursor and repaint via rl.prompt(true)
       return;
     }
+    // Plain Enter: record the buffer BEFORE readline submits and clears it.
+    if (key?.name === 'return') pendingSubmission.line = rl.line;
     for (const listener of readlineListeners) listener(str, key);
   };
 
