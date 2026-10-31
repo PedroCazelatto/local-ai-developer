@@ -66,16 +66,12 @@ Phase definitions live as Markdown in [rules/phases/](rules/phases/) (all curren
 
 I've selected some models to run locally, but you can choose the one that fits you the best:
 
-1. qwen2.5-coder:3b
-2. qwen2.5-coder:14b
-3. qwen2.5-coder:32b
-4. qwen3.5:27b
-5. qwen3-coder:30b
-6. deepseek-coder-v2:16b
-7. deepseek-r1:14b
-8. gpt-oss:20b
-9. devstral:24b
-10. codestral:22b
+1. qwen2.5:7b
+2. qwen2.5-coder:3b
+3. qwen2.5-coder:14b
+4. deepseek-coder-v2:16b
+5. qwen3.5:27b
+6. devstral:24b
 
 The model name is currently hardcoded in [config.ts](config.ts). Moving that choice to the terminal UI is planned.
 
