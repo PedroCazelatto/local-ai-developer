@@ -45,6 +45,7 @@ import { runInput } from './run-input.js'; // one line of input; shows and swall
 import { updateStatus } from './update-status.js'; // recompute the two pinned status lines and paint them
 import { installLegacyInput } from '../core/ui/translate-legacy-input.js';
 import { enableKeyboardProtocol } from '../core/ui/enable-keyboard-protocol.js';
+import { createExitGuard } from './create-exit-guard.js';
 
 /** How often (ms) the status + activity line repaint while a turn runs, to tick the elapsed timer. */
 const STATUS_TICK_MS = 100;
@@ -147,6 +148,17 @@ export async function runRepl(orch: ReplOrchestrator): Promise<void> {
   // Tab completion to idle — a completion redraws the prompt, which must never happen over a reply.
   let processing = false;
 
+  const exitGuard = createExitGuard(() => rl.close());
+  // With a 'SIGINT' listener on the interface, readline no longer closes itself on Ctrl+C — this decides.
+  rl.on('SIGINT', () => {
+    // A press that got past requestCancel mid-turn keeps its old meaning: quit now.
+    if (processing) {
+      rl.close();
+      return;
+    }
+    exitGuard.press();
+  });
+
   // The Tab cycle in flight, or null when the last key was not a Tab. Dropping it on every other key is
   // half of what stops a stale cycle overwriting a word the user has since retyped; cycle-completion.ts
   // holds the other half, which re-checks that the line still reads as this handler left it.
@@ -175,6 +187,7 @@ export async function runRepl(orch: ReplOrchestrator): Promise<void> {
   // refresh. Shift+Tab is deliberately NOT claimed: readline's tab branch finds the no-op completer and
   // does nothing with it, so the key stays free rather than acquiring a second meaning.
   const onKeypress = (_str: string | undefined, key: Key | undefined): void => {
+    if (!(key?.ctrl === true && key.name === 'c')) exitGuard.disarm();
     if (isCompletionKey(key) && !processing) cycle = completeAtCursor(orch, rl, cycle);
     else cycle = null;
     scheduleStatus();
@@ -268,6 +281,7 @@ export async function runRepl(orch: ReplOrchestrator): Promise<void> {
     unbindNewlineKey(); // give readline its own keypress listener back before the interface closes
     if (stdin.isTTY) stdin.removeListener('keypress', onKeypress);
     statusBar.disable(); // release the reserved rows and restore normal scrolling
+    exitGuard.disarm();
     rl.close();
     restoreKeyboard();
   }
