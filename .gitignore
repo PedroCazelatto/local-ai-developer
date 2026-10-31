@@ -17,3 +17,5 @@ projects/*
 # Logs
 logs
 *.log
+
+.DS_Store
