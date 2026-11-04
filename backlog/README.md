@@ -12,10 +12,10 @@ line below is a pointer, never a summary to act from.
 
 Every item is **fully answered** — [OPEN-QUESTIONS.md](../OPEN-QUESTIONS.md) #1–#103, answered in
 [ANSWERS.md](../ANSWERS.md), folded into the task files — with one exception in kind rather than in
-readiness. **Items 2 and 15 open with a question to the user rather than with code**, and are marked
-**⚠ Ask first** where they sit. They are startable; asking is the first step of the work, not a reason
-to defer it. Raise the question and wait for the answer before writing anything, because in both cases
-the answer can **delete** the task rather than shape it.
+readiness. **Item 15 opens with a question to the user rather than with code**, and is marked
+**⚠ Ask first** where it sits. It is startable; asking is the first step of the work, not a reason to
+defer it. Raise the question and wait for the answer before writing anything, because the answer can
+**delete** the task rather than shape it.
 
 ---
 
@@ -60,7 +60,7 @@ swept; and a split file survives only by assembling its parts into an object.
 **Governance is settled and wave A is closed.** The amendment landed in `d0176cf` after the user
 reviewed it. Wave A then committed four directories in parallel — `core/llm` (`6e1c3f9`),
 `core/container` (`b63092e`), `src/context` (`daf08cf`) and `src/commands` (`f08c47c`) — alongside
-[2](test-the-invariant-functions.md)'s 195 tests (`973adce`).
+[2](#2-test-the-pure-invariant-functions--shipped)'s 195 tests (`973adce`).
 
 **Wave B took `core/ui`, the hub, alone** — `4daa490` for the pure half (8 files, all 11 `.type.ts`
 folds, `prompts.ts` deleted) and `1c3b1cb` for the six singletons as assemblers over `<name>-state.ts`
@@ -151,7 +151,7 @@ a shell.** Its four types were each measured by importer and all four found genu
 pre-flight census was **exactly right** — 7 files, 28 declarations, per-file 9/5/4/3/3/2/2 — worth
 recording after three earlier censuses in this sweep were not.
 
-**[2](test-the-invariant-functions.md) is CLOSED.** Ten original targets plus four `src/context/`
+**[2](#2-test-the-pure-invariant-functions--shipped) is CLOSED.** Ten original targets plus four `src/context/`
 additions — **25 test files, 400 tests, 0 failures, 0 skips**, `tsc --noEmit` clean:
 
 | pass | commit | tests | suite |
@@ -362,30 +362,40 @@ resolver is written into the shape that already exists rather than added to an e
 afterwards — that half is done, and item 12's bullet now says so. The same argument reaches
 **item 6**, shipped through the second file: that item rewrites `listModels` to
 stop projecting `capabilities` away, and it now lands in `list-models.ts`. At the widened scope it also
-blocks [2](test-the-invariant-functions.md), [5](record-attempted-tasks.md) and
+blocks [2](#2-test-the-pure-invariant-functions--shipped), [5](record-attempted-tasks.md) and
 [7](derive-constants-from-one-ceiling.md), each of which tests, moves or adds to a function the sweep
 will relocate.
 
-### 2. ⚠ Ask first — [Test the pure invariant functions](test-the-invariant-functions.md)
-*Engineering quality.* The invariants the whole design rests on, pinned by tests: `verdictGitConflict`,
-`resolveInProject`, `replaceStatus`, `nextRunnableTasks` / `taskSkipReason`, the `readTaskFile` field
-readers, `StreamFilter` and `recoverToolCalls`, `taskBranchName`, `addTokenCounts`, and the width layer.
-No Docker, no Ollama, no real terminal — everything else stays on the throwaway-script and
-terminal-emulator rules.
+### 2. ~~Test the pure invariant functions~~ — shipped
+*Engineering quality.* **Shipped.** The question it opened with was answered by amending
+`constitution.md`'s *Testing* section: the blanket exemption is reversed for every function that needs
+no live model, no container and no real terminal. That is a little wider than "pure functions only" — a
+test may read the filesystem, as `resolveInProject`'s does. Everything else stays on the throwaway-script
+and terminal-emulator rules. The invariants were then pinned in three passes:
 
-**The question, asked before any code is written.** `constitution.md`'s *Testing* section exempts the
-orchestrator outright, so this contradicts it as written. Ask whether to amend that section, and if so
-whether the scope is "pure functions only" or something broader. **Do not amend the constitution as part
-of the task** — that edit is governance and review-gated, and the answer may be no, in which case the
-file is deleted.
+| pass | commit | tests |
+|---|---|---:|
+| the eight original targets | `973adce` | 195 |
+| `StreamFilter` + `recoverToolCalls` | `d3e0f42` | 136 |
+| `src/context/` | `48af6f5` | 69 |
 
-**Why here:** after [1](split-config-into-one-function-per-file.md), so the tests are written against the
-settled module layout rather than moved with it — and before everything else, because everything else
-changes a function on that list. [Item 5](record-attempted-tasks.md) puts a fifth member through
-`replaceStatus` and adds a fourth committer beside `verdictGitConflict`;
-[item 12](budget-ceilings-for-runs-and-batches.md) adds a sixth outcome next to it; and
-[item 11](in-turn-progress-reporting.md) adds fields to the rows the width layer paints. Pinning them
-first is what makes those three safe to change.
+**400 tests in 25 files at close**, 0 failures, 0 skips. Later items have added to the suite since.
+
+**It closed without being struck.** The closure was written into item 1's entry above, which the sweep
+was updating at the time, so this entry kept its *Ask first* heading and its task file kept saying the
+orchestrator had no tests — long after neither was true. The file is now deleted, and every link to it
+points here instead.
+
+**Its larger return was not the tests.** It produced twelve findings where the code and its own
+documentation disagree, none fixed in passing, filed as items
+[22](truncate-to-width-measures-code-units.md) to [27](standards-frontmatter-parsers-disagree.md). Their
+tests assert the current, wrong behaviour on purpose (see the note after item 24). The argument that
+justified the amendment was this one: with no tests, the docs were carrying both the specification and
+the verification, so tests relieve an overloaded layer rather than add a new one.
+
+**One follow-up remains**, filed as [31](visible-turn-predicate-has-two-halves.md): the test that the SQL
+and JS halves of the visible-turn predicate agree. It is the first test that touches `node:sqlite`, so it
+waits on the suite running under the Node 24 the repo pins.
 
 ### 3. ~~The required Node version is never enforced~~ — shipped
 *Repo hygiene.* **Shipped.** `.nvmrc` is the single source of truth and now the **only** declaration:
@@ -714,7 +724,7 @@ which matters once [5](record-attempted-tasks.md) has the loop committing that f
 
 ---
 
-**Items 22, 23 and 24 were all found by [2](test-the-invariant-functions.md)** while pinning the
+**Items 22, 23 and 24 were all found by [2](#2-test-the-pure-invariant-functions--shipped)** while pinning the
 invariant functions, and they share two properties that make them safe to pick up later.
 
 - **The tests already assert the current, wrong behaviour**, deliberately and with a comment saying so.
@@ -736,13 +746,13 @@ including every path the app actually takes.
 **It is a task rather than a note because it blocks test coverage.** `constitution.md` requires a test to
 import the file owning the function under test, so a test for `helpCommand` enters the graph at exactly
 this module and throws before its first assertion. That makes it a **prerequisite for
-[2](test-the-invariant-functions.md)'s follow-up work**, and the first test written for that directory is
+[2](#2-test-the-pure-invariant-functions--shipped)'s follow-up work**, and the first test written for that directory is
 what turns latent into blocking. The method is worth keeping too: **one process per entry point**, since
 Node's module cache makes first-import order the only variable and a second import in the same process is
 served from cache.
 
 ### 26. [Two ways `core/llm` corrupts the reply the user reads](streamed-reply-corruption-in-core-llm.md)
-*Terminal UX.* Two defects from [2](test-the-invariant-functions.md)'s `core/llm` pass, grouped as
+*Terminal UX.* Two defects from [2](#2-test-the-pure-invariant-functions--shipped)'s `core/llm` pass, grouped as
 [24](backlog-reader-drifts-from-its-own-docs.md) was — one directory, one reviewer, one symptom class:
 **the model's output is correct and what reaches the screen is not.**
 
@@ -764,7 +774,7 @@ there is no refactor in flight to hide behind. The file also records one **non**
 promotes it: `expandOverFence`'s unreachable guard.
 
 ### 27. [Three defects in the standards frontmatter parsers](standards-frontmatter-parsers-disagree.md)
-*Engineering quality.* From [2](test-the-invariant-functions.md)'s `src/context/` pass, in the pair that
+*Engineering quality.* From [2](#2-test-the-pure-invariant-functions--shipped)'s `src/context/` pass, in the pair that
 decides which standards the model can find and what it reads.
 
 **A UTF-8 BOM defeats both parsers, and one aborts boot.** Both anchor `^---` with no BOM tolerance, so

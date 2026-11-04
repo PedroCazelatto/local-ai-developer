@@ -29,7 +29,7 @@ cache and can never reproduce it. A single script importing ten modules in a loo
 **It blocks test coverage.** [constitution.md](../constitution.md) requires a test to import the file
 that owns the function under test — so a test for `helpCommand` enters the graph at exactly this module
 and throws at import time, before a single assertion runs. That makes this a **prerequisite** for the
-follow-up half of [test-the-invariant-functions.md](test-the-invariant-functions.md), not a curiosity to
+follow-up half of [item 2](README.md#2-test-the-pure-invariant-functions--shipped), not a curiosity to
 file and forget. Today nothing imports `help.ts` first, so nothing breaks; the first test written for it
 is what turns latent into blocking.
 

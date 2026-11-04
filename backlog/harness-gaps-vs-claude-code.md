@@ -68,7 +68,7 @@ Worthwhile but not urgent: [glob-files-by-path.md](glob-files-by-path.md),
 
 Found during the same pass but not parity gaps: [record-attempted-tasks.md](record-attempted-tasks.md) (a defect
 in the execution loop), and the verification argument now folded into
-[test-the-invariant-functions.md](test-the-invariant-functions.md).
+[item 2](README.md#2-test-the-pure-invariant-functions--shipped), which has shipped.
 
 Blocked on a decision before any code: [background-long-running-commands.md](background-long-running-commands.md)
 (the no-parallelism non-goal), plus the two low-confidence items named above.
