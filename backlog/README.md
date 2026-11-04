@@ -1039,6 +1039,16 @@ the argument that the real fix is one extra line in the convention rather than a
 **Why here:** mechanical and safe, but the process half — whether the convention gains a
 repoint-before-delete step, and whether a check enforces it — is the user's call.
 
+### 40. [Choose the project from a list at start](choose-project-at-start.md)
+*Onboarding.* `npm run start` with no project name lists the projects under `projects/` and lets the
+user pick one; a name on the command line still starts directly. The pick has to happen in
+`scripts/run.mjs`, before `docker compose up` mounts the project — and the launcher imports nothing,
+which is the first open decision.
+
+**Why here:** filed at the end, and nothing depends on it. Read [item 17](smooth-new-project-onboarding.md)
+first: it owns switching projects without a restart, and the two should agree on what counts as a
+project. **Five open decisions in the file.**
+
 ---
 
 ## Framing notes — not tasks
