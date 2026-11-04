@@ -17,16 +17,17 @@
 //   - printable keys and backspace build the buffer;
 //   - Enter hands a non-empty buffer to onSubmit (the REPL queues it) and clears the row;
 //   - ↑ asks for the last submitted message back and puts it in the row to edit;
-//   - Shift+Enter is ignored: the row is one line, and a message being composed across lines belongs
-//     at the real prompt where readline can edit it properly;
+//   - Shift+Enter appends a real line break, which the REPL carries into the prompt intact when the turn
+//     ends. The row itself is still ONE reserved row and paints the break raw, so a buffer holding one
+//     is drawn wrong here — a known defect (backlog/multi-line-input-defects.md);
 //   - Ctrl+C is offered to onCancel FIRST: the press stops the turn in flight and the session lives on.
 //     If nothing is there to cancel — or a cancel is already unwinding, so this is the second press — the
 //     handler declines and the key is forwarded to the suspended listeners exactly as before, reaching
 //     readline and ending the session. The escape hatch never disappears; it just takes two presses while
 //     there is something worth stopping first.
 //
-// Editing is deliberately just backspace: the full buffer, with history and multi-line composition, is
-// readline's job and resumes the moment the prompt reopens.
+// Editing is deliberately just backspace and the line break: the full buffer, with history and cursor
+// movement, is readline's job and resumes the moment the prompt reopens.
 
 import { isNewlineKey } from './is-newline-key.js';
 import type { KeypressListener } from './keypress-listener.type.js';
@@ -83,9 +84,14 @@ export function captureTypeAhead(
       handlers.onChange(text);
       return;
     }
-    // isNewlineKey: Shift+Enter / Alt+Enter, which compose a line break at the prompt. Claimed here
-    // ONLY to stop the `return`/`enter` check below reading them as a submit.
-    if (isNewlineKey(key)) return;
+    // isNewlineKey: Shift+Enter / Alt+Enter. A real line break in the buffer, carried into the prompt when
+    // the turn ends. The fenced row cannot show it yet: it is one reserved row, and inputFenceRow passes
+    // the `\n` through (backlog/multi-line-input-defects.md).
+    if (isNewlineKey(key)) {
+      text += '\n';
+      handlers.onChange(text);
+      return;
+    }
     if (key?.name === 'return') {
       if (text.trim() === '') return; // an empty submit queues nothing
       handlers.onSubmit(text);

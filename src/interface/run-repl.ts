@@ -47,6 +47,8 @@ import { installLegacyInput } from '../core/ui/translate-legacy-input.js';
 import { enableKeyboardProtocol } from '../core/ui/enable-keyboard-protocol.js';
 import { createExitGuard } from './create-exit-guard.js';
 import { exitHintState } from './exit-hint-state.js';
+import { pendingSubmission } from '../core/ui/pending-submission.js';
+import { insertNewline } from '../core/ui/insert-newline.js';
 
 /** How often (ms) the status + activity line repaint while a turn runs, to tick the elapsed timer. */
 const STATUS_TICK_MS = 100;
@@ -241,14 +243,22 @@ export async function runRepl(orch: ReplOrchestrator): Promise<void> {
         if (!firstPrompt) renderer.blankLine();
         firstPrompt = false;
         renderer.inputRuleTop();
+        pendingSubmission.line = '';
         const answer = rl.question(INPUT_PROMPT);
         // Anything typed while the turn ran was held in the fenced row rather than echoed into the
         // reply (input-fence.ts). Hand it to readline as if it had just been typed here, so the box
         // opens where the user left off — with full editing back, and Enter working again.
         const typedAhead = inputFence.drain();
-        if (typedAhead !== '') rl.write(typedAhead);
+        if (typedAhead !== '') {
+          typedAhead.split('\n').forEach((part, index) => {
+            if (index > 0) insertNewline(rl); // a real break in the edit buffer, not a submit
+            if (part !== '') rl.write(part);
+          });
+        }
         statusBar.repaint(); // readline drew the prompt (and erased the rows) synchronously — restore them
-        raw = await answer;
+        const answered = await answer;
+        raw = pendingSubmission.line !== '' ? pendingSubmission.line : answered;
+        pendingSubmission.line = '';
         line = raw.trim();
       } catch {
         break;
@@ -261,6 +271,7 @@ export async function runRepl(orch: ReplOrchestrator): Promise<void> {
 
       processing = true;
       startTicker();
+      stdout.write('\x1b[?25l');
       let exitRequested = false;
       try {
         exitRequested = await runInput(orch, line, rl);
@@ -276,6 +287,7 @@ export async function runRepl(orch: ReplOrchestrator): Promise<void> {
         }
       } finally {
         stopTicker();
+        stdout.write('\x1b[?25h');
         processing = false;
         statusActivity.reset(); // clear any lingering tool/turn state so idle shows no activity field
         inputFence.reset(); // a turn that threw mid-flight must never leave stdin captured (dead prompt)

@@ -1049,6 +1049,19 @@ which is the first open decision.
 first: it owns switching projects without a restart, and the two should agree on what counts as a
 project. **Five open decisions in the file.**
 
+### 41. [Multi-line input sends the wrong text, misplaces the cursor and never shrinks](multi-line-input-defects.md)
+*Terminal UX.* Three symptoms the user saw, both at the idle prompt and in the fenced box while a turn
+runs. One cause is verified: readline does not return its own buffer — `"first\nsecond"` comes back as
+`"second\rfirst"` — and the prompt now sends the buffer instead, though that is unconfirmed in a real
+terminal. One defect is new and verified: the fenced box is one reserved row, and a line break typed
+there is painted raw into the pinned rows. The misplaced cursor and the box that never shrinks are not
+diagnosed.
+
+**Why here:** filed at the end, but it is a defect in documented behaviour — `docs/cli.md` describes
+multi-line composition as working — and the unfinished work that exposed it was committed alongside it,
+so it is a candidate to move up. Reproduce each symptom through the terminal-grid harness before fixing
+anything.
+
 ---
 
 ## Framing notes — not tasks
