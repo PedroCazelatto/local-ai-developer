@@ -12,8 +12,8 @@ npm scripts wrapping the cross-platform `scripts/run.mjs` launcher:
 The launcher also runs directly: `node scripts/run.mjs install | start <project> | stop`.
 
 > [!IMPORTANT]
-> **Never run the full app to test a change.** See the working rules in
-> [CLAUDE.md](../CLAUDE.md) — only `npm run setup` and `npm run typecheck` may be run.
+> Which of these commands Claude Code may run is stated in one place only: the working rules in
+> [CLAUDE.md](../CLAUDE.md).
 
 ## Node version
 
@@ -168,9 +168,10 @@ included — and each is announced in the scrollback (`⏳ queued: …`) the mom
 queued message is never indistinguishable from a dropped one.
 
 **↑ takes the newest queued message back** into the row to edit, and says so in the scrollback too. It
-replaces whatever is in the row at the time. Editing there is deliberately just backspace: the full
-buffer — history, arrows, multi-line composition — belongs to the prompt, which reopens with anything
-you typed but did not queue already in it.
+replaces whatever is in the row at the time. Editing there is deliberately just backspace and
+Shift+Enter, whose line break is carried into the prompt intact: the full buffer — history, arrows,
+cursor movement — belongs to the prompt, which reopens with anything you typed but did not queue
+already in it.
 
 ## Stopping a turn
 

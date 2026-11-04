@@ -22,7 +22,8 @@ that owns the topic.
 > [!IMPORTANT]
 > **Never run the full app to test a change.** `npm run start` (and `node scripts/run.mjs start`)
 > boots a live session against Ollama and burns a large number of tokens. The only npm scripts you
-> may run are **`npm run setup`**, **`npm run typecheck`** and **`npm test`**.
+> may run are **`npm run setup`**, **`npm run typecheck`** and **`npm test`**. This is the only
+> place that list lives: other docs link here instead of repeating it.
 
 - **Verify by driving code directly.** Write throwaway `.ts`/`.js` files that import and call the
   specific functions — another reason for the one-function-per-file rule: units stay callable in
