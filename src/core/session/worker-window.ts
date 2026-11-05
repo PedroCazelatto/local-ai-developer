@@ -17,6 +17,7 @@ import { COMMIT_CHANGES } from '../../tools/commit-changes.js';
 import { GIT_PUSH } from '../../tools/git-push.js';
 import { GIT_STASH } from '../../tools/git-stash.js';
 import { addTokenCounts } from './add-token-counts.js';
+import { budgetTokens } from './budget-tokens.js';
 import { appendEvent } from './events-log.js';
 import { loadPhasePrompt } from '../../context/load-phase-prompt.js';
 import { buildSystemPrompt } from '../../context/system-prompt.js';
@@ -28,15 +29,12 @@ import { recordToolCall } from './record-tool-call.js';
 import { renderer } from '../ui/renderer.js';
 import { resolvePhaseTools } from '../../phases/resolve-phase-tools.js';
 import { toolError } from '../../tools/tool-error.js';
-import { truncateHeadTail } from '../../tools/truncate.js';
+import { truncateHeadTailToTokens } from '../../tools/truncate-head-tail-to-tokens.js';
 
 // A test-first implement loop (write test → run → implement → run → summarize) needs more rounds
 // than an interactive chat turn, so give the Worker generous headroom before the loop cap trips.
 // Exported so the V3/01 fix loop reuses the SAME per-round budget it grants each interactive pass.
 export const WORKER_MAX_ROUNDS = 24;
-
-/** Max chars of a captured run_in_project result carried to the Reviewer (it can re-run for more). */
-export const TEST_RUN_CAPTURE_LIMIT = 4000;
 
 /**
  * The tools the Worker window refuses outright, each with the sentence the Worker is shown. These are
@@ -246,10 +244,13 @@ export class WorkerWindow implements TurnContext {
     const result = await dispatchToolCall(ctx, name, args, {
       onToolCall: (record) => recordToolCall(this.deps.projectPath, record),
     });
-    // Remember the last test/build run so V2/02 can seed the Reviewer with the Worker's own results.
+    // Remember the last test/build run so V2/02 can seed the Reviewer with the Worker's own results —
+    // cut to the `testRunCapture` fraction of OLLAMA_NUM_CTX, in tokens (budgetTokens); the Reviewer can
+    // re-run for more.
     if (name === 'run_in_project') {
       const command = typeof args['command'] === 'string' ? args['command'] : '';
-      this.lastTestRun = `$ ${command}\n${truncateHeadTail(result, TEST_RUN_CAPTURE_LIMIT)}`;
+      const budget = budgetTokens('testRunCapture', this.deps.llm.baseNumCtx);
+      this.lastTestRun = `$ ${command}\n${truncateHeadTailToTokens(result, budget)}`;
     }
     return result;
   }

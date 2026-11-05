@@ -10,13 +10,18 @@
 // reaches for most, and it was the one that could hand a 900-line file to a Worker whose whole window
 // is 16k. The cap is the default rather than a flag, because a cap the model must opt into never
 // fires; the numbers are what let it come back for a range instead of the file.
+//
+// The description names the LINE cap but not the token cap, on purpose: the token cap is a fraction of
+// OLLAMA_NUM_CTX known only at runtime, and this object is built when the module loads. The notice a
+// truncated read ends with names the exact cap that fired, which is where the model needs it.
 
 import { errMessage } from '../core/err-message.js';
+import { budgetTokens } from '../core/session/budget-tokens.js';
 import { decodeUtf8Strict } from './decode-utf8-strict.js';
 import { formatReadNotice } from './format-read-notice.js';
 import type { JsonObject } from './json-object.type.js';
 import { readOptionalCount } from './read-optional-count.js';
-import { READ_FILE_CHAR_LIMIT, READ_FILE_LINE_LIMIT, renderNumberedSlice } from './render-numbered-slice.js';
+import { READ_FILE_LINE_LIMIT, renderNumberedSlice } from './render-numbered-slice.js';
 import { scopeToWorkspace } from './scope-to-workspace.js';
 import { toolError } from './tool-error.js';
 import type { ToolModule } from './tool-module.type.js';
@@ -26,11 +31,10 @@ export const readFileTool: ToolModule = {
   name: 'read_file',
   description:
     'Read a UTF-8 text file from the project (path relative to the project root). Output is line-numbered ' +
-    `(\`  12→code\`), and bounded: at most ${READ_FILE_LINE_LIMIT} lines or ` +
-    `${READ_FILE_CHAR_LIMIT.toLocaleString('en-US')} characters, whichever runs out first. Every result ends ` +
-    "with the range it showed and the file's total length, so a cut file never looks like a short one. When " +
-    'you already know which part of a file you need, read only that part with `offset` and `limit` rather ' +
-    'than paying for the whole file.',
+    `(\`  12→code\`), and bounded: at most ${READ_FILE_LINE_LIMIT} lines or a token budget, whichever runs ` +
+    "out first. Every result ends with the range it showed and the file's total length, so a cut file never " +
+    'looks like a short one. When you already know which part of a file you need, read only that part with ' +
+    '`offset` and `limit` rather than paying for the whole file.',
   parameters: {
     type: 'object',
     properties: {
@@ -104,10 +108,12 @@ export const readFileTool: ToolModule = {
       return toolError(`Error reading '${path}': ${errMessage(err)}`);
     }
 
-    // renderNumberedSlice: numbers the requested window of lines and stops at the line cap or the
-    // character cap, whichever runs out first; it refuses only a starting point past the end of the
-    // file, or past the end of the line `char_offset` is aimed into.
-    const slice = renderNumberedSlice(text, offset.value ?? 0, limit.value, charOffset.value ?? 0);
+    // renderNumberedSlice: numbers the requested window of lines and stops at the line cap or the token
+    // cap — the `readFile` fraction of OLLAMA_NUM_CTX (budgetTokens) — whichever runs out first; it
+    // refuses only a starting point past the end of the file, or past the end of the line `char_offset`
+    // is aimed into.
+    const tokenCap = budgetTokens('readFile', ctx.baseNumCtx);
+    const slice = renderNumberedSlice(text, offset.value ?? 0, limit.value, charOffset.value ?? 0, tokenCap);
     if (!slice.ok) {
       return slice.past === 'end-of-file'
         ? toolError(

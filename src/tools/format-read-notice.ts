@@ -8,7 +8,7 @@
 // Whatever it names as the way to continue must actually advance. That is why a mid-line cut is
 // resumed with a `char_offset` and not merely the same line again.
 
-import { READ_FILE_CHAR_LIMIT, READ_FILE_LINE_LIMIT } from './render-numbered-slice.js';
+import { READ_FILE_LINE_LIMIT } from './render-numbered-slice.js';
 import type { NumberedSlice } from './render-numbered-slice.js';
 
 export function formatReadNotice(slice: NumberedSlice, path: string): string {
@@ -33,7 +33,7 @@ export function formatReadNotice(slice: NumberedSlice, path: string): string {
   const cap =
     slice.stoppedBy === 'line-cap'
       ? `truncated at the ${READ_FILE_LINE_LIMIT}-line cap`
-      : `truncated at the ${READ_FILE_CHAR_LIMIT.toLocaleString('en-US')}-character cap` +
+      : `truncated at the ${slice.tokenCap.toLocaleString('en-US')}-token cap` +
         // Naming the cut line matters: that row is only part of its line, so an old_string copied from
         // it would not match, and the model needs to know which row to distrust.
         (slice.cutMidLine ? ` mid-line ${slice.lastLine}` : '');

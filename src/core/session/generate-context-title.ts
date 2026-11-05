@@ -8,6 +8,7 @@ import type { ContextTitle } from './context-title.type.js';
 import type { MemoryRecord } from './memory-record.type.js';
 import type { OllamaClient } from '../llm/client.js';
 import type { TokenCounts } from '../llm/token-counts.type.js';
+import { budgetTokens } from './budget-tokens.js';
 import { buildTitleTranscript } from './build-title-transcript.js';
 import { capTitle } from './cap-title.js';
 import { loadPrompt } from '../../context/load-prompt.js';
@@ -34,7 +35,9 @@ export async function generateContextTitle(
   // loadPrompt: read rules/prompts/context-title.md fresh — an edit applies on the next call, no restart.
   const messages: Message[] = [
     { role: 'system', content: loadPrompt(PROMPT_NAME) },
-    { role: 'user', content: buildTitleTranscript(records) },
+    // buildTitleTranscript: the context's opening turns, whole turns only, cut from the head to the
+    // `titleTranscript` fraction of OLLAMA_NUM_CTX (budgetTokens).
+    { role: 'user', content: buildTitleTranscript(records, budgetTokens('titleTranscript', llm.baseNumCtx)) },
   ];
   // oneShot: one fresh call, no history and no tools; its turns never enter any phase's memory, so the
   // working phase pays nothing but wall-clock. Returns THIS call's exact tokens. 'context-title' is a

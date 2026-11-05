@@ -55,7 +55,7 @@ Anything you skip stays blocked.
 | H | surface-matching-standards | #48–#56, meta H, #88, #89 | **✅ complete — build it** |
 | I | small-model-lane-for-one-shots | #57–#60, meta I, #90 | **✅ closed without shipping**; the file is deleted |
 | J | in-turn-progress-reporting | #61–#67, meta J, #91, #92, #98, #102 | **✅ complete**; only **#62** waits, and that is your drawing rather than a question |
-| K | derive-constants-from-one-ceiling | meta F, #93, #99 | **✅ complete — build it.** Cheaper than expected; the fractions are taken as proposed |
+| K | derive-constants-from-one-ceiling | meta F, #93, #99 | **✅ shipped (item 7)** — the fractions as proposed, in estimated tokens; #93b superseded |
 | L | split-config-into-one-function-per-file | #94 | **✅ complete — build it** |
 
 **Where the new numbers went:** #68 into F, #69/#71/#72 into B, #70 into A, #73–#76 into C, #77 into A,
@@ -1166,7 +1166,7 @@ before it was killed.
 
 **What this changes:** nothing about #28 — a character cap costs nothing and the exact token count still
 arrives in the response that follows. It does bear on
-[derive-constants-from-one-ceiling.md](backlog/derive-constants-from-one-ceiling.md) #93, where the
+[item 7's entry](backlog/README.md#7-derive-every-budget-from-one-ceiling-in-exact-tokens--shipped) #93, where the
 question is whether a *character* budget may be derived from a *token* ceiling at all.
 
 ### ✅ #83 — Does the 12 000 count include `truncateHeadTail`'s elision marker?
@@ -2156,11 +2156,17 @@ the overlap since it was filed without ever deciding which one is authoritative.
 
 **What the task is.** One ceiling; every sub-value a fraction of it. The full inventory of ~20 constants,
 grouped by whether they can be derived at all, is in
-[backlog/derive-constants-from-one-ceiling.md](backlog/derive-constants-from-one-ceiling.md).
+[item 7's entry](backlog/README.md#7-derive-every-budget-from-one-ceiling-in-exact-tokens--shipped).
 
 ### ✅ #93 — Three decisions this task cannot start without
 
 **Your answer:** **a.** the configured `.env` value (`OLLAMA_NUM_CTX`). · **b.** make them exact — which turned out to be cheap, see below. · **c.** no, rounds and line caps stay as they are.
+
+> **(b) was superseded on 2026-11-05, when item 7 was built.** The user chose an approximation instead
+> of the local BPE tokenizer: *"use an approximation for now, a simple tokenizer for the input"* — a fixed
+> four characters a token, with no calibration from the response, recorded as a one-off override of the
+> constitution's exact-count rule. Reported and stored counts stay Ollama's own. See
+> [item 7's entry](backlog/README.md#7-derive-every-budget-from-one-ceiling-in-exact-tokens--shipped).
 
 
 **a. What does "the maximum context available" name?** Three different numbers, and they disagree by two
@@ -2185,7 +2191,7 @@ merges) — 4.2 MB, fetched in 2.1 s, once per model. A byte-level BPE built fro
 checked against Ollama's own `prompt_eval_count`: **exact on prose, TypeScript and JSON, in ~2 ms for
 12 000 characters** against ~5 000 ms for a probe call. So the exact-counts invariant is satisfied by
 construction rather than traded against. Full numbers and the proposed fraction table are in
-[backlog/derive-constants-from-one-ceiling.md](backlog/derive-constants-from-one-ceiling.md); the
+[item 7's entry](backlog/README.md#7-derive-every-budget-from-one-ceiling-in-exact-tokens--shipped); the
 fractions themselves need confirming in **#99**.
 
 **c. Are rounds and line caps excluded?** `WORKER_MAX_ROUNDS`, `MAX_DEBATE_ROUNDS`,

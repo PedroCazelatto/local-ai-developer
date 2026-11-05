@@ -7,6 +7,7 @@
 // next /run.
 
 import { BacklogError } from '../../core/session/backlog-error.js';
+import { budgetTokens } from '../../core/session/budget-tokens.js';
 import { dropTaskStash } from '../../core/session/drop-task-stash.js';
 import { findTask } from '../../core/session/find-task.js';
 import { openBlockerForTask } from '../../core/session/open-blocker-for-task.js';
@@ -26,6 +27,8 @@ const USAGE = 'Usage: /answer <task-id> <answer text>';
 /** The slice of the orchestrator /answer needs to spawn Retro — satisfied by SessionOrchestrator. */
 export interface AnswerOrchestrator {
   readonly projectPath: string;
+  /** OLLAMA_NUM_CTX — the failed attempt's diff is cut to a fraction of it (budget-tokens.ts). */
+  readonly numCtx: number;
   // spawnRetro: the V3/03 one-shot Retro window; patches one file (systemic uncommitted / task-specific committed).
   spawnRetro(input: RetroInput): Promise<RetroResult>;
 }
@@ -74,8 +77,9 @@ export async function dispatchAnswer(rawLine: string, orch: AnswerOrchestrator):
 
   // readTaskStashDiff: the failed Worker attempt stashed at block time (V3/05), as a bounded diff — advisory
   // evidence for Retro to see HOW the ambiguity misled implementation. The Worker never reuses it (a fresh
-  // Worker redoes the task from scratch); absent (undefined) if nothing was stashed.
-  const failedAttempt = readTaskStashDiff(projectPath, taskId) ?? undefined;
+  // Worker redoes the task from scratch); absent (undefined) if nothing was stashed. Cut to the
+  // `reviewDiff` token budget (budgetTokens), the same one the Reviewer's own diff gets.
+  const failedAttempt = readTaskStashDiff(projectPath, taskId, budgetTokens('reviewDiff', orch.numCtx)) ?? undefined;
 
   // Spawn Retro to close the learning loop: diagnose the misunderstanding, patch the one right file.
   // Retro is best-effort — a RetroError (no edit / never submitted) must not swallow the answer, so warn

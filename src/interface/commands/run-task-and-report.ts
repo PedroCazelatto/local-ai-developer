@@ -18,7 +18,7 @@ import type { RunOrchestrator } from './run-orchestrator.type.js';
 /** Run one already-eligible task through the V3/01 fix loop, render its outcome, and return it (or null on error). */
 export async function runTaskAndReport(orch: RunOrchestrator, task: Task): Promise<TaskLoopResult | null> {
   // buildSpecSlice: the Worker's focused context — its level docs + the Architecture excerpt.
-  const specSlice = buildSpecSlice(orch.projectPath, task);
+  const specSlice = buildSpecSlice(orch.projectPath, task, orch.numCtx);
   let result: TaskLoopResult;
   try {
     // runTaskLoop: persistent Worker across ≤5 rounds, fresh Reviewer each round which commits what it accepts.

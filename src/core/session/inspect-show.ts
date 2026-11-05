@@ -3,11 +3,13 @@
 
 import { boundInspectOutput } from './bound-inspect-output.js';
 import type { InspectResult } from './inspect-result.type.js';
-import { REVIEW_DIFF_BUDGET } from './review-diff-budget.js';
 import { runGit } from './run-git.js';
 
-/** One commit in full: its metadata, message and patch. `ref` is required — there is no default. */
-export function inspectShow(projectPath: string, ref: string, budget: number = REVIEW_DIFF_BUDGET): InspectResult {
+/**
+ * One commit in full: its metadata, message and patch. `ref` is required — there is no default. `budget`
+ * is in tokens (budget-tokens.ts, `reviewDiff`).
+ */
+export function inspectShow(projectPath: string, ref: string, budget: number): InspectResult {
   const show = runGit(projectPath, ['--no-pager', 'show', ref]);
   if (!show.ok) return { ok: false, output: '', truncated: false, error: `git show failed: ${show.stderr}` };
   // boundInspectOutput: head+tail truncation to `budget`, flagging whether anything was cut.

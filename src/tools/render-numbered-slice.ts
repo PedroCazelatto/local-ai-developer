@@ -1,7 +1,9 @@
 // The bounded, line-numbered window read_file returns. Two caps run at once and the first to run out
 // wins: lines are the unit the model reasons in and the unit `offset`/`limit` are expressed in, but
 // lines are not what bounds num_ctx — one minified bundle is three lines and two megabytes. The
-// character cap is the backstop that makes the line cap safe to state.
+// token cap is the backstop that makes the line cap safe to state. It is the `readFile` fraction of
+// OLLAMA_NUM_CTX (budget-fractions.ts) — 1 170 estimated tokens at 16 384 — so the caller derives it
+// and hands it in.
 //
 // Numbering is the half that stops a SECOND read: with `12→` in front of every line the model can cite
 // file:line, lift an exact `old_string` for edit_file, and come back with `offset: 340, limit: 60`
@@ -9,20 +11,19 @@
 //
 // `charOffset` is the escape hatch that keeps the promise the notice makes. A line longer than the
 // whole budget can never be finished by asking for the next LINE — the read would return the same
-// bytes forever — so a cut row is continued at the character it stopped on instead.
+// bytes forever — so a cut row is continued at the character it stopped on instead. It stays a
+// CHARACTER position although the cap is in tokens: it addresses where to resume, not how much to send.
+//
+// The token cap bounds a read AND any single line within it. One number covers both: the per-read
+// budget is the binding one (a row can never outgrow the read that holds it), so the per-line rule is
+// what the same cap means when a single line is all the read contains. It is deliberately NOT the shell
+// tools' DEFAULT_OUTPUT_LIMIT: a file dump is re-askable in ranges and the model reaches for it
+// constantly; a command's output is neither, so they are tuned apart.
+
+import { charsWithinTokens } from '../core/llm/chars-within-tokens.js';
 
 /** Lines returned when the caller names no `limit` — and the ceiling on one it does name. */
 export const READ_FILE_LINE_LIMIT = 250;
-
-/**
- * Character ceiling on a read AND on any single line within it. One number covers both: the per-read
- * budget is the binding one (a row can never outgrow the read that holds it), so the per-line rule is
- * what the same constant means when a single line is all the read contains.
- *
- * Deliberately NOT the shell tools' DEFAULT_OUTPUT_LIMIT. A file dump is re-askable in ranges and the
- * model reaches for it constantly; a command's output is neither, so they are tuned apart.
- */
-export const READ_FILE_CHAR_LIMIT = 5_000;
 
 // What a bounded read produced, and what stopped it — the notice is built from these fields alone,
 // so the wording can never disagree with the bytes that were emitted.
@@ -33,9 +34,9 @@ export const READ_FILE_CHAR_LIMIT = 5_000;
  * - `range` — the caller's own `limit` ran out while lines remained.
  * - `line-cap` — READ_FILE_LINE_LIMIT ran out while lines remained (the caller asked for no limit, or
  *   for one at least as large as the cap, so the cap is what actually stopped the read).
- * - `char-cap` — READ_FILE_CHAR_LIMIT ran out, usually part-way through a line.
+ * - `token-cap` — the caller's token cap ran out, usually part-way through a line.
  */
-export type SliceStop = 'end-of-file' | 'range' | 'line-cap' | 'char-cap';
+export type SliceStop = 'end-of-file' | 'range' | 'line-cap' | 'token-cap';
 
 /** One rendered, bounded, line-numbered window onto a file. */
 export interface NumberedSlice {
@@ -58,6 +59,8 @@ export interface NumberedSlice {
    */
   readonly nextCharOffset: number;
   readonly stoppedBy: SliceStop;
+  /** The token cap this slice was rendered under — carried so the notice quotes the cap that actually applied. */
+  readonly tokenCap: number;
   /** True when the last row shown is only part of its line, so re-reading must start AT that line, not after it. */
   readonly cutMidLine: boolean;
 }
@@ -78,14 +81,19 @@ export type NumberedSliceResult =
  * first. `offset` is 0-based and `charOffset` starts the FIRST row part-way into its line (0 for an
  * ordinary read); `requestedLimit` is null when the caller named none, and is clamped down to
  * READ_FILE_LINE_LIMIT — the model may narrow the read, never widen it (as with git_inspect's
- * `count`). Returns `ok: false` when either starting point is past the end of what it addresses.
+ * `count`). `tokenCap` is the read's budget in estimated tokens. Returns `ok: false` when either
+ * starting point is past the end of what it addresses.
  */
 export function renderNumberedSlice(
   text: string,
   offset: number,
   requestedLimit: number | null,
   charOffset: number,
+  tokenCap: number,
 ): NumberedSliceResult {
+  // charsWithinTokens: the most text `tokenCap` estimated tokens admit. The rows are measured against it
+  // in characters, which is exactly the estimate's own test (estimate-tokens.ts) and stays O(1) per row.
+  const charLimit = charsWithinTokens(tokenCap);
   const lines = text.split('\n');
   // A trailing newline terminates the last line rather than starting an empty one — drop the empty
   // tail element so totalLines agrees with what an editor and `wc -l` report.
@@ -103,6 +111,7 @@ export function renderNumberedSlice(
       nextOffset: null,
       nextCharOffset: 0,
       stoppedBy: 'end-of-file',
+      tokenCap,
       cutMidLine: false,
     };
   }
@@ -127,7 +136,7 @@ export function renderNumberedSlice(
   let used = 0;
   let lastLine = 0;
   let cutMidLine = false;
-  let charCapHit = false;
+  let tokenCapHit = false;
   let nextCharOffset = 0;
 
   for (let index = offset; index < end; index += 1) {
@@ -139,7 +148,7 @@ export function renderNumberedSlice(
     // has to be byte-identical to the file, or an old_string copied out of it stops matching.
     const row = `${prefix}${(lines[index] ?? '').slice(startChar)}`;
     const separator = rows.length === 0 ? 0 : 1; // the newline joining this row to the previous one
-    if (used + separator + row.length <= READ_FILE_CHAR_LIMIT) {
+    if (used + separator + row.length <= charLimit) {
       rows.push(row);
       used += separator + row.length;
       lastLine = index + 1;
@@ -147,7 +156,7 @@ export function renderNumberedSlice(
     }
     // The budget ran out inside this line. Keep the part that fits — but only when there is room for the
     // number plus at least one character of content, since a bare `13→` tells the model nothing.
-    const room = READ_FILE_CHAR_LIMIT - used - separator;
+    const room = charLimit - used - separator;
     if (room > prefix.length) {
       const kept = row.slice(0, room);
       rows.push(kept);
@@ -155,12 +164,12 @@ export function renderNumberedSlice(
       cutMidLine = true;
       nextCharOffset = startChar + kept.length - prefix.length;
     }
-    charCapHit = true;
+    tokenCapHit = true;
     break;
   }
 
-  const stoppedBy: SliceStop = charCapHit
-    ? 'char-cap'
+  const stoppedBy: SliceStop = tokenCapHit
+    ? 'token-cap'
     : end >= totalLines
       ? 'end-of-file'
       : limitIsCap
@@ -178,6 +187,7 @@ export function renderNumberedSlice(
     nextOffset: cutMidLine ? lastLine - 1 : lastLine >= totalLines ? null : lastLine,
     nextCharOffset,
     stoppedBy,
+    tokenCap,
     cutMidLine,
   };
 }

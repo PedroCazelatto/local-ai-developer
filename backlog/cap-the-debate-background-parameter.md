@@ -6,10 +6,11 @@
 given", and trimmed. **There is no cap anywhere.** It is the one model-supplied payload in the repo with
 no bound.
 
-Every sibling is bounded, and deliberately: `read_file` (250 lines or 5 000 characters), `search_in_files`
-(200 output lines · 200 matches · 20 per file), `git_inspect` (default 20), `list_changes` (paths, never a
-diff), `REVIEW_DIFF_BUDGET` (12 000 characters, for both the commit-message writer and the Retro stash
-diff), and `truncateHeadTail` for shell output.
+Every sibling is bounded, and deliberately: `read_file` (250 lines or the `readFile` token budget),
+`search_in_files` (200 output lines · 200 matches · 20 per file), `git_inspect` (default 20),
+`list_changes` (paths, never a diff), the `reviewDiff` token budget (for both the commit-message writer
+and the Retro stash diff), and `truncateHeadTail` for shell output. The token budgets are fractions of
+`OLLAMA_NUM_CTX` in `src/core/session/budget-fractions.ts` (backlog item 7).
 
 ## Why it costs more than it looks
 
@@ -95,13 +96,26 @@ that it had been shrunk.
 
 ## This cap is now a token budget, not a character one
 
-**#93b changed the unit under this task.** Every model-facing budget becomes an **exact token** count,
-and it turned out to be cheap: `/api/show` with `verbose: true` returns the model's full BPE vocabulary
-and merge table, so the orchestrator can tokenize locally — **verified to reproduce Ollama's own
-`prompt_eval_count` exactly, in ~2 ms for 12 000 characters.** See
-[derive-constants-from-one-ceiling.md](derive-constants-from-one-ceiling.md), which owns the mechanism.
+**Item 7 has shipped, and changed the unit under this task — but not the way #93b planned.** #93b asked
+for exact token counts from a local BPE tokenizer. When item 7 was built, the user chose an
+**approximation** instead: a fixed four characters a token (`src/core/llm/estimate-tokens.ts`), with no
+calibration, as a one-off override of the constitution's exact-count rule. Reported and stored counts are
+still Ollama's own. So every budget, this one included, is now in **estimated** tokens. See
+[item 7's entry](README.md#7-derive-every-budget-from-one-ceiling-in-exact-tokens--shipped) in the
+ledger.
 
-So #28's *"12k is a good cap"* survives as an intent rather than as a literal number: 12 000 characters
-measured **2 666 tokens** of prose and **2 964** of TypeScript, and the cap becomes whichever token
-figure is confirmed in that file's fraction table. **Ship this task after the tokenizer**, or the cap is
-written twice.
+What that means here:
+
+- **The cap is the `debateBackground` row, `base × 3/16`** — 3 072 estimated tokens at 16 384, which at
+  four characters a token is 12 288 characters, #28's *"12k is a good cap"* almost to the character.
+  Item 7 deliberately did **not** add the row, so the table never carries a budget nothing reads: add it
+  to `BUDGET_FRACTIONS` in this task, beside `reviewDiff`.
+- **The instrument is `truncateHeadTailToTokens`**, not `truncateHeadTail` (#30c named the latter when
+  only characters existed). Same head + tail shape, and the marker still sits on top of the budget —
+  #83a's rule is what item 7 adopted for every token cut. Its marker reads `[truncated ~N tokens]`.
+- **The budget is derived at runtime**, so `debate.ts` needs the base ceiling. Tools read it as
+  `ctx.baseNumCtx`, which item 7 added to `ToolContext`.
+- **The parameter description cannot quote a number that is only known at runtime** — the same
+  constraint read_file hit, where the user chose to drop the number from the description and let the
+  truncation notice name the cap that fired. #33b asks for the description to carry the budget, so how to
+  state it there is a question for the user before building, not a default to pick.

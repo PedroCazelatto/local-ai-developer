@@ -21,6 +21,12 @@ export interface ToolContext {
   readonly workspacePath: string; // "/workspace" — the mount point inside the sandbox
   readonly sandbox: SandboxClient; // Foundation/04 dockerode handle (root sandbox)
   readonly phase: string; // active phase name, for the audit row
+  /**
+   * The session's BASE token ceiling, OLLAMA_NUM_CTX — what every model-facing budget a tool applies is a
+   * fraction of (budget-tokens.ts). Read off the session's OllamaClient by createToolContext, so a tool's
+   * budget and the ceiling its window is sent under cannot come from two places.
+   */
+  readonly baseNumCtx: number;
   /** Join `relative` onto the project root, rejecting any path that escapes it (throws on escape). */
   resolve(relative: string): string;
   /**

@@ -9,6 +9,7 @@
 // This is the one git tool EVERY phase gets, the Worker included: reading history cannot damage
 // anything, and a Worker that can see how a file got the way it is writes a better change.
 
+import { budgetTokens } from '../core/session/budget-tokens.js';
 import { inspectDiff } from '../core/session/inspect-diff.js';
 import { DEFAULT_LOG_COUNT } from '../core/session/inspect-log-count.js';
 import { inspectLog } from '../core/session/inspect-log.js';
@@ -99,15 +100,18 @@ export const gitInspectTool: ToolModule = {
       return toolError("'ref' is required for what:\"show\".", 'Name the commit, e.g. ref:"HEAD" or a short sha.');
     }
 
+    // budgetTokens: the `reviewDiff` fraction of OLLAMA_NUM_CTX, in tokens — the same budget the Reviewer's
+    // own diff is cut to.
+    const budget = budgetTokens('reviewDiff', ctx.baseNumCtx);
     const result = (() => {
-      if (what === 'diff') return inspectDiff(ctx.projectPath, ref, parsed.paths);
-      if (what === 'show') return inspectShow(ctx.projectPath, ref ?? 'HEAD');
+      if (what === 'diff') return inspectDiff(ctx.projectPath, ref, parsed.paths, budget);
+      if (what === 'show') return inspectShow(ctx.projectPath, ref ?? 'HEAD', budget);
       const rawCount = args['count'];
       if (rawCount !== undefined && (typeof rawCount !== 'number' || !Number.isFinite(rawCount))) {
         return null; // reported below — keeps the count check next to the only action that uses it
       }
       // inspectLog clamps count into [1, MAX_LOG_COUNT] itself; the model cannot widen the cap.
-      return inspectLog(ctx.projectPath, ref, parsed.paths, typeof rawCount === 'number' ? rawCount : DEFAULT_LOG_COUNT);
+      return inspectLog(ctx.projectPath, ref, parsed.paths, typeof rawCount === 'number' ? rawCount : DEFAULT_LOG_COUNT, budget);
     })();
 
     if (result === null) return toolError("'count' must be a number.");

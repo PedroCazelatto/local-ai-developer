@@ -363,7 +363,7 @@ afterwards — that half is done, and item 12's bullet now says so. The same arg
 **item 6**, shipped through the second file: that item rewrites `listModels` to
 stop projecting `capabilities` away, and it now lands in `list-models.ts`. At the widened scope it also
 blocks [2](#2-test-the-pure-invariant-functions--shipped), [5](record-attempted-tasks.md) and
-[7](derive-constants-from-one-ceiling.md), each of which tests, moves or adds to a function the sweep
+[7](#7-derive-every-budget-from-one-ceiling-in-exact-tokens--shipped), each of which tests, moves or adds to a function the sweep
 will relocate.
 
 ### 2. ~~Test the pure invariant functions~~ — shipped
@@ -490,18 +490,41 @@ version check is this one's sibling. The largest of the defects and the one gati
 on this box three of nine models have no `tools` and six cannot keep their weights resident, leaving
 **exactly one** that can run the product.
 
-### 7. [Derive every budget from one ceiling, in exact tokens](derive-constants-from-one-ceiling.md)
-*Memory / context.* The local BPE tokenizer built from `/api/show` `verbose: true` — exact against
-Ollama's own `prompt_eval_count`, ~2 ms per 12 000 characters — then the fraction table: six model-facing
-budgets become exact token counts derived from the one `.env` ceiling, `BOUNDED_ONE_SHOT_NUM_CTX` becomes
-`base / 2`, and two human-facing caps stay in characters.
+### 7. ~~Derive every budget from one ceiling, in exact tokens~~ — shipped
+*Memory / context.* **Shipped — but not in exact tokens, and the title is kept as the record of what was
+planned.** Six model-facing budgets are now fractions of `OLLAMA_NUM_CTX`, written once in
+`src/core/session/budget-fractions.ts` and read through `budgetTokens(name, base)`: the git-read diff
+3/16, the titler's transcript 1/12, `read_file` 1/14, the Worker's test capture 1/16, each spec-slice
+document 1/28, and the bounded one-shots' ceiling 1/2. At the default 16 384 they land exactly on #99's
+table (8 192 · 3 072 · 1 365 · 1 170 · 1 024 · 585). `REVIEW_DIFF_BUDGET`, `TRANSCRIPT_BUDGET`,
+`READ_FILE_CHAR_LIMIT`, `TEST_RUN_CAPTURE_LIMIT`, `SPEC_ARCH_LIMIT` and `BOUNDED_ONE_SHOT_NUM_CTX` are gone;
+every window role still resolves to the base exactly, pinned by a test at four bases.
 
-**Why here:** stated — *"the tokenizer is the first half and nothing else can precede it."* Six budgets
-across five files take their unit from it, and [item 8](cap-the-debate-background-parameter.md) and
-[item 12](budget-ceilings-for-runs-and-batches.md) are both waiting on that unit. This is the first point
-in the sequence where a model-facing number changes meaning, so everything downstream is written in exact
-tokens once. Its new resolver wants [item 1](split-config-into-one-function-per-file.md)'s shape for the
-same reason item 12 does.
+**The unit is an estimate, by the user's decision when the work started, reversing #93b.** The planned
+local BPE tokenizer was dropped for **four characters a token**, with **no calibration** from
+`prompt_eval_count`. It is recorded as a **one-off override** of the constitution's exact-count rule,
+explained in `estimate-tokens.ts`'s header rather than written into `constitution.md`: only pre-send
+sizing is estimated, and every reported, stored or triggering count is still Ollama's own. Two findings
+made the BPE route worse than the task file thought. On this box, **3 of the 6 tool-capable models** do
+not use the `qwen2` split the measurement covered (`llama-bpe`, `tekken`). One of them, `qwen3.5:27b`, a
+safetensors model on the MLX runner, **exposes no vocabulary through `/api/show` at all**. And
+`/api/tokenize` is still a 404 on Ollama 0.40.11.
+
+**Four smaller calls were answered too.** The marker sits on top of the budget, as it did in
+characters, and reads `[truncated ~N tokens]`, the `~` because it is an estimate. `read_file`'s
+description **drops the number**, because the cap is only known at runtime; the notice quotes the cap that
+fired (`truncated at the 1,170-token cap`). `char_offset` stays a character position. Fractions round
+down, with integer arithmetic, so 1/12, 1/14 and 1/28 cannot land one under. **Two model-facing caps the
+inventory missed**, `execute_command`'s 20 000 characters and `run_in_project`'s 50 000 **per stream**
+(more than the whole window when both fill), were filed as **[42](shell-output-caps-in-characters.md)**
+rather than converted in passing. `ToolContext` gained `baseNumCtx`, and `RunOrchestrator` and
+`AnswerOrchestrator` gained `numCtx`. 27 new tests in 8 files (570 in all). `docs/cli.md` and
+`docs/phases.md` were corrected and handed over (review-gated).
+
+**Why it went here:** the unit had to exist before [8](cap-the-debate-background-parameter.md) and
+[12](budget-ceilings-for-runs-and-batches.md) could be written in it. Item 8's file was rewritten in the
+same change: its cap is now the `debateBackground` row, which **item 7 deliberately did not add**, so
+the table never carries a budget nothing reads.
 
 ### 8. [Cap `debate`'s `background` parameter](cap-the-debate-background-parameter.md)
 *Memory / context.* The one model-supplied payload in the repo with no bound, replayed into two windows on
@@ -533,8 +556,10 @@ before paying for its body, the seed-time match kept as an always-top-1 hint, an
 `simplified-technical-english` demoted from an unconditional load to a conditional one (#89).
 
 **Why here:** judgement, not a stated constraint — it depends on nothing in 1–9. It is placed after
-[7](derive-constants-from-one-ceiling.md) because it puts a permanent resident cost into every window, and
-that cost is easier to justify once every budget it competes with is exact rather than estimated. Its
+[7](#7-derive-every-budget-from-one-ceiling-in-exact-tokens--shipped) because it puts a permanent resident cost into every window, and
+that cost is easier to justify once every budget it competes with is exact rather than estimated. *(Item 7
+shipped those budgets as **estimates** — four characters a token — so that half of the argument no
+longer holds as written; the placement itself was not revisited.)* Its
 sharp end is #54c: telling the Reviewer a hinted rule was **not loaded** needs tracking that does not
 exist, and it is a way to fail a task on a technicality — write that prompt carefully.
 
@@ -559,7 +584,7 @@ dependents stop with it and every independent task still runs, which the batch's
 
 **Why here:** three constraints converge on this position. After
 [1](split-config-into-one-function-per-file.md) (stated), after
-[7](derive-constants-from-one-ceiling.md) (stated: it *"sets the precedent for where a derived constant
+[7](#7-derive-every-budget-from-one-ceiling-in-exact-tokens--shipped) (stated: it *"sets the precedent for where a derived constant
 lives"*), and after [11](in-turn-progress-reporting.md), which owns the live display this consumes. Read
 it together with [5](record-attempted-tasks.md). Re-read #86 before building: #38's stated reason for
 wall-clock-only does not hold, but the decision stands on a better one.
@@ -1061,6 +1086,18 @@ diagnosed.
 multi-line composition as working — and the unfinished work that exposed it was committed alongside it,
 so it is a candidate to move up. Reproduce each symptom through the terminal-grid harness before fixing
 anything.
+
+### 42. [The shell tools' output caps are still characters, and one can overrun the window](shell-output-caps-in-characters.md)
+*Memory / context.* Spun out of [7](#7-derive-every-budget-from-one-ceiling-in-exact-tokens--shipped),
+whose inventory missed them: `execute_command`'s `DEFAULT_OUTPUT_LIMIT` (20 000 characters, ~5 000
+estimated tokens) and `run_in_project`'s `RUN_OUTPUT_LIMIT` (50 000 characters **per stream**). A noisy
+`npm i` that fills both streams returns ~25 000 tokens, more than the whole 16 384 window, and neither cap
+moves with `OLLAMA_NUM_CTX`.
+
+**Why here:** filed at the end, by the user's choice not to convert them inside item 7. But
+`run_in_project` is what the Worker runs every round, so the overrun can happen in an ordinary batch,
+and this is a candidate to move up. **Three open decisions in the file**, starting with the fractions,
+because item 7's rule of preserving today's budget would preserve one larger than the window.
 
 ---
 

@@ -52,7 +52,7 @@ export async function dispatchRun(args: readonly string[], orch: RunOrchestrator
   // inversion). Per-task eligibility, dirty-tree guarding, and stashing live inside runBatch.
   const deps: BatchDeps = {
     projectPath: orch.projectPath,
-    runTask: (task, position) => orch.runTaskLoop(task, buildSpecSlice(orch.projectPath, task), buildTaskLoopReporter(task, position)),
+    runTask: (task, position) => orch.runTaskLoop(task, buildSpecSlice(orch.projectPath, task, orch.numCtx), buildTaskLoopReporter(task, position)),
     // The same signal the fence arms from a `/stop` line — the batch reads it between tasks.
     stop: orch.runStop,
   };

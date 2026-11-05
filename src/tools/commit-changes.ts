@@ -11,6 +11,7 @@
 // edit (the orchestrator's own rules/, which lives outside every project) from ever being committed
 // by a model.
 
+import { budgetTokens } from '../core/session/budget-tokens.js';
 import { commitPaths } from '../core/session/commit-paths.js';
 import { diffPaths } from '../core/session/diff-paths.js';
 import { listChangedPaths } from '../core/session/list-changed-paths.js';
@@ -90,9 +91,9 @@ export const commitChangesTool: ToolModule = {
       );
     }
 
-    // diffPaths: the REAL diff of exactly these paths (tracked edits + new-file bodies), bounded so a
-    // huge change can't blow past num_ctx in the message writer's throwaway context.
-    const diff = diffPaths(ctx.projectPath, parsed.paths);
+    // diffPaths: the REAL diff of exactly these paths (tracked edits + new-file bodies), bounded to the
+    // `reviewDiff` token budget (budgetTokens) so a huge change can't blow past the message writer's ceiling.
+    const diff = diffPaths(ctx.projectPath, parsed.paths, budgetTokens('reviewDiff', ctx.baseNumCtx));
     // composeCommitMessage: a fresh, history-free one-shot writes the message from that diff — the
     // committing phase never writes its own message, and this never enters its context.
     const message = await composeCommitMessage({

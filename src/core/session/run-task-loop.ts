@@ -28,6 +28,7 @@ import type { TokenCounts } from '../llm/token-counts.type.js';
 import { TurnAbortedError } from '../llm/turn-aborted-error.js';
 import { addTokenCounts } from './add-token-counts.js';
 import { buildWorkerFixMessage } from './build-worker-fix-message.js';
+import { budgetTokens } from './budget-tokens.js';
 import { captureChangedFiles } from './capture-changed-files.js';
 import { formatReviewFeedback } from './format-review-feedback.js';
 import type { ReviewerCommit } from './reviewer-commit.type.js';
@@ -142,8 +143,9 @@ export async function runTaskLoop(
 
       // captureChangedFiles: host `git status`/`diff` of everything since the last commit — i.e. exactly
       // what this round left over, since a prior round's Reviewer committed whatever it accepted. No diff
-      // ⇒ nothing to review — re-looping a Worker that produced nothing won't converge, so escalate.
-      const changed = captureChangedFiles(deps.projectPath);
+      // ⇒ nothing to review — re-looping a Worker that produced nothing won't converge, so escalate. The
+      // diff is cut to the `reviewDiff` fraction of OLLAMA_NUM_CTX, in tokens (budgetTokens).
+      const changed = captureChangedFiles(deps.projectPath, budgetTokens('reviewDiff', deps.llm.baseNumCtx));
       if (changed.files.length === 0) {
         setTaskStatus(deps.projectPath, task.id, 'pending');
         return {

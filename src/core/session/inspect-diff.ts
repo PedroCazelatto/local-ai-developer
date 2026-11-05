@@ -5,19 +5,18 @@
 import { boundInspectOutput } from './bound-inspect-output.js';
 import { hasHead } from './has-head.js';
 import type { InspectResult } from './inspect-result.type.js';
-import { REVIEW_DIFF_BUDGET } from './review-diff-budget.js';
 import { runGit } from './run-git.js';
 
 /**
  * Uncommitted changes against `ref` (default HEAD), optionally narrowed to `paths`. Unlike
  * captureChangedFiles this does NOT append the bodies of untracked files: this is the model's own
- * inspection tool, and a new file is one read_file away.
+ * inspection tool, and a new file is one read_file away. `budget` is in tokens (budget-tokens.ts, `reviewDiff`).
  */
 export function inspectDiff(
   projectPath: string,
   ref: string | null,
   paths: readonly string[],
-  budget: number = REVIEW_DIFF_BUDGET,
+  budget: number,
 ): InspectResult {
   // hasHead: `git rev-parse --verify HEAD` — false on a repo with no commit yet.
   if (!hasHead(projectPath)) {

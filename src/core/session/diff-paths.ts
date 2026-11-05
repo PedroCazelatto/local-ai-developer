@@ -1,11 +1,10 @@
 // The pathspec-scoped twin of capture-changed-files.ts: the real change behind EXACTLY these paths,
 // which is what the commit-message writer reads — never the committing phase's description of it.
 
-import { truncateHeadTail } from '../../tools/truncate.js';
+import { truncateHeadTailToTokens } from '../../tools/truncate-head-tail-to-tokens.js';
 import { hasHead } from './has-head.js';
 import { porcelainPath } from './porcelain-path.js';
 import { renderNewFile } from './render-new-file.js';
-import { REVIEW_DIFF_BUDGET } from './review-diff-budget.js';
 import { runGit } from './run-git.js';
 
 /**
@@ -13,8 +12,9 @@ import { runGit } from './run-git.js';
  * any new (untracked) files among them, which `git diff` omits. This is what the commit-message
  * writer reads: the real change, never the committing phase's description of it. Mirrors
  * captureChangedFiles, but pathspec-scoped so a partial commit's message describes only its own files.
+ * `budget` is in tokens (budget-tokens.ts, `reviewDiff`).
  */
-export function diffPaths(projectPath: string, paths: readonly string[], budget: number = REVIEW_DIFF_BUDGET): string {
+export function diffPaths(projectPath: string, paths: readonly string[], budget: number): string {
   if (paths.length === 0) return '';
   const statusLines = runGit(projectPath, ['status', '--porcelain', '-uall', '--', ...paths]).stdout
     .split('\n')
@@ -27,6 +27,6 @@ export function diffPaths(projectPath: string, paths: readonly string[], budget:
   // renderNewFile: reads an untracked file off the host fs as a `--- new file: <rel> ---` block.
   const newFiles = untracked.map((p) => renderNewFile(projectPath, p)).filter((s) => s !== '');
 
-  // truncateHeadTail: keeps the head and the tail of the text and elides the middle, to fit `budget`.
-  return truncateHeadTail([trackedDiff, ...newFiles].filter((s) => s !== '').join('\n\n'), budget);
+  // truncateHeadTailToTokens: keeps the head and the tail and elides the middle, to fit `budget` tokens.
+  return truncateHeadTailToTokens([trackedDiff, ...newFiles].filter((s) => s !== '').join('\n\n'), budget);
 }

@@ -51,6 +51,7 @@ export function createToolContext(init: ToolContextInit): ToolContext {
     workspacePath: WORKSPACE_PATH,
     sandbox: init.sandbox,
     phase: init.phase,
+    baseNumCtx: init.llm.baseNumCtx, // OLLAMA_NUM_CTX — what every tool's token budget is derived from
     resolve: (relative: string): string => resolveInProject(init.projectPath, relative),
     readTracker: init.readTracker, // the WINDOW's tracker, outliving this per-call context
 

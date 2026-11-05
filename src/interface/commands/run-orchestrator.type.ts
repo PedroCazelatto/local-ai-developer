@@ -12,6 +12,8 @@ import type { Task } from '../../core/session/task.type.js';
 export interface RunOrchestrator {
   readonly project: string;
   readonly projectPath: string;
+  /** OLLAMA_NUM_CTX — the Worker's spec slice is cut to a fraction of it (budget-tokens.ts). */
+  readonly numCtx: number;
   // runTaskLoop: the V3/01 implement→test→review→fix controller for one task; the Reviewer commits.
   runTaskLoop(task: Task, specSlice: string, reporter: TaskLoopReporter): Promise<TaskLoopResult>;
   /** The `/stop` wind-down request — armed for the length of a run so the fence can claim `/stop`. */

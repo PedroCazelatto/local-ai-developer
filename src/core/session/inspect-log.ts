@@ -1,24 +1,23 @@
 // Read-only history inspection — the `log` action of the git_inspect tool. Bounded twice over: by
-// COMMIT COUNT, because a log's cost is in its rows, and by the shared char budget on top.
+// COMMIT COUNT, because a log's cost is in its rows, and by the shared token budget on top.
 
 import { boundInspectOutput } from './bound-inspect-output.js';
 import { hasHead } from './has-head.js';
 import { MAX_LOG_COUNT } from './inspect-log-count.js';
 import type { InspectResult } from './inspect-result.type.js';
-import { REVIEW_DIFF_BUDGET } from './review-diff-budget.js';
 import { runGit } from './run-git.js';
 
 /**
  * One line per commit, newest first — `<short sha> <subject>`. `count` is clamped into
  * [1, MAX_LOG_COUNT]; `ref` starts the walk somewhere other than HEAD; `paths` narrows it to the
- * commits that touched those files.
+ * commits that touched those files. `budget` is in tokens (budget-tokens.ts, `reviewDiff`).
  */
 export function inspectLog(
   projectPath: string,
   ref: string | null,
   paths: readonly string[],
   count: number,
-  budget: number = REVIEW_DIFF_BUDGET,
+  budget: number,
 ): InspectResult {
   // hasHead: `git rev-parse --verify HEAD` — false on a repo with no commit yet.
   if (!hasHead(projectPath)) {

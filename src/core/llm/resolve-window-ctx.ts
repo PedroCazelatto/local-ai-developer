@@ -21,29 +21,29 @@
 // system instead, because this resolves per call rather than once per phase.
 
 import type { CallRole } from './call-role.type.js';
+import { budgetTokens } from '../session/budget-tokens.js';
+import type { BudgetName } from '../session/budget-tokens.js';
 
 /**
- * The ceiling for the BOUNDED one-shots — the three whose input has a known hard maximum.
+ * Role → the budget its ceiling is derived from, for the roles that differ from the base ONLY (see the
+ * header). Three entries, all naming the same row, listed separately rather than collapsed so that moving
+ * one role out of the bounded group is a one-line edit with nothing else to reason about.
  *
- * 8 192 buys RESIDENCY, not tokens. Measured on the RTX 3060 12 GB with `qwen2.5-coder:14b`
- * (`size_vram` / `size` from Ollama's `/api/ps`): at 8 192 the model is fully resident at 10.28 GB,
- * while at 16 384 it runs with 1.93 GB offloaded to the CPU. So a bounded one-shot runs entirely on
- * the GPU even while the session's windows do not.
+ * The three are the BOUNDED one-shots — the ones whose input has a known hard maximum — and their row,
+ * `boundedOneShotNumCtx`, is half the base (budget-fractions.ts). At the default 16 384 that is 8 192,
+ * the value this held as a measurement before it was derived, and the measurement is still the reason
+ * for the group: on the RTX 3060 12 GB with `qwen2.5-coder:14b` (`size_vram` / `size` from `/api/ps`),
+ * the model is fully resident at 8 192 while at 16 384 it runs with 1.93 GB offloaded to the CPU. So a
+ * bounded one-shot runs entirely on the GPU even while the session's windows do not. That residency is a
+ * fact about THAT ceiling on THAT card; half of some other base buys whatever it buys, unmeasured.
  *
  * It is a deliberate trade with a known cost, not a free saving: changing `num_ctx` makes Ollama
  * rebuild the runner — ~90 ms when the ceiling is unchanged, ~3.3 s when it changes — so each of these
  * calls pays roughly 6.6 s of rebuild, going down and coming back. A turn that fires none of them pays
  * nothing, which is why the roles that would fire mid-turn constantly are not in this group.
  *
- * 4 096 was rejected as too tight: the commit-message writer's worst case is 3 298 prompt tokens, at
- * REVIEW_DIFF_BUDGET's 12 000-character diff.
- */
-const BOUNDED_ONE_SHOT_NUM_CTX = 8192;
-
-/**
- * Role → ceiling, for the roles that differ from the base ONLY (see the header). Three entries, all
- * the same number, listed separately rather than collapsed so that moving one role out of the bounded
- * group is a one-line edit with nothing else to reason about.
+ * A quarter was rejected as too tight: the commit-message writer's worst case is 3 298 prompt tokens,
+ * measured at the 12 000-character diff the `reviewDiff` budget replaced.
  *
  * `summarize` is deliberately absent: its input is the oldest ~50% of a history that has just crossed
  * SUMMARIZATION_THRESHOLD_RATIO of the ceiling — ≈6 100 tokens at 16 384 — so a smaller ceiling would
@@ -53,10 +53,10 @@ const BOUNDED_ONE_SHOT_NUM_CTX = 8192;
  * and nothing caps it (backlog/cap-the-debate-background-parameter.md), and an uncapped input under a
  * reduced ceiling is silent truncation. Capping it is what would let those two join this group.
  */
-const CEILING_BY_ROLE: Partial<Record<CallRole, number>> = {
-  'context-title': BOUNDED_ONE_SHOT_NUM_CTX,
-  'search-rules': BOUNDED_ONE_SHOT_NUM_CTX,
-  'commit-message': BOUNDED_ONE_SHOT_NUM_CTX,
+const BUDGET_BY_ROLE: Partial<Record<CallRole, BudgetName>> = {
+  'context-title': 'boundedOneShotNumCtx',
+  'search-rules': 'boundedOneShotNumCtx',
+  'commit-message': 'boundedOneShotNumCtx',
 };
 
 /**
@@ -65,5 +65,7 @@ const CEILING_BY_ROLE: Partial<Record<CallRole, number>> = {
  * the persisted ceiling to the env value by construction.
  */
 export function resolveWindowCtx(role: CallRole, baseNumCtx: number): number {
-  return CEILING_BY_ROLE[role] ?? baseNumCtx;
+  const budget = BUDGET_BY_ROLE[role];
+  // budgetTokens: that row's fraction of the base, rounded down — a real ceiling, not an estimate.
+  return budget === undefined ? baseNumCtx : budgetTokens(budget, baseNumCtx);
 }
