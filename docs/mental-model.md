@@ -47,8 +47,19 @@ eviction** — past `EVICTION_THRESHOLD_RATIO` of `OLLAMA_NUM_CTX` the Worker re
 of look-only tools with a one-line stub naming the call, keeping the newest few verbatim and never
 touching a result from a tool that changed something. It costs no inference, and it never rewrites
 anything in the older half of the window, because rewriting a message forces Ollama to re-evaluate the
-prompt from that point on. Those windows are RAM-only: they persist nothing, so everything below
-describes the interactive phases.
+prompt from that point on.
+
+Those windows work from a history in RAM, but **everything they generate is also written down**. Each
+spawned window gets its own context in the same tables the phases use: the Worker, the Reviewer, Retro,
+a sub-agent, and the challenger, proponent and digest of a `debate`. Each context has one row per turn,
+written after every model reply, and keeps a turn as it was generated even after the window stubbed or
+summarized it. It is recorded under a namespaced phase (`worker:spawned`, `debate-challenger:spawned`,
+…) and given a title the orchestrator writes, naming its task, sub-agent or claim. A colon cannot come
+out of a phase filename, so **`/resume` never lists them**: they are a trace to read, not a conversation
+to reopen. Every spawned window but the short debate digest also has the **summarization failsafe**
+described below, with one difference: it protects index 1, the window's **seed** (its task, its diff,
+its claim), as well as the system prompt, and the summary takes the collapsed turns' place right after
+it. Everything else below describes the interactive phases.
 
 ### A phase context is a record, not a file
 
@@ -102,7 +113,8 @@ can be listed, described and reopened by address, which is what lets a phase —
 - **Token-threshold failsafe:** when a phase's history crosses `SUMMARIZATION_THRESHOLD_RATIO` of
   `OLLAMA_NUM_CTX`, the orchestrator summarizes the oldest turns and replaces them with a single
   summary entry. The originals stay in the database, pointed at the summary that stands in for them.
-  This is a safety valve against VRAM exhaustion, not normal operation.
+  This is a safety valve against VRAM exhaustion, not normal operation. The spawned windows have the
+  same valve, past their seed (see above).
 - **Lowering `num_ctx` hides the contexts written above it; raising it hides nothing.** Each context
   records the exact `OLLAMA_NUM_CTX` it was written under, and the listing filters on **`<=`** rather
   than on equality, because the two directions are not symmetric. **A history built for 8 192 replays

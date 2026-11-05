@@ -53,7 +53,10 @@ places and enforces none of them tells you nothing about what it was tested on.
 
 ## In-app commands (terminal)
 
-- `/swap <phase>` — switch the active phase
+- `/swap <phase>` — switch the active phase. Any file in `rules/phases/` is accepted, so `/swap worker`
+  (or `reviewer`, `retro`) is legal: it holds an interactive conversation on that phase's prompt,
+  recorded under the plain phase name. A spawned Worker records under `worker:spawned` instead, so the
+  two never meet in `/resume`.
 - `/new-project <name> <stack>` — scaffold a new project (`node` | `python`)
 - `/run <selector>` — run backlog tasks (`next` | a task id | `all`)
 - `/answer <task-id> <text>` — resolve a raised blocker (re-queues the task)
@@ -77,6 +80,9 @@ places and enforces none of them tells you nothing about what it was tested on.
   (`Batch #3`), and a bare `/batch` is the most recent
 - `/audit [n]` — the last N tool calls, one line each (`HH:mm:ss · phase · tool · exit · duration`).
   Default 20, and a larger number is not capped
+- `/events [n]` — the last N harness events: compactions, evictions, cancelled turns, debates, sub-agent
+  spawns and model switches, one line each (`HH:mm:ss · phase · type · key=value … · tokens`). The
+  explanation for a pause between tool calls. Default 20, not capped
 - `/stop` · `/stop round` — wind a running `/run` down (see *Stopping a turn* below); typed into the
   fenced input box while the run is in flight, not at an idle prompt
 - `/help` — list every command · `/exit` — quit
@@ -88,19 +94,23 @@ capability can be narrowed independently of the command the user drives.
 
 ### The inspection commands
 
-`/tasks`, `/blockers`, `/inbox`, `/batch` and `/audit` are the **come-back half of the walk-away
-loop**: start a batch, walk away, come back and read what happened without quitting the session.
-Every one of them is a **pure read** of a file the orchestrator had already written under
+`/tasks`, `/blockers`, `/inbox`, `/batch`, `/audit` and `/events` are the **come-back half of the
+walk-away loop**: start a batch, walk away, come back and read what happened without quitting the
+session. Every one of them is a **pure read** of what the orchestrator had already written under
 `projects/<name>/.orchestrator/` — no new persistence, no model call, nothing that can change a run.
+`/audit` and `/events` read the `tool_audit` and `events` tables of `memory.db`. Until backlog item 19
+those logs were `tool_audit.jsonl` and `events.jsonl`; those files are left in place and no longer
+read, and while a table is still empty the command says where the older entries are.
 
 Two of them mark the boundary of what a phase may see, and the asymmetry is deliberate:
 
 - **`/inbox` has a model counterpart, narrowed.** A phase reads its own inbox with `inbox_read`, and
   only its own — the recipient is derived from the active phase so a window can never name itself as
   someone else. `/inbox all` is the user's view across every phase, which no phase gets.
-- **`/audit` has none at all.** The audit log is the user's record of autonomous, no-confirmation tool
-  calls, and no phase can read it. A window able to read the record of its own calls could reason
-  about how they look to the user, and the log's only job is to be a record the user trusts.
+- **`/audit` and `/events` have none at all.** The audit log is the user's record of autonomous,
+  no-confirmation tool calls, and no phase can read it. A window able to read the record of its own
+  calls could reason about how they look to the user, and the log's only job is to be a record the user
+  trusts. The events log is the same kind of record of the harness's own actions.
 
 Each degrades to one recoverable line when what it reads is not there — a project with no `backlog/`,
 a blocker file no blocker has ever been written to, a batch number that is not on disk — the way
@@ -291,20 +301,34 @@ installed list to decide anything, and a session without Ollama can do nothing a
   [mental-model.md](mental-model.md).
 
   Three **throwaway one-shots** run under a smaller ceiling of their own instead — the context titler,
-  `search_rules`, and the commit-message writer, at 8 192. Each has an input with a known hard maximum,
-  and at 8 192 the model stays fully resident in VRAM where at 16 384 part of it spills to the CPU. The
-  other three one-shots stay at `OLLAMA_NUM_CTX`: summarization is handed roughly half a full window by
-  construction, and a `debate`'s material is uncapped text the model writes, so neither could take a
-  smaller window without Ollama silently dropping the front of it. The values are not configurable —
-  they are a table keyed by the call's role in
-  [src/core/llm/resolve-window-ctx.ts](../src/core/llm/resolve-window-ctx.ts).
-- `SUMMARIZATION_THRESHOLD_RATIO` — compact a phase once its exact `prompt_eval_count` reaches this
-  fraction of `OLLAMA_NUM_CTX`. Must be in `(0, 1]`.
+  `search_rules`, and the commit-message writer, at **half of `OLLAMA_NUM_CTX`**: 8 192 at the default.
+  Each has an input with a known hard maximum, and at 8 192 the model was measured fully resident in
+  VRAM on the RTX 3060 where at 16 384 part of it spills to the CPU. The other three one-shots stay at
+  `OLLAMA_NUM_CTX`: summarization is handed roughly half a full window by construction, and a `debate`'s
+  windows grow a turn every round on top of their capped material, so neither could take a smaller
+  window without Ollama silently dropping the front of it. Which roles run smaller is a table keyed by
+  the call's role in [src/core/llm/resolve-window-ctx.ts](../src/core/llm/resolve-window-ctx.ts); the
+  half is a row of the fraction table below.
+
+  **Every model-facing input budget is a fraction of it too**, so changing `OLLAMA_NUM_CTX` moves them
+  all together: the diff the Reviewer, the commit-message writer, Retro and `git_inspect` read (3/16), a
+  `debate`'s `background` (3/16), the context titler's transcript (1/12), one `read_file` result (1/14),
+  the Worker's test run carried to the Reviewer (1/16), and each document of the Worker's spec slice
+  (1/28). They are counted in **estimated** tokens — four characters a token, since Ollama has no
+  tokenize endpoint — and never stand in for a reported count, which is always Ollama's own. The
+  fractions are not configurable on their own; they live in one table,
+  [src/core/session/budget-fractions.ts](../src/core/session/budget-fractions.ts). `execute_command` and
+  `run_in_project` output caps are still in characters (backlog item 42).
+- `SUMMARIZATION_THRESHOLD_RATIO` — compact a phase, or a spawned window (the Worker, the Reviewer,
+  Retro, a sub-agent, a debate's challenger and proponent), once its exact `prompt_eval_count` reaches
+  this fraction of `OLLAMA_NUM_CTX`. A spawned window keeps its seed and summarizes what came after it.
+  Must be in `(0, 1]`.
 - `EVICTION_THRESHOLD_RATIO` — replace a spawned window's **older tool results** with a one-line stub
   once its exact `prompt_eval_count` reaches this fraction of `OLLAMA_NUM_CTX` (default `0.6`; must be
   in `(0, 1]`). Deliberately below the summarization ratio: eviction costs no inference, so it gets a
-  run first. It applies to the **Worker**, whose window persists across all five review rounds and has
-  no summarization failsafe of its own. `0.6` is a starting point, not a measured optimum.
+  run first. It applies to the **Worker**, whose window persists across all five review rounds and so
+  gets this cheaper bound ahead of the summarization failsafe. `0.6` is a starting point, not a
+  measured optimum.
 - `OLLAMA_TIMEOUT_MS` — how long one model call may go **silent** before it is abandoned (default
   `120000`). A **stall** window, not a limit on how long a turn may take: every chunk restarts it, so a
   slow-but-alive model is never killed for being slow, while a wedged or unreachable daemon surfaces as

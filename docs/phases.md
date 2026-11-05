@@ -136,6 +136,12 @@ A phase about to commit to something expensive can have the claim argued against
 - **No tools, on either side.** Both debaters argue from text alone and can read nothing, so whatever
   the caller leaves out of `background` does not exist to them. Neither one can write, commit, or raise
   anything: a debate has no authority, only an opinion.
+- **`background` is bounded.** It is replayed into both debaters' windows on every call, so past its
+  budget — 3/16 of `OLLAMA_NUM_CTX`, in estimated tokens — its middle is cut and only its start and end
+  reach the debate, with a marker where the cut was. It is truncated rather than refused, because a
+  refusal wastes a tool call inside an unattended batch. The tool and parameter descriptions tell the
+  model the material is bounded (without a number, which is only known at runtime), and a cap that fired
+  is recorded on the tool call's audit row as `backgroundTruncated` and `backgroundOmittedChars`.
 - **Neither debater grades its own fight.** A third context reads the finished transcript and writes the
   digest. If it cannot produce a readable verdict — after one reformat request — the tool returns a
   recoverable error, and no verdict is invented (the same rule as everywhere else: an absent value is
@@ -187,8 +193,9 @@ guardrails.
   Any path escaping the project repo is refused — the guard that keeps a [rules/](../rules/) edit from
   ever being committed by a model.
 - `git_inspect(what, ref?, paths?, count?)` — read-only history: `diff`, `log`, `show`. **Bounded**:
-  `diff`/`show` truncate head+tail at `REVIEW_DIFF_BUDGET`, and `log` is capped at 100 commits
-  (default 20). The model can narrow those limits, never raise them.
+  `diff`/`show` truncate head+tail at the `reviewDiff` budget (3/16 of `OLLAMA_NUM_CTX`, in estimated
+  tokens), and `log` is capped at 100 commits (default 20). The model can narrow those limits, never
+  raise them.
 - `git_stash(action, label?)` — `save` / `list` / `pop` / `drop`, addressed by a label the model
   chooses, never by `stash@{n}` (an index shifts the moment anything else is stashed). Labels live
   under `lad-shelf:`, **disjoint from the task loop's own `lad-stash:<taskId>`** records, so a model

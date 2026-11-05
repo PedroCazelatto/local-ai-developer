@@ -86,15 +86,15 @@ and gating it would break scaffolding into an empty project.
 - Tools live under [src/tools/](../src/tools/) — one model-callable tool per file.
 - **Every call is recorded twice, from one place.** `recordToolCall`
   ([src/core/session/record-tool-call.ts](../src/core/session/record-tool-call.ts)) writes the durable
-  `tool_audit.jsonl` row and prints the call's `←` line in the scrollback (docs/product.md), and every
-  audit-writing site goes through it. That includes the three **runner-level refusals** — the Worker
-  refusing `commit_changes`/`git_stash`/`git_push`, the Reviewer refusing every write tool, Retro
-  refusing a second file — which answer inside their own window and never reach the dispatcher. They
-  are the calls the record matters most for, so the hook is the audit row rather than the dispatcher's
-  `onToolCall` seam, which would miss all three.
+  audit row (memory.db's `tool_audit` table) and prints the call's `←` line in the scrollback
+  (docs/product.md), and every audit-writing site goes through it. That includes the three
+  **runner-level refusals** — the Worker refusing `commit_changes`/`git_stash`/`git_push`, the Reviewer
+  refusing every write tool, Retro refusing a second file — which answer inside their own window and
+  never reach the dispatcher. They are the calls the record matters most for, so the hook is the audit
+  row rather than the dispatcher's `onToolCall` seam, which would miss all three.
 - **A tool says what its result line should read**, on an optional `display` field of its result. Only
   the tool can: the write tools alone hold a file's bytes either side of a change, and only
   `search_in_files` knows which cap it stopped counting at. That field is **never written to the audit
-  log** — `appendAuditRow` builds its row from an explicit field list — so `tool_audit.jsonl`'s format
-  is unchanged and a diff body never enters it. A tool that sets nothing still gets a result line, from
-  its own error message or a plain `ok`.
+  log** — `appendAuditRow` builds its row from an explicit field list — so the `tool_audit` table's
+  shape is unchanged and a diff body never enters it. A tool that sets nothing still gets a result line,
+  from its own error message or a plain `ok`.
