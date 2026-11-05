@@ -9,10 +9,12 @@ import { BUDGET_FRACTIONS } from '../budget-fractions.js';
 import { budgetTokens } from '../budget-tokens.js';
 import type { BudgetName } from '../budget-tokens.js';
 
-// The "= tokens" column of OPEN-QUESTIONS.md #99, at the default 16 384.
+// The "= tokens" column of OPEN-QUESTIONS.md #99, at the default 16 384 (debateBackground is #99's
+// `debate` `background` cap row, added to the table by backlog item 8).
 const AT_DEFAULT: Readonly<Record<BudgetName, number>> = {
   boundedOneShotNumCtx: 8_192,
   reviewDiff: 3_072,
+  debateBackground: 3_072,
   titleTranscript: 1_365,
   readFile: 1_170,
   testRunCapture: 1_024,

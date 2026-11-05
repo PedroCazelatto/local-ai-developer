@@ -5,7 +5,7 @@
 // PROPONENT window defends it, and a third window distils where the argument landed. All three run on
 // `oneShot` — same model, no tools, never appended to any phase's memory — so the calling phase pays
 // context for the DIGEST alone, not for the argument that produced it. All three also stay at the BASE
-// num_ctx, because `background` is uncapped model-supplied text (see DebateDeps.oneShot). Sequential by
+// num_ctx, because a debate window grows every round (see DebateDeps.oneShot). Sequential by
 // construction: no parallelism anywhere in this project (docs/product.md), and a 3060 could not hold
 // two slots anyway.
 //

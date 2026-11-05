@@ -47,8 +47,8 @@ export interface ToolContext {
    *
    * `role` is an ARGUMENT rather than something createToolContext binds, because three tools share this
    * one function and they do not all want the same ceiling: search_rules and the commit-message writer
-   * are bounded, while `debate` replays uncapped model-supplied material and must stay at the base. A
-   * ceiling fixed when the context was built could only have been right for one of them.
+   * are bounded, while `debate`'s windows grow a turn every round and must stay at the base. A ceiling
+   * fixed when the context was built could only have been right for one of them.
    */
   oneShot(messages: Message[], role: OneShotRole): Promise<OneShotResult>;
   /**

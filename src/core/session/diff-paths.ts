@@ -28,5 +28,5 @@ export function diffPaths(projectPath: string, paths: readonly string[], budget:
   const newFiles = untracked.map((p) => renderNewFile(projectPath, p)).filter((s) => s !== '');
 
   // truncateHeadTailToTokens: keeps the head and the tail and elides the middle, to fit `budget` tokens.
-  return truncateHeadTailToTokens([trackedDiff, ...newFiles].filter((s) => s !== '').join('\n\n'), budget);
+  return truncateHeadTailToTokens([trackedDiff, ...newFiles].filter((s) => s !== '').join('\n\n'), budget).text;
 }

@@ -10,5 +10,5 @@ export function boundInspectOutput(output: string, budget: number): InspectResul
   const trimmed = output.trim();
   // truncateHeadTailToTokens: keeps the head and the tail and elides the middle, to fit `budget` tokens.
   const cut = truncateHeadTailToTokens(trimmed, budget);
-  return { ok: true, output: cut, truncated: cut.length !== trimmed.length };
+  return { ok: true, output: cut.text, truncated: cut.omittedChars > 0 };
 }

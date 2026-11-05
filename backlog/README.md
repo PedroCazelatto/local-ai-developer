@@ -521,20 +521,36 @@ rather than converted in passing. `ToolContext` gained `baseNumCtx`, and `RunOrc
 `AnswerOrchestrator` gained `numCtx`. 27 new tests in 8 files (570 in all). `docs/cli.md` and
 `docs/phases.md` were corrected and handed over (review-gated).
 
-**Why it went here:** the unit had to exist before [8](cap-the-debate-background-parameter.md) and
+**Why it went here:** the unit had to exist before [8](#8-cap-debates-background-parameter--shipped) and
 [12](budget-ceilings-for-runs-and-batches.md) could be written in it. Item 8's file was rewritten in the
 same change: its cap is now the `debateBackground` row, which **item 7 deliberately did not add**, so
 the table never carries a budget nothing reads.
 
-### 8. [Cap `debate`'s `background` parameter](cap-the-debate-background-parameter.md)
-*Memory / context.* The one model-supplied payload in the repo with no bound, replayed into two windows on
-every call — up to ten times in one debate. Truncated head+tail at the entry gate in `debate.ts`, recorded
-on the existing `debate` events row, and taught to the parameter description and the five phase files.
+### 8. ~~Cap `debate`'s `background` parameter~~ — shipped
+*Memory / context.* **Shipped.** `background` is cut head + tail at the entry gate in `debate.ts`, to the
+new `debateBackground` row of the fraction table (`base × 3/16`, 3 072 estimated tokens at 16 384, which
+is 12 288 characters and #28's 12k almost to the character). The cut is made with
+`truncateHeadTailToTokens`, which now also returns the exact characters it dropped. Driven end to end
+with a fake model: 40 000 characters in, 27 712 dropped, the marker in both debaters' seeds, and the
+digest window still never shown `background`. The ceiling half was **re-filed as
+[43](debate-windows-reduced-ceiling.md)** (#34a). `debate-turn` and `debate-digest` stay at the base,
+and the five comments that said `background` was uncapped now give the reason that remains: a debate
+window grows a turn every round.
 
-**Why here:** stated in both files — *"ship this task after the tokenizer, or the cap is written twice"*,
-once in characters and once in tokens. Its 12 000-character cap is a row in item 7's fraction table
-(`base × 3/16`). It is also the prerequisite for letting `debate-turn` and `debate-digest` take a reduced
-ceiling in `resolve-window-ctx.ts`, where they are pinned to the base for exactly this reason.
+**Two of the file's folded answers did not match the answers they cited, and the user corrected both
+before the build.** **#33** was answered *"A is very similar to B, lets try to keep both"*, meaning the
+tool description and the `background` parameter description. The file had folded it as **B + C**, which
+would have amended all five phase files. **The phase files are untouched**, and both descriptions now say
+the material is bounded, **without a number**, because the cap is only known at runtime (the same call as
+`read_file`). **#32**'s premise put `debatePromptTokens` on the *events* row, but it lives on the
+**audit** row. The cap is recorded there, beside it, as `backgroundTruncated: true` and
+`backgroundOmittedChars` (exact characters, so no estimate lands on a record that otherwise carries exact
+counts), and only when the cap fired. A debate that fails returns an error with no metadata, so a cap
+that fired on a failed debate is not recorded, exactly as `debatePromptTokens` is not.
+`docs/phases.md` and `docs/cli.md` were updated and handed over (review-gated).
+
+**Why it went here:** after [7](#7-derive-every-budget-from-one-ceiling-in-exact-tokens--shipped), or the
+cap would have been written twice, once in characters and once in tokens.
 
 ### 9. [The spawned windows have no failsafe, and no record](spawned-windows-have-no-failsafe.md)
 *Memory / context.* All **six** spawned windows get compaction — Worker, Reviewer, Retro, sub-agent and
@@ -543,7 +559,7 @@ is the window's seed. **And the second half:** every spawned window persists its
 `contexts` + `messages` under a namespaced `worker:spawned`, which `/resume`'s existing filter excludes by
 construction.
 
-**Why here:** after [8](cap-the-debate-background-parameter.md) by the files' own pairing — a cap bounds
+**Why here:** after [8](#8-cap-debates-background-parameter--shipped) by the files' own pairing — a cap bounds
 what `background` contributes at index 1, and only a failsafe bounds five rounds of argument growing on
 top of it. The widest single item still open, and the one that ends the current situation where an
 unattended overnight batch destroys every window it opens. Price the volume before building: hundreds of
@@ -1098,6 +1114,17 @@ moves with `OLLAMA_NUM_CTX`.
 `run_in_project` is what the Worker runs every round, so the overrun can happen in an ordinary batch,
 and this is a candidate to move up. **Three open decisions in the file**, starting with the fractions,
 because item 7's rule of preserving today's budget would preserve one larger than the window.
+
+### 43. [Measure the debate windows before giving them a smaller ceiling](debate-windows-reduced-ceiling.md)
+*Memory / context.* Re-filed from [8](#8-cap-debates-background-parameter--shipped) by its own #34a.
+With `background` capped, the one reason left for keeping `debate-turn` and `debate-digest` at the full
+base ceiling is that a debate window grows a turn every round. Measure the peak exact
+`prompt_eval_count` each of the three windows reaches across five rounds, then either move the two roles
+into the half-ceiling group (one line each) or record why not.
+
+**Why here:** filed at the end. It needs live Ollama runs to measure, and it should wait for
+[9](spawned-windows-have-no-failsafe.md), whose failsafe for the debate pair bounds the same growth by a
+different means and may change what the measurement has to show.
 
 ---
 

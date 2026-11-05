@@ -27,6 +27,13 @@ export const BUDGET_FRACTIONS = {
    * three git_inspect reads (inspect-diff.ts / inspect-log.ts / inspect-show.ts). 3 072 at 16 384.
    */
   reviewDiff: { numerator: 3, denominator: 16 },
+  /**
+   * `debate`'s `background` — the one model-written payload with a bound of its own, cut at the tool's
+   * entry gate (tools/debate.ts) because it is replayed into the challenger AND the proponent window on
+   * every call, up to ten times in one debate. The same 3/16 as `reviewDiff`: #28 set the old cap to that
+   * budget's 12 000 characters, as the repo's existing bound on material handed to a model. 3 072 at 16 384.
+   */
+  debateBackground: { numerator: 3, denominator: 16 },
   /** The transcript handed to the context titler (build-title-transcript.ts). 1 365 at 16 384. */
   titleTranscript: { numerator: 1, denominator: 12 },
   /** One read_file result (render-numbered-slice.ts). 1 170 at 16 384. */

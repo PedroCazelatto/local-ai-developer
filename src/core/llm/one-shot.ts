@@ -11,7 +11,7 @@
 //
 // The `num_ctx` is NOT necessarily the session's: `role` decides it (resolve-window-ctx.ts). Three of
 // the six one-shot roles are bounded and run under a smaller ceiling; the other three take the base,
-// because their input is either window-sized (`summarize`) or uncapped (`debate-*`). Passing the role
+// because their input is either window-sized (`summarize`) or grows every round (`debate-*`). Passing the role
 // rather than binding a ceiling here is what keeps that decision in one place instead of six.
 
 import type { Message } from 'ollama';

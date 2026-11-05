@@ -250,7 +250,7 @@ export class WorkerWindow implements TurnContext {
     if (name === 'run_in_project') {
       const command = typeof args['command'] === 'string' ? args['command'] : '';
       const budget = budgetTokens('testRunCapture', this.deps.llm.baseNumCtx);
-      this.lastTestRun = `$ ${command}\n${truncateHeadTailToTokens(result, budget)}`;
+      this.lastTestRun = `$ ${command}\n${truncateHeadTailToTokens(result, budget).text}`;
     }
     return result;
   }

@@ -38,6 +38,6 @@ export function captureChangedFiles(projectPath: string, budget: number): Change
 
   const combined = [trackedDiff, ...newFiles].filter((s) => s !== '').join('\n\n');
   // truncateHeadTailToTokens: keeps the head and the tail and elides the middle, to fit `budget` tokens.
-  const diff = truncateHeadTailToTokens(combined, budget);
-  return { status, files, diff, truncated: diff.length !== combined.length };
+  const cut = truncateHeadTailToTokens(combined, budget);
+  return { status, files, diff: cut.text, truncated: cut.omittedChars > 0 };
 }

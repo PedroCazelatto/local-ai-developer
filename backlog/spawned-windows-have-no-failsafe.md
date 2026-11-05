@@ -45,7 +45,7 @@ window it costs less than a plain append.
 
 - **All six windows are in scope** (#22a): Worker, Reviewer, Retro, sub-agent, and **both debate
   windows**. The debate pair was not in this file's original count of four. Including them does not
-  make [cap-the-debate-background-parameter.md](cap-the-debate-background-parameter.md) redundant — a
+  make [item 8's cap](README.md#8-cap-debates-background-parameter--shipped) redundant — a
   cap bounds what `background` contributes at index 1, and only a failsafe bounds five rounds of
   argument growing on top of it.
 - **A spawned window summarizes** (#23a) — `oneShot('summarize')`, the same instrument the interactive

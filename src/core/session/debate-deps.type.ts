@@ -14,10 +14,10 @@ export interface DebateDeps {
    * per debate turn plus once or twice for the digest; NONE of those turns enter any phase's memory.
    *
    * The loop passes `debate-turn` for an argument and `debate-digest` for the distillation, so the two
-   * are separable later. Both resolve to the BASE ceiling today, and must: `background` is free text the
-   * model writes and nothing caps it, so a reduced window would silently truncate the material the
-   * argument is about (backlog/cap-the-debate-background-parameter.md). Capping it is the prerequisite
-   * for either role joining the bounded group.
+   * are separable later. Both resolve to the BASE ceiling today, and must until a measurement says
+   * otherwise. `background` is capped now (tools/debate.ts), but a debate window still GROWS — every
+   * round adds a turn — and the bounded group's defining property is an input with a known hard maximum.
+   * Whether a measured peak would let either role take a reduced ceiling is backlog item 43.
    */
   oneShot(messages: Message[], role: OneShotRole): Promise<OneShotResult>;
   /** Called as each turn completes, so the argument prints live rather than in one block at the end. */

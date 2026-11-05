@@ -11,8 +11,17 @@
 // Available to the five phases whose arrays name it (planning + Reviewer + Retro). The Worker is
 // deliberately excluded — see phases/phase-tool-names.ts. Nothing is persisted: the transcript goes to
 // the scrollback, the cost goes to the events log, and the windows die with the call.
+//
+// `background` is CAPPED here, at the entry gate where it is already validated and trimmed (backlog item
+// 8). It is the one model-written payload that is replayed — into the challenger's seed and the
+// proponent's, then re-sent with every call each of those windows makes — so an oversized one is paid
+// for up to ten times in one debate. It is cut head + tail rather than refused: a refusal wastes a tool
+// call inside an unattended batch, and material pasted from a file often ends with its conclusion. The
+// budget is the `debateBackground` fraction of OLLAMA_NUM_CTX; neither description states the number,
+// because it is only known at runtime — the marker in the material says what was cut.
 
 import { errMessage } from '../core/err-message.js'; // an Error's message, or the thrown value stringified
+import { budgetTokens } from '../core/session/budget-tokens.js';
 import { appendEvent } from '../core/session/events-log.js';
 import { runDebate } from '../core/session/run-debate.js';
 import type { DebateOutcome } from '../core/session/debate-outcome.type.js';
@@ -24,6 +33,7 @@ import type { StructuredToolResult } from './structured-tool-result.type.js';
 import { toolError } from './tool-error.js';
 import type { ToolModule } from './tool-module.type.js';
 import type { ToolResult } from './tool-result.type.js';
+import { truncateHeadTailToTokens } from './truncate-head-tail-to-tokens.js';
 
 export const DEBATE = 'debate';
 
@@ -46,7 +56,8 @@ export const debateTool: ToolModule = {
     'objections that still stand, what held up, and what to change. The argument itself never enters ' +
     'your context — only the digest. Use it for a decision that is expensive to get wrong (an ' +
     'architectural boundary, a verdict, a diagnosis), not for an obvious call. Answer nothing yourself ' +
-    'here: state the claim, your reasoning, and the material, then read the result.',
+    'here: state the claim, your reasoning, and the material, then read the result. The material is ' +
+    'bounded: past a token budget, its middle is cut and only its start and end reach the debate.',
   parameters: {
     type: 'object',
     properties: {
@@ -66,8 +77,9 @@ export const debateTool: ToolModule = {
         type: 'string',
         description:
           'Optional: the material the claim concerns — the constraint, the schema, the relevant file ' +
-          'content — inline. Both sides argue from text only; neither can read a file, so anything you ' +
-          'leave out is a fact the debate cannot use.',
+          'content — inline. Both sides argue from text only; neither can read a file, so include the ' +
+          'facts the debate needs. It is bounded by a token budget: longer material has its middle cut ' +
+          'out, keeping the start and the end, so pass the relevant excerpt rather than a whole file.',
       },
     },
     required: ['claim', 'reasoning'],
@@ -87,11 +99,14 @@ export const debateTool: ToolModule = {
     if (background !== undefined && typeof background !== 'string') {
       return toolError("'background' must be a string when given.", 'Put the relevant material inline, or omit the field.');
     }
-    const trimmedBackground = background?.trim() ?? '';
+    // truncateHeadTailToTokens: keeps the start and the end of the material within the `debateBackground`
+    // fraction of OLLAMA_NUM_CTX (budgetTokens), with a marker where the middle was, and reports exactly
+    // how many characters it dropped. An absent `background` cuts to nothing and is still omitted below.
+    const cut = truncateHeadTailToTokens(background?.trim() ?? '', budgetTokens('debateBackground', ctx.baseNumCtx));
     const request: DebateRequest = {
       claim: claim.trim(),
       reasoning: reasoning.trim(),
-      ...(trimmedBackground === '' ? {} : { background: trimmedBackground }),
+      ...(cut.text === '' ? {} : { background: cut.text }),
     };
 
     let outcome: DebateOutcome;
@@ -151,8 +166,13 @@ export const debateTool: ToolModule = {
     const objections = outcome.digest.standingObjections.length;
     const result: StructuredToolResult = {
       content,
-      // The debate's EXACT cost on the audit row too, the way search_rules records its own one-shot.
-      metadata: { debatePromptTokens: outcome.tokens.promptTokens, debateEvalTokens: outcome.tokens.evalTokens },
+      // The debate's EXACT cost on the audit row too, the way search_rules records its own one-shot — and,
+      // beside it, a `background` cap that fired, in exact characters (#32). Absent when nothing was cut.
+      metadata: {
+        debatePromptTokens: outcome.tokens.promptTokens,
+        debateEvalTokens: outcome.tokens.evalTokens,
+        ...(cut.omittedChars > 0 ? { backgroundTruncated: true, backgroundOmittedChars: cut.omittedChars } : {}),
+      },
       // The verdict and what still stands against it — the two facts a reader of the transcript above
       // would otherwise have to re-derive. The argument itself already printed as it happened.
       display: {

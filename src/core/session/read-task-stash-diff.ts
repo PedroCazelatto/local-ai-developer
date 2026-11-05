@@ -18,5 +18,5 @@ export function readTaskStashDiff(projectPath: string, taskId: string, budget: n
   const show = runGit(projectPath, ['--no-pager', 'stash', 'show', '-p', '--include-untracked', ref]);
   const diff = show.stdout.trim();
   // truncateHeadTailToTokens: keeps the head and the tail and elides the middle, to fit `budget` tokens.
-  return diff === '' ? null : truncateHeadTailToTokens(diff, budget);
+  return diff === '' ? null : truncateHeadTailToTokens(diff, budget).text;
 }

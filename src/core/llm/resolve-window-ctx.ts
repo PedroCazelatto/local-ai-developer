@@ -49,9 +49,10 @@ import type { BudgetName } from '../session/budget-tokens.js';
  * SUMMARIZATION_THRESHOLD_RATIO of the ceiling — ≈6 100 tokens at 16 384 — so a smaller ceiling would
  * make Ollama silently drop the front of the slice, corrupting exactly what the failsafe protects.
  *
- * Both debate roles are deliberately absent too: `debate`'s `background` is free text the MODEL writes
- * and nothing caps it (backlog/cap-the-debate-background-parameter.md), and an uncapped input under a
- * reduced ceiling is silent truncation. Capping it is what would let those two join this group.
+ * Both debate roles are deliberately absent too. `debate`'s `background` is capped (tools/debate.ts),
+ * but that bounds only what a debate STARTS from: each window then grows a turn every round, and this
+ * group's defining property is an input with a known hard maximum. A reduced window under a growing
+ * input is silent truncation. Whether a measured peak would let them in is backlog item 43.
  */
 const BUDGET_BY_ROLE: Partial<Record<CallRole, BudgetName>> = {
   'context-title': 'boundedOneShotNumCtx',

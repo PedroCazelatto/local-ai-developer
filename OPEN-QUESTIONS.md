@@ -49,7 +49,7 @@ Anything you skip stays blocked.
 | B | boot-can-pick-a-toolless-model | #7–#14, #69, #71, #72, #78, #79 | **✅ complete — build it** |
 | C | node-version-is-not-enforced | #15–#21, #73–#76, #80 | **✅ complete — build it** |
 | D | spawned-windows-have-no-failsafe | #22–#27, #81, #82, #97, #101 | **✅ complete** — and the scope grew: spawned windows persist their **whole** trace |
-| E | cap-the-debate-background-parameter | #28–#34, meta E, #83 | ✅ answered; the cap's *unit* now waits on K |
+| E | cap-the-debate-background-parameter | #28–#34, meta E, #83 | ✅ shipped (item 8) — #32 and #33 corrected at build time |
 | F | tune-the-global-num-ctx-default | #35–#37, #68, #84, #85, #96, #100, #103 | **✅ closed and shipped** — 16 384 stays, the residency rule is in `docs/product.md`, the file is deleted |
 | G | budget-ceilings-for-runs-and-batches | #38–#47, #86, #87, #95 | **✅ complete** — and renamed: it bounds a **window**, not a task |
 | H | surface-matching-standards | #48–#56, meta H, #88, #89 | **✅ complete — build it** |
@@ -1098,6 +1098,10 @@ There is exactly **one caller** today, so nothing in the repo decides this.
 
 **Your answer:** *"C."* — folded into the task file.
 
+> **Corrected at build time (2026-11-05).** The premise below is wrong: the events row carries no
+> `debatePromptTokens`; that field is on the tool call's **audit** row. The user chose the audit row, with
+> `backgroundTruncated` and `backgroundOmittedChars` (exact characters), present only when the cap fired.
+
 
 **Today.** The events log gets one `debate` row per loop, carrying `debatePromptTokens` in its metadata —
 the only durable record of what those throwaway calls cost. The transcript goes to the scrollback and the
@@ -1109,6 +1113,10 @@ windows die.
 ### ✅ #33 — Do the five phase files learn the bound?
 
 **Your answer:** *"A is very similar to B, lets try to keep both."* — folded into the task file.
+
+> **Corrected at build time (2026-11-05).** The task file had folded this as B + C. The user confirmed
+> **A + B**: the tool description and the `background` parameter description carry the bound, without
+> a number (it is only known at runtime), and the five phase files are untouched.
 
 
 **Today.** All five phase files that hold `debate` push toward **more** material — the tool description
