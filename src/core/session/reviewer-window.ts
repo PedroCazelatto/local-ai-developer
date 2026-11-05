@@ -132,8 +132,22 @@ export class ReviewerWindow implements TurnContext {
     return this.tokenSum;
   }
 
+  /**
+   * The summarization failsafe (backlog item 9), awaited by the turn loop before EVERY model call: when
+   * the last call's exact prompt reached the threshold, the oldest half past the seed becomes one summary.
+   */
+  async beforeModelCall(): Promise<void> {
+    await this.deps.memory.beforeCall(this.messages);
+  }
+
+  /** The exchange ended: write whatever this window's trace still buffers (see TurnContext). */
+  onExchangeEnd(): void {
+    this.deps.memory.flush();
+  }
+
   streamAsk(userInput: string): StreamHandle {
-    this.messages.push({ role: 'user', content: userInput });
+    // memory.append: onto the window AND into its memory.db trace — never a bare push.
+    this.deps.memory.append(this.messages, { role: 'user', content: userInput });
     return this.deps.llm.stream('reviewer', this.messages, this.reviewerTools);
   }
 
@@ -142,6 +156,8 @@ export class ReviewerWindow implements TurnContext {
   }
 
   onTokens(tokens: TokenCounts): void {
+    // memory.observe: stamps the reply recorded next, and schedules the failsafe at the threshold.
+    this.deps.memory.observe(tokens);
     this.lastTokens = tokens;
     // Also accumulate across turns so the fix loop can sum the Reviewer's whole-window token cost.
     this.tokenSum = addTokenCounts(this.tokenSum, tokens);
@@ -152,11 +168,12 @@ export class ReviewerWindow implements TurnContext {
     if (toolCalls && toolCalls.length > 0) {
       entry.tool_calls = toolCalls;
     }
-    this.messages.push(entry);
+    // memory.appendReply: the reply is the flush point — it reaches memory.db with its exact counts.
+    this.deps.memory.appendReply(this.messages, entry);
   }
 
   addToolResult(toolName: string, result: string): void {
-    this.messages.push({ role: 'tool', content: result, tool_name: toolName });
+    this.deps.memory.append(this.messages, { role: 'tool', content: result, tool_name: toolName });
   }
 
   /** Terminal once a verdict OR a blocker is captured, or we gave up after the re-prompt — ends the loop. */
@@ -181,6 +198,7 @@ export class ReviewerWindow implements TurnContext {
         sandbox: this.deps.sandbox,
         phase: 'reviewer',
         llm: this.deps.llm, // backs ctx.oneShot for search_rules (V4/02) and the commit-message writer
+        summarizationThresholdRatio: this.deps.summarizationThresholdRatio, // a `debate`'s own failsafe
         readTracker: this.readTracker, // this window's own (the Reviewer cannot write, so never gated)
       });
       const result = await dispatchToolCall(ctx, name, args, {

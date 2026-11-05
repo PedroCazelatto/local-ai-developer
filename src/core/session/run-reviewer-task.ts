@@ -21,6 +21,7 @@ import { ReviewerVerdictError } from './reviewer-verdict-error.js';
 import { ReviewerWindow } from './reviewer-window.js';
 import { SUBMIT_VERDICT, parseVerdict } from '../../tools/submit-verdict.js';
 import { buildReviewerSeed } from './build-reviewer-seed.js';
+import { SpawnedMemory } from './spawned-memory.js';
 import { loadPhasePrompt } from '../../context/load-phase-prompt.js';
 import { buildSystemPrompt } from '../../context/system-prompt.js';
 import { processMessage } from './process-message.js';
@@ -51,7 +52,7 @@ export interface ReviewerOutcome {
  * all tool calls audited), and return the validated verdict + exact tokens. The window is discarded
  * when this resolves. Throws ReviewerVerdictError if the Reviewer never produced a usable verdict.
  */
-export async function runReviewerTask(deps: ReviewerDeps, input: ReviewerInput): Promise<ReviewerOutcome> {
+export async function runReviewerTask(deps: Omit<ReviewerDeps, 'memory'>, input: ReviewerInput): Promise<ReviewerOutcome> {
   // resolvePhaseTools is pure over a static registry, so this resolve and the window's own (which
   // feeds Ollama) return the same array — the prompt's "# Your Tools" list names submit_verdict,
   // raise_blocker and mark_task_done alongside the registry tools, exactly as the window sends them.
@@ -60,7 +61,16 @@ export async function runReviewerTask(deps: ReviewerDeps, input: ReviewerInput):
     resolvePhaseTools('reviewer'),
     `Project: ${deps.projectName}`,
   );
-  const window = new ReviewerWindow(deps, systemPrompt, input.task, input.round);
+  // SpawnedMemory: this round's trace in memory.db (`reviewer:spawned`) and its failsafe — a fresh
+  // Reviewer each round, so a context per round, titled with the task and the round.
+  const memory = new SpawnedMemory(deps.llm, deps.projectPath, {
+    base: 'reviewer',
+    title: `Reviewer ${input.task.id} round ${input.round}`,
+    label: 'Reviewer',
+    summarizationThresholdRatio: deps.summarizationThresholdRatio,
+    eventPhase: 'reviewer',
+  });
+  const window = new ReviewerWindow({ ...deps, memory }, systemPrompt, input.task, input.round);
   await processMessage(window, buildReviewerSeed(input), REVIEWER_MAX_ROUNDS);
 
   // A raised blocker takes precedence over any verdict: the Reviewer halted because the TASK is the

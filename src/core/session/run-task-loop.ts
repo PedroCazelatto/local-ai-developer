@@ -29,6 +29,7 @@ import { TurnAbortedError } from '../llm/turn-aborted-error.js';
 import { addTokenCounts } from './add-token-counts.js';
 import { buildWorkerFixMessage } from './build-worker-fix-message.js';
 import { budgetTokens } from './budget-tokens.js';
+import { SpawnedMemory } from './spawned-memory.js';
 import { captureChangedFiles } from './capture-changed-files.js';
 import { formatReviewFeedback } from './format-review-feedback.js';
 import type { ReviewerCommit } from './reviewer-commit.type.js';
@@ -103,7 +104,16 @@ export async function runTaskLoop(
 
   // ONE persistent Worker window for the WHOLE loop — never reset between rounds (the load-bearing
   // rule): it remembers prior attempts + Reviewer feedback and so converges (CLAUDE.md memory model).
-  const worker = new WorkerWindow(deps);
+  // SpawnedMemory: this Worker's trace in memory.db (`worker:spawned`, titled with the task) and its
+  // summarization failsafe. ONE for the whole task, because the Worker's window persists across rounds.
+  const workerMemory = new SpawnedMemory(deps.llm, deps.projectPath, {
+    base: 'worker',
+    title: `Worker ${task.id}`,
+    label: 'Worker',
+    summarizationThresholdRatio: deps.summarizationThresholdRatio,
+    eventPhase: 'worker',
+  });
+  const worker = new WorkerWindow({ ...deps, memory: workerMemory });
 
   // Running SUM of every Reviewer turn's exact tokens across all rounds. The Worker's own cumulative
   // total (worker.tokens is already summed across its turns) is added at each return site, so the

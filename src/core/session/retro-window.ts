@@ -102,8 +102,22 @@ export class RetroWindow implements TurnContext {
     return this.tokenSum;
   }
 
+  /**
+   * The summarization failsafe (backlog item 9), awaited by the turn loop before EVERY model call: when
+   * the last call's exact prompt reached the threshold, the oldest half past the seed becomes one summary.
+   */
+  async beforeModelCall(): Promise<void> {
+    await this.deps.memory.beforeCall(this.messages);
+  }
+
+  /** The exchange ended: write whatever this window's trace still buffers (see TurnContext). */
+  onExchangeEnd(): void {
+    this.deps.memory.flush();
+  }
+
   streamAsk(userInput: string): StreamHandle {
-    this.messages.push({ role: 'user', content: userInput });
+    // memory.append: onto the window AND into its memory.db trace — never a bare push.
+    this.deps.memory.append(this.messages, { role: 'user', content: userInput });
     return this.deps.llm.stream('retro', this.messages, this.retroTools);
   }
 
@@ -112,6 +126,8 @@ export class RetroWindow implements TurnContext {
   }
 
   onTokens(tokens: TokenCounts): void {
+    // memory.observe: stamps the reply recorded next, and schedules the failsafe at the threshold.
+    this.deps.memory.observe(tokens);
     this.tokenSum = addTokenCounts(this.tokenSum, tokens);
   }
 
@@ -120,11 +136,12 @@ export class RetroWindow implements TurnContext {
     if (toolCalls && toolCalls.length > 0) {
       entry.tool_calls = toolCalls;
     }
-    this.messages.push(entry);
+    // memory.appendReply: the reply is the flush point — it reaches memory.db with its exact counts.
+    this.deps.memory.appendReply(this.messages, entry);
   }
 
   addToolResult(toolName: string, result: string): void {
-    this.messages.push({ role: 'tool', content: result, tool_name: toolName });
+    this.deps.memory.append(this.messages, { role: 'tool', content: result, tool_name: toolName });
   }
 
   /** Terminal once submit_retro captured a diagnosis — ends the turn loop immediately. */
@@ -189,6 +206,7 @@ export class RetroWindow implements TurnContext {
       sandbox: this.deps.sandbox,
       phase: 'retro',
       llm: this.deps.llm, // required by createToolContext; Retro's tools don't use ctx.oneShot
+      summarizationThresholdRatio: this.deps.summarizationThresholdRatio, // a `debate`'s own failsafe
       readTracker: this.readTracker, // this window's own — backs the guard on Retro's one edit_file
     });
     return dispatchToolCall(ctx, name, args, {

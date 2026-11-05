@@ -33,22 +33,26 @@ export async function distilDebate(
   request: DebateRequest,
   transcript: readonly DebateTurn[],
 ): Promise<{ readonly digest: DebateDigest | null; readonly tokens: TokenCounts }> {
-  const messages: Message[] = [
-    { role: 'system', content: prompt },
-    // digestRequest: the claim, the reasoning, and the argument in order — never the material again.
-    { role: 'user', content: digestRequest(request, transcript) },
-  ];
+  // openWindow: the digest's own trace in memory.db (`debate-digest:spawned`). One or two calls, so it is
+  // recorded but never compacted.
+  const window = deps.openWindow('digest');
+  const messages: Message[] = [{ role: 'system', content: prompt }];
+  // digestRequest: the claim, the reasoning, and the argument in order — never the material again.
+  window.append(messages, { role: 'user', content: digestRequest(request, transcript) });
   const first = await deps.oneShot(messages, 'debate-digest');
   let tokens = first.tokens;
+  window.observe(first.tokens);
+  window.appendReply(messages, { role: 'assistant', content: first.content });
   // parseDebateDigest: the untrusted reply validated into a digest — null when it carries no boolean
   // verdict, which is the one field that cannot be defaulted.
   const parsed = parseDebateDigest(first.content);
   if (parsed !== null) return { digest: parsed, tokens };
 
-  messages.push({ role: 'assistant', content: first.content });
-  messages.push({ role: 'user', content: REFORMAT_REQUEST });
+  window.append(messages, { role: 'user', content: REFORMAT_REQUEST });
   const retry = await deps.oneShot(messages, 'debate-digest');
   // addTokenCounts: exact sums; a null metric poisons the total rather than reading as 0.
   tokens = addTokenCounts(tokens, retry.tokens);
+  window.observe(retry.tokens);
+  window.appendReply(messages, { role: 'assistant', content: retry.content });
   return { digest: parseDebateDigest(retry.content), tokens };
 }

@@ -17,6 +17,7 @@ import type { RetroDeps } from './retro-deps.type.js';
 import type { RetroInput } from './retro-input.type.js';
 import type { RetroResult } from './retro-result.type.js';
 import { RetroWindow } from './retro-window.js';
+import { SpawnedMemory } from './spawned-memory.js';
 import { routeRetroEdit } from './route-retro-edit.js';
 import { processMessage } from './process-message.js';
 
@@ -30,7 +31,7 @@ const RETRO_MAX_ROUNDS = 16;
  * if the Retro produced no edit or never submitted a diagnosis (best-effort learning — the caller keeps
  * the session alive and the answer already recorded).
  */
-export async function spawnRetro(deps: RetroDeps, input: RetroInput): Promise<RetroResult> {
+export async function spawnRetro(deps: Omit<RetroDeps, 'memory'>, input: RetroInput): Promise<RetroResult> {
   // Same pure resolve the window uses for its own defs, so the prompt's "# Your Tools" list names
   // read_phase_rule/edit_phase_rule/submit_retro exactly as the window sends them.
   const systemPrompt = buildSystemPrompt(
@@ -38,7 +39,15 @@ export async function spawnRetro(deps: RetroDeps, input: RetroInput): Promise<Re
     resolvePhaseTools('retro'),
     `Project: ${deps.projectName}`,
   );
-  const window = new RetroWindow(deps, systemPrompt);
+  // SpawnedMemory: this Retro's trace in memory.db (`retro:spawned`, titled with the task) and its failsafe.
+  const memory = new SpawnedMemory(deps.llm, deps.projectPath, {
+    base: 'retro',
+    title: `Retro ${input.task.id}`,
+    label: 'Retro',
+    summarizationThresholdRatio: deps.summarizationThresholdRatio,
+    eventPhase: 'retro',
+  });
+  const window = new RetroWindow({ ...deps, memory }, systemPrompt);
   await processMessage(window, buildRetroSeed(input), RETRO_MAX_ROUNDS);
 
   const editedAbs = window.editedFile;
@@ -49,5 +58,5 @@ export async function spawnRetro(deps: RetroDeps, input: RetroInput): Promise<Re
   if (submission === null) {
     throw new RetroError(`The Retro edited ${editedAbs} but ended without calling ${SUBMIT_RETRO}.`);
   }
-  return routeRetroEdit(deps, input.task, editedAbs, submission, window.tokens);
+  return routeRetroEdit({ ...deps, memory }, input.task, editedAbs, submission, window.tokens);
 }

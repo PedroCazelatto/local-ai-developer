@@ -29,6 +29,7 @@ import { createReadTracker } from './read-tracker.js';
 import type { FileReadTracker } from './file-read-tracker.type.js';
 import { recordToolCall } from './record-tool-call.js';
 import { shortSubagentId } from './short-subagent-id.js';
+import { SpawnedMemory } from './spawned-memory.js';
 import type { SubagentAskOutcome } from './subagent-ask-outcome.type.js';
 import type { SubagentHandle } from './subagent-handle.type.js';
 import type { SubagentInfo } from './subagent-info.type.js';
@@ -65,6 +66,11 @@ export interface SubagentState {
    * isolation runs the other way too: the master's reads do not unlock writes here.
    */
   readonly readTracker: FileReadTracker;
+  /**
+   * Its trace in memory.db (`subagent:spawned`) and its summarization failsafe (spawned-memory.ts).
+   * Every message appended to `messages` goes through it, so the trace's numbering stays aligned.
+   */
+  readonly memory: SpawnedMemory;
   /** Date.now() ms at spawn — drives the age shown by `/subagents`. */
   readonly createdAt: number;
   /** EXACT cumulative prompt_eval_count; null once any turn failed to report it (never estimated). */
@@ -81,6 +87,8 @@ export interface SubagentDeps {
   readonly projectPath: string;
   /** num_ctx recorded on each SubagentState. The model is read LIVE from `llm` at spawn (V5/02). */
   readonly numCtx: number;
+  /** SUMMARIZATION_THRESHOLD_RATIO — each sub-agent's failsafe trigger (#26b), and its ToolContext's. */
+  readonly summarizationThresholdRatio: number;
 }
 
 /** The three tools a sub-agent must NOT receive — stripped from its tool defs so it cannot nest. */
@@ -147,6 +155,16 @@ export class SubagentManager implements SubagentHandle {
       // the same way `messages` is, so neither one's reads unlock the other's writes.
       readTracker: createReadTracker(),
       createdAt: Date.now(),
+      // SpawnedMemory: its own context, titled with its short id and the first line of its task, and a
+      // failsafe whose event rows carry its id so two sub-agents' compactions stay apart (#27a).
+      memory: new SpawnedMemory(this.deps.llm, this.deps.projectPath, {
+        base: 'subagent',
+        title: `Sub-agent ${shortSubagentId(id)}: ${task.split('\n')[0] ?? ''}`,
+        label: `Sub-agent ${shortSubagentId(id)}`,
+        summarizationThresholdRatio: this.deps.summarizationThresholdRatio,
+        eventPhase: masterPhase,
+        subagentId: id,
+      }),
       promptTokens: 0,
       evalTokens: 0,
     };
@@ -209,24 +227,30 @@ export class SubagentManager implements SubagentHandle {
    * Bounded by SUBAGENT_MAX_ROUNDS so a confused sub-agent can't spin forever.
    */
   private async runTurns(state: SubagentState, userMessage: string): Promise<string> {
-    state.messages.push({ role: 'user', content: userMessage });
+    // memory.append: onto the sub-agent's history AND into its memory.db trace — never a bare push.
+    state.memory.append(state.messages, { role: 'user', content: userMessage });
     const short = shortSubagentId(state.id);
 
     for (let round = 0; round <= SUBAGENT_MAX_ROUNDS; round += 1) {
+      // memory.beforeCall: the failsafe — when the last call reached the threshold, the oldest half past
+      // the task becomes one summary. This is the seam the sub-agent never had (#26b).
+      await state.memory.beforeCall(state.messages);
       // 'subagent' is a WINDOW role — it holds tools and a history — so it sits at the base ceiling
       // alongside its master, which is what `state.numCtx` records.
       const { message, tokens } = await this.deps.llm.chat('subagent', state.messages, state.toolDefs);
       this.accumulate(state, tokens);
+      // memory.observe: stamps the reply recorded next, and schedules the failsafe at the threshold.
+      state.memory.observe(tokens);
 
       const toolCalls = message.tool_calls;
       if (!toolCalls || toolCalls.length === 0) {
-        state.messages.push({ role: 'assistant', content: message.content });
+        state.memory.appendReply(state.messages, { role: 'assistant', content: message.content });
         return message.content; // final prose — handed back to the master as the tool result
       }
 
       // qwen2.5-coder renders assistant content XOR tool_calls, so store empty content to keep the
       // tool call on replay (same rule as the shared turn loop and the Worker/Reviewer windows).
-      state.messages.push({ role: 'assistant', content: '', tool_calls: toolCalls });
+      state.memory.appendReply(state.messages, { role: 'assistant', content: '', tool_calls: toolCalls });
       for (const call of toolCalls) {
         const name = call.function.name;
         // printToolCall with the short id: same `→ <tool> <subject>` record every phase gets, indented
@@ -237,10 +261,12 @@ export class SubagentManager implements SubagentHandle {
         // spinner frame into the append-only scrollback.
         printToolCall(name, call.function.arguments, short);
         const result = await this.dispatch(state, name, call.function.arguments);
-        state.messages.push({ role: 'tool', content: result, tool_name: name });
+        state.memory.append(state.messages, { role: 'tool', content: result, tool_name: name });
       }
     }
 
+    // The cap leaves the last round's tool results recorded but unwritten — the reply is the flush point.
+    state.memory.flush();
     // Round cap reached without a plain-prose answer — surface it, never fabricate one (constitution).
     return `[sub-agent ${short} reached its ${SUBAGENT_MAX_ROUNDS}-round limit without a final answer]`;
   }
@@ -258,6 +284,7 @@ export class SubagentManager implements SubagentHandle {
       sandbox: this.deps.sandbox,
       phase: state.masterPhase,
       llm: this.deps.llm, // required by createToolContext; backs ctx.oneShot for search_rules
+      summarizationThresholdRatio: this.deps.summarizationThresholdRatio, // a `debate`'s own failsafe
       readTracker: state.readTracker, // THIS sub-agent's own — never the master's (see SubagentState)
     });
     // recordToolCall: the audit row (with this sub-agent's id for lineage) AND the `←` result line,

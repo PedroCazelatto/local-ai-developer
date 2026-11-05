@@ -117,7 +117,21 @@ export const debateTool: ToolModule = {
       // The loop names its own role per call — 'debate-turn' for an argument, 'debate-digest' for the
       // distillation — so this just forwards it rather than choosing a ceiling on the loop's behalf.
       outcome = await runDebate(
-        { oneShot: (messages, role) => ctx.oneShot(messages, role), onTurn: renderDebateTurn },
+        {
+          oneShot: (messages, role) => ctx.oneShot(messages, role),
+          onTurn: renderDebateTurn,
+          // openSpawnedMemory: each debate window's own context in memory.db, titled with the claim, and
+          // its failsafe — none for the digest, which makes one or two calls.
+          openWindow: (window) =>
+            ctx.openSpawnedMemory({
+              base: `debate-${window}`,
+              title: `Debate ${window}: ${request.claim}`,
+              label: `debate ${window}`,
+              summarizationThresholdRatio: window === 'digest' ? null : ctx.summarizationThresholdRatio,
+              eventPhase: ctx.phase,
+              eventDetail: { window },
+            }),
+        },
         request,
       );
     } catch (err) {

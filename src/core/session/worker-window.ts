@@ -129,8 +129,14 @@ export class WorkerWindow implements TurnContext {
     return this.tokenSum;
   }
 
+  /** The exchange ended: write whatever this window's trace still buffers (see TurnContext). */
+  onExchangeEnd(): void {
+    this.deps.memory.flush();
+  }
+
   streamAsk(userInput: string): StreamHandle {
-    this.messages.push({ role: 'user', content: userInput });
+    // memory.append: onto the window AND into its memory.db trace — never a bare push.
+    this.deps.memory.append(this.messages, { role: 'user', content: userInput });
     return this.deps.llm.stream('worker', this.messages, this.workerTools);
   }
 
@@ -139,6 +145,8 @@ export class WorkerWindow implements TurnContext {
   }
 
   onTokens(tokens: TokenCounts): void {
+    // memory.observe: stamps the reply recorded next, and schedules the failsafe at the threshold.
+    this.deps.memory.observe(tokens);
     // Sum exact counts across every turn so the V3/01 loop can report the Worker's whole-task cost.
     this.tokenSum = addTokenCounts(this.tokenSum, tokens);
     // A pass ran before THIS call, so this call's prompt_eval_count IS the exact post-eviction size —
@@ -156,16 +164,26 @@ export class WorkerWindow implements TurnContext {
   }
 
   /**
-   * Late-batch eviction (the turn loop awaits this before EVERY model call — turn-loop.ts). The Worker
-   * is the one window whose history persists across all five review rounds by design, and it has no
-   * summarization failsafe at all, so without this its only bound is Ollama silently dropping its oldest
-   * tokens at num_ctx.
+   * Both of this window's pre-call bounds, awaited by the turn loop before EVERY model call. Eviction
+   * runs first because it costs no inference; the summarization failsafe (backlog item 9) runs after
+   * it and independently of it — each has its own threshold and its own schedule.
+   */
+  async beforeModelCall(): Promise<void> {
+    this.evictIfScheduled();
+    // memory.beforeCall: when the last call reached SUMMARIZATION_THRESHOLD_RATIO, the oldest half past
+    // the seed becomes one summary — in place, and as a `summary` row in memory.db.
+    await this.deps.memory.beforeCall(this.messages);
+  }
+
+  /**
+   * Late-batch eviction. The Worker is the one window whose history persists across all five review
+   * rounds by design, so it is the one that gets the cheaper bound as well as the failsafe.
    *
    * Costs no inference: it rewrites the array and returns. What it does cost is prompt re-evaluation
    * from the earliest message it touched, which is why the pass refuses to touch the head of the window
    * — see evict-stale-tool-results.ts for the measurements that fixed that rule.
    */
-  async beforeModelCall(): Promise<void> {
+  private evictIfScheduled(): void {
     if (this.evictionScheduledAt === null) return;
     const before = this.evictionScheduledAt;
     // Cleared on every trip, acted on or not: a pass that declines must not re-run on every subsequent
@@ -218,11 +236,12 @@ export class WorkerWindow implements TurnContext {
     } else {
       this.summary = content; // a no-tool-call turn is the Worker's final summary
     }
-    this.messages.push(entry);
+    // memory.appendReply: the reply is the flush point — it reaches memory.db with its exact counts.
+    this.deps.memory.appendReply(this.messages, entry);
   }
 
   addToolResult(toolName: string, result: string): void {
-    this.messages.push({ role: 'tool', content: result, tool_name: toolName });
+    this.deps.memory.append(this.messages, { role: 'tool', content: result, tool_name: toolName });
   }
 
   async callTool(name: string, args: Record<string, unknown>): Promise<string> {
@@ -239,6 +258,7 @@ export class WorkerWindow implements TurnContext {
       sandbox: this.deps.sandbox,
       phase: 'worker',
       llm: this.deps.llm, // backs ctx.oneShot for search_rules (V4/02)
+      summarizationThresholdRatio: this.deps.summarizationThresholdRatio, // a `debate`'s own failsafe
       readTracker: this.readTracker, // this window's own; a sub-agent's reads never reach it
     });
     const result = await dispatchToolCall(ctx, name, args, {

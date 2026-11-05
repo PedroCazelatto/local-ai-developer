@@ -31,6 +31,11 @@ export interface TaskLoopDeps {
    * straight to `new WorkerWindow(...)`, so WorkerDeps' own fields have to be satisfiable from it.
    */
   readonly evictionThresholdRatio: number;
+  /**
+   * From SessionConfig — the fraction of num_ctx at which a Worker or Reviewer window compacts its history
+   * past its seed (spawned-memory.ts). The loop builds each window's SpawnedMemory from it.
+   */
+  readonly summarizationThresholdRatio: number;
   /** The `/stop` wind-down request, read between rounds. See run-stop-signal.ts. */
   readonly stop: RunStopSignal;
 }

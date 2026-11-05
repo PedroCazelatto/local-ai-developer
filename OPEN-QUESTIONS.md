@@ -48,7 +48,7 @@ Anything you skip stays blocked.
 | A | record-attempted-tasks | #2–#6, #70, #77 | **✅ complete — build it** |
 | B | boot-can-pick-a-toolless-model | #7–#14, #69, #71, #72, #78, #79 | **✅ complete — build it** |
 | C | node-version-is-not-enforced | #15–#21, #73–#76, #80 | **✅ complete — build it** |
-| D | spawned-windows-have-no-failsafe | #22–#27, #81, #82, #97, #101 | **✅ complete** — and the scope grew: spawned windows persist their **whole** trace |
+| D | spawned-windows-have-no-failsafe | #22–#27, #81, #82, #97, #101 | **✅ shipped (item 9)** — failsafe in all spawned windows, and their whole trace persisted |
 | E | cap-the-debate-background-parameter | #28–#34, meta E, #83 | ✅ shipped (item 8) — #32 and #33 corrected at build time |
 | F | tune-the-global-num-ctx-default | #35–#37, #68, #84, #85, #96, #100, #103 | **✅ closed and shipped** — 16 384 stays, the residency rule is in `docs/product.md`, the file is deleted |
 | G | budget-ceilings-for-runs-and-batches | #38–#47, #86, #87, #95 | **✅ complete** — and renamed: it bounds a **window**, not a task |

@@ -4,6 +4,8 @@
 import type { Message } from 'ollama';
 
 import type { DebateTurn } from './debate-turn.type.js';
+import type { DebateWindow } from './debate-window.type.js';
+import type { SpawnedMemory } from './spawned-memory.js';
 import type { OneShotRole } from '../llm/one-shot-role.type.js';
 import type { OneShotResult } from '../llm/one-shot.js';
 
@@ -22,4 +24,9 @@ export interface DebateDeps {
   oneShot(messages: Message[], role: OneShotRole): Promise<OneShotResult>;
   /** Called as each turn completes, so the argument prints live rather than in one block at the end. */
   onTurn(turn: DebateTurn): void;
+  /**
+   * Open one of the debate's windows in memory.db (`debate-<window>:spawned`) with its failsafe — the
+   * challenger and proponent compact at the threshold, the short digest is only recorded (#22a, #82a).
+   */
+  openWindow(window: DebateWindow): SpawnedMemory;
 }

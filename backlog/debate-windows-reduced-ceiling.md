@@ -33,6 +33,8 @@ across calls, not the peak of any one window, so the measurement needs per-call 
 
 ## Related
 
-Backlog item 9 gives every spawned window, the debate pair included, a summarization failsafe. That is a
-different instrument for the same growth: it would bound how large a debate window can get, which may
-change what this measurement needs to show. Read item 9's outcome before measuring.
+Backlog item 9 has shipped: the challenger and proponent now compact past their seed once their exact
+prompt reaches `SUMMARIZATION_THRESHOLD_RATIO` of the ceiling, and every debate window's turns are in
+`memory.db` under `debate-<window>:spawned`. That bounds the same growth by a different means, so the
+measurement has to show a peak with the failsafe in place — and the per-call `prompt_tokens` it needs
+are now on each reply's row, so it can be read from the database rather than instrumented.

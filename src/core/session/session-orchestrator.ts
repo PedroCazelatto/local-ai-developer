@@ -73,6 +73,8 @@ export class SessionOrchestrator implements TurnContext {
   private lastTokens: TokenCounts = NO_TOKENS;
   /** Handed to each spawned Worker window; see task-loop-deps.type.ts and worker-window.ts. */
   private readonly evictionThresholdRatio: number;
+  /** Handed to every spawned window's failsafe (spawned-memory.ts) and on to each ToolContext. */
+  private readonly summarizationThresholdRatio: number;
 
   // Summarization failsafe (V4/05). The trigger point (exact tokens): a phase whose last
   // prompt_eval_count reaches this many tokens is scheduled to compact before its NEXT model call.
@@ -127,6 +129,7 @@ export class SessionOrchestrator implements TurnContext {
     // Kept as the RATIO, not a threshold: it belongs to the spawned Worker window, which resolves it
     // against the client's own num_ctx when it is created (worker-runner.ts).
     this.evictionThresholdRatio = config.evictionThresholdRatio;
+    this.summarizationThresholdRatio = config.summarizationThresholdRatio;
     this.llm = llm;
     this.sandbox = sandbox;
     // SQLite-backed (memory.db under the project's .orchestrator/). numCtx is stamped on every context
@@ -150,6 +153,7 @@ export class SessionOrchestrator implements TurnContext {
       projectName: this.project,
       projectPath: this.projectPath,
       numCtx: this.numCtx,
+      summarizationThresholdRatio: this.summarizationThresholdRatio,
     });
   }
 
@@ -381,6 +385,7 @@ export class SessionOrchestrator implements TurnContext {
         projectName: this.project,
         projectPath: this.projectPath,
         evictionThresholdRatio: this.evictionThresholdRatio,
+        summarizationThresholdRatio: this.summarizationThresholdRatio,
         // The session's one wind-down request: the loop reads it between rounds, so `/stop round` lands
         // on the round boundary rather than tearing down the round already running.
         stop: this.runStop,
@@ -406,6 +411,7 @@ export class SessionOrchestrator implements TurnContext {
         sandbox: this.sandbox,
         projectName: this.project,
         projectPath: this.projectPath,
+        summarizationThresholdRatio: this.summarizationThresholdRatio,
       },
       input,
     );
@@ -611,6 +617,7 @@ export class SessionOrchestrator implements TurnContext {
       sandbox: this.sandbox,
       phase: this.phase.name,
       llm: this.llm, // backs ctx.oneShot for search_rules (V4/02)
+      summarizationThresholdRatio: this.summarizationThresholdRatio, // a `debate`'s own failsafe
       subagents: this.subagents, // ONLY the interactive master phases can spawn sub-agents (V5/01)
       readTracker: this.trackerForActivePhase(), // survives this per-call context; see read-tracker.ts
     });

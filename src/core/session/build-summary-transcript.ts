@@ -4,11 +4,11 @@
 // Named buildSummaryTranscript because generate-context-title.ts declared its own `buildTranscript`
 // with a DIFFERENT body -- head-bounded, because a title only needs the opening.
 
-import type { MemoryRecord } from './memory-record.type.js';
 import { renderTurn } from './render-turn.js';
+import type { RenderableTurn } from './render-turn.js';
 
 /** Render the selected turns as a readable transcript for the summarizer (roles + tool context kept). */
-export function buildSummaryTranscript(records: readonly MemoryRecord[]): string {
+export function buildSummaryTranscript(records: readonly RenderableTurn[]): string {
   // renderTurn: one turn as `[role]` + content + any tool calls — shared with the context-title writer,
   // so both throwaway contexts read a transcript in exactly the same shape.
   return `Summarize this earlier transcript slice:\n\n${records.map(renderTurn).join('\n\n')}`;

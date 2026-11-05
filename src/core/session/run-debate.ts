@@ -14,8 +14,9 @@
 // NOT the reasoning, so its objections are its own rather than a critique of the caller's wording. The
 // challenger also moves first — its opening objection is what there is to defend.
 //
-// Nothing here prints or persists. `onTurn` is where the caller renders each turn live, and the caller
-// owns the events-log row; this file is the argument and nothing else.
+// Nothing here prints or persists by itself. `onTurn` is where the caller renders each turn live, the
+// caller owns the debate's events-log row, and each window's memory.db trace and summarization failsafe
+// come in through `deps.openWindow` (backlog item 9) — this file is the argument and nothing else.
 
 import type { Message } from 'ollama';
 
@@ -52,6 +53,10 @@ export async function runDebate(deps: DebateDeps, request: DebateRequest): Promi
   const challenger: Message[] = [{ role: 'system', content: loadPrompt(CHALLENGER_PROMPT) }];
   const proponent: Message[] = [{ role: 'system', content: loadPrompt(PROPONENT_PROMPT) }];
   const digestPrompt = loadPrompt(DIGEST_PROMPT);
+  // openWindow: each debater's trace in memory.db and its failsafe. Every message past the system prompt
+  // goes through them, so the trace's numbering stays aligned with the array.
+  const challengerMemory = deps.openWindow('challenger');
+  const proponentMemory = deps.openWindow('proponent');
 
   // Every call's EXACT counts fold into one running total; a metric Ollama omitted poisons the sum to
   // null rather than being read as 0 (constitution: token counts are always exact).
@@ -65,10 +70,13 @@ export async function runDebate(deps: DebateDeps, request: DebateRequest): Promi
   let proponentSeeded = false;
 
   for (let round = 1; round <= MAX_DEBATE_ROUNDS; round += 1) {
-    challenger.push({ role: 'user', content: nextForChallenger });
+    // beforeCall: compacts this window past its seed when its last call reached the threshold (#82a).
+    await challengerMemory.beforeCall(challenger);
+    challengerMemory.append(challenger, { role: 'user', content: nextForChallenger });
     const attack = await deps.oneShot(challenger, 'debate-turn');
     tokens = addTokenCounts(tokens, attack.tokens);
-    challenger.push({ role: 'assistant', content: attack.content });
+    challengerMemory.observe(attack.tokens);
+    challengerMemory.appendReply(challenger, { role: 'assistant', content: attack.content });
 
     // readChallengerStatus: splits the mandatory STATUS: line off; no line ⇒ still objecting.
     const status = readChallengerStatus(attack.content);
@@ -80,7 +88,8 @@ export async function runDebate(deps: DebateDeps, request: DebateRequest): Promi
     deps.onTurn(objection);
     if (conceded) break; // the challenger ran out of real objections: the claim held
 
-    proponent.push({
+    await proponentMemory.beforeCall(proponent);
+    proponentMemory.append(proponent, {
       role: 'user',
       content: proponentSeeded
         ? nextObjectionRequest(status.body, round)
@@ -89,7 +98,8 @@ export async function runDebate(deps: DebateDeps, request: DebateRequest): Promi
     proponentSeeded = true;
     const defence = await deps.oneShot(proponent, 'debate-turn');
     tokens = addTokenCounts(tokens, defence.tokens);
-    proponent.push({ role: 'assistant', content: defence.content });
+    proponentMemory.observe(defence.tokens);
+    proponentMemory.appendReply(proponent, { role: 'assistant', content: defence.content });
 
     const body = defence.content.trim();
     if (body === '') break; // an empty defence ends the argument; the digest reports what stands

@@ -15,9 +15,16 @@ export interface TurnContext {
   /**
    * Optional failsafe hook run BEFORE each model call (V4/05). The orchestrator uses it to compact an
    * over-threshold phase's history synchronously, so the imminent call streams on the shrunken view.
-   * Absent for spawned windows (Worker/Reviewer/Retro) — they have no persisted history to compact.
+   * The spawned windows implement it too, for their own failsafe (spawned-memory.ts) — the Worker
+   * runs its tool-result eviction here first.
    */
   beforeModelCall?(): Promise<void>;
+  /**
+   * Optional: the exchange processMessage was running has ended — normally, at the round cap, or by a
+   * throw. The spawned windows write whatever their memory.db trace still buffers (a tool result at
+   * the cap, say); the interactive phases flush on their own schedule and leave it absent.
+   */
+  onExchangeEnd?(): void;
   /** Add the user message to memory, then start streaming the reply. */
   streamAsk(userInput: string): StreamHandle;
   /** Stream the next assistant turn from current memory WITHOUT injecting a user message. */

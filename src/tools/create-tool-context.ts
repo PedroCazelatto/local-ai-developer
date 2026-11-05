@@ -10,6 +10,8 @@ import type { OllamaClient } from '../core/llm/client.js';
 import type { OneShotRole } from '../core/llm/one-shot-role.type.js';
 import type { OneShotResult } from '../core/llm/one-shot.js';
 import type { FileReadTracker } from '../core/session/file-read-tracker.type.js';
+import { SpawnedMemory } from '../core/session/spawned-memory.js';
+import type { SpawnedWindowSpec } from '../core/session/spawned-window-spec.type.js';
 import type { SubagentHandle } from '../core/session/subagent-handle.type.js';
 // Joins a path onto the project root and throws on any escape, symlinks resolved.
 import { resolveInProject } from './resolve-in-project.js';
@@ -23,6 +25,8 @@ export interface ToolContextInit {
   readonly phase: string;
   /** The session's OllamaClient — backs ctx.oneShot for the standards-retrieval tools (V4/02). */
   readonly llm: OllamaClient;
+  /** SUMMARIZATION_THRESHOLD_RATIO — what a tool's own spawned windows (debate) compact at. */
+  readonly summarizationThresholdRatio: number;
   /**
    * THIS window's read tracker (core/session/read-tracker.ts). One per window and passed in rather than
    * created here: createToolContext runs once per dispatched call, so a tracker built here would forget
@@ -54,6 +58,9 @@ export function createToolContext(init: ToolContextInit): ToolContext {
     baseNumCtx: init.llm.baseNumCtx, // OLLAMA_NUM_CTX — what every tool's token budget is derived from
     resolve: (relative: string): string => resolveInProject(init.projectPath, relative),
     readTracker: init.readTracker, // the WINDOW's tracker, outliving this per-call context
+    summarizationThresholdRatio: init.summarizationThresholdRatio,
+    // A SpawnedMemory bound to the session's client and project: a debate's three windows open theirs here.
+    openSpawnedMemory: (spec: SpawnedWindowSpec): SpawnedMemory => new SpawnedMemory(init.llm, init.projectPath, spec),
 
     // The ROLE comes from the calling tool, not from here — see ToolContext.oneShot for why binding one
     // ceiling at construction could only ever have been right for one of the three tools that share it.

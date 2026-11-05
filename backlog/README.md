@@ -552,18 +552,43 @@ that fired on a failed debate is not recorded, exactly as `debatePromptTokens` i
 **Why it went here:** after [7](#7-derive-every-budget-from-one-ceiling-in-exact-tokens--shipped), or the
 cap would have been written twice, once in characters and once in tokens.
 
-### 9. [The spawned windows have no failsafe, and no record](spawned-windows-have-no-failsafe.md)
-*Memory / context.* All **six** spawned windows get compaction — Worker, Reviewer, Retro, sub-agent and
-both debate windows — summarizing at the existing 0.75 ratio with `[0]` and `[1]` protected, because `[1]`
-is the window's seed. **And the second half:** every spawned window persists its whole trace into
-`contexts` + `messages` under a namespaced `worker:spawned`, which `/resume`'s existing filter excludes by
-construction.
+### 9. ~~The spawned windows have no failsafe, and no record~~ — shipped
+*Memory / context.* **Shipped, both halves.** Each spawned window now holds one `SpawnedMemory`
+(`src/core/session/spawned-memory.ts`): the Worker, the Reviewer (one per round), Retro, every
+sub-agent, and the challenger, proponent and digest of a debate. Every message past the system prompt
+is appended through it, so the window's array and its trace cannot fall out of step. **The failsafe** is
+the interactive one's instrument and trigger: the exact `prompt_eval_count` against
+`SUMMARIZATION_THRESHOLD_RATIO`, scheduled by one call and run before the next, with `summarization_fire`
+deferred to the next call's exact "after". It differs in protecting `[0]` **and `[1]`** (#24a), and in
+putting the summary **in place** of what it collapsed. The Worker runs its eviction first, then this,
+independently. The sub-agent got the seam the task file said it lacked (#26b), and its event rows carry
+`subagentId` (#27a); a debate's carry `window`. **The record** is a "small dedicated writer"
+(`spawned-trace.ts`) over the same SQL helpers as `SessionMemory`. It gives each window a context under
+`<base>:spawned` (#101b), with a title the orchestrator writes (`Worker 01-login-form`,
+`Reviewer 01-login-form round 2`, `Sub-agent 3f2a: <task>`, `Debate challenger: <claim>`). It writes
+once per model reply, keeps a turn as it was generated even after eviction stubbed it in RAM, and
+flushes what an exchange leaves behind through a new `onExchangeEnd` hook on the turn loop.
 
-**Why here:** after [8](#8-cap-debates-background-parameter--shipped) by the files' own pairing — a cap bounds
-what `background` contributes at index 1, and only a failsafe bounds five rounds of argument growing on
-top of it. The widest single item still open, and the one that ends the current situation where an
-unattended overnight batch destroys every window it opens. Price the volume before building: hundreds of
-`messages` rows per task.
+**Decided with the user at build time:** the dedicated writer over a `SessionMemory` per window; the
+flush after every reply; originals kept, never the RAM stub; all three debate windows recorded, by window
+name, with the short digest recorded but never compacted; orchestrator-written titles, since the task
+file allowed no new column; and four defaults (summary in place, eviction before summarization,
+the event-row `phase` the log already uses for each window, and `/swap worker` kept legal and documented
+in `docs/cli.md`, the call the task file delegated to build time). **The volume was priced first:**
+≈60–120 rows a typical task and ≈450 at worst, roughly 0.2–2 MB a task. A row can reach ~100 KB through
+`run_in_project`'s character cap, which is [42](shell-output-caps-in-characters.md).
+
+**Built in a tree the user's paused session had uncommitted work in** — the live-window status line,
+in the same seven windows and loop files. Every edit was written as anchors that exist in both versions,
+replayed onto a clean HEAD for the commit, and verified there alone. That work is untouched and
+uncommitted. 8 new tests (579 in all), the first to open `memory.db` in the suite (SpawnedTrace against a real
+database in the OS temp directory, including the `/resume` listing that must not show a spawned
+context). The failsafe was driven end to end with a fake client: a full debate, a Worker window and a
+sub-agent. `docs/mental-model.md` and `docs/cli.md` were corrected and handed over (review-gated).
+
+**Why it went here:** after [8](#8-cap-debates-background-parameter--shipped) by the files' own pairing: a
+cap bounds what `background` contributes at index 1, and only a failsafe bounds five rounds of argument
+growing on top of it.
 
 ### 10. [Make the standards visible](surface-matching-standards.md)
 *Model behavior.* All nine standard names resident at `ctx[0]` in every phase (~50 exact tokens, 0.3 % of
@@ -678,7 +703,7 @@ surfaces, so an unexplained pause has no in-app explanation. Both logs become **
 existing `memory.db`: the concerns stay distinct in the schema, and what unifies is the store and the
 reader.
 
-**Why here:** after [9](spawned-windows-have-no-failsafe.md), which is what makes `memory.db` the store
+**Why here:** after [9](#9-the-spawned-windows-have-no-failsafe-and-no-record--shipped), which is what makes `memory.db` the store
 for everything a window said; the two grow side by side and item 9's file names the overlap. It also
 inherits [item 11](in-turn-progress-reporting.md)'s residue — `runBatch` keeps writing
 `.orchestrator/batches/` with no command to print it, which is an argument for folding those summaries in
@@ -1123,7 +1148,7 @@ base ceiling is that a debate window grows a turn every round. Measure the peak 
 into the half-ceiling group (one line each) or record why not.
 
 **Why here:** filed at the end. It needs live Ollama runs to measure, and it should wait for
-[9](spawned-windows-have-no-failsafe.md), whose failsafe for the debate pair bounds the same growth by a
+[9](#9-the-spawned-windows-have-no-failsafe-and-no-record--shipped), whose failsafe for the debate pair bounds the same growth by a
 different means and may change what the measurement has to show.
 
 ---

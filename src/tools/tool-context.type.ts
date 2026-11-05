@@ -8,6 +8,8 @@ import type { SandboxClient } from '../core/container/sandbox.js';
 import type { OneShotRole } from '../core/llm/one-shot-role.type.js';
 import type { OneShotResult } from '../core/llm/one-shot.js';
 import type { FileReadTracker } from '../core/session/file-read-tracker.type.js';
+import type { SpawnedMemory } from '../core/session/spawned-memory.js';
+import type { SpawnedWindowSpec } from '../core/session/spawned-window-spec.type.js';
 import type { SubagentHandle } from '../core/session/subagent-handle.type.js';
 
 /**
@@ -51,6 +53,13 @@ export interface ToolContext {
    * fixed when the context was built could only have been right for one of them.
    */
   oneShot(messages: Message[], role: OneShotRole): Promise<OneShotResult>;
+  /** SUMMARIZATION_THRESHOLD_RATIO, for the windows a tool opens itself (a debate's challenger and proponent). */
+  readonly summarizationThresholdRatio: number;
+  /**
+   * Open a spawned window's trace in memory.db and its failsafe (spawned-memory.ts), bound to the
+   * session's client and project. `debate` opens its three windows here; most tools ignore it.
+   */
+  openSpawnedMemory(spec: SpawnedWindowSpec): SpawnedMemory;
   /**
    * The session's sub-agent manager (V5/01), present ONLY for the interactive master phases — they can
    * spawn/ask/dismiss sub-agents. Undefined inside spawned windows (Worker/Reviewer/Retro) and inside a

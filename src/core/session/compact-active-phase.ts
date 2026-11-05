@@ -11,14 +11,7 @@ import type { TokenCounts } from '../llm/token-counts.type.js';
 import { buildSummaryTranscript } from './build-summary-transcript.js';
 import { oneShot } from '../llm/one-shot.js';
 import { selectOldest } from './select-oldest.js';
-
-// Terse, artifact-preserving compression — the three requirements from the task, verbatim in intent.
-const SUMMARY_SYSTEM_PROMPT =
-  'You are compressing an EARLIER slice of a coding-agent transcript so the conversation stays under a ' +
-  'hard VRAM/context limit. Rewrite the slice into ONE terse summary that PRESERVES concrete artifacts — ' +
-  'file paths, function/type/module names, decisions made and their rationale, open questions, TODOs, ' +
-  'and any cross-phase inbox items raised — over conversational filler. Do not restate turns verbatim; ' +
-  'target a small fraction of the original length. Output ONLY the summary prose, no preamble or headings.';
+import { SUMMARY_SYSTEM_PROMPT } from './summary-system-prompt.js';
 
 /**
  * Compact the memory's ACTIVE phase: summarize its oldest ~50% of visible turns into one `summary`

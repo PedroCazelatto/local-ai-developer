@@ -55,6 +55,8 @@ export async function processMessage(
     if (err instanceof TurnAbortedError) ctx.onAborted?.(err.reason, cut.message);
     throw err;
   } finally {
+    // onExchangeEnd: a spawned window writes what its trace still buffers; absent on the interactive phases.
+    ctx.onExchangeEnd?.();
     statusActivity.turnEnded();
     inputFence.end();
   }
