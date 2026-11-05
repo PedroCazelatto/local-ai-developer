@@ -1,4 +1,4 @@
-// One field of a parsed JSONL row, taken only if it is a non-empty string. Split out of
+// One field of a log row — memory.db's `tool_audit` or `events` table — taken only if it is a non-empty string. Split out of
 // read-audit-rows.ts, where it was private and called `readText` — a name that, as a file, would read
 // as "read some text off disk", which is the one thing it does not do. It narrows a value that has
 // already been parsed.

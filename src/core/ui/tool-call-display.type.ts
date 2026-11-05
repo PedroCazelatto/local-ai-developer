@@ -2,7 +2,7 @@
 // diff when the call changed a file (tool-diff-display.type.ts).
 //
 // This rides on the tool result and on the audit record, but it is NOT audit data: appendAuditRow
-// builds its JSONL row from an explicit field list, so nothing here reaches tool_audit.jsonl and a
+// builds its row from an explicit field list, so nothing here reaches the `tool_audit` table and a
 // diff body never bloats the log. It exists because the dispatch choke point cannot derive these
 // answers — only write_file and edit_file hold the file's bytes before AND after, and only
 // search_in_files knows how many matches it stopped counting at. Parsing a tool's model-facing string

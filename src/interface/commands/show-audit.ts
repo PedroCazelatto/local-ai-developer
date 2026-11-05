@@ -6,7 +6,9 @@
 
 import { renderer } from '../../core/ui/renderer.js';
 import { theme } from '../../core/ui/theme.js';
+import { auditLogFile } from './audit-log-file.js'; // the pre-memory.db tool_audit.jsonl
 import { formatAuditRow } from './format-audit-row.js';
+import { legacyLogNote } from './legacy-log-note.js';
 import { readAuditRows } from './read-audit-rows.js';
 import { writeFittedLine } from './write-fitted-line.js';
 
@@ -38,18 +40,23 @@ export function showAudit(args: readonly string[], orch: AuditOrchestrator): voi
     limit = count;
   }
 
-  // readAuditRows: the last `limit` intact rows of tool_audit.jsonl, oldest first, with the intact
-  // total and the count of lines that would not parse.
+  // readAuditRows: the last `limit` rows of memory.db's tool_audit table, oldest first, with the table's
+  // total and the count of rows that would not narrow.
   const tail = readAuditRows(orch.projectPath, limit);
+  // legacyLogNote: where the pre-memory.db rows are, when that file still exists — said only while the
+  // table has nothing to show, so an old project never looks as if it lost its history.
+  const legacy = legacyLogNote(auditLogFile(orch.projectPath));
   if (!tail.ok) {
     // A log that is simply not there yet is a plain statement of fact; one that exists and would not
     // read is a fault, and the two must not look the same.
     if (tail.absent) renderer.systemMessage(tail.error);
     else renderer.errorLine(tail.error);
+    if (tail.absent && legacy !== null) renderer.systemMessage(legacy);
     return;
   }
-  if (tail.rows.length === 0) {
+  if (tail.rows.length === 0 && tail.malformed === 0) {
     renderer.systemMessage('The tool audit log is empty — no tool call has been recorded in this project yet.');
+    if (legacy !== null) renderer.systemMessage(legacy);
     return;
   }
 
@@ -71,7 +78,7 @@ export function showAudit(args: readonly string[], orch: AuditOrchestrator): voi
   if (tail.malformed > 0) {
     // Never silent: an audit view that drops rows without saying so is worse than no audit view.
     writeFittedLine(
-      `${tail.malformed} line(s) in the log could not be read and were skipped (a torn write at worst).`,
+      `${tail.malformed} row(s) in the log could not be read and were skipped.`,
       theme.danger,
     );
     writeFittedLine('', theme.meta);

@@ -982,7 +982,7 @@ is not a phase context.
 - **b.** Persisted to `contexts`, which means `contexts` grows a notion of a non-interactive phase, and
   `/resume` grows something it can list but not restore into.
 - **c.** Persisted somewhere new — a spawned-window table beside the two the logs are moving into
-  ([move-the-logs-into-sqlite-tables.md](backlog/move-the-logs-into-sqlite-tables.md)).
+  ([item 19's entry](backlog/README.md#19-move-both-logs-into-sqlite-tables--shipped)).
 
 ### ✅ #82 — Should a debate window compact at all, or just end the debate?
 
@@ -1633,7 +1633,7 @@ cant resume from it.* `contexts` is keyed on the interactive phases and carries 
 machinery, which this explicitly does not need.
 
 - **a.** A new table in `memory.db`, beside the two
-  [move-the-logs-into-sqlite-tables.md](backlog/move-the-logs-into-sqlite-tables.md) is creating —
+  [item 19](backlog/README.md#19-move-both-logs-into-sqlite-tables--shipped) was creating —
   *ship the two together, one schema change.*
 - **b.** `contexts`, with a flag marking it non-resumable. *Reuses everything; makes `/resume`'s
   listing responsible for hiding rows it must never offer.*
@@ -1649,7 +1649,7 @@ machinery, which this explicitly does not need.
 [record-attempted-tasks.md](backlog/record-attempted-tasks.md) calls *"the only durable record of this
 was tried and it failed"*, and a non-TTY run's scrollback is a pipe that may go nowhere. Keeping the
 writer without a reader recreates the exact shape that justified filing
-[move-the-logs-into-sqlite-tables.md](backlog/move-the-logs-into-sqlite-tables.md): *nothing reads
+[item 19's entry](backlog/README.md#19-move-both-logs-into-sqlite-tables--shipped): *nothing reads
 `events.jsonl`*.
 
 - **a.** Keep writing it — it is a durable artifact, and the summary being on disk matters more than a

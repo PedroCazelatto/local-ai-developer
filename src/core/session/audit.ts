@@ -1,49 +1,50 @@
 // Tool-call audit log (V1/06) — the only safety net for autonomous, no-confirmation tool calls
-// (CLAUDE.md). Appends ONE JSON line per call to projects/<active>/.orchestrator/tool_audit.jsonl
-// from the single dispatch choke point (V1/02) — tools never write their own rows. Ports
-// core/session/audit.py, renaming the legacy `persona` field to `phase`.
+// (CLAUDE.md). Inserts ONE row per call into the `tool_audit` table of the project's memory.db, from the
+// single choke point every finished call passes through (record-tool-call.ts) — tools never write their
+// own rows. Ports core/session/audit.py, renaming the legacy `persona` field to `phase`.
 //
-// Append-only + flushed (fsync) per row: a kill mid-tool leaves a partial LAST line at worst, never
-// a torn earlier row. Only a ~1 KB output PREVIEW is stored — full stdout/build logs stay out of
-// the log (full-output persistence is deferred). The fsync-per-line durability lives in the shared
-// appendJsonlLine writer, which the sibling events log (V5/04) uses too.
+// It was `tool_audit.jsonl` until backlog item 19; that file is left where it is and no longer written
+// or read. Each row is its own autocommitted INSERT under `synchronous = FULL`, so a kill mid-tool loses
+// at most the row being written — the guarantee fsync-per-line gave the file, now from a transaction.
+// A failed write THROWS where it happens, exactly as a failed append did: a call that ran but left no
+// record must never pass silently. Only a ~1 KB output PREVIEW is stored — the full result the model
+// read is already the `tool` row of the conversation that made the call.
+//
+// A connection is opened per row and closed again, like the spawned-window trace: the writer is reached
+// from every window with nothing but a project path, and a tool call is never fast enough for the
+// opening to matter.
 
-import path from 'node:path';
-
-import { appendJsonlLine } from './append-jsonl-line.js';
 import type { ToolCallRecord } from './tool-call-record.type.js';
+import { openMemoryDb } from './open-memory-db.js';
 
 /** Only the first ~1 KB of a tool's result is kept on the row (never the full output). */
 export const OUTPUT_PREVIEW_LIMIT = 1024;
 
-/**
- * Append one audit row for a dispatched tool call. Builds the row shape, then hands it to the shared
- * appendJsonlLine writer, which creates `<projectPath>/.orchestrator/` on first write and fsyncs the
- * line so prior rows are always intact on disk.
- */
+/** Insert one audit row for a dispatched tool call into memory.db's `tool_audit` table. */
 export function appendAuditRow(projectPath: string, record: ToolCallRecord): void {
-  const file = path.join(projectPath, '.orchestrator', 'tool_audit.jsonl');
-
   const output = record.output;
-  const row: Record<string, unknown> = {
-    ts: record.ts, // UTC ISO-8601 ms
-    phase: record.phase, // NOT `persona` — the legacy Python name is not carried over
-    tool: record.tool,
-    args: record.args,
-    exit_status: record.exitStatus, // 0 / real code / -1 for any failure
-    duration_ms: record.durationMs,
-    output_truncated: output.length > OUTPUT_PREVIEW_LIMIT,
-    output_preview: output.slice(0, OUTPUT_PREVIEW_LIMIT),
-    error: record.error, // null on success
-  };
-  if (record.metadata !== undefined) {
-    row['metadata'] = record.metadata;
+  // openMemoryDb: creates .orchestrator/memory.db on first use and applies the schema, both logs included.
+  const db = openMemoryDb(projectPath);
+  try {
+    db.prepare(
+      'INSERT INTO tool_audit (ts, phase, tool, args, exit_status, duration_ms, output_truncated, ' +
+        'output_preview, error, metadata, subagent_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+    ).run(
+      record.ts, // UTC ISO-8601 ms, when the call started
+      record.phase, // NOT `persona` — the legacy Python name is not carried over
+      record.tool,
+      JSON.stringify(record.args),
+      record.exitStatus, // 0 / real code / -1 for any failure
+      record.durationMs,
+      output.length > OUTPUT_PREVIEW_LIMIT ? 1 : 0,
+      output.slice(0, OUTPUT_PREVIEW_LIMIT),
+      record.error, // null on success
+      record.metadata !== undefined ? JSON.stringify(record.metadata) : null,
+      // A sub-agent's own tool call (V5/01) carries its id so lineage traces back to the sub-agent; a
+      // master-phase call leaves it NULL.
+      record.subagentId ?? null,
+    );
+  } finally {
+    db.close();
   }
-  // A sub-agent's own tool call (V5/01) carries its id so lineage traces back to the sub-agent; a
-  // master-phase call omits the field entirely (never a null placeholder).
-  if (record.subagentId !== undefined) {
-    row['subagent_id'] = record.subagentId;
-  }
-
-  appendJsonlLine(file, row);
 }

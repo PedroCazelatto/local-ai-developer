@@ -8,7 +8,7 @@
 // Owned by no function: to-audit-row.ts narrows one, read-audit-rows.ts collects them into its tail,
 // and format-audit-row.ts prints one. It is the /audit view's vocabulary, so it gets its own file.
 
-/** One tool call as the /audit listing sees it — the fields of a `tool_audit.jsonl` row it prints. */
+/** One tool call as the /audit listing sees it — the columns of a `tool_audit` row it prints. */
 export interface AuditRow {
   /** UTC ISO-8601 ms, when the call was dispatched (`ts` on the file's row). */
   readonly ts: string;

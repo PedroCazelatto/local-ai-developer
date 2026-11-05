@@ -157,7 +157,7 @@ of one run is the overlap this file has flagged since it was filed.
   tried and it failed".
 
   This does knowingly recreate the shape that justified filing
-  [move-the-logs-into-sqlite-tables.md](move-the-logs-into-sqlite-tables.md) — *a record written to a
+  [item 19](README.md#19-move-both-logs-into-sqlite-tables--shipped) — *a record written to a
   file no command surfaces* — which is an argument for folding the batch summaries into that task's
   store rather than for not writing them.
 - **`/audit` stays** (#102a): *"audit reaches older messages."* The duplication argument that removed

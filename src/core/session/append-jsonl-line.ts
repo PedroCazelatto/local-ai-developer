@@ -1,10 +1,11 @@
-// The single append-only JSONL writer shared by BOTH .orchestrator/ logs: the tool-audit log
-// (V1/06) and the orchestrator events log (V5/04). One writer, two files, identical durability:
-// create the parent dir on first write, open in append mode, write ONE line, and fsync before
-// closing so a kill mid-write leaves at most a torn LAST line — never a corrupted earlier row.
+// The single append-only JSONL writer shared by the .orchestrator/ stores that are still files — the
+// blocker, question and inbox logs. Identical durability for all of them: create the parent dir on
+// first write, open in append mode, write ONE line, and fsync before closing so a kill mid-write leaves
+// at most a torn LAST line — never a corrupted earlier row.
 //
-// Extracted so audit.ts and events-log.ts do not each re-implement the fsync dance (DRY): the
-// caller owns the row's SHAPE, this owns getting it onto disk intact.
+// It was written for the tool-audit and events logs, which moved into memory.db tables in backlog item
+// 19; it survives because these stores still need it. The caller owns the row's SHAPE, this owns
+// getting it onto disk intact.
 
 import { closeSync, fsyncSync, mkdirSync, openSync, writeSync } from 'node:fs';
 import path from 'node:path';

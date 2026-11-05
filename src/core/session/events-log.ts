@@ -1,15 +1,17 @@
-// Orchestrator events log (V5/04) — appends ONE JSON line per harness-level structural event to
-// projects/<active>/.orchestrator/events.jsonl, a SIBLING of the tool-audit log written through the
-// SAME appendJsonlLine writer (V1/06 durability). Distinct concerns, never merged: audit = the model's
-// tool calls, events = the harness's own actions (phase swap / memory load / summarization fire /
-// eviction fire / sub-agent spawn+dismiss / model use). Lives under the ACTIVE PROJECT (per-project
-// persistence, CLAUDE.md), never in the orchestrator repo, and is NEVER injected into any phase's
-// prompt: it is append-only, a replay/audit artifact exactly like the audit log.
+// Orchestrator events log (V5/04) — inserts ONE row per harness-level structural event into the `events`
+// table of the project's memory.db, beside the `tool_audit` table (audit.ts) and with its durability:
+// one autocommitted INSERT per row, and a failed write THROWS where it happens. It was `events.jsonl`
+// until backlog item 19; that file is left where it is and no longer written or read, and `/events`
+// now shows the rows. Distinct concerns in distinct TABLES — audit = the model's tool calls, events =
+// the harness's own actions (phase swap / memory load / summarization fire / eviction fire / sub-agent
+// spawn+dismiss / model use) — with the store and the reader shared rather than the row. Lives under
+// the ACTIVE PROJECT (per-project persistence, CLAUDE.md), never in the orchestrator repo, and is NEVER
+// injected into any phase's prompt: it is append-only, a replay/audit artifact exactly like the audit log.
 //
-// "Harness", not "orchestrator", because `eviction_fire` is written by a SPAWNED window (the Worker)
-// rather than by SessionOrchestrator. That is the one widening this log has taken: the distinction that
-// matters is model-action vs. harness-action, and a Worker rewriting its own history is as structural as
-// a phase swap. Its `phase` field carries the spawned window's name ("worker"), like any other row.
+// "Harness", not "orchestrator", because `eviction_fire` and the spawned windows' `summarization_fire`
+// are written by SPAWNED windows rather than by SessionOrchestrator. The distinction that matters is
+// model-action vs. harness-action, and a Worker rewriting its own history is as structural as a phase
+// swap. Its `phase` field carries the spawned window's name ("worker"), like any other row.
 //
 // `context_title` records the throwaway call that titled a phase context: the title it produced and the
 // EXACT tokens it cost. That call belongs to no phase's history, so this log is the only place its cost
@@ -32,9 +34,7 @@
 // prompt_eval_count exactly as `summarization_fire` defers its own; a computed figure would be an
 // estimate, which the constitution forbids for token counts.
 
-import path from 'node:path';
-
-import { appendJsonlLine } from './append-jsonl-line.js';
+import { openMemoryDb } from './open-memory-db.js';
 
 /** The structural actions worth recording. Phase terminology only — never "persona"/"role". */
 export type OrchestratorEventType =
@@ -73,18 +73,25 @@ export interface OrchestratorEvent {
 /** The caller-supplied fields — everything except `ts`, which appendEvent stamps at write time. */
 export type OrchestratorEventInput = Omit<OrchestratorEvent, 'ts'>;
 
-/** Append one orchestrator event; stamps `ts` here so every emit site stays terse (like the dispatcher). */
+/** Insert one orchestrator event; stamps `ts` here so every emit site stays terse (like the dispatcher). */
 export function appendEvent(projectPath: string, event: OrchestratorEventInput): void {
-  const file = path.join(projectPath, '.orchestrator', 'events.jsonl');
-  const row: Record<string, unknown> = {
-    ts: new Date().toISOString(),
-    type: event.type,
-    phase: event.phase,
-    detail: event.detail,
-  };
-  // A sub-agent's id / token figures are stamped only when present — never a null placeholder.
-  if (event.subagentId !== undefined) row['subagent_id'] = event.subagentId;
-  if (event.promptTokens !== undefined) row['prompt_tokens'] = event.promptTokens;
-  if (event.evalTokens !== undefined) row['eval_tokens'] = event.evalTokens;
-  appendJsonlLine(file, row);
+  // openMemoryDb: creates .orchestrator/memory.db on first use and applies the schema, both logs included.
+  // Opened per row and closed again — every window reaches this with nothing but a project path.
+  const db = openMemoryDb(projectPath);
+  try {
+    db.prepare(
+      'INSERT INTO events (ts, type, phase, subagent_id, detail, prompt_tokens, eval_tokens) VALUES (?, ?, ?, ?, ?, ?, ?)',
+    ).run(
+      new Date().toISOString(),
+      event.type,
+      event.phase,
+      // A sub-agent's id and the token figures are NULL when absent — never a 0 or "" placeholder.
+      event.subagentId ?? null,
+      JSON.stringify(event.detail),
+      event.promptTokens ?? null,
+      event.evalTokens ?? null,
+    );
+  } finally {
+    db.close();
+  }
 }

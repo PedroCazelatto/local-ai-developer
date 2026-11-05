@@ -697,18 +697,36 @@ purpose.
 caller or the tool — which is the one that decides whether schema authorship ends up in a small model's
 hands.
 
-### 19. [Move both logs into SQLite tables](move-the-logs-into-sqlite-tables.md)
-*Memory / context.* Nothing reads `events.jsonl` — five event types written to a file no command
-surfaces, so an unexplained pause has no in-app explanation. Both logs become **two tables** in the
-existing `memory.db`: the concerns stay distinct in the schema, and what unifies is the store and the
-reader.
+### 19. ~~Move both logs into SQLite tables~~ — shipped
+*Memory / context.* **Shipped.** The tool-call audit log and the harness events log are now the
+`tool_audit` and `events` tables of the project's `memory.db`. They are **two tables, not one**: the
+concerns keep distinct shapes, and the store and the reader are what they share. `appendAuditRow` and
+`appendEvent` keep their signatures, so no emit site changed. Each row is its own autocommitted INSERT
+under `synchronous = FULL`, which gives the guarantee fsync-per-line gave the files, now from a
+transaction. A new **`/events [n]`** shows the events the way `/audit` shows tool calls (default 20,
+uncapped, oldest first, `HH:mm:ss · phase · type · key=value … · tokens`), so a pause for a compaction
+or an eviction finally has an in-app explanation. `events-log.ts`'s *"never merged"* invariant and
+`audit.ts`'s fsync argument were rewritten rather than left to contradict the code.
+`append-jsonl-line.ts` survives, because the blocker, question and inbox stores still use it.
 
-**Why here:** after [9](#9-the-spawned-windows-have-no-failsafe-and-no-record--shipped), which is what makes `memory.db` the store
-for everything a window said; the two grow side by side and item 9's file names the overlap. It also
-inherits [item 11](in-turn-progress-reporting.md)'s residue — `runBatch` keeps writing
-`.orchestrator/batches/` with no command to print it, which is an argument for folding those summaries in
-here. **Five open decisions in the file**, and it overturns a stated invariant in `events-log.ts`'s
-header and trades away `audit.ts`'s durability argument — read both headers first.
+**The five open decisions, answered at build time:** the existing `.jsonl` files are **left where they
+are, unread**, and the tables start empty; `/audit` and `/events` say where the older entries are while
+their table is still empty, so an old project never looks as if it lost its history. The audit row
+**keeps its 1 KB preview**, because the full result the model read is already the `tool` row of the
+conversation that made the call. The events reader is a **separate `/events`** command. **No
+retention**: nothing deletes a row. **A failed write throws**, as a failed append did. The user also
+chose **UUID ids** like the other tables; the order rows were written in is SQLite's implicit `rowid`,
+which both readers sort by, so a sub-agent's call still lists before the master's spawn call that
+contains it, as it did in the file. Reading never creates `memory.db`.
+
+**Not done here:** item 11's residue, folding the `.orchestrator/batches/` summaries into this store.
+`/batch` still reads those files today, so the argument for folding them only arrives with the item
+that removes `/batch` ([11](in-turn-progress-reporting.md)), and it is left to that item. 14 new tests
+(593 in all), round trips through the real writers and readers against a temp `memory.db`.
+`docs/cli.md` and `docs/sandboxing.md` were corrected and handed over (review-gated).
+
+**Why it went here:** after [9](#9-the-spawned-windows-have-no-failsafe-and-no-record--shipped), which
+made `memory.db` the store for everything a window said.
 
 ### 20. [A plan inside a task](task-plan-inside-a-task.md)
 *Execution loop.* A small `task_plan` the Worker writes once and then **replaces**, placed late in the

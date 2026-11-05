@@ -1,4 +1,4 @@
-// One numeric field of a parsed JSONL row, or null when it was not usable. Split out of
+// One numeric field of a log row — memory.db's `tool_audit` or `events` table — or null when it was not usable. Split out of
 // read-audit-rows.ts, where it was private and called `readNumber`.
 //
 // The `-or-null` half of the name is the point, the way sql-int-or-null.ts's is: null here means "the

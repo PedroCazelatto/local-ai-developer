@@ -19,6 +19,7 @@ import { auditCommand } from './commands/audit.js';
 import { batchCommand } from './commands/batch.js';
 import { blockersCommand } from './commands/blockers.js';
 import { clearCommand } from './commands/clear.js';
+import { eventsCommand } from './commands/events.js';
 import { exitCommand } from './commands/exit.js';
 import { helpCommand } from './commands/help.js';
 import { inboxCommand } from './commands/inbox.js';
@@ -51,6 +52,7 @@ const COMMANDS: readonly Command[] = [
   inboxCommand,
   batchCommand,
   auditCommand,
+  eventsCommand,
 ];
 
 /**

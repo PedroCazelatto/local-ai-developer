@@ -21,7 +21,7 @@ export const auditCommand: Command = {
   group: 'session',
   description: 'Show the last N tool calls from the audit log (phase, tool, exit status, duration)',
   usage: '/audit [<row count>]',
-  // showAudit: the last N intact rows of tool_audit.jsonl as a padded table, oldest first, with a
-  // recoverable line for a bad count, an absent log, or rows that would not parse.
+  // showAudit: the last N rows of memory.db's tool_audit table as a padded table, oldest first, with a
+  // recoverable line for a bad count, an absent log, or rows that would not read.
   run: (ctx) => showAudit(ctx.args, ctx.orch),
 };

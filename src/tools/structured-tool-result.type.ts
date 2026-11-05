@@ -21,7 +21,7 @@ export interface StructuredToolResult {
   /**
    * What the SCROLLBACK should say about this call — the `←` result line, and the diff when the call
    * changed a file. Never written to the audit log (appendAuditRow builds its row from an explicit
-   * field list), so a diff body cannot bloat tool_audit.jsonl. It rides out on the result because the
+   * field list), so a diff body cannot bloat the `tool_audit` table. It rides out on the result because the
    * dispatch choke point cannot derive it: only this tool held the file's bytes before and after, or
    * knows how many matches it stopped counting at. A tool that omits it still gets a result line.
    */

@@ -59,6 +59,15 @@ PRAGMA synchronous = FULL;
  *
  * The `*_touch` triggers maintain `updated_at`. Each UPDATEs its own table, which does not recurse:
  * SQLite's `recursive_triggers` is OFF by default and this code never turns it on.
+ *
+ * `tool_audit` and `events` are the two LOGS (backlog item 19), moved here from `tool_audit.jsonl` and
+ * `events.jsonl`. Two tables, not one: the model's tool calls and the harness's own actions stay distinct
+ * concerns with distinct shapes, and what they share is the store and the way they are read. Both are
+ * append-only — nothing updates a row and nothing deletes one, by decision (no retention) — and every
+ * row is its own autocommitted INSERT, so a kill loses at most the row being written, which is the
+ * property fsync-per-line gave the files. Their ids are UUIDs like every other table's; the order rows
+ * were WRITTEN in is SQLite's implicit `rowid`, which an append-only table only ever grows (a VACUUM may
+ * renumber it, and nothing here runs one). `args`, `metadata` and `detail` are JSON text.
  */
 export const MEMORY_SCHEMA = `
 CREATE TABLE IF NOT EXISTS contexts (
@@ -97,6 +106,36 @@ CREATE TABLE IF NOT EXISTS messages (
 CREATE TRIGGER IF NOT EXISTS messages_touch AFTER UPDATE ON messages BEGIN
   UPDATE messages SET updated_at = ${SQL_NOW} WHERE id = NEW.id;
 END;
+
+CREATE TABLE IF NOT EXISTS tool_audit (
+  id               TEXT    NOT NULL PRIMARY KEY DEFAULT (${SQL_UUID4}),
+  ts               TEXT    NOT NULL,
+  phase            TEXT    NOT NULL,
+  tool             TEXT    NOT NULL,
+  args             TEXT    NOT NULL,
+  exit_status      INTEGER NOT NULL,
+  duration_ms      INTEGER NOT NULL,
+  output_truncated INTEGER NOT NULL CHECK (output_truncated IN (0, 1)),
+  output_preview   TEXT    NOT NULL,
+  error            TEXT,
+  metadata         TEXT,
+  subagent_id      TEXT
+);
+
+CREATE INDEX IF NOT EXISTS tool_audit_by_ts ON tool_audit (ts);
+
+CREATE TABLE IF NOT EXISTS events (
+  id            TEXT    NOT NULL PRIMARY KEY DEFAULT (${SQL_UUID4}),
+  ts            TEXT    NOT NULL,
+  type          TEXT    NOT NULL,
+  phase         TEXT    NOT NULL,
+  subagent_id   TEXT,
+  detail        TEXT    NOT NULL,
+  prompt_tokens INTEGER,
+  eval_tokens   INTEGER
+);
+
+CREATE INDEX IF NOT EXISTS events_by_ts ON events (ts);
 `;
 
 /** The `messages.cancelled_at` migration for a database created before cancelling existed. */
